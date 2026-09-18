@@ -31,7 +31,7 @@ fi
 # Auto-iniciar o actualizar servicio Ollama
 if ! curl -s http://127.0.0.1:11434/api/tags &> /dev/null; then
     if [ -n "$OLLAMA_BIN" ]; then
-        echo "🤖 Iniciando motor de IA Ollama con GPU (RTX 4050)..."
+        echo "🤖 Iniciando motor de IA Ollama..."
         nohup "$OLLAMA_BIN" serve > /tmp/ollama.log 2>&1 &
         sleep 2
     fi
@@ -43,16 +43,22 @@ else
         LOCAL_VER=$("$OLLAMA_BIN" --version 2>&1 | grep -oP '\d+\.\d+[\.\d]*' | head -n1 || true)
     fi
     if [ -n "$RUNNING_VER" ] && [ -n "$LOCAL_VER" ] && [ "$RUNNING_VER" != "$LOCAL_VER" ]; then
-        echo "🔄 Actualizando servicio Ollama en ejecución ($RUNNING_VER -> $LOCAL_VER)..."
-        pkill -f "ollama serve" 2>/dev/null || true
-        sleep 1
-        nohup "$OLLAMA_BIN" serve > /tmp/ollama.log 2>&1 &
-        sleep 2
+        # Solo se reinicia el Ollama propio de Prig (bin/ de este directorio). Un
+        # Ollama del sistema o de otro usuario no se toca nunca.
+        if pgrep -u "$(id -u)" -f "^$DIR/bin/.*ollama serve" > /dev/null; then
+            echo "🔄 Actualizando el Ollama de Prig ($RUNNING_VER -> $LOCAL_VER)..."
+            pkill -u "$(id -u)" -f "^$DIR/bin/.*ollama serve" 2>/dev/null || true
+            sleep 1
+            nohup "$OLLAMA_BIN" serve > /tmp/ollama.log 2>&1 &
+            sleep 2
+        else
+            echo "ℹ️  Hay otro Ollama activo ($RUNNING_VER); Prig lo usa tal cual."
+        fi
     fi
 fi
 
 if curl -s http://127.0.0.1:11434/api/tags &> /dev/null; then
-    echo "✅ IA Local Ollama ACTIVA y conectada con aceleración GPU."
+    echo "✅ IA local (Ollama) activa."
 else
     echo "⚠️ Servicio de IA local inactivo o cargando..."
 fi

@@ -81,7 +81,7 @@ class FileManager:
             pass
 
     def set_base_dir(self, path: str) -> Dict[str, Any]:
-        abs_path = os.path.abspath(path)
+        abs_path = os.path.abspath(os.path.expanduser(path))
         if os.path.isdir(abs_path):
             self.base_dir = abs_path
             self._save_last_workspace(abs_path)

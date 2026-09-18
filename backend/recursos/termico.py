@@ -34,6 +34,7 @@ Lo aprendido se guarda en el almacén de recursos y sobrevive a reinicios.
 
 import shutil
 import subprocess
+import os
 import threading
 import time
 from collections import deque
@@ -349,7 +350,9 @@ class Gobernador:
         # Motor suave (recursos/motor_suave.py): la dosificación dentro del proceso del modelo
         self.controlador = motor_suave.Controlador(self.ritmo, monitor)
         self.motor_suave: Dict[str, Any] = {"ok": False, "motivo": "Sin iniciar."}
-        if guardar:
+        # PRIG_SIN_MOTOR_SUAVE=1 (lo fijan las pruebas): no instalar ni arrancar el controlador,
+        # que escribiría en el archivo de control de un Prig que esté abierto a la vez.
+        if guardar and os.environ.get("PRIG_SIN_MOTOR_SUAVE") != "1":
             threading.Thread(target=self._preparar_motor, daemon=True, name="prig-motor-suave-inicio").start()
 
     def _preparar_motor(self):

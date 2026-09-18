@@ -348,7 +348,7 @@ class BookService:
         return metadata
 
     def import_file(self, source_path: str, target_category: Optional[str] = None) -> Dict[str, Any]:
-        abs_src = os.path.abspath(source_path)
+        abs_src = os.path.abspath(os.path.expanduser(source_path))
         if not os.path.exists(abs_src):
             return {"error": f"El archivo u origen no existe: {source_path}"}
         

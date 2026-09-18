@@ -610,7 +610,7 @@ class BookLibraryManager {
     }
 
     async importDocumentFile() {
-        const path = prompt("Ingresa la ruta completa del archivo PDF o código a importar a tu biblioteca:", "/home/ama-gi/Documentos/mi_libro.pdf");
+        const path = prompt("Ingresa la ruta completa del archivo PDF o código a importar a tu biblioteca:", "~/Documentos/mi_libro.pdf");
         if (!path || !path.trim()) return;
 
         try {

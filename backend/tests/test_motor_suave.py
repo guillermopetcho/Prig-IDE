@@ -163,27 +163,31 @@ class TestBibliotecaNativa(Base):
         salida = subprocess.run([self.prog, self.cudart], capture_output=True, text=True, env=entorno, timeout=60).stdout.split()
         return float(salida[0]), int(salida[1]), int(salida[2]), int(salida[3])
 
+    def duracion(self, control=None, veces=3):
+        """ El mínimo de varias corridas: el ruido de la máquina solo suma tiempo. """
+        return min(self.correr(control() if control else None)[0] for _ in range(veces))
+
     def test_espera_bloqueante_por_evento(self):
-        dur, n_sync, n_evento, flags = self.correr()
+        _, n_sync, n_evento, flags = self.correr()
         self.assertEqual((n_sync, n_evento), (0, 100))                # nunca la espera que gira
         self.assertEqual(flags, 0x01 | 0x02)                          # BlockingSync | DisableTiming
-        self.assertLess(dur, 0.5)                                    # sin control: sin pausas (100 × 2 ms)
+        self.assertLess(self.duracion(), 0.5)                        # sin control: sin pausas (100 × 2 ms)
         _, n_sync, n_evento, _ = self.correr(PRIG_SUAVE_GIRO="1")
         self.assertEqual((n_sync, n_evento), (100, 0))
 
     def test_dosifica_en_la_proporcion_pedida(self):
-        base, *_ = self.correr()
-        dur, *_ = self.correr(control=f"0.5 0.01 {time.time():.3f}")
+        base = self.duracion()
+        dur = self.duracion(lambda: f"0.5 0.01 {time.time():.3f}")
         # Mide tiempos reales: con la máquina cargada (la suite entera en marcha) hay ruido,
         # así que se comprueba el orden de magnitud, no el decimal
         self.assertGreater(dur / base, 1.5)                           # al 50 %: en torno al doble
         self.assertLess(dur / base, 3.0)
-        dur, *_ = self.correr(control=f"0.25 0.01 {time.time():.3f}")
+        dur = self.duracion(lambda: f"0.25 0.01 {time.time():.3f}")
         self.assertGreater(dur / base, 2.8)                           # al 25 %: en torno al cuádruple
 
     def test_control_caducado_no_frena(self):
-        base, *_ = self.correr()
-        dur, *_ = self.correr(control=f"0.2 0.01 {time.time() - 60:.3f}")   # Prig cerrado hace un minuto
+        base = self.duracion()
+        dur = self.duracion(lambda: f"0.2 0.01 {time.time() - 60:.3f}")   # Prig cerrado hace un minuto
         self.assertLess(dur / base, 1.4)
 
     def test_escribe_su_estado(self):

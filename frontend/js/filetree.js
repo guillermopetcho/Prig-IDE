@@ -137,7 +137,7 @@ class FileTreeManager {
             // Fallback manual si el diálogo nativo no responde
         }
 
-        const path = prompt("Ingresa la ruta absoluta de la carpeta a abrir:", "/home/ama-gi/");
+        const path = prompt("Ingresa la ruta absoluta de la carpeta a abrir:", "~/");
         if (!path) return;
 
         try {

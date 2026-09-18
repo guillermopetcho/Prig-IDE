@@ -693,6 +693,9 @@ select optgroup {
   color: #333333;
 }
 
+.nb-output-line.stdout,
+.nb-output-line.stderr,
+.nb-output-line.info { white-space: pre-wrap; word-break: break-word; }
 .nb-output-line.stdout { color: var(--accent-green); }
 .nb-output-line.stderr { color: var(--accent-red); }
 .nb-output-line.info { color: var(--text-muted); }
