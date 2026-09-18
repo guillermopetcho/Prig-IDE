@@ -1,0 +1,117 @@
+{
+ "exercises": {
+  "concept": [
+   {
+    "slug": "guidos-gorgeous-lasagna",
+    "name": "Guido's Gorgeous Lasagna",
+    "uuid": "dfd7dc01-3544-4f61-a063-af8530d6e601",
+    "concepts": [
+     "basics"
+    ],
+    "prerequisites": [],
+    "status": "beta"
+   },
+   {
+    "slug": "inventory-management",
+    "name": "Inventory Management",
+    "uuid": "0558b66c-f2c8-4ff3-846a-4ac87a8660d9",
+    "concepts": [
+     "dicts"
+    ],
+    "prerequisites": [
+     "loops",
+     "lists",
+     "tuples"
+    ],
+    "status": "beta"
+   },
+   {
+    "slug": "log-levels",
+    "name": "Log Levels",
+    "uuid": "083f29eb-734f-4d4a-9f27-3e8ceedc29b1",
+    "concepts": [
+     "enums"
+    ],
+    "prerequisites": [
+     "classes",
+     "conditionals",
+     "comprehensions",
+     "loops",
+     "sequences",
+     "string-methods",
+     "tuples"
+    ],
+    "status": "wip"
+   }
+  ],
+  "practice": [
+   {
+    "slug": "hello-world",
+    "name": "Hello World",
+    "uuid": "f458c48a-4a05-4809-9168-8edd55179349",
+    "practices": [],
+    "prerequisites": [],
+    "difficulty": 1
+   },
+   {
+    "slug": "leap",
+    "name": "Leap",
+    "uuid": "b6acda85-5f62-4d9c-bb4f-42b7a360355a",
+    "practices": [
+     "bools"
+    ],
+    "prerequisites": [
+     "basics",
+     "bools",
+     "numbers"
+    ],
+    "difficulty": 1
+   },
+   {
+    "slug": "binary-search",
+    "name": "Binary Search",
+    "uuid": "a8288e93-93c5-4e0f-896c-2a376f6f6e5e",
+    "practices": [
+     "loops"
+    ],
+    "prerequisites": [
+     "basics",
+     "bools",
+     "conditionals",
+     "lists",
+     "list-methods",
+     "loops",
+     "strings",
+     "string-methods"
+    ],
+    "difficulty": 1
+   },
+   {
+    "slug": "pascals-triangle",
+    "name": "Pascal's Triangle",
+    "uuid": "e1e1c7d7-c1d9-4027-b90d-fad573182419",
+    "practices": [
+     "recursion"
+    ],
+    "prerequisites": [
+     "basics",
+     "conditionals",
+     "classes",
+     "lists",
+     "numbers"
+    ],
+    "difficulty": 4
+   },
+   {
+    "slug": "retirado",
+    "name": "Retirado",
+    "practices": [
+     "loops"
+    ],
+    "prerequisites": [],
+    "difficulty": 1,
+    "status": "deprecated"
+   }
+  ]
+ }
+}

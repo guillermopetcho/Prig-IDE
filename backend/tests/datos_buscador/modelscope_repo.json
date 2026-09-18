@@ -1,0 +1,71 @@
+{
+ "Data": {
+  "Files": [
+   {
+    "Path": ".gitattributes",
+    "Size": 1630,
+    "Type": "blob"
+   },
+   {
+    "Path": "configuration.json",
+    "Size": 2,
+    "Type": "blob"
+   },
+   {
+    "Path": "LICENSE",
+    "Size": 11343,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-fp16.gguf",
+    "Size": 1266425696,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q2_k.gguf",
+    "Size": 415182688,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q3_k_m.gguf",
+    "Size": 432041824,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q4_0.gguf",
+    "Size": 428730208,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    "Size": 491400032,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q5_0.gguf",
+    "Size": 490475360,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "Size": 522186592,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q6_k.gguf",
+    "Size": 650379104,
+    "Type": "blob"
+   },
+   {
+    "Path": "qwen2.5-0.5b-instruct-q8_0.gguf",
+    "Size": 675710816,
+    "Type": "blob"
+   },
+   {
+    "Path": "README.md",
+    "Size": 4856,
+    "Type": "blob"
+   }
+  ]
+ }
+}

@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prig IDE - Editor de Código & Tutor IA</title>
+  <link rel="stylesheet" href="/static/css/style.css?v=7">
+  <link rel="stylesheet" href="/static/css/rediseno.css?v=13">
+
+  <!-- Google Font & FontAwesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Highlight.js CSS Theme for AI Chat Code Blocks -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+
+  <!-- Marked.js Markdown Parser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+
+  <!-- DOMPurify: sanea el HTML generado a partir de respuestas del modelo y de
+       páginas web raspadas antes de inyectarlo con innerHTML -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+
+  <!-- KaTeX for LaTeX Math Rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked-katex-extension/lib/index.umd.js"></script>
+
+  <!-- Highlight.js Code Highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <!-- Mermaid.js for Interactive ML/DL Flow Diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+
+  <!-- Monaco Editor Loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+
+
+  <!-- Global Marked Configuration -->
+  <script>
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({
+        gfm: true,
+        breaks: true
+      });
+      if (typeof markedKatex !== 'undefined') {
+        marked.use(markedKatex({ throwOnError: false, displayMode: true }));
+      }
+    }
+  </script>
+</head>
+
+<body class="dark-theme">
+  <div id="app-container">
+
+    <!-- Top Navigation & Toolbar Header -->
+    <!-- Barra superior única: todo se ordena dentro de estos seis menús -->
+    <div id="prig-topbar">
+      <div id="prig-menubar-mount"></div>
+      <div id="prig-topbar-derecha">
+        <!-- Bloque actual del plan de estudio -->
+        <div class="plan-envoltorio">
+          <button id="plan-actual" class="plan-actual">
+            <i class="fa-solid fa-route"></i>
+            <span id="plan-actual-texto">Sin aprendizaje guiado</span>
+          </button>
+          <div id="plan-actual-detalle" class="plan-detalle" hidden></div>
+        </div>
+        <span id="current-workspace-name">Prig</span>
+      </div>
+    </div>
+
+    <!-- Entornos de trabajo, al estilo del selector de escritorios de Ubuntu -->
+
+
+
+    <!-- Main Content Grid Layout -->
+    <main id="prig-cuerpo">
+
+      <div id="prig-note-mode-container" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #242424; z-index: 99990; flex-direction: column; font-family: 'Ubuntu', sans-serif;">
+        
+        <!-- Header Bar de Prig Note -->
+        <div id="prig-note-headerbar" style="background: #303030; height: 42px; border-bottom: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; user-select: none;">
+          
+          <!-- Izquierda: Marca </ > Prig Note y Lista Desplegable Archivo (Abrir y Guardar en lista) -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <!-- Texto de Marca </> Prig Note (Solo texto) -->
+            <div style="font-weight: bold; color: var(--accent-purple); font-size: 14px; display: flex; align-items: center; gap: 6px; margin-right: 6px;">
+              <i class="fa-solid fa-code"></i> Prig Note
+            </div>
+
+            <!-- Lista Desplegable para Abrir y Guardar -->
+            <div style="position: relative;">
+              <button class="ubuntu-btn" onclick="const m = document.getElementById('prig-note-file-menu'); m.style.display = m.style.display==='block'?'none':'block';" title="Menú de Archivo" style="background: #3c3c3c; border: 1px solid #4a4a4a; color: #eee; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-folder-tree"></i> Archivo <i class="fa-solid fa-chevron-down" style="font-size: 9px;"></i>
+              </button>
+
+              <div id="prig-note-file-menu" style="display: none; position: absolute; top: 100%; left: 0; background: #2b2b2b; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 0; min-width: 200px; box-shadow: 0 8px 16px rgba(0,0,0,0.6); z-index: 999999;">
+                <a href="#" onclick="document.getElementById('prig-note-file-menu').style.display='none'; window.noteWindowMgr.openWorkspaceFilePicker();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 8px; font-size: 12px; text-decoration: none;">
+                  <i class="fa-regular fa-folder-open" style="color: var(--accent-blue);"></i> Abrir del Proyecto Prig...
+                </a>
+                <a href="#" onclick="document.getElementById('prig-note-file-menu').style.display='none'; document.getElementById('note-file-input-full').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 8px; font-size: 12px; text-decoration: none;">
+                  <i class="fa-solid fa-upload" style="color: var(--accent-yellow);"></i> Abrir de Disco Local...
+                </a>
+                <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+                <a href="#" onclick="document.getElementById('prig-note-file-menu').style.display='none'; window.noteWindowMgr.saveToWorkspaceFile();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 8px; font-size: 12px; text-decoration: none;">
+                  <i class="fa-solid fa-floppy-disk" style="color: var(--accent-green);"></i> Guardar en Proyecto Prig
+                </a>
+                <a href="#" onclick="document.getElementById('prig-note-file-menu').style.display='none'; window.noteWindowMgr.newNote();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 8px; font-size: 12px; text-decoration: none;">
+                  <i class="fa-solid fa-plus" style="color: var(--accent-purple);"></i> Nueva Nota
+                </a>
+              </div>
+            </div>
+
+            <input type="file" id="note-file-input-full" style="display: none;" onchange="if(this.files[0]) { const r = new FileReader(); r.onload=e=>{ if(window.noteWindowMgr && window.noteWindowMgr.fullEditor) window.noteWindowMgr.fullEditor.setValue(e.target.result); }; r.readAsText(this.files[0]); }">
+
+            <span style="background: rgba(203,166,247,0.15); color: var(--accent-purple); border: 1px solid var(--accent-purple); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;" title="Escribe /ex: tema y presiona Enter para que la IA redacte una explicación en ~500 palabras">
+              💡 /ex: tema
+            </span>
+          </div>
+
+          <!-- Centro: Nombre del archivo -->
+          <div id="prig-note-full-title" style="color: #ffffff; font-weight: bold; font-size: 13px;">
+            Documento sin título 1
+          </div>
+
+          <!-- Derecha: Botón </> Prig para volver a Prig IDE -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btn-return-to-prig" class="ubuntu-btn" onclick="window.noteWindowMgr.exitPrigNoteView();" title="Volver al entorno de desarrollo Prig IDE" style="background: rgba(137, 180, 250, 0.2); border: 1px solid var(--accent-blue); color: var(--accent-blue); border-radius: 6px; padding: 4px 14px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-code"></i> Prig
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Editor Monaco Prig Note Pantalla Completa -->
+        <div id="prig-note-monaco-full" style="flex: 1; background: #1e1e1e;"></div>
+
+        <!-- Barra de Estado Inferior -->
+        <div id="prig-note-full-statusbar" style="background: #2a2a2a; height: 28px; border-top: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 11px; color: #aaaaaa; user-select: none;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span>Texto plano <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+            <span>Anchura del tabulador: 4 <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 16px; font-weight: 500;">
+            <span id="prig-note-stat-cpu" style="color: var(--accent-blue);"><i class="fa-solid fa-microchip"></i> CPU: --%</span>
+            <span id="prig-note-stat-ram" style="color: var(--accent-yellow);"><i class="fa-solid fa-memory"></i> RAM: --%</span>
+            <span id="prig-note-stat-gpu" style="color: var(--accent-green);"><i class="fa-solid fa-bolt"></i> GPU: --</span>
+            <div style="display: flex; align-items: center; gap: 4px; color: var(--accent-purple); font-weight: bold;">
+              <i class="fa-solid fa-robot"></i> Modelo: 
+              <select id="prig-note-model-select" onchange="window.noteWindowMgr.onModelChange(this.value);" style="background: #181825; border: 1px solid var(--accent-purple); color: var(--accent-purple); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: bold; cursor: pointer; outline: none;">
+                <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+              </select>
+            </div>
+            <span id="prig-note-stat-lncol" style="color: #ffffff;">Ln 1, Col 1</span>
+            <span>INS</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SECCIÓN 1 · MODELO -->
+      <section id="seccion-modelo" class="superficie">
+        <div class="seccion-cabecera" style="padding-left:0;">
+          <div class="sub-tabs" id="tabs-modelo">
+            <button class="sub-tab activo" data-vista="modelo"><i class="fa-solid fa-brain"></i> Modelo</button>
+            <button class="sub-tab" data-vista="archivos"><i class="fa-solid fa-folder-tree"></i> Archivos</button>
+          </div>
+          <select id="model-select" title="Modelo de Ollama activo"
+            style="margin-left:auto; min-width: 0; flex-shrink: 1; background-color: #1e1e2e; border: 1px solid var(--border-color); color: #cdd6f4; border-radius: 4px; padding: 2px 6px; font-size: 11px; text-transform: none; letter-spacing: 0; max-width: 190px; cursor: pointer;">
+            <option value="qwen2.5-coder:7b" style="background-color: #1e1e2e; color: #cdd6f4;">qwen2.5-coder:7b</option>
+          </select>
+          <button id="btn-ocultar-modelo" class="btn-ocultar-modelo" title="Ocultar Modelo y Archivos para dar todo el ancho al trabajo (Ctrl+L)"
+            onclick="window.layoutMgr.togglePanel('modelo')">
+            <i class="fa-solid fa-angles-left"></i>
+          </button>
+        </div>
+      <div id="vista-modelo" class="vista-modelo">
+        <aside id="sidebar-right" class="panel">
+
+        <!-- AI Chat Messages Scroll Container -->
+        <div id="ai-chat-messages" class="chat-history">
+          <div class="message ai-msg">
+            <div class="msg-author"><i class="fa-solid fa-brain"></i> Tutor Prig</div>
+            <div class="msg-content markdown-rendered">
+              ¡Hola! Estoy listo para explicarte cualquier código o **Jupyter Notebook (.ipynb)**.
+              <br><br>
+              📁 Puedes hacer clic en **"Abrir Carpeta"** arriba para cargar tu directorio de códigos o notebooks.
+              <br><br>
+              💡 Selecciona cualquier celda o línea y presiona **"Explicar Flujo paso a paso"** para entender la lógica
+              sin rodeos.
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Input Area -->
+        <div id="ai-chat-input-wrapper" style="padding: 12px; background: #1e1e2e; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-purple); font-weight: 600;" title="Responder a partir de los libros y documentos de tu biblioteca, citando página">
+              <input type="checkbox" id="chk-usar-biblioteca" style="accent-color: var(--accent-purple); cursor: pointer;">
+              <i class="fa-solid fa-book-bookmark"></i> Mi biblioteca
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-blue); font-weight: 600;" title="Buscar en fuentes oficiales de Internet (Python Docs, MDN, PyTorch, etc.) para profundizar la respuesta">
+              <input type="checkbox" id="chk-web-search" style="accent-color: var(--accent-blue); cursor: pointer;">
+              <i class="fa-solid fa-globe"></i> Búsqueda Web
+            </label>
+          </div>
+          <!-- Opciones según lo que sabe hacer el modelo elegido -->
+          <div id="ai-chat-opciones-modelo" style="display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--text-muted);">
+            <label id="opc-pensar" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="El modelo razona antes de responder (más lento, mejor en problemas)">
+              <input type="checkbox" id="chk-pensar" checked style="accent-color: var(--accent-yellow);"> <i class="fa-solid fa-lightbulb"></i> Pensar
+            </label>
+            <label id="opc-herramientas" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="El modelo puede buscar en tu biblioteca, leer y buscar en tus archivos">
+              <input type="checkbox" id="chk-herramientas" style="accent-color: var(--accent-blue);"> <i class="fa-solid fa-screwdriver-wrench"></i> Herramientas
+            </label>
+            <label id="opc-permitir-codigo" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer; color: var(--accent-red);" title="Además, puede ejecutar código Python en una sesión aislada">
+              <input type="checkbox" id="chk-permitir-codigo" style="accent-color: var(--accent-red);"> Permitir ejecutar Python
+            </label>
+            <label id="opc-confianza" style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="Guarda la probabilidad de cada palabra para ver dónde dudó el modelo">
+              <input type="checkbox" id="chk-confianza" style="accent-color: var(--accent-green);"> <i class="fa-solid fa-chart-simple"></i> Confianza
+            </label>
+          </div>
+
+          <!-- Contenedor de Chips de Archivos Enganchados (Gancho) -->
+          <div id="gancho-chips-container" style="display: none; flex-wrap: wrap; gap: 6px; padding: 4px 0; max-height: 80px; overflow-y: auto;">
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: flex-end;">
+            <button id="btn-chat-gancho" type="button" title="Enganchar archivos o carpetas para que el modelo navegue y escriba código" style="height: 42px; padding: 0 10px; background: #252538; border: 1px solid var(--accent-blue); color: #cdd6f4; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; flex-shrink: 0; transition: all 0.2s;">
+              <i class="fa-solid fa-paperclip" style="color: var(--accent-blue); font-size: 13px;"></i>
+              <span>Gancho</span>
+              <span id="gancho-badge" style="display: none; background: var(--accent-blue); color: #111; border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: bold;">0</span>
+            </button>
+            <textarea id="ai-chat-input" placeholder="Pregunta sobre el flujo, código o cuaderno Jupyter..." rows="2" style="flex: 1; min-height: 52px; max-height: 120px; background: #11111b; border: 1px solid #313244; color: #cdd6f4; border-radius: 8px; padding: 10px; font-family: var(--font-sans); font-size: 12px; resize: none; outline: none; line-height: 1.4;"></textarea>
+            <button id="btn-send-ai" class="btn-send" title="Enviar consulta (Enter)" style="width: 42px; height: 42px; background: var(--accent-purple); color: #11111b; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </aside>
+        </div>
+        <div id="vista-archivos" class="vista-modelo" hidden>
+      <aside id="sidebar-left" class="panel">
+        <div class="panel-header" style="position: relative; justify-content: space-between; align-items: center; padding: 6px 10px;">
+          <!-- Título Interactivo ARCHIVOS ▾ -->
+          <div style="position: relative;">
+            <button id="btn-archivos-dropdown" onclick="const m = document.getElementById('archivos-header-menu'); m.style.display = m.style.display==='block'?'none':'block';" title="Menú de Acciones de Archivos" style="background: transparent; border: none; color: #fff; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px;">
+              <i class="fa-solid fa-folder-tree" style="color: var(--accent-blue);"></i> ARCHIVOS <i class="fa-solid fa-chevron-down" style="font-size: 9px; color: var(--accent-blue);"></i>
+            </button>
+
+            <!-- Menú Desplegable de Archivos -->
+            <div id="archivos-header-menu" style="display: none; position: absolute; top: 100%; left: 0; background: #232334; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 0; min-width: 230px; box-shadow: 0 10px 24px rgba(0,0,0,0.7); z-index: 99999;">
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('btn-new-file').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-file-circle-plus" style="color: var(--accent-purple);"></i> Nuevo Archivo
+              </a>
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('btn-new-folder').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-folder-plus" style="color: var(--accent-green);"></i> Nueva Carpeta
+              </a>
+
+              <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('btn-open-workspace').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; justify-content: space-between; font-size: 12px; text-decoration: none;">
+                <span style="display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-folder-open" style="color: var(--accent-yellow);"></i> Rutas Guardadas / Cambiar Carpeta</span>
+              </a>
+
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; window.abrirAprendizajeGuiado();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-brain" style="color: var(--accent-blue);"></i> Análisis Inteligente (Plan de Estudio)
+              </a>
+
+              <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.refreshTree();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-rotate-right" style="color: var(--text-muted);"></i> Actualizar Explorador
+              </a>
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('sidebar-left').style.display='none';" style="padding: 8px 14px; color: #e01b24; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-xmark"></i> Ocultar Panel de Archivos
+              </a>
+            </div>
+          </div>
+
+          <!-- Hidden triggers for existing JS bindings -->
+          <div style="display: none;">
+            <button id="btn-sidebar-ai-analysis"></button>
+            <button id="btn-sidebar-open-folder"></button>
+            <button id="btn-new-file"></button>
+            <button id="btn-new-folder"></button>
+            <button id="btn-refresh-tree"></button>
+            <button id="btn-close-sidebar-panel"></button>
+          </div>
+        </div>
+
+        <!-- Filter / Quick Search Input -->
+        <div class="tree-search-wrapper">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="tree-search-input" placeholder="Buscar archivo o notebook...">
+        </div>
+
+        <div id="file-tree-container" class="file-tree">
+          <!-- Tree nodes rendered via JS -->
+        </div>
+      </aside>
+        
+        </div>
+      </section>
+
+      <div id="resizer-secciones"></div>
+
+      <!-- Con Modelo/Archivos ocultos queda esta tira para volver a abrirlos -->
+      <nav id="barra-modelo-oculto" class="barra-modelo-oculto" hidden>
+        <button data-mostrar="modelo" title="Mostrar Modelo (Ctrl+L)"><i class="fa-solid fa-brain"></i></button>
+        <button data-mostrar="archivos" title="Mostrar Archivos (Ctrl+B)"><i class="fa-solid fa-folder-tree"></i></button>
+      </nav>
+
+      <!-- SECCIÓN 2 · TRABAJO -->
+      <section id="seccion-trabajo" class="superficie">
+        <div id="trabajo-split-contenedor" class="trabajo-split-contenedor">
+
+          <!-- PANEL IZQUIERDO -->
+          <div id="panel-trabajo-izq" class="panel-trabajo">
+            <div id="trabajo-header-izq" class="trabajo-pane-header" hidden>
+              <div id="trabajo-tabs" class="trabajo-tabs"></div>
+              <div id="trabajo-acciones-izq" class="trabajo-pane-acciones"></div>
+            </div>
+
+            <div id="trabajo-vistas" class="trabajo-vistas">
+              <div id="vista-editor" class="vista-trabajo">
+                <!-- Columnas adicionales al usar "Abrir el archivo al lado" (Ctrl+\) -->
+                <div id="editor-grupos" class="editor-grupos" hidden></div>
+                <div id="editor-tabs" class="tab-bar">
+                  <!-- Open file tabs dynamically injected -->
+                </div>
+
+                <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
+                  <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
+                    Cuaderno Jupyter</button>
+                  <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
+                    Raw</button>
+                </div>
+
+                <div id="monaco-editor-container"></div>
+                <!-- El cuaderno se pinta aquí, en la misma vista que el código: antes vivía en una
+                     vista aparte que nunca se mostraba y un .ipynb abierto se veía en blanco -->
+                <div id="notebook-view-container" style="display:none;"></div>
+                <!-- Sin archivos abiertos: nada de «Hola, mundo», solo cómo empezar -->
+                <div id="editor-vacio" class="editor-vacio" hidden>
+                  <i class="fa-solid fa-code"></i>
+                  <h2>No hay ningún archivo abierto</h2>
+                  <p>Abre un archivo desde el panel Archivos, crea uno nuevo o vuelve al Inicio.</p>
+                  <div class="editor-vacio-acciones">
+                    <button data-cmd="archivo.nuevoArchivo"><i class="fa-solid fa-file-circle-plus"></i> Nuevo archivo</button>
+                    <button data-cmd="archivo.abrirArchivo"><i class="fa-solid fa-file-code"></i> Abrir archivo…</button>
+                    <button data-cmd="archivo.abrirCarpeta"><i class="fa-solid fa-folder-open"></i> Abrir carpeta…</button>
+                    <button data-cmd="herr.inicio"><i class="fa-solid fa-house"></i> Inicio</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="vista-consola" class="vista-trabajo" hidden>
+                <div id="terminal-panel">
+                  <div class="terminal-header">
+                    <div class="terminal-title">
+                      <i class="fa-solid fa-terminal"></i> CONSOLA DE SALIDA
+                      <span id="exec-status-tag" class="exec-badge">Listo</span>
+                    </div>
+                    <div class="terminal-actions">
+                      <button id="btn-stop-run" hidden
+                      style="background: rgba(243,139,168,0.18); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.4); border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 600; cursor: pointer; margin-right: 6px;"
+                      title="Detener la ejecución en curso">
+                      <i class="fa-solid fa-stop"></i> Detener
+                      </button>
+                      <button id="btn-clear-terminal" title="Limpiar Consola"><i class="fa-solid fa-eraser"></i>
+                        Limpiar</button>
+                      <button id="btn-ai-explain-error" class="btn-sm-ai" style="display:none;"
+                        title="Pedir ayuda a la IA sobre este error">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> ¿Por qué falló?
+                      </button>
+                      <button id="btn-toggle-terminal-panel" title="Minimizar / Ocultar Consola (Ctrl+J)"><i
+                          class="fa-solid fa-chevron-down"></i></button>
+                    </div>
+                  </div>
+                  <div id="terminal-body" class="terminal-output">
+                    <div class="term-line info">Prig IDE listo. Soporta scripts (.py, .js, .sh) y cuadernos Jupyter (.ipynb).
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Buscar y reemplazar en todos los archivos (Ctrl+Shift+F) -->
+              <div id="vista-buscar" class="vista-trabajo" hidden></div>
+              <!-- Aquí se aloja la herramienta que se abra como pestaña -->
+              <div id="vista-herramienta" class="vista-trabajo" hidden></div>
+            </div>
+          </div>
+
+          <!-- DIVISOR REDIMENSIONABLE -->
+          <div id="resizer-trabajo" class="resizer-trabajo" hidden title="Arrastra para cambiar el ancho de los paneles"></div>
+
+          <!-- PANEL DERECHO -->
+          <div id="panel-trabajo-der" class="panel-trabajo" hidden>
+            <div id="trabajo-header-der" class="trabajo-pane-header" hidden>
+              <div id="trabajo-tabs-der" class="trabajo-tabs"></div>
+              <div id="trabajo-acciones-der" class="trabajo-pane-acciones"></div>
+            </div>
+            <div id="trabajo-vistas-der" class="trabajo-vistas"></div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- Professional Bottom Status Bar -->
+    <footer id="prig-estado">
+      <span id="prig-mensaje-estado"></span>
+      <span id="prig-estado-derecha">
+        <span class="ai-status-badge" id="ai-status-container">
+          <span class="status-dot offline" id="ai-status-dot"></span>
+          <span id="ai-status-text">Ollama</span>
+        </span>
+        <span id="hw-cpu">CPU —</span>
+        <span id="hw-ram">RAM —</span>
+        <span id="hw-gpu">GPU —</span>
+        <span id="hw-temp" title="Temperaturas de la máquina: pulsa para ver el detalle" style="cursor:pointer; display:inline-flex; gap:8px; align-items:center;"><i class="fa-solid fa-temperature-half"></i> —</span>
+      </span>
+    </footer>
+
+    <!-- Inicio: se abre al arrancar (Herramientas → Inicio). js/inicio.js -->
+    <div id="modal-inicio" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="padding:0; height:100%; max-width:none;">
+        <div id="inicio-raiz"></div>
+      </div>
+    </div>
+
+    <!-- Modelos: se abre como pestaña de trabajo (Herramientas → Modelos) -->
+    <div id="modal-modelos" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="padding:0; height:100%;"></div>
+    </div>
+
+    <!-- GitHub: buscar repositorios y leerlos con un profesor (js/github_lector.js) -->
+    <div id="modal-github" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="padding:0; height:100%; max-width:none;">
+        <div id="github-raiz" style="height:100%;"></div>
+      </div>
+    </div>
+
+    <!-- Kaggle: notebooks de la comunidad leídos con un profesor (js/kaggle_lector.js) -->
+    <div id="modal-kaggle-hub" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1400px; height: 90vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-brands fa-kaggle" style="color:#20beff;"></i> Kaggle · explorar datos y leer notebooks con un profesor
+          </div>
+          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="document.getElementById('modal-kaggle-hub').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
+          <div id="kaggle-raiz" style="height:100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Workflow Modal -->
+    <div id="modal-agent-workflow" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-network-wired"></i> Flujo de Agentes (Modelos Locales)
+          </div>
+          <button id="btn-close-workflow-modal" class="modal-close-btn" title="Cerrar (Esc)"><i
+              class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="modal-body" style="padding: 20px;">
+          <div class="workflow-layout" style="display: flex; gap: 20px; height: 100%;">
+            <!-- Left: Workflow Builder -->
+            <div class="workflow-builder" style="flex: 1; display: flex; flex-direction: column;">
+              <h4>1. Contexto Inicial</h4>
+              <textarea id="wf-initial-input"
+                placeholder="Ingresa el texto o código inicial que será procesado por el primer agente..." rows="4"
+                style="width: 100%; margin-top: 8px; padding: 10px; background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 5px;"></textarea>
+
+              <h4 style="margin-top:20px;">2. Secuencia de Agentes (Flujo Visual)</h4>
+              <div id="wf-steps-container" class="wf-canvas">
+                <!-- Pasos de los agentes se renderizan aquí -->
+              </div>
+
+              <button id="btn-add-wf-step" class="btn-primary" style="margin-top: 15px; align-self: flex-start;">
+                <i class="fa-solid fa-plus"></i> Agregar Nuevo Nodo
+              </button>
+
+              <button id="btn-run-workflow" class="btn-primary-action"
+                style="margin-top: auto; padding: 12px; font-size: 14px; text-align: center;">
+                <i class="fa-solid fa-play"></i> Ejecutar Flujo Completo
+              </button>
+            </div>
+
+            <!-- Right: Results -->
+            <div class="workflow-results"
+              style="flex: 1; display: flex; flex-direction: column; border-left: 1px solid var(--border-color); padding-left: 20px;">
+              <h4>Resultados de Ejecución</h4>
+              <div id="wf-execution-status" style="margin-top: 8px; font-size: 13px; color: var(--accent-yellow);">Listo
+                para ejecutar...</div>
+              <div id="wf-results-container"
+                style="margin-top: 15px; flex: 1; overflow-y: auto; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 5px; padding: 12px; white-space: pre-wrap; font-family: monospace; font-size: 13px;">
+                <!-- Resultados aparecen aquí -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ML/DL Flow Analyzer Modal -->
+    <div id="modal-ml-flow" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1100px; height: 85vh;">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-diagram-project" style="color: var(--accent-blue);"></i> Analizador de Flujo e Informe
+            ML/DL
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btn-run-ml-analysis" class="tool-btn btn-primary" title="Re-analizar código actual">
+              <i class="fa-solid fa-rotate-right"></i> Re-analizar
+            </button>
+            <button id="btn-close-ml-flow-modal" class="modal-close-btn" title="Cerrar (Esc)"><i
+                class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div class="modal-body"
+          style="padding: 15px; display: flex; flex-direction: column; height: calc(100% - 50px);">
+          <div id="ml-flow-status-text" style="font-size: 13px; margin-bottom: 10px;"></div>
+
+          <!-- Tabs Bar -->
+          <div class="ml-tabs-bar"
+            style="display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); margin-bottom: 15px;">
+            <button class="ml-tab-btn active" data-target="pane-ml-report"><i class="fa-solid fa-file-contract"></i>
+              Informe Didáctico</button>
+            <button class="ml-tab-btn" data-target="pane-ml-diagram"><i class="fa-solid fa-diagram-next"></i> Diagrama
+              Interactivo de Flujo</button>
+          </div>
+
+          <!-- Tab Contents -->
+          <div class="ml-tab-content-wrapper" style="flex: 1; overflow: hidden; position: relative;">
+            <div id="pane-ml-report" class="ml-tab-pane active"
+              style="height: 100%; overflow-y: auto; padding-right: 10px;">
+              <div id="ml-flow-report" class="markdown-body">
+                <!-- Informe en Markdown + LaTeX -->
+              </div>
+            </div>
+
+            <div id="pane-ml-diagram" class="ml-tab-pane" style="height: 100%; display: flex; gap: 15px;">
+              <div
+                style="flex: 2; height: 100%; overflow: auto; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; display: flex; align-items: center; justify-content: center;">
+                <div id="ml-flow-diagram" style="width: 100%; text-align: center;">
+                  <!-- Diagrama Mermaid -->
+                </div>
+              </div>
+              <div
+                style="flex: 1; height: 100%; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px;">
+                <h4 style="margin-top: 0; color: var(--accent-blue); font-size: 14px;"><i
+                    class="fa-solid fa-magnifying-glass"></i> Inspector del Nodo</h4>
+                <div id="ml-flow-inspector" style="margin-top: 10px;">
+                  <div style="color: var(--text-muted); font-size: 12px;">Haz clic en cualquier caja del diagrama para
+                    inspeccionar las operaciones matemáticas y funciones asociadas.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <!-- Book Library Modal -->
+    <div id="modal-book-library" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1280px; height: 90vh;">
+
+        <!-- Header del Modal -->
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-book-bookmark" style="color: var(--accent-purple);"></i> Biblioteca <span
+              style="font-size: 11px; opacity: 0.7; font-weight: normal; margin-left: 6px; color: var(--accent-blue);">(Knowledge
+              Repository)</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button id="btn-explorar-libros" class="tool-btn"
+              style="background: rgba(137,180,250,0.15); color: var(--accent-blue); border-color: rgba(137,180,250,0.3);"
+              title="Buscar libros en tus carpetas y sondearlos antes de extraerlos"
+              onclick="if(window.ExploradorLibros) window.ExploradorLibros.abrir();">
+              <i class="fa-solid fa-magnifying-glass"></i> Buscar libros
+            </button>
+            <button id="btn-import-book-file" class="tool-btn"
+              style="background: rgba(137,180,250,0.15); color: var(--accent-blue); border-color: rgba(137,180,250,0.3);"
+              title="Añadir PDF o archivo de código a la biblioteca">
+              <i class="fa-solid fa-file-circle-plus"></i> Importar Elemento
+            </button>
+            <button id="btn-analyze-book-ai" class="tool-btn btn-primary"
+              style="background: rgba(249,226,175,0.2); color: var(--accent-yellow); border-color: rgba(249,226,175,0.4);"
+              title="Realizar análisis completo con Ollama IA y generar Ficha JSON">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Analizar con IA (JSON)
+            </button>
+            <button id="btn-create-book-snippet" class="tool-btn"
+              style="background: rgba(203,166,247,0.15); color: var(--accent-purple); border-color: rgba(203,166,247,0.3);"
+              title="Crear Cita / Recorte del documento">
+              <i class="fa-solid fa-quote-left"></i> Cita
+            </button>
+            <button id="btn-delete-book" class="tool-btn"
+              style="background: rgba(243,139,168,0.12); color: var(--accent-red); border-color: rgba(243,139,168,0.3);"
+              title="Eliminar el elemento seleccionado de la biblioteca y del índice">
+              <i class="fa-solid fa-trash-can"></i> Eliminar
+            </button>
+            <button id="btn-refresh-books" class="tool-btn" title="Refrescar lista de la biblioteca"><i
+                class="fa-solid fa-rotate-right"></i></button>
+            <button id="btn-close-book-library" class="modal-close-btn" title="Cerrar (Esc)"><i
+                class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+
+        <!-- Body del Modal -->
+        <div class="modal-body"
+          style="padding: 12px; display: flex; gap: 12px; height: calc(100% - 48px); background: var(--bg-dark);">
+
+          <!-- Panel Izquierdo: Categorías Repository, Lista & Filtro -->
+          <div
+            style="width: 310px; height: 100%; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;">
+
+            <div style="margin-bottom: 8px;">
+              <input type="text" id="input-search-books" placeholder="🔍 Buscar tema, concepto, librería..."
+                style="width: 100%; padding: 6px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+            </div>
+
+            <!-- Estado del índice de conocimiento: qué puede consultar y citar el tutor -->
+            <div id="library-index-bar"
+              style="margin-bottom: 10px; padding: 8px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 6px; font-size: 11px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span id="library-index-summary" style="color: var(--text-muted);">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Consultando índice…
+                </span>
+                <button id="btn-index-library"
+                  style="font-size:10px; padding:3px 8px; border-radius:4px; background: rgba(166,227,161,0.15); color: var(--accent-green); border:1px solid rgba(166,227,161,0.35); cursor:pointer; white-space:nowrap;"
+                  title="Fragmentar e indexar la biblioteca para que el tutor pueda citarla">
+                  <i class="fa-solid fa-layer-group"></i> Indexar
+                </button>
+              </div>
+              <div id="library-index-progress" style="display:none; margin-top:6px;">
+                <div style="height:5px; background: rgba(0,0,0,0.4); border-radius:3px; overflow:hidden;">
+                  <div id="library-index-bar-fill"
+                    style="width:0%; height:100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)); transition: width .3s ease;"></div>
+                </div>
+                <div id="library-index-detail" style="margin-top:4px; color: var(--text-muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; overflow:hidden;"></div>
+              </div>
+            </div>
+
+            <!-- Base de conocimiento: libros ya analizados con GPU externa -->
+            <div id="kb-panel"
+              style="margin-bottom: 10px; padding: 8px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 6px; font-size: 11px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;">
+                <b style="color: var(--accent-purple);"
+                   title="Libros leídos enteros por un modelo grande: cada afirmación guarda su cita y su página">
+                  <i class="fa-solid fa-database"></i> Base de conocimiento</b>
+                <span style="display:flex; gap:4px;">
+                  <button id="btn-kb-libros" class="tool-btn"
+                    style="font-size:10px; padding:2px 6px; border-radius:4px; background: var(--bg-panel); color: var(--text-muted); border:1px solid var(--border-color); cursor:pointer;"
+                    title="Ver qué se guardó de cada libro y si alguno quedó incompleto">
+                    <i class="fa-solid fa-list-check"></i></button>
+                  <button id="btn-kb-ficha" class="tool-btn"
+                    style="font-size:10px; padding:2px 6px; border-radius:4px; background: var(--bg-panel); color: var(--text-muted); border:1px solid var(--border-color); cursor:pointer;"
+                    title="Analizar un libro entero con un flujo de agentes: qué enseña, qué da por sabido, cómo leerlo y sobre qué se puede practicar"
+                    onclick="if(window.Flujos) window.Flujos.abrir('ficha');">
+                    <i class="fa-solid fa-microscope"></i></button>
+                  <button id="btn-kb-trabajo" class="tool-btn"
+                    style="font-size:10px; padding:2px 6px; border-radius:4px; background: var(--bg-panel); color: var(--text-muted); border:1px solid var(--border-color); cursor:pointer;"
+                    title="Preparar los libros para analizarlos en una GPU externa (Kaggle)">
+                    <i class="fa-solid fa-box-open"></i></button>
+                  <button id="btn-kb-importar"
+                    style="display:none; font-size:10px; padding:2px 8px; border-radius:4px; background: rgba(203,166,247,0.15); color: var(--accent-purple); border:1px solid rgba(203,166,247,0.35); cursor:pointer; white-space:nowrap;">
+                    <i class="fa-solid fa-download"></i> Importar</button>
+                </span>
+              </div>
+              <div id="kb-resumen" style="color: var(--text-muted);">
+                <i class="fa-solid fa-spinner fa-spin"></i> Consultando…
+              </div>
+              <input type="text" id="input-kb-concepto" placeholder="Consultar un concepto…"
+                title="Escribe un concepto y pulsa Enter: verás todo lo que dicen tus libros de él, con página"
+                style="width:100%; margin-top:6px; padding:4px 8px; background: var(--bg-panel); border:1px solid var(--border-color); color:#fff; border-radius:5px; font-size:11px;">
+              <div id="kb-detalle" style="margin-top:6px;"></div>
+              <div id="kb-trabajo" data-abierto="0"></div>
+            </div>
+
+            <!-- Selector de Categorías Knowledge Repository -->
+            <div id="library-category-pills"
+              style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+              <button class="cat-pill active" data-cat="ALL"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--accent-purple); color: #111; font-weight: bold; border: none; cursor: pointer;">TODOS</button>
+              <button class="cat-pill" data-cat="books"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="BOOKS">📚 BOOKS</button>
+              <button class="cat-pill" data-cat="documentation"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="DOCUMENTATION">📑 DOCS</button>
+              <button class="cat-pill" data-cat="papers"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="PAPERS">📄 PAPERS</button>
+              <button class="cat-pill" data-cat="code"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="CODE">💻 CODE</button>
+              <button class="cat-pill" data-cat="notebooks"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="NOTEBOOKS">📓 NOTEBOOKS</button>
+              <button class="cat-pill" data-cat="datasets"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="DATASETS">📊 DATASETS</button>
+              <button class="cat-pill" data-cat="projects"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
+                title="PROJECTS">🚀 PROJECTS</button>
+            </div>
+
+            <div id="book-list-items"
+              style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Libros y archivos listados aquí -->
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 8px;">
+              <h5 style="margin: 0 0 6px 0; font-size: 11px; color: var(--text-muted);"><i
+                  class="fa-solid fa-quote-left"></i> Citas Guardadas</h5>
+              <div id="book-snippets-list" style="max-height: 110px; overflow-y: auto;"></div>
+            </div>
+          </div>
+
+
+          <!-- Panel Derecho: Visor de Ficha IA (JSON) / Lector de Documentos -->
+          <div
+            style="flex: 1; height: 100%; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;">
+
+            <!-- Barra de Pestañas Derecha -->
+            <div
+              style="padding: 8px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 6px;" id="book-tabs-bar">
+                <button id="tab-btn-book-metadata" class="tool-btn active" style="font-size: 12px; padding: 4px 10px;"
+                  onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('metadata');">
+                  <i class="fa-solid fa-diagram-project" style="color: var(--accent-yellow);"></i> Ficha de Análisis IA
+                  (JSON)
+                </button>
+                <button id="tab-btn-book-reader" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
+                  onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('reader');">
+                  <i class="fa-solid fa-book-open" style="color: var(--accent-blue);"></i> Lector de Documento / PDF
+                </button>
+                <button id="tab-btn-book-flujos" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
+                  title="Encadenar varios modelos pequeños, cada uno con una tarea, para analizar en profundidad"
+                  onclick="if(window.Flujos) window.Flujos.abrir('libro');">
+                  <i class="fa-solid fa-diagram-project" style="color: var(--accent-purple);"></i> Flujos de agentes
+                </button>
+              </div>
+
+              <div id="book-header-status" style="font-size: 11px; color: var(--text-muted);">
+                <!-- Estado de análisis -->
+              </div>
+            </div>
+
+            <!-- Contenido Pestaña 1: Ficha de Análisis IA (JSON) -->
+            <div id="pane-book-metadata" style="flex: 1; overflow-y: auto; padding: 16px; background: var(--bg-dark);">
+              <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+                <i class="fa-solid fa-brain fa-bounce"
+                  style="font-size: 40px; color: var(--accent-yellow); margin-bottom: 16px; opacity: 0.7;"></i>
+                <h3 style="color: #fff; margin-bottom: 8px;">Ficha de Análisis Estructural con IA</h3>
+                <p style="font-size: 13px; max-width: 450px; margin: 0 auto;">Selecciona un libro o archivo y haz clic
+                  en <strong>"Analizar con IA (JSON)"</strong> para generar la ficha completa con temas, conceptos,
+                  lenguajes y resumen estructurado.</p>
+              </div>
+            </div>
+
+            <!-- Contenido Pestaña 2: Lector de Documento / PDF -->
+            <div id="pane-book-reader" style="flex: 1; overflow: hidden; display: none;">
+              <div id="book-viewer-content" style="height: 100%; overflow: auto;">
+                <div style="padding: 40px; text-align: center; color: var(--text-muted);">Selecciona un libro de la
+                  lista para comenzar a estudiar.</div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+
+  
+
+  <!-- ============ Explorador de libros con sondeo ============ -->
+  <div id="modal-explorador" class="modal-overlay" style="display:none;">
+    <div class="modal-content modal-lg" style="width: 1180px; max-width: 96vw; height: 88vh; display:flex; flex-direction:column;">
+      <div class="modal-header">
+        <h3 style="margin:0; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-magnifying-glass" style="color: var(--accent-blue);"></i>
+          Buscar libros
+        </h3>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label style="font-size:11px; color:var(--text-muted); display:flex; gap:5px; align-items:center; cursor:pointer;"
+            title="Incluye los libros de las subcarpetas, para carpetas organizadas por materia">
+            <input type="checkbox" id="exp-recursivo" style="accent-color: var(--accent-blue); cursor:pointer;">
+            mirar subcarpetas</label>
+          <button class="modal-close-btn" title="Cerrar (Esc)"
+            onclick="document.getElementById('modal-explorador').style.display='none';">
+            <i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="flex:1; overflow:hidden; display:flex; flex-direction:row; padding:0;">
+        <div style="width:210px; flex-shrink:0; border-right:1px solid var(--border-color);
+          padding:10px 8px; background:var(--bg-panel); overflow-y:auto;">
+          <div style="font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+            color:var(--text-muted); margin:2px 0 6px 6px;">Dónde mirar</div>
+          <div id="exp-atajos"></div>
+        </div>
+
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div style="padding:9px 14px; border-bottom:1px solid var(--border-color);
+            display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div id="exp-migas" style="flex:1; min-width:180px; display:flex; flex-wrap:wrap; align-items:center;"></div>
+            <input type="text" id="exp-buscar" placeholder="🔍 Buscar por nombre…"
+              title="Busca en esta carpeta y todas sus subcarpetas"
+              style="width:220px; padding:4px 10px; background:var(--bg-dark);
+                border:1px solid var(--border-color); color:#fff; border-radius:5px; font-size:12px;">
+          </div>
+
+          <div id="exp-lista" style="flex:1; overflow-y:auto; padding:8px 12px;"></div>
+
+          <!-- Barra de progreso para extracción y sondeo de libros -->
+          <div id="exp-progreso-contenedor" style="display:none; padding:10px 14px; background:rgba(24,24,37,0.92); border-top:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:12px;">
+              <span id="exp-progreso-etiqueta" style="font-weight:600; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-spinner fa-spin" style="color:var(--accent-blue);"></i> Extrayendo libro...
+              </span>
+              <span id="exp-progreso-porcentaje" style="font-family:var(--font-mono); font-weight:bold; color:var(--accent-blue);">0%</span>
+            </div>
+            <div style="width:100%; height:8px; background:rgba(0,0,0,0.45); border-radius:4px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
+              <div id="exp-progreso-barra" style="width:0%; height:100%; background:linear-gradient(90deg, #89b4fa, #a6e3a1); border-radius:4px; transition:width 0.25s ease;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; font-size:11px; color:var(--text-muted);">
+              <span id="exp-progreso-detalle">Iniciando proceso de extracción...</span>
+              <span id="exp-progreso-contador" style="font-family:var(--font-mono);"></span>
+            </div>
+          </div>
+
+          <div style="padding:9px 14px; border-top:1px solid var(--border-color);
+            display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:rgba(0,0,0,0.18);">
+            <div id="exp-resumen-sel" style="font-size:12px; min-width:150px;"></div>
+            <button id="btn-exp-limpiar" class="tool-btn" style="font-size:11px; padding:3px 9px;"
+              title="Quitar la selección">limpiar</button>
+            <label style="font-size:11px; color:var(--text-muted); display:flex; gap:5px; align-items:center; cursor:pointer;"
+              title="Además de medir el archivo, pide al modelo que lo clasifique. Añade unos segundos por libro.">
+              <input type="checkbox" id="exp-con-modelo" checked style="accent-color: var(--accent-purple); cursor:pointer;">
+              clasificar con el modelo</label>
+            <span style="flex:1"></span>
+            <div id="exp-estado" style="font-size:11px; color:var(--text-muted); text-align:right; max-width:280px;"></div>
+            <button id="btn-exp-sondear" class="tool-btn"
+              style="font-size:12px; padding:5px 12px; background:rgba(137,180,250,0.15);
+                color:var(--accent-blue); border:1px solid rgba(137,180,250,0.35);"
+              title="Mide cada libro: páginas, cuánta matemática y cuánto código lleva, si está escaneado, y qué le conviene">
+              <i class="fa-solid fa-gauge-high"></i> Sondear</button>
+            <button id="btn-exp-extraer" class="tool-btn" disabled
+              style="font-size:12px; padding:5px 14px; background:rgba(166,227,161,0.22);
+                color:var(--accent-green); border:1px solid rgba(166,227,161,0.45); font-weight:600;"
+              title="Extrae e indexa los libros seleccionados y los incorpora directamente a tu Biblioteca">
+              <i class="fa-solid fa-file-import"></i> Extraer libro a Biblioteca</button>
+            <button id="btn-exp-preparar" class="tool-btn" disabled
+              style="font-size:12px; padding:5px 12px; background:rgba(203,166,247,0.15);
+                color:var(--accent-purple); border:1px solid rgba(203,166,247,0.35);"
+              title="Trocea los libros y genera paquete de extracción (Kaggle / Dataset)">
+              <i class="fa-solid fa-box-open"></i> Preparar para extraer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Flujos de agentes ============ -->
+  <div id="modal-flujos" class="modal-overlay" style="display:none;">
+    <div class="modal-content modal-lg" style="width: 1340px; max-width: 97vw; height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-diagram-project" style="color: var(--accent-purple);"></i>
+          Flujos de agentes
+          <span id="flujos-ambito-eti" style="font-size: 11px; font-weight: normal; color: var(--text-muted);"></span>
+        </h3>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span id="flujos-vram" style="font-size: 11px; color: var(--text-muted);"></span>
+          <button class="modal-close-btn" title="Cerrar (Esc)"
+            onclick="document.getElementById('modal-flujos').style.display='none';">
+            <i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <!-- flex-direction en línea a propósito: .modal-body apila en columna, y sin
+           esto el lateral queda encima del editor en vez de al lado -->
+      <div class="modal-body" style="flex:1; overflow:hidden; display:flex; flex-direction:row; padding:0;">
+
+        <!-- Lateral: flujos, plantillas e historial -->
+        <div style="width: 264px; flex-shrink:0; border-right: 1px solid var(--border-color); display:flex; flex-direction:column; background: var(--bg-panel);">
+          <div style="padding: 10px; border-bottom: 1px solid var(--border-color);">
+            <button id="btn-flujo-nuevo" class="tool-btn" style="width:100%; font-size:12px; padding:6px; background: rgba(203,166,247,0.15); color: var(--accent-purple); border:1px solid rgba(203,166,247,0.35);">
+              <i class="fa-solid fa-plus"></i> Flujo nuevo
+            </button>
+          </div>
+          <div id="flujos-lateral" style="flex:1; overflow-y:auto; padding: 8px 10px; font-size: 12px;"></div>
+        </div>
+
+        <!-- Centro: editor o ejecución -->
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="flujo-nombre" placeholder="Nombre del flujo"
+              style="flex:1; min-width:180px; padding:5px 10px; background: var(--bg-dark); border:1px solid var(--border-color); color:#fff; border-radius:5px; font-size:13px; font-weight:600;">
+            <button id="btn-flujo-modelos" class="tool-btn" style="font-size:12px; padding:5px 12px;"
+              title="Ver los modelos disponibles y descargar los que falten">
+              <i class="fa-solid fa-microchip"></i> Modelos</button>
+            <button id="btn-flujo-guardar" class="tool-btn" style="font-size:12px; padding:5px 12px;">
+              <i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+            <button id="btn-flujo-ejecutar" class="tool-btn" style="font-size:12px; padding:5px 14px; background: rgba(166,227,161,0.15); color: var(--accent-green); border:1px solid rgba(166,227,161,0.35);">
+              <i class="fa-solid fa-play"></i> Ejecutar</button>
+          </div>
+
+          <input type="text" id="flujo-descripcion" placeholder="Para qué sirve este flujo (opcional)"
+            style="margin: 8px 14px 0; padding:4px 10px; background: transparent; border:none; border-bottom:1px solid var(--border-color); color: var(--text-muted); font-size:11px;">
+
+          <div id="flujo-plan" style="margin: 8px 14px; font-size: 11px;"></div>
+
+          <div id="flujo-editor" style="flex:1; overflow-y:auto; padding: 0 14px 14px;"></div>
+
+          <div id="flujo-ejecucion" style="display:none; flex:1; overflow-y:auto; padding: 0 14px 14px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model Download Confirmation Modal -->
+
+    <div id="modal-download-model" class="modal-overlay" style="display:none;">
+      <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-green);"></i> Descargar Modelo de IA
+            Local
+          </div>
+          <button id="btn-close-download-modal" class="modal-close-btn" title="Cerrar (Esc)"><i
+              class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+          <h3 id="dl-model-title" style="margin-top: 0; color: var(--accent-blue); font-size: 16px;">qwen2.5-coder:7b
+          </h3>
+
+          <div id="dl-model-info"
+            style="background: var(--bg-dark); border: 1px solid var(--border-color); padding: 14px; border-radius: 6px; font-size: 13px; margin: 15px 0; line-height: 1.6;">
+            <!-- Información dinámica del modelo -->
+          </div>
+
+          <!-- Barra de Progreso de Descarga -->
+          <div id="dl-progress-container" style="display: none; margin: 15px 0;">
+            <div
+              style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text-muted);">
+              <span id="dl-status-label">Iniciando descarga...</span>
+              <span id="dl-status-percentage">0%</span>
+            </div>
+            <div
+              style="width: 100%; height: 8px; background: var(--bg-dark); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+              <div id="dl-progress-bar"
+                style="width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button id="btn-cancel-download" class="tool-btn" style="padding: 8px 16px;">Cancelar</button>
+            <button id="btn-confirm-download" class="tool-btn btn-primary"
+              style="padding: 8px 16px; background: var(--accent-green); border-color: var(--accent-green); color: #111; font-weight: bold;">
+              <i class="fa-solid fa-check"></i> Aceptar y Descargar
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Recorrido de Aprendizaje (Mapa Visual + Chat & Herramientas) -->
+
+    <!-- Modal Gestor de Planes Guardados & Historial de Versiones -->
+    <div id="modal-saved-plans" class="modal-overlay" style="display:none;">
+      <div class="modal-content" style="max-width: 650px; height: 75vh;">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-map" style="color: var(--accent-yellow);"></i> Gestor de Planes & Historial de
+            Versiones (.prig_plans)
+          </div>
+          <button id="btn-close-saved-plans" class="modal-close-btn" title="Cerrar (Esc)"><i
+              class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body"
+          style="padding: 14px; display: flex; flex-direction: column; gap: 10px; height: calc(100% - 48px); background: var(--bg-dark);">
+          <div style="font-size: 12px; color: var(--text-muted);">
+            Planes de estudio versionados de forma inmutable en <code>.prig_plans/&lt;plan_id&gt;/</code>
+          </div>
+          <div id="saved-plans-list-container"
+            style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Lista de planes cargados dinámicamente -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Configuración de IA & Asignación de Modelos por Agente -->
+  </div>
+
+  <!-- Modal Ejercicio: enunciado, editor y comprobación por ejecución -->
+  <!-- Desafíos: enunciado, caja de razonamiento, plan, páginas de código y pruebas (js/desafios.js) -->
+  <div id="modal-desafios" class="modal-overlay" style="display:none;">
+    <div class="modal-content modal-lg" style="max-width: 1400px; height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-chess-knight" style="color: var(--accent-purple);"></i> Desafíos
+          <span style="font-size: 11px; opacity: 0.7; font-weight: normal; margin-left: 6px; color: var(--accent-blue);">Razonar primero, programar después</span>
+        </div>
+        <button class="modal-close-btn" title="Cerrar (Esc)" onclick="document.getElementById('modal-desafios').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
+        <div id="desafios-raiz"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Seguimiento (Ruta por Temas) -->
+  <div id="modal-seguimiento" class="modal-overlay" style="display:none;">
+    <div class="modal-content modal-lg" style="width: 1300px; max-width: 96vw; height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-route" style="color: var(--accent-green);"></i> Aprendizaje Guiado
+        </h3>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="btn-guiado-flujos" class="tool-btn" style="padding: 4px 10px; font-size: 12px; background: rgba(203,166,247,0.15); border: 1px solid rgba(203,166,247,0.35); color: var(--accent-purple);"
+            title="Construir el plan con varios agentes en cadena en vez de con una sola llamada"
+            onclick="if(window.Flujos) window.Flujos.abrir('plan');">
+            <i class="fa-solid fa-diagram-project"></i> Flujos de agentes
+          </button>
+          <button id="btn-export-seguimiento" class="tool-btn" style="padding: 4px 10px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);" onclick="window.guiadoMgr.exportMarkdown()">
+            <i class="fa-solid fa-file-export" style="color: var(--accent-yellow);"></i> Exportar Markdown
+          </button>
+          <button class="modal-close-btn" title="Cerrar (Esc)"
+            onclick="document.getElementById('modal-seguimiento').style.display='none';"><i
+              class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0;">
+
+        <!-- Top Pane: Canvas (60%) -->
+        <div id="seguimiento-top-pane"
+          style="flex: 3; display: flex; flex-direction: column; position: relative; border-bottom: 1px solid var(--border-color); overflow: hidden;">
+          <div id="seguimiento-progress-bar"
+            style="display: none; background: rgba(166,227,161,0.12); border-bottom: 1px solid rgba(166,227,161,0.3); padding: 8px 16px; flex-direction: column; gap: 4px; z-index: 20;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: bold; font-size: 13px; color: var(--accent-green);">
+                <i class="fa-solid fa-chart-line"></i> Progreso de Aprendizaje
+              </span>
+              <span id="seguimiento-pct" style="font-weight: bold; font-size: 14px; color: #fff;">0% Completado</span>
+            </div>
+            <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.3); border-radius: 3px; overflow: hidden;">
+              <div id="seguimiento-progress-fill"
+                style="width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex: 1; overflow: hidden;">
+            <!-- Left: Canvas -->
+            <div id="seguimiento-canvas-container"
+              style="flex: 2; overflow: auto; position: relative; background-image: radial-gradient(var(--border-color) 1px, transparent 0); background-size: 20px 20px; padding: 20px; border-right: 1px solid var(--border-color);">
+              <svg id="seguimiento-svg-overlay"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;">
+                <defs>
+                  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-green)" />
+                  </marker>
+                  <marker id="arrow-blue-seg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-blue)" />
+                  </marker>
+                </defs>
+              </svg>
+              <div id="seguimiento-canvas-content">
+                <div style="text-align: center; color: var(--text-muted); margin-top: 60px;">
+                  <i class="fa-solid fa-map-location-dot fa-3x" style="opacity: 0.5; margin-bottom: 15px;"></i>
+                  <p>El lienzo está vacío. Ingresa una meta y una lista de temas en el panel inferior.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Tutor IA Panel -->
+            <div id="seguimiento-tutor-panel"
+              style="flex: 1; background: var(--bg-dark); display: flex; flex-direction: column; overflow: hidden;">
+              <div
+                style="padding: 12px; border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.02); display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-chalkboard-user" style="color: var(--accent-purple);"></i>
+                <h4 style="margin: 0; color: #fff; font-size: 14px;">Tutor IA Personal</h4>
+              </div>
+              <div id="seguimiento-tutor-content"
+                style="flex: 1; overflow-y: auto; padding: 20px; font-size: 13px; line-height: 1.6; color: var(--text-main);">
+                <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;">
+                  <i class="fa-solid fa-robot fa-2x" style="opacity: 0.5; margin-bottom: 10px; display: block;"></i>
+                  Haz clic en "Explicar con Tutor" o "Quiz de Autoevaluación" en cualquier bloque.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Pane: Split (40%) -->
+        <div id="seguimiento-bottom-pane" style="flex: 2; display: flex; flex-direction: row; overflow: hidden;">
+
+          <!-- Bottom Left: Input Form -->
+          <div
+            style="flex: 1; border-right: 1px solid var(--border-color); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: var(--bg-panel);">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label style="font-weight: bold; color: var(--accent-blue); font-size: 12px;">Meta / Objetivo
+                Principal</label>
+              <input type="text" id="seguimiento-goal" placeholder="Ej: Aprender Data Science..."
+                style="padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; width: 100%; font-size: 12px;">
+            </div>
+
+            <!-- Profundidad: lo que antes eran dos sistemas distintos -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label style="font-weight: bold; color: var(--accent-purple); font-size: 12px;">Profundidad</label>
+              <div id="guiado-modo" style="display: flex; gap: 6px;">
+                <button type="button" class="modo-pill active" data-modo="rapido"
+                  style="flex: 1; padding: 7px; border-radius: 6px; font-size: 11px; cursor: pointer; background: var(--accent-green); color: #111; border: 1px solid var(--accent-green); font-weight: 600;"
+                  title="Un agente organiza los temas que le des. Segundos.">
+                  <i class="fa-solid fa-bolt"></i> Rápida
+                </button>
+                <button type="button" class="modo-pill" data-modo="profundo"
+                  style="flex: 1; padding: 7px; border-radius: 6px; font-size: 11px; cursor: pointer; background: rgba(203,166,247,0.12); color: var(--accent-purple); border: 1px solid rgba(203,166,247,0.4); font-weight: 600;"
+                  title="Tres agentes analizan tu biblioteca y generan cuadernos. Varios minutos.">
+                  <i class="fa-solid fa-layer-group"></i> Profunda
+                </button>
+              </div>
+              <div id="guiado-modo-ayuda" style="font-size: 10px; color: var(--text-muted); line-height: 1.4;">
+                Un agente ordena los temas que escribas abajo.
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: bold; color: var(--accent-yellow); font-size: 11px;">Nivel</label>
+                <select id="seguimiento-level" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; font-size: 12px;">
+                  <option value="Principiante">Principiante (Básico)</option>
+                  <option value="Intermedio" selected>Intermedio</option>
+                  <option value="Avanzado">Avanzado (Expert)</option>
+                </select>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: bold; color: var(--accent-green); font-size: 11px;">Enfoque</label>
+                <select id="seguimiento-focus" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; font-size: 12px;">
+                  <option value="Práctico" selected>Práctico (Proyectos)</option>
+                  <option value="Teórico">Teórico (Fundamentos)</option>
+                  <option value="Entrevistas">Entrevistas Técnicas</option>
+                </select>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-weight: bold; color: var(--accent-purple); font-size: 11px;"><i class="fa-solid fa-microchip"></i> Modelo IA</label>
+                <select id="seguimiento-model" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; font-size: 12px;">
+                  <option value="qwen2.5-coder:7b" selected>qwen2.5-coder:7b</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+              <label style="font-weight: bold; color: var(--accent-blue); font-size: 12px;">Lista de Temas
+                (Desordenada)</label>
+              <textarea id="seguimiento-topics" placeholder="Pega aquí los temas..."
+                style="padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; width: 100%; flex: 1; resize: none; font-family: monospace; font-size: 12px;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <button id="btn-cancel-seguimiento" class="tool-btn"
+                style="display: none; padding: 6px 14px; font-weight: bold; font-size: 12px; background: rgba(243,139,168,0.15); color: var(--accent-red); border: 1px solid var(--accent-red);"
+                onclick="window.guiadoMgr && window.guiadoMgr.cancelGeneration();">
+                <i class="fa-solid fa-ban"></i> Cancelar Plan
+              </button>
+              <button id="btn-generate-seguimiento" class="tool-btn btn-primary"
+                style="padding: 6px 14px; font-weight: bold; font-size: 12px;"
+                onclick="window.generarRutaGuiada();">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Crear Ruta
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Right: History -->
+          <div
+            style="flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; background: var(--bg-dark);">
+            <h4 style="margin: 0 0 12px 0; color: var(--accent-yellow); font-size: 14px;"><i
+                class="fa-solid fa-graduation-cap"></i> Lista de aprendizaje</h4>
+            <div id="seguimiento-history-list"
+              style="display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto;">
+              <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 20px;">Cargando
+                historial...</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PERFIL DE APRENDIZAJES, ÁRBOL DE HABILIDADES Y HEXÁGONO -->
+  <div id="modal-perfil" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(6px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; width: 95%; max-width: 1100px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 36px rgba(0,0,0,0.6);">
+      
+      <!-- Modal Header -->
+      <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <i class="fa-solid fa-user-graduate" style="font-size: 22px; color: var(--accent-purple);"></i>
+          <div>
+            <h3 style="margin: 0; color: #fff; font-size: 16px; font-weight: 700;">Perfil de Aprendizaje & Análisis de Avance</h3>
+            <span style="font-size: 12px; color: var(--text-muted);">Estadísticas reales acumuladas de tus Recorridos y Seguimientos completados</span>
+          </div>
+        </div>
+        <button onclick="window.closePerfilModal();" style="background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;" title="Cerrar (Esc)"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Modal Body (Grid 2 columnas) -->
+      <div id="perfil-content-container" style="flex: 1; overflow-y: auto; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <!-- Competencia real: medida ejecutando el código del alumno, no marcando casillas -->
+        <div id="perfil-competencia" style="grid-column: 1 / -1; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h4 style="margin: 0; color: var(--accent-green); font-size: 14px;"><i class="fa-solid fa-gauge-high"></i> Competencia real</h4>
+            <span style="font-size: 11px; color: var(--accent-green); background: rgba(166,227,161,0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(166,227,161,0.3);">Medida ejecutando tu código</span>
+          </div>
+          <div id="perfil-competencia-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;"></div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; margin-bottom: 8px;">DÓNDE FALLAS</div>
+              <div id="perfil-errores"></div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; margin-bottom: 8px;">CONCEPTOS QUE SE TE RESISTEN</div>
+              <div id="perfil-debiles"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUMNA IZQUIERDA: Hexágono de Competencias -->
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; color: var(--accent-purple); font-size: 14px;"><i class="fa-solid fa-draw-polygon"></i> Actividad por área</h4>
+            <span style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color);" title="Cuenta los ítems que marcaste como completados; no mide si sabes hacerlos">Ítems completados</span>
+          </div>
+
+          <!-- Canvas del Hexágono / Radar Chart -->
+          <div style="display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px;">
+            <canvas id="perfil-hexagon-canvas" width="380" height="320"></canvas>
+          </div>
+
+          <!-- Leyenda de Ejes (Matemáticas, Programación, ML, DL, BD, Teoría) -->
+          <div id="perfil-hexagon-legend" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <!-- Renderizado dinámico desde JS -->
+          </div>
+        </div>
+
+        <!-- COLUMNA DERECHA: Mapa de Calor y Árbol de Habilidades -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- Tarjetas Resumen de Métricas -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <div style="background: rgba(137, 180, 250, 0.1); border: 1px solid rgba(137, 180, 250, 0.3); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: var(--accent-blue);">Recorridos</div>
+              <div id="perfil-stat-recorridos" style="font-size: 15px; font-weight: bold; color: #fff;">0/0</div>
+            </div>
+            <div style="background: rgba(249, 226, 175, 0.1); border: 1px solid rgba(249, 226, 175, 0.3); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: var(--accent-yellow);">Seguimientos</div>
+              <div id="perfil-stat-seguimientos" style="font-size: 15px; font-weight: bold; color: #fff;">0/0</div>
+            </div>
+            <div style="background: rgba(166, 227, 161, 0.1); border: 1px solid rgba(166, 227, 161, 0.3); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: var(--accent-green);">Bloques Hitos</div>
+              <div id="perfil-stat-blocks" style="font-size: 15px; font-weight: bold; color: #fff;">0</div>
+            </div>
+            <div style="background: rgba(203, 166, 247, 0.1); border: 1px solid rgba(203, 166, 247, 0.3); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 10px; color: var(--accent-purple);">Temas Dominados</div>
+              <div id="perfil-stat-topics" style="font-size: 15px; font-weight: bold; color: #fff;">0</div>
+            </div>
+          </div>
+
+          <!-- Mapa de Calor (Activity Heatmap) -->
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h4 style="margin: 0; color: var(--accent-yellow); font-size: 13px;"><i class="fa-solid fa-calendar-days"></i> Mapa de Calor & Hábito de Estudio (Últimos 30 días)</h4>
+              <span id="perfil-heatmap-active-days" style="font-size: 11px; color: var(--text-muted);">0 días activos</span>
+            </div>
+            <div id="perfil-heatmap-grid" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0;">
+              <!-- Renderizado dinámico -->
+            </div>
+          </div>
+
+          <!-- Árbol de Habilidades y Competencias -->
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; flex: 1; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
+            <h4 style="margin: 0; color: var(--accent-blue); font-size: 13px;"><i class="fa-solid fa-sitemap"></i> Árbol de Habilidades & Competencias Adquiridas</h4>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Temas Dominados</div>
+              <div id="perfil-topics-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto;">
+                <!-- Temas dinámicos -->
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Competencias e Hitos Validados</div>
+              <div id="perfil-competencies-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto;">
+                <!-- Competencias dinámicas -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VENTANA FLOTANTE INDEPENDIENTE: BLOC DE NOTAS DE UBUNTU (NOTE) -->
+  <div id="window-note" style="display: none; position: fixed; top: 12%; left: 18%; width: 780px; height: 530px; min-width: 480px; min-height: 320px; resize: both; overflow: hidden; background: #242424; border: 1px solid #3d3d3d; border-radius: 8px; z-index: 9998; flex-direction: column; box-shadow: 0 20px 48px rgba(0,0,0,0.7); font-family: 'Ubuntu', sans-serif;">
+    
+    <!-- Header Bar al estilo Ubuntu HeaderBar -->
+    <div id="note-headerbar" style="background: #303030; height: 42px; border-bottom: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; cursor: move; user-select: none;">
+      
+      <!-- Controles Izquierda (Abrir v, +) -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button class="ubuntu-btn" onclick="window.noteWindowMgr.openWorkspaceFilePicker();" title="Cargar archivo del Proyecto Prig IDE" style="background: #3c3c3c; border: 1px solid #4a4a4a; color: #eee; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+          <i class="fa-regular fa-folder-open"></i> Abrir <i class="fa-solid fa-chevron-down" style="font-size: 9px;"></i>
+        </button>
+        <button class="ubuntu-btn" onclick="document.getElementById('note-file-input').click();" title="Cargar archivo desde PC local" style="background: #3c3c3c; border: 1px solid #4a4a4a; color: #eee; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+          <i class="fa-solid fa-upload"></i>
+        </button>
+        <input type="file" id="note-file-input" style="display: none;" onchange="if(this.files[0]) { const r = new FileReader(); r.onload=e=>{ if(window.noteWindowMgr && window.noteWindowMgr.editor) window.noteWindowMgr.editor.setValue(e.target.result); }; r.readAsText(this.files[0]); }">
+        
+        <button class="ubuntu-btn" onclick="window.noteWindowMgr.newNote();" title="Nueva Nota (+)" style="background: #3c3c3c; border: 1px solid #4a4a4a; color: #eee; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+
+        <span style="background: rgba(203,166,247,0.15); color: var(--accent-purple); border: 1px solid var(--accent-purple); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;" title="Escribe /ex: tema y presiona Enter para que la IA redacte una explicación pedagógica en ~500 palabras">
+          💡 /ex: tema
+        </span>
+      </div>
+
+      <!-- Título Central de la Ventana -->
+      <div id="note-window-title" style="color: #ffffff; font-weight: bold; font-size: 13px;">
+        Documento sin título 1
+      </div>
+
+      <!-- Controles Derecha (Prig, Guardar, Minimizar, Maximizar, Cerrar) -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button class="ubuntu-btn" onclick="window.noteWindowMgr.togglePrigNoteView();" title="Volver a la vista normal del IDE Prig" style="background: rgba(137, 180, 250, 0.2); border: 1px solid var(--accent-blue); color: var(--accent-blue); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold;">
+          <i class="fa-solid fa-code"></i> Prig
+        </button>
+
+        <button class="ubuntu-btn" onclick="window.noteWindowMgr.saveToWorkspaceFile();" title="Guardar nota en el Proyecto Prig IDE" style="background: #3584e4; border: none; color: #fff; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: bold; cursor: pointer;">
+          <i class="fa-solid fa-floppy-disk"></i> Guardar
+        </button>
+
+        <div style="display: flex; gap: 4px; margin-left: 8px;">
+          <button onclick="window.closeNoteWindow();" title="Minimizar" style="background: #3c3c3c; border: none; color: #ccc; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px;">-</button>
+          <button onclick="window.noteWindowMgr.toggleMaximize();" title="Maximizar" style="background: #3c3c3c; border: none; color: #ccc; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 9px;">□</button>
+          <button onclick="window.closeNoteWindow();" title="Cerrar" style="background: #e01b24; border: none; color: #fff; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px; font-weight: bold;">✕</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Área Principal de Edición (Monaco Editor de Note) -->
+    <div id="note-monaco-container" style="flex: 1; background: #1e1e1e;"></div>
+
+    <!-- Barra de Estado Inferior (Ubuntu Status Bar + Estadísticas de Hardware y Modelo) -->
+    <div id="note-statusbar" style="background: #2a2a2a; height: 28px; border-top: 1px solid #1e1e1e; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 11px; color: #aaaaaa; user-select: none;">
+      
+      <!-- Izquierda: Formato y Tabulación -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span>Texto plano <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+        <span>Anchura del tabulador: 4 <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+      </div>
+
+      <!-- Centro / Derecha: Estadísticas Hardware + Modelo + Ln/Col -->
+      <div style="display: flex; align-items: center; gap: 16px; font-weight: 500;">
+        <span id="note-stat-cpu" style="color: var(--accent-blue);"><i class="fa-solid fa-microchip"></i> CPU: --%</span>
+        <span id="note-stat-ram" style="color: var(--accent-yellow);"><i class="fa-solid fa-memory"></i> RAM: --%</span>
+        <span id="note-stat-gpu" style="color: var(--accent-green);"><i class="fa-solid fa-bolt"></i> GPU: --</span>
+        <span id="note-stat-model" style="color: var(--accent-purple); font-weight: bold;"><i class="fa-solid fa-robot"></i> Modelo: qwen2.5-coder:7b</span>
+        <span id="note-status-lncol" style="color: #ffffff;">Ln 1, Col 1</span>
+        <span>INS</span>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL: PICKER DE ARCHIVOS DEL WORKSPACE PRIG -->
+  <div id="modal-note-picker" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; width: 450px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+      <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin: 0; color: #fff; font-size: 14px;"><i class="fa-solid fa-folder-open" style="color: var(--accent-blue);"></i> Seleccionar Archivo de Prig IDE</h4>
+        <button onclick="document.getElementById('modal-note-picker').style.display='none';" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="note-picker-list" style="flex: 1; overflow-y: auto; max-height: 350px;">
+        <!-- Lista de archivos -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GANCHO DE ARCHIVOS Y CARPETAS PARA EL CHAT IA -->
+  <div id="modal-gancho-archivos" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; width: 560px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 48px rgba(0,0,0,0.8);">
+      
+      <!-- Modal Header -->
+      <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; font-size: 14px; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-paperclip" style="color: var(--accent-blue);"></i> Gancho: Seleccionar Archivos / Carpetas
+        </div>
+        <button id="btn-cerrar-modal-gancho" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Description & Quick Actions -->
+      <div style="padding: 12px 18px; background: rgba(137,180,250,0.05); border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);">
+        Elige los archivos donde el modelo navegará para leer contexto y escribir código con los prompts del chat.
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          <button id="btn-gancho-activo" type="button" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; background: #252538; color: #cdd6f4; border: 1px solid #45475a;">
+            <i class="fa-solid fa-file-code" style="color: var(--accent-blue);"></i> Archivo Activo
+          </button>
+          <button id="btn-gancho-todos" type="button" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; background: #252538; color: #cdd6f4; border: 1px solid #45475a;">
+            <i class="fa-solid fa-check-double" style="color: var(--accent-green);"></i> Seleccionar Todo
+          </button>
+          <button id="btn-gancho-limpiar" type="button" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; background: #252538; color: #cdd6f4; border: 1px solid #45475a;">
+            <i class="fa-solid fa-trash-can" style="color: var(--accent-red);"></i> Desmarcar Todo
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Input -->
+      <div style="padding: 8px 18px; border-bottom: 1px solid var(--border-color); background: #181825;">
+        <input type="text" id="gancho-search-input" placeholder="Filtrar por nombre o extensión (.py, .js, .html)..." style="width: 100%; padding: 8px 12px; background: #11111b; border: 1px solid #313244; color: #cdd6f4; border-radius: 6px; font-size: 12px; outline: none;">
+      </div>
+
+      <!-- Tree Container -->
+      <div id="gancho-tree-container" style="flex: 1; overflow-y: auto; max-height: 380px; padding: 10px 18px; font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="color: var(--text-muted); text-align: center; padding: 20px;">Cargando archivos del proyecto...</div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding: 12px 18px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+        <span id="gancho-counter-text" style="font-size: 12px; color: var(--accent-blue); font-weight: 600;">0 archivos seleccionados</span>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-gancho-cancelar" type="button" class="btn-secondary" style="padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-muted); border: 1px solid #45475a;">Cancelar</button>
+          <button id="btn-gancho-confirmar" type="button" style="padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--accent-blue); color: #111; border: none;">
+            <i class="fa-solid fa-paperclip"></i> Fijar Gancho
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURACIÓN GLOBAL CENTRALIZADA -->
+  <div id="modal-global-config" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; width: 700px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 48px rgba(0,0,0,0.8); font-family: 'Inter', sans-serif;">
+      
+      <!-- Modal Header -->
+      <div style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+        <div style="font-weight: bold; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> Configuración Global de Prig IDE
+        </div>
+        <button onclick="window.closeGlobalConfigModal();" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Tab Navigation Bar -->
+      <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border-color);">
+        <button class="config-tab-btn active" data-tab="ai" onclick="window.globalConfigMgr.switchTab('ai');" style="padding: 8px 14px; background: rgba(137, 180, 250, 0.15); border: 1px solid var(--accent-blue); border-bottom: none; border-radius: 6px 6px 0 0; color: var(--accent-blue); font-size: 12px; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-robot"></i> Modelos IA
+        </button>
+          <button class="config-tab-btn" onclick="window.globalConfigMgr.switchTab('apariencia')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+            <i class="fa-solid fa-palette"></i> Apariencia
+          </button>
+          <button class="config-tab-btn" onclick="window.globalConfigMgr.switchTab('atajos')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+            <i class="fa-solid fa-keyboard"></i> Atajos
+          </button>
+        <button class="config-tab-btn" data-tab="note" onclick="window.globalConfigMgr.switchTab('note');" style="padding: 8px 14px; background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-note-sticky"></i> Note
+        </button>
+        <button class="config-tab-btn" data-tab="editor" onclick="window.globalConfigMgr.switchTab('editor');" style="padding: 8px 14px; background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-palette"></i> Editor
+        </button>
+        <button class="config-tab-btn" data-tab="permissions" onclick="window.globalConfigMgr.switchTab('permissions');" style="padding: 8px 14px; background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-shield-halved"></i> Permisos
+        </button>
+        <button class="config-tab-btn" data-tab="tutor" onclick="window.globalConfigMgr.switchTab('tutor');" style="padding: 8px 14px; background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-graduation-cap"></i> Pedagógico
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div style="flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-dark); font-size: 12px;">
+        
+        <!-- Tab 1: Modelos IA & Gestor de Cuantizaciones -->
+        <!-- Apariencia: transparencia de la interfaz -->
+        <div id="config-tab-apariencia" class="config-tab-content" style="display: none; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="font-weight: bold; color: var(--accent-purple); margin-bottom: 6px; display: block;">Opacidad de la interfaz</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="range" id="ap-opacidad" min="0.35" max="1" step="0.01" value="0.92"
+                style="flex: 1; accent-color: var(--accent-purple);">
+              <span id="ap-opacidad-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-purple); min-width: 44px; text-align: right;">92%</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Cuanto más baja, más se ve lo que hay detrás de Prig. Con <b>Ctrl+Alt+↑</b> y <b>Ctrl+Alt+↓</b> se ajusta sin abrir esta ventana.
+            </div>
+          </div>
+
+          <div>
+            <label style="font-weight: bold; color: var(--accent-blue); margin-bottom: 6px; display: block;">Desenfoque del fondo</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="range" id="ap-desenfoque" min="0" max="30" step="1" value="10"
+                style="flex: 1; accent-color: var(--accent-blue);">
+              <span id="ap-desenfoque-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-blue); min-width: 44px; text-align: right;">10px</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              Suaviza lo que se transparenta para que el texto siga leyéndose.
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="font-weight: bold; color: var(--accent-green); margin-bottom: 6px; display: block;">Color de acento</label>
+              <input type="color" id="ap-acento" value="#89b4fa"
+                style="width: 100%; height: 34px; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+            </div>
+            <div>
+              <label style="font-weight: bold; color: var(--accent-yellow); margin-bottom: 6px; display: block;">Densidad</label>
+              <select id="ap-densidad" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                <option value="compacta">Compacta</option>
+                <option value="normal" selected>Normal</option>
+                <option value="amplia">Amplia</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="ap-restablecer" class="tool-btn" style="align-self: flex-start; background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px;">
+            <i class="fa-solid fa-rotate-left"></i> Restablecer apariencia
+          </button>
+        </div>
+
+        <!-- Atajos de teclado, reasignables -->
+        <div id="config-tab-atajos" class="config-tab-content" style="display: none; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" id="atajos-buscar" placeholder="🔍 Buscar acción…"
+              style="flex: 1; padding: 7px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+            <button id="atajos-restablecer" class="tool-btn" style="background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px; white-space: nowrap;">
+              <i class="fa-solid fa-rotate-left"></i> Restablecer todos
+            </button>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">
+            Haz clic en una combinación y pulsa las teclas nuevas. <b>Esc</b> cancela.
+          </div>
+          <div id="atajos-lista" style="flex: 1; overflow-y: auto; max-height: 52vh;"></div>
+        </div>
+
+        <div id="config-tab-ai" class="config-tab-content" style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- Estado del Servidor Ollama -->
+          <div id="cfg-ollama-status-box" style="background: rgba(166,227,161,0.1); border: 1px solid var(--accent-green); padding: 10px 14px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; color: var(--accent-green); font-weight: 600;">
+              <i class="fa-solid fa-server"></i> <span id="cfg-ollama-status-text">Ollama Conectado en http://localhost:11434</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button id="cfg-btn-update-ollama" onclick="window.globalConfigMgr.updateOllama();" class="ubuntu-btn" style="background: rgba(203, 166, 247, 0.2); border: 1px solid var(--accent-purple); color: var(--accent-purple); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;" title="Buscar y descargar última versión de Ollama">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Actualizar Ollama
+              </button>
+              <button id="cfg-btn-reload-ollama" onclick="window.globalConfigMgr.reloadOllama();" class="ubuntu-btn" style="background: rgba(137, 180, 250, 0.2); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;" title="Intentar reconectar / reiniciar servicio Ollama">
+                <i class="fa-solid fa-arrows-rotate"></i> Recargar Ollama
+              </button>
+              <button onclick="window.globalConfigMgr.loadDetailedModels();" class="ubuntu-btn" style="background: rgba(166,227,161,0.2); border: 1px solid var(--accent-green); color: var(--accent-green); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-rotate-right"></i> Actualizar Lista
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel de Progreso y Notificación de Actualización de Ollama -->
+          <div id="cfg-ollama-update-box" style="display: none; background: #11111b; border: 1px solid var(--accent-purple); padding: 14px; border-radius: 8px; font-size: 11px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: bold; color: var(--accent-purple); display: flex; align-items: center; gap: 6px; font-size: 12px;">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Actualizador de Ollama
+              </span>
+              <span style="color: var(--text-muted); cursor: pointer; padding: 2px 6px;" onclick="document.getElementById('cfg-ollama-update-box').style.display='none';">
+                <i class="fa-solid fa-xmark"></i>
+              </span>
+            </div>
+            <div id="cfg-ollama-update-status" style="color: #eee; font-family: monospace; margin-bottom: 8px;">
+              Comprobando versiones disponibles...
+            </div>
+            <div id="cfg-ollama-update-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 10px;">
+              <div id="cfg-ollama-update-bar" style="width: 0%; height: 100%; background: var(--accent-purple); transition: width 0.3s;"></div>
+            </div>
+            <div id="cfg-ollama-manual-cmd" style="display: none; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                <span style="color: var(--text-muted); font-size: 11px;">Actualización oficial en terminal (recomendada con permisos del sistema):</span>
+                <button type="button" onclick="window.globalConfigMgr.launchTerminalUpdate();" class="ubuntu-btn" style="padding: 4px 10px; font-size: 11px; background: rgba(166,227,161,0.2); border: 1px solid var(--accent-green); color: var(--accent-green); border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                  <i class="fa-solid fa-terminal"></i> Abrir Terminal y Actualizar
+                </button>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <code style="background: #181825; color: var(--accent-yellow); padding: 6px 8px; border-radius: 4px; font-family: monospace; flex: 1; user-select: all; font-size: 11px;">curl -fsSL https://ollama.com/install.sh | sh</code>
+                <button type="button" id="cfg-btn-copy-ollama-cmd" onclick="window.globalConfigMgr.copyOllamaCommand(this);" class="ubuntu-btn" style="padding: 6px 12px; font-size: 11px; background: var(--accent-blue); color: #11111b; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                  <i class="fa-solid fa-copy"></i> Copiar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gestor de Descarga de Modelos y Cuantizaciones (ollama pull) -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-weight: bold; color: var(--accent-purple); font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-cloud-arrow-down"></i> Descargar Modelo u Opción de Cuantización (Ollama Pull)
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div style="flex: 2; min-width: 240px;">
+                <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 3px; display: block;">Modelo a Descargar (Elige de la lista o escribe tu tag):</label>
+                <!-- Selector desplegable de presets con scroll nativo y todos los modelos visibles -->
+                <select id="cfg-pull-preset-select" onchange="window.globalConfigMgr.onPresetSelectChange(this.value);" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px; cursor: pointer; margin-bottom: 6px;">
+                  <option value="">-- 📋 Seleccionar modelo del catálogo completo --</option>
+                  <optgroup label="⚡ Familia Qwen3 (Razonamiento Conmutable)">
+                    <option value="qwen3:8b">qwen3:8b (8B - Máximo que entra entero en 6GB)</option>
+                    <option value="qwen3:4b">qwen3:4b (4B - Muy rápido, 2.5GB VRAM)</option>
+                    <option value="qwen3:1.7b">qwen3:1.7b (1.7B - Clasificar y extraer, 1.4GB)</option>
+                    <option value="qwen3:0.6b">qwen3:0.6b (0.6B - Ultra ligero, 0.5GB)</option>
+                    <option value="qwen3:14b">qwen3:14b (14B - Partición GPU 6GB + RAM, 9.3GB)</option>
+                    <option value="qwen3:30b-a3b">qwen3:30b-a3b (30B MoE Oficial Qwen3 - 3.3B activos, 18.2GB)</option>
+                  </optgroup>
+                  <optgroup label="🧩 Modelos MoE y Mezclas Comunitarias">
+                    <option value="hf.co/bartowski/OLMoE-1B-7B-0924-Instruct-GGUF:Q4_K_M">OLMoE 1B-7B (Hugging Face, MoE 7B/1B activos - 4.2GB)</option>
+                    <option value="hf.co/RichardErkhov/Qwen_-_Qwen1.5-MoE-A2.7B-Chat-gguf:Q4_K_M">Qwen1.5 MoE A2.7B (Hugging Face, 14B/2.7B activos - 9.5GB)</option>
+                    <option value="deepseek-coder-v2:16b">deepseek-coder-v2:16b (16B Coder MoE - 8.9GB)</option>
+                    <option value="qwen3.6:35b-a3b">qwen3.6:35b-a3b (35B/3B activos MoE Qwen3.6 con visión - 22.6GB)</option>
+                    <option value="hf.co/bartowski/Phi-3.5-MoE-instruct-GGUF:Q4_K_M">Phi-3.5 MoE (Hugging Face, 42B/6.6B activos - 25.4GB)</option>
+                    <option value="mixtral:8x7b">mixtral:8x7b (Mistral MoE 47B/13B activos - 26.0GB)</option>
+                  </optgroup>
+                  <optgroup label="🧠 Razonadores R1 y Variantes">
+                    <option value="deepseek-r1:8b">deepseek-r1:8b (8B R1 - Razonamiento paso a paso, 5.2GB)</option>
+                    <option value="deepseek-r1:14b">deepseek-r1:14b (14B R1 - Razonamiento profundo, 9.0GB)</option>
+                    <option value="deepseek-r1:7b">deepseek-r1:7b (7B R1 sobre Qwen, 4.7GB)</option>
+                    <option value="deepseek-r1:1.5b">deepseek-r1:1.5b (1.5B R1 ultra ligero, 1.1GB)</option>
+                    <option value="qwen3-coder:30b">qwen3-coder:30b (30B MoE de código, 3.3B activos - 18.6GB)</option>
+                    <option value="dolphin3:8b">dolphin3:8b (Dolphin 3.0 sobre Llama 3.1 8B - 4.9GB)</option>
+                  </optgroup>
+                  <optgroup label="💻 Familia Qwen2.5 y Coder">
+                    <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (7B Coder - Recomendado código/tutoría, 4.7GB)</option>
+                    <option value="qwen2.5-coder:14b">qwen2.5-coder:14b (14B Coder - Alta precisión, 9.0GB)</option>
+                    <option value="qwen2.5-coder:32b">qwen2.5-coder:32b (32B Coder - Nivel experto, 19.0GB)</option>
+                    <option value="qwen2.5-coder:3b">qwen2.5-coder:3b (3B Coder - Ligero, 1.9GB)</option>
+                    <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b (1.5B Coder - Rápido, 1.0GB)</option>
+                    <option value="qwen2.5:7b">qwen2.5:7b (7B General, 4.7GB)</option>
+                    <option value="qwen2.5:14b">qwen2.5:14b (14B General, 9.0GB)</option>
+                    <option value="qwen2.5:3b">qwen2.5:3b (3B General, 1.9GB)</option>
+                  </optgroup>
+                  <optgroup label="🌐 Otras Familias Optimizadas">
+                    <option value="gemma3:4b">gemma3:4b (4B Gemma 3 - Redacción en español, 3.3GB)</option>
+                    <option value="gemma2:9b">gemma2:9b (9B Gemma 2 - Pedagógico, 5.4GB)</option>
+                    <option value="llama3.1:8b">llama3.1:8b (8B Llama 3.1 Instruct, 4.9GB)</option>
+                    <option value="llama3.2:3b">llama3.2:3b (3B Llama 3.2, 2.0GB)</option>
+                    <option value="granite3.3:8b">granite3.3:8b (8B IBM Granite, 4.9GB)</option>
+                    <option value="phi4-mini">phi4-mini (3.8B Phi-4 Matemáticas, 2.5GB)</option>
+                    <option value="phi4">phi4 (14B Phi-4, 9.1GB)</option>
+                    <option value="mistral:7b">mistral:7b (7B Mistral General, 4.4GB)</option>
+                    <option value="exaone3.5:7.8b">exaone3.5:7.8b (7.8B EXAONE, 4.8GB)</option>
+                    <option value="olmo2:7b">olmo2:7b (7B OLMo 2 Abierto, 4.5GB)</option>
+                  </optgroup>
+                </select>
+
+                <!-- Campo de texto editable con botón de limpiar -->
+                <div style="position: relative;">
+                  <input type="text" id="cfg-pull-model-tag" list="cfg-preset-models" placeholder="O escribe directamente un tag: ej. qwen3:8b" style="width: 100%; padding: 8px 30px 8px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;" onfocus="this.select();" oninput="window.globalConfigMgr.onTagInput(this.value);">
+                  <span onclick="window.globalConfigMgr.clearPullInput();" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 16px; font-weight: bold;" title="Limpiar y elegir otro">&times;</span>
+                </div>
+                <datalist id="cfg-preset-models">
+                  <option value="qwen3:8b"></option>
+                  <option value="qwen3:4b"></option>
+                  <option value="qwen3:1.7b"></option>
+                  <option value="qwen3:0.6b"></option>
+                  <option value="qwen3:14b"></option>
+                  <option value="qwen3:30b-a3b"></option>
+                  <option value="hf.co/bartowski/OLMoE-1B-7B-0924-Instruct-GGUF:Q4_K_M"></option>
+                  <option value="hf.co/RichardErkhov/Qwen_-_Qwen1.5-MoE-A2.7B-Chat-gguf:Q4_K_M"></option>
+                  <option value="deepseek-coder-v2:16b"></option>
+                  <option value="qwen3.6:35b-a3b"></option>
+                  <option value="hf.co/bartowski/Phi-3.5-MoE-instruct-GGUF:Q4_K_M"></option>
+                  <option value="mixtral:8x7b"></option>
+                  <option value="deepseek-r1:8b"></option>
+                  <option value="deepseek-r1:14b"></option>
+                  <option value="deepseek-r1:7b"></option>
+                  <option value="deepseek-r1:1.5b"></option>
+                  <option value="deepseek-r1:8b"></option>
+                  <option value="deepseek-r1:1.5b"></option>
+                  <option value="qwen3-coder:30b"></option>
+                  <option value="dolphin3:8b"></option>
+                  <option value="dolphin3:8b"></option>
+                  <option value="qwen2.5-coder:7b"></option>
+                  <option value="qwen2.5-coder:14b"></option>
+                  <option value="qwen2.5-coder:32b"></option>
+                  <option value="qwen2.5-coder:3b"></option>
+                  <option value="qwen2.5-coder:1.5b"></option>
+                  <option value="qwen2.5:7b"></option>
+                  <option value="qwen2.5:14b"></option>
+                  <option value="qwen2.5:3b"></option>
+                  <option value="gemma3:4b"></option>
+                  <option value="gemma2:9b"></option>
+                  <option value="llama3.1:8b"></option>
+                  <option value="llama3.2:3b"></option>
+                  <option value="granite3.3:8b"></option>
+                  <option value="phi4-mini"></option>
+                  <option value="phi4"></option>
+                  <option value="mistral:7b"></option>
+                  <option value="exaone3.5:7.8b"></option>
+                  <option value="olmo2:7b"></option>
+                </datalist>
+              </div>
+
+              <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 3px; display: block;">Cuantización (GGUF):</label>
+                <select id="cfg-pull-quant-level" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+                  <option value="">Por defecto del tag</option>
+                  <option value="q4_k_m">Q4_K_M (4-bit Equilibrado)</option>
+                  <option value="q5_k_m">Q5_K_M (5-bit Mayor Calidad)</option>
+                  <option value="q8_0">Q8_0 (8-bit Alta Precisión)</option>
+                  <option value="fp16">FP16 (Precisión Nativa)</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: flex-end; gap: 6px;">
+                <button onclick="window.globalConfigMgr.pullSelectedModel();" class="ubuntu-btn" style="background: var(--accent-purple); color: #11111b; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                  <i class="fa-solid fa-download"></i> Descargar
+                </button>
+                <button type="button" onclick="window.globalConfigMgr.toggleCatalogView();" class="ubuntu-btn" style="background: rgba(137,180,250,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;" title="Ver todos los modelos soportados de agent_flows">
+                  <i class="fa-solid fa-layer-group"></i> Catálogo
+                </button>
+              </div>
+            </div>
+
+            <!-- Vista Expandible del Catálogo Completo de agent_flows con barra de scroll ("barrita") y buscador -->
+            <div id="cfg-catalog-view" style="display: none; background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; max-height: 380px; overflow-y: scroll; scrollbar-width: thin; scrollbar-color: var(--accent-purple) rgba(0,0,0,0.4);">
+              <div style="font-size: 11px; font-weight: bold; color: var(--accent-blue); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span><i class="fa-solid fa-layer-group"></i> Catálogo de Modelos (Haz clic en cualquiera para seleccionarlo)</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="text" id="cfg-catalog-filter" oninput="window.globalConfigMgr.filterCatalogGrid(this.value);" placeholder="🔍 Filtrar modelos (ej: moe, r1, coder, 14b)..." style="padding: 4px 10px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px; font-size: 11px; width: 190px;">
+                  <span style="color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 2px 6px;" onclick="window.globalConfigMgr.toggleCatalogView();" title="Cerrar"><i class="fa-solid fa-xmark"></i></span>
+                </div>
+              </div>
+              <div id="cfg-catalog-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; padding-bottom: 16px;">
+                <!-- Poblado dinámicamente -->
+              </div>
+            </div>
+
+            <!-- Log / Barra de Progreso de Descarga -->
+            <div id="cfg-pull-progress-box" style="display: none; background: #11111b; border: 1px solid #313244; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11px; color: var(--accent-blue); margin-top: 4px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="cfg-pull-progress-status">Iniciando descarga...</div>
+                <button type="button" onclick="document.getElementById('cfg-pull-progress-box').style.display='none';" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px;" title="Ocultar aviso">&times;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Modelos Instalados y Disponibilidad -->
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-weight: bold; color: var(--accent-blue); font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+              <span><i class="fa-solid fa-list-check"></i> Modelos Locales Instalados y Disponibilidad</span>
+              <span id="cfg-models-count-badge" style="font-size: 11px; background: rgba(137,180,250,0.2); color: var(--accent-blue); padding: 2px 8px; border-radius: 10px;">0 Modelos</span>
+            </div>
+
+            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+              <div id="cfg-salud-avisos" style="margin-bottom: 10px;"></div>
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;">
+                <thead>
+                  <tr style="background: rgba(0,0,0,0.3); color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                    <th style="padding: 8px 12px;">Modelo / Tag</th>
+                    <th style="padding: 8px 12px;">Cuantización</th>
+                    <th style="padding: 8px 12px;">Tamaño (GB)</th>
+                    <th style="padding: 8px 12px;">Estado</th>
+                    <th style="padding: 8px 12px; text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="cfg-installed-models-tbody">
+                  <tr><td colspan="5" style="padding: 12px; text-align: center; color: var(--text-muted);">Cargando modelos de Ollama...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Configuraciones Críticas de Rendimiento, Memoria y Velocidad -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div style="font-weight: bold; color: var(--accent-yellow); font-size: 13px;">
+                <i class="fa-solid fa-microchip"></i> Control de Rendimiento, Consumo de VRAM, RAM y Velocidad
+              </div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button type="button" id="btn-cfg-recomendado" onclick="window.Recursos &amp;&amp; window.Recursos.abrir('tutor');" style="background: rgba(249,226,175,0.15); border: 1px solid var(--accent-yellow); color: var(--accent-yellow); padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;" title="Analiza tu GPU, RAM, CPU, sistema y Ollama y propone cómo abrir cada modelo instalado con el mejor rendimiento">
+                  ⭐ Recomendado
+                </button>
+                <button type="button" onclick="window.globalConfigMgr.applyProfile('ahorro');" style="background: rgba(166,227,161,0.15); border: 1px solid var(--accent-green); color: var(--accent-green); padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;" title="Optimizado para qwen3:14b en GPU 6GB o CPUs">
+                  🟢 Ahorro
+                </button>
+                <button type="button" onclick="window.globalConfigMgr.applyProfile('equilibrado');" style="background: rgba(137,180,250,0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;" title="Estándar para 7B/8B">
+                  🔵 Equilibrado
+                </button>
+                <button type="button" onclick="window.globalConfigMgr.applyProfile('calidad');" style="background: rgba(203,166,247,0.15); border: 1px solid var(--accent-purple); color: var(--accent-purple); padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;" title="Máximo contexto y capas en VRAM">
+                  🟣 Máxima Calidad
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Límite de Contexto (num_ctx):</label>
+                <select id="cfg-num-ctx" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="1024">1024 tokens (Mínimo consumo VRAM)</option>
+                  <option value="2048">2048 tokens (Recomendado para 14B en GPU 6GB)</option>
+                  <option value="4096" selected>4096 tokens (Estándar equilibrado)</option>
+                  <option value="8192">8192 tokens (Proyectos medianos)</option>
+                  <option value="16384">16384 tokens (Proyectos grandes)</option>
+                  <option value="32768">32768 tokens (Máxima memoria VRAM)</option>
+                </select>
+                <span style="font-size: 10px; color: var(--text-muted);">Reducir num_ctx ahorra gigabytes directos de VRAM/RAM.</span>
+              </div>
+
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Capas en GPU (num_gpu layers):</label>
+                <select id="cfg-num-gpu" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="-1" selected>-1 (Auto - Máximas capas en GPU)</option>
+                  <option value="0">0 (Solo CPU - 0 VRAM utilizada)</option>
+                  <option value="16">16 Capas en GPU (~3.0 GB)</option>
+                  <option value="20">20 Capas en GPU (~3.8 GB - Ideal 14B en 6GB)</option>
+                  <option value="24">24 Capas en GPU (~4.5 GB)</option>
+                  <option value="28">28 Capas en GPU (~5.2 GB)</option>
+                  <option value="32">32 Capas en GPU</option>
+                  <option value="40">40 Capas en GPU</option>
+                </select>
+                <span style="font-size: 10px; color: var(--text-muted);">Permite ajustar exactamente cuántas capas van a VRAM y cuáles a RAM.</span>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Hilos de CPU (num_thread):</label>
+                <select id="cfg-num-thread" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="0" selected>0 (Automático - Detección óptima)</option>
+                  <option value="2">2 Hilos (Bajo impacto en CPU)</option>
+                  <option value="4">4 Hilos (Equilibrado)</option>
+                  <option value="6">6 Hilos (Recomendado para 14B en RAM)</option>
+                  <option value="8">8 Hilos (Rápido multicore)</option>
+                  <option value="12">12 Hilos (Máxima potencia CPU)</option>
+                </select>
+                <span style="font-size: 10px; color: var(--text-muted);">Acelera la velocidad de cálculo cuando el modelo se reparte con RAM.</span>
+              </div>
+
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Límite de Tokens de Salida (num_predict):</label>
+                <select id="cfg-num-predict" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="512">512 tokens (Ultra rápido / Respuestas breves)</option>
+                  <option value="1024">1024 tokens (Rápido / Código estándar)</option>
+                  <option value="2048" selected>2048 tokens (Estándar recomendado)</option>
+                  <option value="4096">4096 tokens (Explicaciones extensas)</option>
+                  <option value="-1">-1 (Sin límite duro)</option>
+                </select>
+                <span style="font-size: 10px; color: var(--text-muted);">Evita que el modelo genere de forma infinita, ahorrando tiempo.</span>
+              </div>
+            </div>
+
+            <!-- low_vram y f16_kv se quitaron: medido en Ollama 0.34.1, se aceptan pero no
+                 llegan al motor. La caché se controla en Recomendado (OLLAMA_KV_CACHE_TYPE). -->
+            <div style="padding: 8px 10px; border-radius: 6px; background: rgba(137,180,250,0.08); border: 1px solid rgba(137,180,250,0.3); font-size: 11.5px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="flex:1; min-width:240px;"><i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i>
+                Muestreo, razonamiento, carga y demás opciones por modelo y por uso están en <b>Modelos</b>.</span>
+              <button type="button" onclick="window.Modelos && window.Modelos.abrir();" style="background: rgba(137,180,250,0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;">
+                <i class="fa-solid fa-cubes"></i> Abrir Modelos</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Liberar Modelo de VRAM (keep_alive):</label>
+                <select id="cfg-keep-alive" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="0">0 (Descargar inmediatamente tras responder)</option>
+                  <option value="1m">1 minuto</option>
+                  <option value="5m" selected>5 minutos (Estándar Ollama)</option>
+                  <option value="15m">15 minutos</option>
+                  <option value="30m">30 minutos</option>
+                  <option value="-1">-1 (Mantener siempre cargado en memoria)</option>
+                </select>
+                <span style="font-size: 10px; color: var(--text-muted);">"0" libera el 100% de la GPU en cuanto termina de generar.</span>
+              </div>
+
+              <div>
+                <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Asignación de Modelo para Tutoría:</label>
+                <select id="gcfg-tutor-model" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                  <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+                  <option value="qwen3:14b">qwen3:14b</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style="display:flex; align-items:center; gap:6px; font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; cursor:pointer;" title="Temperatura, top_k, top_p y penalización los decide cada modelo (su Modelfile) y lo que fijes en Modelos. Qwen3, por ejemplo, pide 0.6 / 20 / 0.95 / 1.0.">
+                <input type="checkbox" id="cfg-muestreo-del-modelo" checked style="accent-color: var(--accent-purple);"
+                  onchange="document.getElementById('cfg-temperature').disabled = this.checked;">
+                Usar la temperatura y el muestreo que recomienda cada modelo
+              </label>
+              <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Temperatura (Creatividad vs Precisión):</label>
+              <input type="range" id="cfg-temperature" min="0.0" max="1.0" step="0.1" value="0.2" oninput="document.getElementById('val-temp').innerText = this.value;" style="width: 100%; accent-color: var(--accent-purple);">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted);">
+                <span>0.0 (Precisión Código)</span>
+                <span id="val-temp" style="color: var(--accent-purple); font-weight: bold;">0.2</span>
+                <span>1.0 (Creativo)</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tab 2: Note -->
+        <div id="config-tab-note" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-weight: bold; color: var(--accent-yellow); margin-bottom: 6px; display: block;">📝 Modo de Apertura del Bloc de Notas (Note):</label>
+            <select id="gcfg-note-launch-mode" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="standalone">🖥️ Ventana independiente</option>
+              <option value="prig_note">📝 Prig Note (El programa Prig se vuelve un anotador)</option>
+            </select>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+            <div style="font-weight: bold; color: #fff; margin-bottom: 4px;"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-purple);"></i> Autocompletado Fantasma (Ghost Text):</div>
+            <div style="color: var(--text-muted); font-size: 11px;">Muestra texto semitransparente sugerido por la IA en Note y Monaco. Presionar <b>TAB</b> inserta el código aceptado.</div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Editor -->
+        <div id="config-tab-editor" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Tamaño de Fuente (px):</label>
+            <input type="number" id="cfg-editor-font-size" value="14" min="10" max="24" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Familia de Fuente:</label>
+            <select id="cfg-editor-font-family" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="'Fira Code', monospace">Fira Code (Recomendado)</option>
+              <option value="'Ubuntu Mono', monospace">Ubuntu Mono</option>
+              <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+              <option value="monospace">Monospace estándar</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Tamaño de Tabulación (Tab Width):</label>
+            <select id="cfg-editor-tab-size" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="2">2 espacios</option>
+              <option value="4" selected>4 espacios</option>
+              <option value="8">8 espacios</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Tema del Editor:</label>
+            <select id="cfg-editor-theme" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="prig-dark">Prig Dark (Predeterminado)</option>
+              <option value="vs-dark">VS Code Dark</option>
+              <option value="hc-black">High Contrast Black</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tab 4: Permisos -->
+        <div id="config-tab-permissions" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-weight: bold; color: var(--accent-red); margin-bottom: 4px; display: block;">Diagnóstico Automático de Errores en Consola:</label>
+            <select id="cfg-auto-diagnose" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="true">Activo (Muestra botón y analiza Tracebacks con IA y Web)</option>
+              <option value="false">Desactivado</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Ejecución de Comandos Sugeridos por IA:</label>
+            <select id="cfg-allow-auto-cmd" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="ask">Solicitar confirmación antes de ejecutar</option>
+              <option value="always">Permitir ejecución directa en consola</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight: bold; color: #fff; margin-bottom: 4px; display: block;">Tiempo Límite de Ejecución de Código (Timeout Segundos):</label>
+            <input type="number" id="cfg-exec-timeout" value="30" min="5" max="300" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+          </div>
+        </div>
+
+        <!-- Tab 5: Pedagógico -->
+        <div id="config-tab-tutor" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-weight: bold; color: var(--text-main); margin-bottom: 4px; display: block;">Nivel de Profundidad de Aprendizaje:</label>
+            <select id="gcfg-depth-level" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+              <option value="basic">Principiante (Explicaciones sencillas y paso a paso)</option>
+              <option value="intermediate" selected>Intermedio (Teoría profunda y práctica aplicada)</option>
+              <option value="advanced">Avanzado (Patrones avanzados y optimización)</option>
+              <option value="expert">Experto (Arquitectura de datos y producción)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: 12px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; background: rgba(0,0,0,0.2);">
+        <button onclick="window.closeGlobalConfigModal();" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 6px; cursor: pointer;">Cancelar</button>
+        <button onclick="window.globalConfigMgr.saveSettings();" style="padding: 8px 20px; background: #3584e4; border: none; color: #fff; font-weight: bold; border-radius: 6px; cursor: pointer;">
+          <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal Exportador PDF de Notebooks y Código -->
+  <div id="modal-pdf-exporter" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(6px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="modal-content modal-lg" style="width: 1350px; max-width: 96vw; height: 92vh; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+      
+      <!-- Header -->
+      <div class="modal-header" style="height: 48px; padding: 0 20px; background: var(--bg-dark); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div class="modal-title" style="font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
+          <i class="fa-solid fa-file-pdf" style="color: #e74c3c; font-size: 18px;"></i>
+          <span>Exportador PDF de Notebooks y Código</span>
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(231,76,60,0.15); color: #e74c3c; font-weight: 600;" id="pdf-modal-folder-name">Carpeta</span>
+          <span style="font-size: 11px; opacity: 0.6; font-weight: normal; margin-left: 8px;" id="pdf-modal-files-count">0 detectados</span>
+        </div>
+        <button id="btn-close-pdf-exporter" class="modal-close-btn" title="Cerrar (Esc)" style="background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (2 Secciones Lado a Lado: Panel Izquierdo de Ajustes + Panel Derecho de Vista Previa) -->
+      <div class="pdf-modal-body">
+        
+        <!-- Panel Izquierdo: Configuración y Selección de Archivos -->
+        <div style="width: 380px; flex-shrink: 0; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; background: var(--bg-panel); overflow-y: auto; height: 100%;">
+          
+          <!-- Folder Info Box -->
+          <div style="padding: 14px 16px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px;">Carpeta Origen</div>
+            <div style="font-size: 12px; font-family: var(--font-mono); color: var(--accent-blue); word-break: break-all;" id="pdf-modal-folder-path">/ruta/carpeta</div>
+          </div>
+
+          <!-- Selector de Temas Estilizados -->
+          <div style="padding: 14px 16px; border-bottom: 1px solid var(--border-color);">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 8px;">Diseño & Tema PDF</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="theme-btn active" data-theme="light" onclick="window.pdfExporterMgr.setTheme('light')" style="flex:1; padding:8px 6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-dark); color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                <i class="fa-solid fa-sun" style="color:var(--accent-yellow);"></i> Elegante Claro
+              </button>
+              <button class="theme-btn" data-theme="dark" onclick="window.pdfExporterMgr.setTheme('dark')" style="flex:1; padding:8px 6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-dark); color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                <i class="fa-solid fa-moon" style="color:var(--accent-purple);"></i> Dark Cyber
+              </button>
+              <button class="theme-btn" data-theme="executive" onclick="window.pdfExporterMgr.setTheme('executive')" style="flex:1; padding:8px 6px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-dark); color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                <i class="fa-solid fa-file-contract" style="color:var(--accent-blue);"></i> Ejecutivo
+              </button>
+            </div>
+          </div>
+
+          <!-- Opciones de Formato y Presentación -->
+          <div style="padding: 14px 16px; border-bottom: 1px solid var(--border-color); display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 2px;">Opciones de Contenido</div>
+            
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="opt-pdf-outputs" checked>
+              <span>Incluir salidas de celdas (Gráficos, Tablas, Logs)</span>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="opt-pdf-linenos" checked>
+              <span>Mostrar números de línea en bloques de código</span>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="opt-pdf-cover" checked>
+              <span>Incluir Portada y Metadatos de Proyecto</span>
+            </label>
+
+            <div style="display:flex; gap:12px; margin-top:4px;">
+              <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:2px;">Tamaño Fuente</label>
+                <select id="opt-pdf-fontsize" style="width:100%; padding:4px 8px; background:var(--bg-dark); color:var(--text-main); border:1px solid var(--border-color); border-radius:4px; font-size:11px;">
+                  <option value="11px">Pequeño (11px)</option>
+                  <option value="13px" selected>Normal (13px)</option>
+                  <option value="15px">Grande (15px)</option>
+                </select>
+              </div>
+
+              <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:2px;">Formato Página</label>
+                <select id="opt-pdf-pagesize" style="width:100%; padding:4px 8px; background:var(--bg-dark); color:var(--text-main); border:1px solid var(--border-color); border-radius:4px; font-size:11px;">
+                  <option value="a4" selected>A4 Estándar</option>
+                  <option value="letter">Carta (Letter)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selección de Archivos -->
+          <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Filtros de Selección</span>
+            <div style="display:flex; gap:4px;">
+              <button class="tool-btn" style="font-size:10px; padding:2px 6px;" onclick="window.pdfExporterMgr.selectSet('all')">Todos</button>
+              <button class="tool-btn" style="font-size:10px; padding:2px 6px;" onclick="window.pdfExporterMgr.selectSet('notebooks')">Notebooks</button>
+              <button class="tool-btn" style="font-size:10px; padding:2px 6px;" onclick="window.pdfExporterMgr.selectSet('code')">Código</button>
+              <button class="tool-btn" style="font-size:10px; padding:2px 6px;" onclick="window.pdfExporterMgr.selectSet('none')">Ninguno</button>
+            </div>
+          </div>
+
+          <!-- Checklist contenedor -->
+          <div style="flex:1; overflow-y:auto; padding:10px 14px;" id="pdf-files-checklist">
+            <!-- Renderizado dinámico de checklist -->
+          </div>
+
+        </div>
+
+        <!-- Panel Derecho: Vista Previa en Vivo (Live Preview Iframe) -->
+        <div style="flex: 1; display: flex; flex-direction: column; background: #0e0e11; height: 100%; min-width: 0; overflow: hidden;">
+          
+          <!-- Bar de Vista Previa -->
+          <div style="padding: 8px 16px; background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-eye" style="color: var(--accent-blue);"></i> Vista Previa del Documento PDF
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="tool-btn" style="background: rgba(9,105,218,0.2); color: var(--accent-blue); border-color: rgba(9,105,218,0.4);" onclick="window.pdfExporterMgr.printPdf()">
+                <i class="fa-solid fa-print"></i> Vista de Impresión Nativa
+              </button>
+              <button class="tool-btn" style="background: rgba(231,76,60,0.2); color: #e74c3c; border-color: rgba(231,76,60,0.4);" onclick="window.pdfExporterMgr.downloadPdf()">
+                <i class="fa-solid fa-download"></i> Descargar PDF Directo
+              </button>
+            </div>
+          </div>
+
+          <!-- Iframe Container -->
+          <div style="flex: 1; padding: 16px; display: flex; justify-content: center; overflow: hidden; min-height: 0;">
+            <!-- sandbox sin allow-scripts: la vista previa incrusta HTML procedente de
+                 las salidas de los cuadernos, que no debe poder ejecutar código ni
+                 alcanzar la API local. -->
+            <iframe id="pdf-preview-iframe" sandbox="" style="width: 100%; height: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"></iframe>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+
+  <script src="/static/js/prig_net.js?v=6"></script>
+  <script src="/static/js/apariencia.js?v=7"></script>
+  <script src="/static/js/shortcuts.js?v=8"></script>
+  <script src="/static/js/commands.js?v=16"></script>
+  <script src="/static/js/menubar.js?v=9"></script>
+  <script src="/static/js/layout.js?v=8"></script>
+  <script src="/static/js/workarea.js?v=11"></script>
+  <script src="/static/js/plan_actual.js?v=7"></script>
+  <script src="/static/js/editor.js?v=10"></script>
+  <script src="/static/js/notebook.js?v=7"></script>
+  <script src="/static/js/filetree.js?v=7"></script>
+  <script src="/static/js/terminal.js?v=6"></script>
+  <script src="/static/js/ai_chat.js?v=10"></script>
+  <script src="/static/js/kaggle_lector.js?v=7"></script>
+  <script src="/static/js/github_lector.js?v=2"></script>
+  <script src="/static/js/inicio.js?v=3"></script>
+  <script src="/static/js/agent_workflow.js?v=6"></script>
+  <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
+  <script src="/static/js/book_library.js?v=6"></script>
+  <script src="/static/js/base_conocimiento.js?v=3"></script>
+  <script src="/static/js/explorador.js?v=3"></script>
+  <script src="/static/js/flujos.js?v=7"></script>
+  <script src="/static/js/recursos.js?v=1"></script>
+  <script src="/static/js/modelos.js?v=3"></script>
+  <script src="/static/js/buscador_modelos.js?v=5"></script>
+  <script src="/static/js/temperaturas.js?v=3"></script>
+  <script src="/static/js/aprendizaje_guiado.js?v=7"></script>
+  <script src="/static/js/progreso.js?v=2"></script>
+  <script src="/static/js/perfil.js?v=9"></script>
+  <script src="/static/js/note_window.js?v=6"></script>
+  <script src="/static/js/global_config.js?v=9"></script>
+  <script src="/static/js/pdf_exporter.js?v=6"></script>
+  <script src="/static/js/desafios.js?v=6"></script>
+  <script src="/static/js/ide.js?v=3"></script>
+  <script src="/static/js/app.js?v=7"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,83 @@
+{
+  "title": "Introducción a FastAPI y Async Python",
+  "description": "Este curso te guiará desde cero hasta dominar el uso de FastAPI y programación asíncrona con Python.",
+  "target_topic": "FastAPI y Async Python",
+  "level": "Principiante",
+  "modules": [
+    {
+      "id": "mod_1",
+      "title": "Módulo 1: Introducción a Python Asincrónico",
+      "topics": [
+        {
+          "id": "top_1_1",
+          "title": "Conceptos Básicos de Asyncio",
+          "completed": false,
+          "notes": "Aprende sobre eventos, bucles de eventos y corutinas.",
+          "exercise_code": "# Código de práctica inicial\nimport asyncio\ndef hello_world():\n    print('Hello World')\nasync def main():\n    await asyncio.sleep(1)\n    hello_world()\nasyncio.run(main())"
+        },
+        {
+          "id": "top_1_2",
+          "title": "Manejo de Excepciones Asincrónicas",
+          "completed": false,
+          "notes": "Aprende a manejar excepciones en código asincrónico.",
+          "exercise_code": "# Código de práctica inicial\nimport asyncio\ndef risky_function():\n    raise ValueError('Algo salió mal')\nasync def main():\n    try:\n        await asyncio.sleep(1)\n        risky_function()\n    except ValueError as e:\n        print(e)\nasyncio.run(main())"
+        }
+      ]
+    },
+    {
+      "id": "mod_2",
+      "title": "Módulo 2: Introducción a FastAPI",
+      "topics": [
+        {
+          "id": "top_2_1",
+          "title": "Instalación y Configuración de FastAPI",
+          "completed": false,
+          "notes": "Aprende cómo instalar FastAPI y configurar un proyecto básico.",
+          "exercise_code": "# Código de práctica inicial\n# Instala FastAPI con pip: pip install fastapi\nfrom fastapi import FastAPI\napp = FastAPI()\n@app.get('/')\ndef read_root():\n    return {'message': 'Hello World'}"
+        },
+        {
+          "id": "top_2_2",
+          "title": "Definición de Rutas y Parámetros",
+          "completed": false,
+          "notes": "Aprende a definir rutas y parámetros en FastAPI.",
+          "exercise_code": "# Código de práctica inicial\nfrom fastapi import FastAPI\napp = FastAPI()\n@app.get('/items/{item_id}')\ndef read_item(item_id: int, q: str = None):\n    return {'item_id': item_id, 'q': q}"
+        }
+      ]
+    },
+    {
+      "id": "mod_3",
+      "title": "Módulo 3: Integración de Asyncio y FastAPI",
+      "topics": [
+        {
+          "id": "top_3_1",
+          "title": "Ejecución de Corutinas en Rutas",
+          "completed": false,
+          "notes": "Aprende a ejecutar corutinas dentro de las rutas de FastAPI.",
+          "exercise_code": "# Código de práctica inicial\nfrom fastapi import FastAPI\nimport asyncio\ndef async_function():\n    await asyncio.sleep(1)\n    return {'message': 'Async Function Executed'}\napp = FastAPI()\n@app.get('/async')\ndef read_async():\n    loop = asyncio.new_event_loop()\n    asyncio.set_event_loop(loop)\n    result = loop.run_until_complete(async_function())\n    return result"
+        },
+        {
+          "id": "top_3_2",
+          "title": "Uso de Dependencias Asincrónicas",
+          "completed": false,
+          "notes": "Aprende a usar dependencias asincrónicas en FastAPI.",
+          "exercise_code": "# Código de práctica inicial\nfrom fastapi import FastAPI, Depends\nimport asyncio\ndef async_dependency():\n    await asyncio.sleep(1)\n    return {'message': 'Dependency Executed'}\napp = FastAPI()\n@app.get('/async-dependency')\ndef read_async_dependency(dep: dict = Depends(async_dependency)):\n    return dep"
+        }
+      ]
+    },
+    {
+      "id": "mod_4",
+      "title": "Módulo 4: Desafío Final",
+      "topics": [
+        {
+          "id": "top_4_1",
+          "title": "Desarrolla una API Simple con FastAPI y Asyncio",
+          "completed": false,
+          "notes": "Crea una API simple que incluya rutas asincrónicas, dependencias y manejo de errores.",
+          "exercise_code": "# Código de práctica inicial\nfrom fastapi import FastAPI, Depends, HTTPException\nimport asyncio\ndef async_dependency():\n    await asyncio.sleep(1)\n    return {'message': 'Dependency Executed'}\ndef validate_item(item_id: int):\n    if item_id < 0:\n        raise HTTPException(status_code=400, detail='Invalid item ID')\napp = FastAPI()\n@app.get('/items/{item_id}')\ndef read_item(item_id: int, dep: dict = Depends(async_dependency)):,\n    validate_item(item_id)\n    return {'item_id': item_id, 'dep': dep}"
+        }
+      ]
+    }
+  ],
+  "id": "plan_fbbf706d",
+  "progress_pct": 0
+}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181825" />
+      <stop offset="100%" stop-color="#11111b" />
+    </linearGradient>
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cba6f7" />
+      <stop offset="100%" stop-color="#89b4fa" />
+    </linearGradient>
+  </defs>
+  <!-- Background Card -->
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#bg-grad)" stroke="#313244" stroke-width="8"/>
+  
+  <!-- Code Brackets Icon -->
+  <path d="M 175 160 L 95 256 L 175 352" fill="none" stroke="url(#accent-grad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 337 160 L 417 256 L 337 352" fill="none" stroke="url(#accent-grad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="280" y1="140" x2="232" y2="372" stroke="#a6e3a1" stroke-width="32" stroke-linecap="round"/>
+</svg>

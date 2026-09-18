@@ -1,0 +1,71 @@
+{
+ "Data": {
+  "Model": {
+   "Models": [
+    {
+     "Path": "Qwen",
+     "Name": "Qwen2.5-7B-Instruct",
+     "Downloads": 7218644,
+     "Stars": 521,
+     "Libraries": [
+      "transformer",
+      "safetensors"
+     ],
+     "LastUpdatedTime": 1741335540,
+     "BaseModel": [
+      "Qwen/Qwen2.5-7B"
+     ],
+     "ChineseName": "千问2.5-7B-Instruct",
+     "License": "apache-2.0"
+    },
+    {
+     "Path": "Qwen",
+     "Name": "Qwen2.5-VL-7B-Instruct",
+     "Downloads": 5171879,
+     "Stars": 453,
+     "Libraries": [
+      "transformer",
+      "safetensors",
+      "pytorch"
+     ],
+     "LastUpdatedTime": 1743977825,
+     "BaseModel": [],
+     "ChineseName": "千问2.5-VL-7B-Instruct",
+     "License": "apache-2.0"
+    },
+    {
+     "Path": "Qwen",
+     "Name": "Qwen2.5-0.5B-Instruct",
+     "Downloads": 9012693,
+     "Stars": 257,
+     "Libraries": [
+      "transformer",
+      "safetensors"
+     ],
+     "LastUpdatedTime": 1740594293,
+     "BaseModel": [
+      "Qwen/Qwen2.5-0.5B"
+     ],
+     "ChineseName": "千问2.5-0.5B-Instruct",
+     "License": "apache-2.0"
+    },
+    {
+     "Path": "Qwen",
+     "Name": "Qwen2.5-7B-Instruct-GGUF",
+     "Downloads": 220946,
+     "Stars": 82,
+     "Libraries": [
+      "gguf"
+     ],
+     "LastUpdatedTime": 1786111709,
+     "BaseModel": [
+      "Qwen/Qwen2.5-7B-Instruct"
+     ],
+     "ChineseName": "千问2.5-7B-Instruct-GGUF",
+     "License": "apache-2.0"
+    }
+   ],
+   "TotalCount": 5119
+  }
+ }
+}

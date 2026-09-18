@@ -1,0 +1,193 @@
+# ==============================================================================
+# .gitignore - Prig IDE
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. INFORMACIÓN PRIVADA, CLAVES, TOKENS Y CREDENCIALES (CRÍTICO)
+# ------------------------------------------------------------------------------
+# Archivos de entorno con claves secretas
+.env
+.env.*
+*.env
+
+# Archivos de credenciales y tokens (Gemini, GitHub, Kaggle, Hugging Face, etc.)
+*token*.json
+*token*.txt
+*credential*.json
+*credentials*.json
+*secret*.json
+kaggle.json
+*kaggle*.json
+.prig_gemini.json
+*gemini*.json
+.prig_github.json
+*github*.json
+*.key
+*.pem
+*.cert
+*.crt
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+
+# ------------------------------------------------------------------------------
+# 2. BINARIOS COMPILADOS Y RUNTIME DE OLLAMA (GIGABYTES)
+# ------------------------------------------------------------------------------
+# Binarios locales de Ollama y ejecutables (evita subir ~4.3 GB)
+bin/
+lib/
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.a
+*.lib
+
+# ------------------------------------------------------------------------------
+# 3. MODELOS DE IA, PESOS, BLOBS Y PAQUETES
+# ------------------------------------------------------------------------------
+# Almacenamiento local de Ollama dentro del workspace
+.ollama/
+
+# Formatos de pesos y modelos pesados
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.ckpt
+*.h5
+blobs/
+models/
+downloads/
+
+# Paquetes exportados de biblioteca
+*.prigpack
+
+# ------------------------------------------------------------------------------
+# 4. DATOS DE USUARIO, TELEMETRÍA Y CACHÉS DE PRIG
+# ------------------------------------------------------------------------------
+# Datasets de telemetría y aprendizaje del usuario
+.prig_dataset/
+
+# Planes de estudio y seguimientos creados por el usuario
+.prig_plans/
+.prig_seguimientos/
+
+# Cachés web y temporales de Prig
+.prig_web_cache/
+**/.prig_web_cache/
+.prig_*
+
+# Cuadernos generados por el plan de estudio y descargados de Kaggle
+notebooks_plan/*
+!notebooks_plan/.gitkeep
+kaggle_notebooks/*
+!kaggle_notebooks/.gitkeep
+
+# Resultados de evaluaciones locales
+backend/evals/results/*.json
+
+# ------------------------------------------------------------------------------
+# 5. BASES DE DATOS Y CATÁLOGOS SQLITE
+# ------------------------------------------------------------------------------
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite3
+catalog.db
+learning.db
+k.db
+telemetry.db
+
+# ------------------------------------------------------------------------------
+# 6. ENTORNOS VIRTUALES Y PAQUETES DE PYTHON
+# ------------------------------------------------------------------------------
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# ------------------------------------------------------------------------------
+# 7. BYTECODE Y CACHÉS DE PYTHON
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ------------------------------------------------------------------------------
+# 8. CACHÉS DE TESTING, LINTERS Y COBERTURA
+# ------------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------------------------------------------
+# 9. JUPYTER NOTEBOOKS (CHECKPOINTS)
+# ------------------------------------------------------------------------------
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# ------------------------------------------------------------------------------
+# 10. ARCHIVOS TEMPORALES, LOGS Y SCRATCH
+# ------------------------------------------------------------------------------
+*.log
+logs/
+*.tmp
+tmp/
+temp/
+scratch/
+
+# ------------------------------------------------------------------------------
+# 11. SISTEMA OPERATIVO Y EDITORES / IDEs
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Configuraciones de editores locales
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.bak
+*.sublime-workspace
+*.sublime-project

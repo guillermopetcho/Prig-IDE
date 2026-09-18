@@ -1,0 +1,738 @@
+/* =========================================================================
+   Rediseño: barra de menú única, dos secciones, entornos y transparencia.
+   Se carga después de style.css y solo sobrescribe lo que cambia de sitio.
+   ========================================================================= */
+
+:root {
+    /* Controladas desde Configuración → Apariencia */
+    --superficie-alfa: 0.92;
+    --desenfoque: 10px;
+    --acento-usuario: #89b4fa;
+
+    --altura-menu: 30px;
+    --altura-estado: 24px;
+}
+
+/* Superficies translúcidas: un único lugar donde se decide la transparencia */
+.superficie {
+    background: rgba(30, 30, 46, var(--superficie-alfa));
+    backdrop-filter: blur(var(--desenfoque));
+    -webkit-backdrop-filter: blur(var(--desenfoque));
+}
+
+body.alta-transparencia .superficie,
+body.alta-transparencia .prig-menubar {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+body[data-densidad="compacta"] { --altura-menu: 26px; font-size: 12px; }
+body[data-densidad="amplia"]   { --altura-menu: 36px; }
+
+/* ---------------------------- Barra de menú ---------------------------- */
+
+#prig-topbar {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    height: var(--altura-menu);
+    background: rgba(24, 24, 37, var(--superficie-alfa));
+    backdrop-filter: blur(var(--desenfoque));
+    -webkit-backdrop-filter: blur(var(--desenfoque));
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 900;
+}
+
+.prig-menubar { display: flex; align-items: stretch; }
+
+.menu-raiz { position: relative; display: flex; }
+
+.menu-titulo {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-size: 12px;
+    padding: 0 11px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.menu-titulo:hover,
+.menu-raiz.abierto .menu-titulo {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+}
+.menu-titulo:focus-visible { outline: 2px solid var(--acento-usuario); outline-offset: -2px; }
+
+.menu-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 268px;
+    padding: 5px 0;
+    background: rgba(30, 30, 46, calc(var(--superficie-alfa) + 0.06));
+    backdrop-filter: blur(calc(var(--desenfoque) + 6px));
+    -webkit-backdrop-filter: blur(calc(var(--desenfoque) + 6px));
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 7px 7px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    z-index: 950;
+    /* Menús largos (Archivos, Vista) no pueden salirse de una pantalla baja */
+    max-height: calc(100vh - 44px);
+    overflow-y: auto;
+}
+.menu-item-check { width: 14px; display: inline-block; color: var(--accent-green); }
+.menu-panel .menu-item-label { white-space: nowrap; }
+.menu-item:hover .menu-item-check { color: #11111b; }
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 14px;
+    cursor: pointer;
+    text-align: left;
+}
+.menu-item:hover { background: var(--acento-usuario); color: #11111b; }
+.menu-item:hover .menu-item-accel { color: #11111b; opacity: 0.8; }
+.menu-item-accel { font-size: 10.5px; color: var(--text-muted); font-family: 'Fira Code', monospace; }
+.menu-separador { height: 1px; background: var(--border-color); margin: 5px 8px; }
+
+#prig-topbar-derecha {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 0;          /* sin esto el bloque del plan empuja y corta el nombre */
+    flex-shrink: 1;
+}
+#current-workspace-name {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+}
+.prig-menubar { flex-shrink: 0; }
+
+/* --------------------------- Dos secciones ---------------------------- */
+
+#prig-cuerpo {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#seccion-modelo {
+    width: 380px;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--border-color);
+}
+
+#resizer-secciones {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+}
+#resizer-secciones:hover { background: var(--acento-usuario); }
+
+/* #seccion-modelo usa display:flex, que gana al atributo hidden: sin esto no se ocultaba */
+#seccion-modelo[hidden], #resizer-secciones[hidden] { display: none; }
+
+.btn-ocultar-modelo {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 1px 5px;
+}
+.btn-ocultar-modelo:hover { color: var(--text-main); border-color: var(--border-color); }
+
+.barra-modelo-oculto {
+    width: 34px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding-top: 6px;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-panel);
+}
+.barra-modelo-oculto[hidden] { display: none; }
+.barra-modelo-oculto button {
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.barra-modelo-oculto button:hover { color: var(--acento-usuario, var(--accent-blue)); border-color: var(--border-color); }
+body.modo-zen .barra-modelo-oculto { display: none; }
+
+#seccion-trabajo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.seccion-cabecera {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    height: 28px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.panel-entorno { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.panel-entorno[hidden] { display: none; }
+
+body.modo-zen .trabajo-tabs { display: none; }
+
+/* ----------------------------- Barra de estado ------------------------- */
+
+#prig-estado {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: var(--altura-estado);
+    padding: 0 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(17, 17, 27, var(--superficie-alfa));
+    backdrop-filter: blur(var(--desenfoque));
+    -webkit-backdrop-filter: blur(var(--desenfoque));
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+#prig-mensaje-estado { color: var(--acento-usuario); }
+#prig-estado-derecha { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+
+/* --------------------------- Paleta de comandos ------------------------ */
+
+.prig-paleta {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 12vh;
+    z-index: 4000;
+}
+.prig-paleta[hidden] { display: none; }
+
+.paleta-caja {
+    width: min(620px, 92vw);
+    background: rgba(30, 30, 46, 0.97);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--acento-usuario);
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+#paleta-input {
+    width: 100%;
+    padding: 13px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+.paleta-lista { max-height: 44vh; overflow-y: auto; }
+.paleta-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    text-align: left;
+}
+.paleta-item:hover, .paleta-item.activo { background: rgba(137, 180, 250, 0.18); }
+.paleta-menu {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    min-width: 92px;
+}
+.paleta-label { flex: 1; }
+.paleta-accel { font-family: 'Fira Code', monospace; font-size: 10.5px; color: var(--text-muted); }
+.paleta-vacio { padding: 18px; text-align: center; color: var(--text-muted); font-size: 12px; }
+
+/* --------------------------- Editor de atajos -------------------------- */
+
+.atajo-fila {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.atajo-menu {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    min-width: 88px;
+    letter-spacing: 0.04em;
+}
+.atajo-label { flex: 1; font-size: 12px; color: var(--text-main); }
+.atajo-tecla {
+    font-family: 'Fira Code', monospace;
+    font-size: 10.5px;
+    padding: 3px 8px;
+    min-width: 116px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--acento-usuario);
+    cursor: pointer;
+}
+.atajo-tecla.capturando {
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
+    background: rgba(249, 226, 175, 0.12);
+}
+.atajo-reset {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 5px;
+}
+.atajo-reset:hover { color: var(--accent-red); }
+
+@media (max-width: 900px) {
+    #seccion-modelo { width: 300px; min-width: 200px; }
+    .trabajo-tab .tab-txt { display: none; }
+}
+
+/* ===================== Pestañas de la sección Modelo ===================== */
+
+.sub-tabs { display: flex; align-items: stretch; height: 100%; }
+
+.sub-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+.sub-tab:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
+.sub-tab.activo {
+    color: var(--acento-usuario);
+    border-bottom-color: var(--acento-usuario);
+    background: rgba(137, 180, 250, 0.08);
+}
+
+.vista-modelo { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.vista-modelo[hidden] { display: none; }
+
+/* =================== Pestañas del área de trabajo ======================= */
+
+/* ==================== Área de Trabajo Dividida (Paneles Izq / Der) ======================= */
+
+.trabajo-split-contenedor {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.panel-trabajo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 140px;
+    min-height: 0;
+    height: 100%;
+    position: relative;
+}
+.panel-trabajo[hidden] { display: none !important; }
+
+.resizer-trabajo {
+    width: 4px;
+    background: transparent;
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+    z-index: 10;
+}
+.resizer-trabajo:hover,
+.resizer-trabajo.arrastrando {
+    background: var(--acento-usuario, #89b4fa);
+}
+.resizer-trabajo[hidden] { display: none !important; }
+
+.trabajo-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 30px;
+    background: rgba(17, 17, 27, 0.5);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    min-width: 0;
+}
+.trabajo-pane-header[hidden] { display: none !important; }
+
+.trabajo-pane-acciones {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 6px;
+    flex-shrink: 0;
+    height: 100%;
+}
+
+.btn-accion-panel {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+.btn-accion-panel:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+.btn-accion-panel.btn-swap:hover {
+    color: var(--acento-usuario, #89b4fa);
+    background: rgba(137, 180, 250, 0.15);
+}
+.btn-accion-panel.btn-cerrar-panel:hover {
+    color: var(--accent-red, #f38ba8);
+    background: rgba(243, 139, 168, 0.2);
+}
+
+.trabajo-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+    height: 100%;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+.trabajo-tabs[hidden] { display: none; }
+
+.trabajo-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+.trabajo-tab:hover { background: rgba(255, 255, 255, 0.07); color: var(--text-main); }
+.trabajo-tab.activo {
+    background: rgba(137, 180, 250, 0.12);
+    border-bottom-color: var(--acento-usuario);
+    color: #fff;
+}
+.tab-mover {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all 0.15s ease;
+}
+.trabajo-tab:hover .tab-mover { opacity: 0.9; }
+.tab-mover:hover {
+    opacity: 1 !important;
+    background: rgba(137, 180, 250, 0.25);
+    color: var(--acento-usuario, #89b4fa);
+}
+.tab-cerrar { opacity: 0.5; font-size: 10px; padding: 2px; border-radius: 3px; }
+.tab-cerrar:hover { opacity: 1; background: rgba(243, 139, 168, 0.25); color: var(--accent-red); }
+
+.trabajo-vistas { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.vista-trabajo { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.vista-trabajo[hidden] { display: none; }
+
+/* Una herramienta incrustada ocupa la pestaña entera, sin cromo de ventana */
+#vista-herramienta .modal-content.incrustado,
+.vista-herramienta-contenedor .modal-content.incrustado {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+}
+#vista-herramienta .modal-content.incrustado > .modal-header,
+.vista-herramienta-contenedor .modal-content.incrustado > .modal-header { border-radius: 0; }
+
+/* ==================== Varios códigos uno al lado ======================= */
+
+#vista-editor { flex-direction: column; }
+
+.editor-grupos { display: flex; gap: 1px; background: var(--border-color); flex-shrink: 0; }
+.editor-grupos[hidden] { display: none; }
+
+.editor-grupo {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-editor, #1e1e1e);
+    height: 42vh;
+}
+.grupo-cabecera {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--border-color);
+}
+.grupo-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grupo-cerrar {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 11px; padding: 2px 4px;
+}
+.grupo-cerrar:hover { color: var(--accent-red); }
+.grupo-monaco { flex: 1; min-height: 0; }
+
+#monaco-editor-container.con-divisiones { flex: 1; min-height: 140px; }
+
+/* ================= Bloque del plan en la barra superior ================= */
+
+.plan-envoltorio { position: relative; display: flex; align-items: center; }
+
+.plan-actual {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 260px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.plan-actual:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-main); }
+.plan-actual.con-plan {
+    color: var(--accent-green);
+    border-color: rgba(166, 227, 161, 0.4);
+    background: linear-gradient(to right,
+        rgba(166, 227, 161, 0.22) var(--pct, 0%),
+        rgba(255, 255, 255, 0.05) var(--pct, 0%));
+}
+#plan-actual-texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.plan-detalle {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 320px;
+    padding: 12px 14px;
+    background: rgba(30, 30, 46, 0.98);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+    z-index: 1200;
+    text-align: left;
+    white-space: normal;
+}
+.plan-detalle[hidden] { display: none; }
+
+.plan-det-titulo { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 8px; line-height: 1.35; }
+.plan-det-barra { height: 5px; background: rgba(0, 0, 0, 0.4); border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
+.plan-det-barra > div { height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
+.plan-det-cifras { display: flex; gap: 10px; align-items: center; font-size: 10.5px; color: var(--text-muted); flex-wrap: wrap; }
+.plan-det-cifras b { color: var(--accent-green); font-size: 12px; }
+.plan-det-modo {
+    margin-left: auto; padding: 1px 7px; border-radius: 9px; font-size: 9.5px;
+    background: rgba(203, 166, 247, 0.16); color: var(--accent-purple);
+}
+.plan-det-sep { height: 1px; background: var(--border-color); margin: 10px 0 8px; }
+.plan-det-etiqueta { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 3px; }
+.plan-det-bloque { font-size: 12.5px; color: var(--acento-usuario); font-weight: 600; margin-bottom: 6px; }
+.plan-det-texto { font-size: 11px; color: var(--text-main); line-height: 1.5; margin-bottom: 4px; }
+.plan-det-temas { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.plan-det-temas span {
+    font-size: 9.5px; padding: 2px 7px; border-radius: 9px;
+    background: rgba(137, 180, 250, 0.14); color: var(--acento-usuario);
+}
+.plan-det-pie {
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color);
+    font-size: 10px; color: var(--text-muted); text-align: center;
+}
+
+/* ============ Las vistas llenan su sección, no su ancho antiguo ============
+   #sidebar-left y #sidebar-right conservaban anchos fijos (240px y 360px) de
+   cuando eran barras laterales. Dentro de la sección Modelo eso hacía que no se
+   adaptaran: dejaban hueco a la derecha o se salían al estrechar. */
+
+.vista-modelo > aside,
+.vista-modelo > .panel,
+#vista-modelo #sidebar-right,
+#vista-archivos #sidebar-left {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* La expansión al 55vw pertenecía al panel lateral; aquí manda la sección */
+#vista-modelo #sidebar-right.ai-expanded { width: 100% !important; }
+
+/* Contenido interno: que scrollee dentro y no empuje la sección */
+.vista-modelo #ai-chat-messages,
+.vista-modelo #file-tree-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.vista-modelo #ai-chat-input-wrapper { flex-shrink: 0; }
+
+/* Nada dentro de la sección puede forzar un ancho mayor que ella */
+#seccion-modelo, #seccion-modelo * { max-width: 100%; }
+#seccion-modelo pre,
+#seccion-modelo code,
+#seccion-modelo .msg-content { overflow-x: auto; word-break: break-word; }
+
+/* La sección sí puede encogerse: sin esto, flex le da el ancho de su contenido */
+#seccion-modelo { min-width: 0; flex-shrink: 0; }
+#seccion-trabajo { min-width: 0; }
+
+/* Un display en línea (display:flex) anula el atributo hidden: sin esto, las opciones
+   del chat que no aplican al modelo elegido seguían viéndose. */
+#ai-chat-opciones-modelo [hidden] { display: none !important; }
+
+/* =========================================================================
+   Menús desplegables (Selects, Options, Optgroups) - Tema Oscuro Garantizado
+   ========================================================================= */
+select,
+select option,
+select optgroup {
+    background-color: #1e1e2e !important;
+    color: #cdd6f4 !important;
+}
+
+select {
+    border: 1px solid var(--border-color, #45475a);
+}
+
+select:focus {
+    border-color: var(--acento-usuario, #89b4fa) !important;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+    background-color: #313244 !important;
+    color: #ffffff !important;
+}
+
+select optgroup {
+    background-color: #181825 !important;
+    color: #89b4fa !important;
+    font-weight: bold !important;
+}
+
+#model-select,
+#model-select option {
+    background-color: #1e1e2e !important;
+    color: #cdd6f4 !important;
+}
+
+#model-select optgroup {
+    background-color: #181825 !important;
+    color: #89b4fa !important;
+}
+
+
+/* Editor sin archivos: un mensaje y accesos, en vez de un archivo de ejemplo */
+.editor-vacio { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--text-muted); text-align:center; padding:24px; }
+.editor-vacio[hidden] { display:none; }
+.editor-vacio > i { font-size:40px; color:var(--accent-blue); opacity:.7; }
+.editor-vacio h2 { color:var(--text-main); font-size:17px; margin:4px 0 0; }
+.editor-vacio p { margin:0; font-size:12.5px; }
+.editor-vacio-acciones { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
+.editor-vacio-acciones button { background:rgba(255,255,255,.05); color:var(--text-main); border:1px solid var(--border-color); border-radius:7px; padding:7px 13px; font-size:12px; cursor:pointer; display:inline-flex; gap:7px; align-items:center; }
+.editor-vacio-acciones button:hover { border-color:var(--accent-blue); }

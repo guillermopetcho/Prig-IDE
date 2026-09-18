@@ -1,0 +1,26 @@
+{
+  "name": "S1 - Generación de ejercicios verificables",
+  "description": "¿Puede un modelo open source pequeño generar ejercicios cuya solución de referencia pase sus propios tests y cuyos tests discriminen?",
+  "concepts": [
+    "comprensiones de listas en Python",
+    "argumentos por defecto mutables",
+    "funciones que devuelven varios valores mediante tuplas",
+    "uso de diccionarios para contar frecuencias",
+    "manejo de excepciones con try/except",
+    "slicing de listas y cadenas",
+    "funciones recursivas simples",
+    "ordenar con sorted y una clave personalizada",
+    "uso de enumerate y zip",
+    "operaciones con conjuntos: unión e intersección",
+    "formateo de cadenas con f-strings",
+    "filtrado de datos con condicionales dentro de un bucle",
+    "clases con __init__ y un método",
+    "generadores con yield",
+    "decoradores sencillos",
+    "normalización de una lista de números",
+    "separación de datos en entrenamiento y prueba",
+    "cálculo de la media y la desviación típica sin librerías",
+    "búsqueda binaria sobre una lista ordenada",
+    "validación de entrada con expresiones regulares"
+  ]
+}

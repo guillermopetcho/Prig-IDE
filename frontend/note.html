@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note - Anotador Inteligente (Prig IDE)</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  
+  <!-- Monaco Editor Loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #242424;
+      font-family: 'Ubuntu', sans-serif;
+    }
+    #note-app-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+    }
+    #note-headerbar {
+      background: #303030;
+      height: 42px;
+      border-bottom: 1px solid #1e1e1e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      user-select: none;
+    }
+    .ubuntu-btn {
+      background: #3c3c3c;
+      border: 1px solid #4a4a4a;
+      color: #eee;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.2s ease;
+    }
+    .ubuntu-btn:hover {
+      background: #4a4a4a;
+    }
+    .ubuntu-btn-primary {
+      background: #3584e4;
+      border: none;
+      color: #ffffff;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .ubuntu-btn-primary:hover {
+      background: #1c71d8;
+    }
+    #note-monaco-container {
+      flex: 1;
+      background: #1e1e1e;
+    }
+    #note-statusbar {
+      background: #2a2a2a;
+      height: 28px;
+      border-top: 1px solid #1e1e1e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 11px;
+      color: #aaaaaa;
+      user-select: none;
+    }
+    .picker-item:hover {
+      background: rgba(137, 180, 250, 0.15);
+    }
+    .command-badge {
+      background: rgba(203,166,247,0.2);
+      color: var(--accent-purple);
+      border: 1px solid var(--accent-purple);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="note-app-container">
+    
+    <!-- Ubuntu HeaderBar -->
+    <div id="note-headerbar">
+      <!-- Izquierda: Abrir, Nueva Nota -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button class="ubuntu-btn" onclick="openWorkspacePicker();" title="Abrir archivo del Proyecto Prig IDE">
+          <i class="fa-regular fa-folder-open"></i> Abrir <i class="fa-solid fa-chevron-down" style="font-size: 9px;"></i>
+        </button>
+        <button class="ubuntu-btn" onclick="document.getElementById('file-loader').click();" title="Cargar desde disco local">
+          <i class="fa-solid fa-upload"></i>
+        </button>
+        <input type="file" id="file-loader" style="display:none;" onchange="loadLocalFile(this)">
+        
+        <button class="ubuntu-btn" onclick="newNote();" title="Nueva Nota (+)">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+
+        <span class="command-badge" title="Escribe /ex: tema y presiona Enter para que la IA genere una explicación pedagógica en ~500 palabras">
+          💡 Comando IA: <code>/ex: tema</code>
+        </span>
+      </div>
+
+      <!-- Centro: Título -->
+      <div id="note-title" style="color: #ffffff; font-weight: bold; font-size: 13px;">
+        Documento sin título 1
+      </div>
+
+      <!-- Derecha: Comentar IA, Guardar -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="ubuntu-btn" onclick="commentCodeWithAI();" style="background: rgba(203,166,247,0.2); border: 1px solid var(--accent-purple); color: var(--accent-purple); font-weight: 600;">
+          <i class="fa-solid fa-robot"></i> Comentar IA
+        </button>
+
+        <button class="ubuntu-btn-primary" onclick="saveNoteFile();">
+          <i class="fa-solid fa-floppy-disk"></i> Guardar
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenedor del Editor Monaco -->
+    <div id="note-monaco-container"></div>
+
+    <!-- Barra de Estado Inferior con Hardware & Modelo -->
+    <div id="note-statusbar">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span>Texto plano <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+        <span>Anchura del tabulador: 4 <i class="fa-solid fa-chevron-down" style="font-size: 8px;"></i></span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px; font-weight: 500;">
+        <span id="stat-cpu" style="color: var(--accent-blue);"><i class="fa-solid fa-microchip"></i> CPU: --%</span>
+        <span id="stat-ram" style="color: var(--accent-yellow);"><i class="fa-solid fa-memory"></i> RAM: --%</span>
+        <span id="stat-gpu" style="color: var(--accent-green);"><i class="fa-solid fa-bolt"></i> GPU: --</span>
+        <span id="stat-model" style="color: var(--accent-purple); font-weight: bold;"><i class="fa-solid fa-robot"></i> Modelo: qwen2.5-coder:7b</span>
+        <span id="stat-lncol" style="color: #ffffff;">Ln 1, Col 1</span>
+        <span>INS</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal Picker de Archivos Prig -->
+  <div id="modal-picker" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; width: 480px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 36px rgba(0,0,0,0.6);">
+      <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin: 0; color: #fff; font-size: 14px;"><i class="fa-solid fa-folder-open" style="color: var(--accent-blue);"></i> Cargar Archivo de Prig IDE</h4>
+        <button onclick="document.getElementById('modal-picker').style.display='none';" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="picker-file-list" style="flex: 1; overflow-y: auto; max-height: 350px;"></div>
+    </div>
+  </div>
+
+  <!-- Script de Lógica Independiente de Note -->
+  <script>
+    let noteEditor = null;
+    let currentPath = localStorage.getItem('prig_note_active_path') || null;
+    let activeModel = "qwen2.5-coder:7b";
+
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+    require(['vs/editor/editor.main'], () => {
+      monaco.editor.defineTheme('prig-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [],
+        colors: {
+          'editor.background': '#1e1e1e',
+          'editor.lineHighlightBackground': '#2a2d2e'
+        }
+      });
+
+      const savedCode = localStorage.getItem('prig_note_saved_content') ||
+        '# Bloc de Notas Inteligente (Note)\n# Escribe /ex: tema y presiona Enter para pedir una explicación en ~500 palabras.\n# Ejemplo:\n# /ex: algoritmos de ordenamiento\n\n';
+
+      noteEditor = monaco.editor.create(document.getElementById('note-monaco-container'), {
+        value: savedCode,
+        language: 'python',
+        theme: 'prig-dark',
+        automaticLayout: true,
+        fontSize: 13,
+        fontFamily: "'Fira Code', 'Ubuntu Mono', monospace",
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        smoothScrolling: true,
+        lineNumbers: 'on',
+        renderLineHighlight: 'all',
+        folding: true,
+        foldingStrategy: 'auto',
+        showFoldingControls: 'always'
+      });
+
+      noteEditor.onDidChangeModelContent(() => {
+        const val = noteEditor.getValue();
+        localStorage.setItem('prig_note_saved_content', val);
+        if (currentPath) localStorage.setItem('prig_note_active_path', currentPath);
+      });
+
+      noteEditor.onDidChangeCursorPosition((e) => {
+        const pos = e.position;
+        document.getElementById('stat-lncol').innerText = `Ln ${pos.lineNumber}, Col ${pos.column}`;
+      });
+
+      // PARSER DE COMANDO /ex: <tema> AL PRESIONAR ENTER
+      noteEditor.addCommand(monaco.KeyCode.Enter, async () => {
+        const position = noteEditor.getPosition();
+        const lineContent = noteEditor.getModel().getLineContent(position.lineNumber);
+        const match = lineContent.match(/^\/ex:\s*(.+)/i);
+
+        if (match) {
+          const topic = match[1].trim();
+          const lineNumber = position.lineNumber;
+          
+          const loadingTag = `\n## 📚 Explicación: ${topic}\n*🤖 Generando explicación pedagógica en ~500 palabras...*\n\n`;
+          noteEditor.executeEdits("ex-cmd", [{
+            range: new monaco.Range(lineNumber, 1, lineNumber, lineContent.length + 1),
+            text: loadingTag
+          }]);
+
+          try {
+            const res = await fetch('/api/note/explain', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ topic: topic, model: activeModel })
+            });
+
+            if (res.ok) {
+              const reader = res.body.getReader();
+              const decoder = new TextDecoder("utf-8");
+              let fullExplanation = "";
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                fullExplanation += decoder.decode(value, { stream: true });
+              }
+
+              const currentVal = noteEditor.getValue();
+              const updatedVal = currentVal.replace(
+                `*🤖 Generando explicación pedagógica en ~500 palabras...*`,
+                fullExplanation.trim()
+              );
+              noteEditor.setValue(updatedVal);
+            }
+          } catch (e) {
+            alert("Error al solicitar explicación: " + e.message);
+          }
+        } else {
+          noteEditor.trigger('keyboard', 'type', { text: '\n' });
+        }
+      });
+
+      // Autocompletado IA con TAB
+      if (monaco.languages.registerInlineCompletionsProvider) {
+        monaco.languages.registerInlineCompletionsProvider('python', {
+          provideInlineCompletions: async (model, position, context, token) => {
+            const line = model.getLineContent(position.lineNumber);
+            if (!line.trim() || line.trim().length < 2) return { items: [] };
+
+            const prefix = model.getValueInRange({
+              startLineNumber: Math.max(1, position.lineNumber - 10),
+              startColumn: 1,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column
+            });
+
+            try {
+              const res = await fetch('/api/ai/inline-complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code_prefix: prefix, model: activeModel })
+              });
+              if (!res.ok) return { items: [] };
+              const data = await res.json();
+              if (data.completion) {
+                return {
+                  items: [{
+                    insertText: data.completion,
+                    range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + data.completion.length)
+                  }]
+                };
+              }
+            } catch (e) {}
+            return { items: [] };
+          },
+          freeInlineCompletions: () => {}
+        });
+      }
+    });
+
+    // Monitoreo de Hardware
+    async function updateHardwareStats() {
+      try {
+        const resStats = await fetch('/api/system/stats');
+        if (resStats.ok) {
+          const s = await resStats.json();
+          document.getElementById('stat-cpu').innerHTML = `<i class="fa-solid fa-microchip"></i> CPU: ${s.cpu_pct || 0}%`;
+          document.getElementById('stat-ram').innerHTML = `<i class="fa-solid fa-memory"></i> RAM: ${s.ram_used_gb || 0}GB/${s.ram_total_gb || 0}GB`;
+          document.getElementById('stat-gpu').innerHTML = `<i class="fa-solid fa-bolt"></i> GPU: ${(s.gpu_used_gb || 0)}GB/${(s.gpu_total_gb || 0)}GB`;
+        }
+
+        const resCfg = await fetch('/api/ai/config');
+        if (resCfg.ok) {
+          const c = await resCfg.json();
+          activeModel = c.agent1_model || "qwen2.5-coder:7b";
+          document.getElementById('stat-model').innerHTML = `<i class="fa-solid fa-robot"></i> Modelo: ${activeModel}`;
+        }
+      } catch (e) {}
+    }
+
+    setInterval(updateHardwareStats, 3500);
+    updateHardwareStats();
+
+    function newNote() {
+      if (noteEditor) {
+        noteEditor.setValue('# Documento sin título\n\n');
+        currentPath = null;
+        localStorage.removeItem('prig_note_active_path');
+        document.getElementById('note-title').innerText = 'Documento sin título 1';
+      }
+    }
+
+    async function openWorkspacePicker() {
+      try {
+        const res = await fetch('/api/tree');
+        if (!res.ok) throw new Error("Error al obtener árbol");
+        const tree = await res.json();
+        
+        const listEl = document.getElementById('picker-file-list');
+        const renderTree = (items) => {
+          let html = '';
+          items.forEach(it => {
+            if (it.type === 'directory') {
+              if (it.children) html += renderTree(it.children);
+            } else {
+              html += `
+                <div class="picker-item" onclick="selectWorkspaceFile('${it.path}')" style="padding: 8px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                  <span style="color: #fff;"><i class="fa-regular fa-file-code" style="color: var(--accent-blue);"></i> ${it.name}</span>
+                  <span style="color: var(--text-muted); font-size: 10px;">${it.path}</span>
+                </div>
+              `;
+            }
+          });
+          return html;
+        };
+        listEl.innerHTML = renderTree(tree);
+        document.getElementById('modal-picker').style.display = 'flex';
+      } catch (err) {
+        alert("Error cargando archivos: " + err.message);
+      }
+    }
+
+    async function selectWorkspaceFile(path) {
+      try {
+        const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error("Error leyendo archivo");
+        const data = await res.json();
+        if (noteEditor) {
+          noteEditor.setValue(data.content || '');
+          currentPath = path;
+          localStorage.setItem('prig_note_active_path', path);
+          document.getElementById('note-title').innerText = path.split('/').pop();
+        }
+        document.getElementById('modal-picker').style.display = 'none';
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    function loadLocalFile(input) {
+      if (input.files && input.files[0]) {
+        const r = new FileReader();
+        r.onload = e => {
+          if (noteEditor) noteEditor.setValue(e.target.result);
+          document.getElementById('note-title').innerText = input.files[0].name;
+        };
+        r.readAsText(input.files[0]);
+      }
+    }
+
+    async function saveNoteFile() {
+      if (!noteEditor) return;
+      const content = noteEditor.getValue();
+      let path = currentPath;
+      if (!path) {
+        path = prompt("Nombre o ruta del archivo en Prig IDE para guardar:", "mi_nota.py");
+        if (!path) return;
+      }
+      try {
+        const res = await fetch('/api/file', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: path, content: content })
+        });
+        if (!res.ok) throw new Error("Error al guardar");
+        currentPath = path;
+        localStorage.setItem('prig_note_active_path', path);
+        document.getElementById('note-title').innerText = path.split('/').pop();
+        alert(`✅ Nota guardada exitosamente en '${path}'`);
+      } catch (err) {
+        alert("Error al guardar: " + err.message);
+      }
+    }
+
+    async function commentCodeWithAI() {
+      if (!noteEditor) return;
+      const code = noteEditor.getValue();
+      if (!code.trim()) return;
+
+      const titleEl = document.getElementById('note-title');
+      const oldTitle = titleEl.innerText;
+      titleEl.innerText = '🤖 IA Comentando código...';
+
+      try {
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: "Agrega comentarios explicativos en español (usando #) a cada línea de este código:\n\n" + code,
+            model: activeModel,
+            mode: "chat"
+          })
+        });
+
+        if (!res.ok) throw new Error("Error comunicando con IA");
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let full = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += decoder.decode(value, { stream: true });
+        }
+
+        const clean = full.replace(/^```python\n?/g, '').replace(/^```\n?/g, '').replace(/```$/g, '').trim();
+        noteEditor.setValue(clean);
+        titleEl.innerText = oldTitle;
+      } catch (e) {
+        titleEl.innerText = oldTitle;
+        alert("Error comentando código: " + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
