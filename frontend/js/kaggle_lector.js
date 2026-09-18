@@ -208,6 +208,16 @@
           .kg-dialogo { max-width:94vw; max-height:92vh; overflow:auto; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; padding:16px; }
           .kg-opcion { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:4px 0; cursor:pointer; }
           @media (max-width: 1100px) { .kg-celda { grid-template-columns: 1fr; } .kg-original { border-right:none; } .kg-datos-rej { grid-template-columns:1fr; } }
+          @container (max-width: 1100px) { .kg-celda { grid-template-columns: 1fr; } .kg-original { border-right:none; } .kg-datos-rej { grid-template-columns:1fr; } }
+          @container (max-width: 780px) {
+            #kaggle-raiz { grid-template-columns:52px 1fr; }
+            .kg-nav { padding:10px 6px; align-items:center; }
+            .kg-logo { font-size:0; padding:0; }
+            .kg-logo::before { content:'k'; font-size:24px; }
+            .kg-nav button.kg-nav-item { font-size:0; gap:0; padding:9px; justify-content:center; }
+            .kg-nav button.kg-nav-item i { font-size:14px; width:auto; }
+            #kg-cuenta { display:none; }
+          }
         `;
         document.head.appendChild(css);
     }
@@ -229,7 +239,7 @@
         r.innerHTML = `
           <nav class="kg-nav" id="kg-nav">
             <div class="kg-logo">kaggle</div>
-            ${SECCIONES.map(([id, icono, texto]) => `<button class="kg-nav-item" data-seccion="${id}"><i class="fa-solid ${icono}"></i>${texto}</button>`).join('')}
+            ${SECCIONES.map(([id, icono, texto]) => `<button class="kg-nav-item" data-seccion="${id}" title="${texto}"><i class="fa-solid ${icono}"></i>${texto}</button>`).join('')}
             <span style="flex:1"></span>
             <div id="kg-cuenta" style="padding:6px 4px;"></div>
           </nav>
@@ -356,7 +366,7 @@
             if (g.configurado) nube = (await json('/api/gemini/modelos')).modelos.map(m => `gemini:${m.id}`);
         } catch (e) { /* sin Gemini */ }
         estado.modelos = [...locales, ...nube];
-        const preferido = leerLocal('prig_kaggle_modelo') || leerLocal('prig_desafios_modelo') || (window.aiConfig && window.aiConfig.agent1_model);
+        const preferido = (window.PrigModelos && window.PrigModelos.para('explicar')) || leerLocal('prig_kaggle_modelo') || leerLocal('prig_desafios_modelo') || (window.aiConfig && window.aiConfig.agent1_model);
         estado.modelo = estado.modelos.includes(preferido) ? preferido : (estado.modelos[0] || preferido || '');
         const sel = $('kg-modelo');
         if (sel) pintarSelectorModelo(sel);

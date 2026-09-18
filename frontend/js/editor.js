@@ -622,7 +622,10 @@ class EditorManager {
         const placeholderLine = lineNumber + 1;
 
         const modelSelect = document.getElementById('model-select') || document.getElementById('ai-model-select');
-        const selectedModel = modelSelect ? modelSelect.value : null;
+        // Prig//: escribe código: el modelo elegido para «Código» en Configuración, o el del chat
+        const selectedModel = window.PrigModelos
+            ? window.PrigModelos.para('codigo', modelSelect ? modelSelect.value : null)
+            : (modelSelect ? modelSelect.value : null);
 
         try {
             const res = await fetch('/api/ai/inline-prompt', {

@@ -75,6 +75,11 @@ class AIEngine:
             "agent2_model": "qwen2.5-coder:7b",
             "agent3_model": "qwen2.5-coder:7b",
             "designer_model": "qwen2.5-coder:7b",
+            # Un modelo por tarea (Configuración global). Vacío = automático: lo que
+            # elija cada sección, como antes. Ollama los carga solo al usarlos.
+            "modelo_codigo": "",         # escribir código: Prig//:, crear desafíos
+            "modelo_explicar": "",       # explicar: Kaggle, GitHub, explicaciones del editor
+            "modelo_autocompletar": "",  # rellenar código mientras se escribe
             "depth_level": "intermediate",
             "temperature": 0.3,
             "num_ctx": 4096,
@@ -117,6 +122,17 @@ class AIEngine:
 
     def get_config(self) -> Dict[str, Any]:
         return self.config
+
+    ROLES = {"codigo": "modelo_codigo", "explicar": "modelo_explicar", "autocompletar": "modelo_autocompletar"}
+
+    def modelo_para(self, rol: Optional[str], pedido: Optional[str] = None) -> Optional[str]:
+        """ El modelo de una tarea: el que se pide explícitamente, si no el elegido para
+        ese rol en la configuración global, si no None (automático) """
+        pedido = (pedido or "").strip()
+        if pedido:
+            return pedido
+        clave = self.ROLES.get(rol or "", rol or "")
+        return (str(self.config.get(clave) or "")).strip() or None
 
     def update_config(self, new_cfg: Dict[str, Any]) -> Dict[str, Any]:
         for k, v in new_cfg.items():

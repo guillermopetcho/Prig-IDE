@@ -1117,3 +1117,24 @@ if (document.readyState === 'loading') {
 } else {
     initSeguimientoModule();
 }
+
+window.cambiarPestanaAprendizaje = function(tabName) {
+    const paneRutas = document.getElementById('pane-aprendizaje-rutas');
+    const paneDiagramas = document.getElementById('pane-aprendizaje-diagramas');
+    const btnRutas = document.getElementById('tab-btn-seguimiento-rutas');
+    const btnDiagramas = document.getElementById('tab-btn-seguimiento-diagramas');
+
+    if (tabName === 'diagramas') {
+        if (paneRutas) paneRutas.style.display = 'none';
+        if (paneDiagramas) paneDiagramas.style.display = 'flex';
+        if (btnRutas) btnRutas.classList.remove('active');
+        if (btnDiagramas) btnDiagramas.classList.add('active');
+        if (window.diagramasML) window.diagramasML.render();
+    } else {
+        if (paneDiagramas) paneDiagramas.style.display = 'none';
+        if (paneRutas) paneRutas.style.display = 'flex';
+        if (btnDiagramas) btnDiagramas.classList.remove('active');
+        if (btnRutas) btnRutas.classList.add('active');
+        if (window.guiadoMgr) window.guiadoMgr.drawConnectors();
+    }
+};

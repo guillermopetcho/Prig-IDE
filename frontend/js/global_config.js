@@ -711,6 +711,56 @@ class GlobalConfigManager {
         }
     }
 
+    /**
+     * Los tres selectores de «Modelos por tarea». Los que saben rellenar al medio
+     * (capacidad `insert`) llevan ✦ y, en «Rellenar código», van primero.
+     */
+    async pintarModelosPorTarea(cfg) {
+        const selects = [...document.querySelectorAll('#gcfg-roles select[data-rol]')];
+        if (!selects.length) return;
+        let modelos = [];
+        try {
+            const res = await fetch('/api/modelos');
+            if (res.ok) modelos = ((await res.json()).modelos || []).filter(m => !(m.capacidades || []).includes('embedding'));
+        } catch (e) { /* sin Ollama: solo «Automático» y lo ya elegido */ }
+        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const gb = (b) => b ? ` · ${(b / 1e9).toFixed(1)} GB` : '';
+        const rellena = (m) => (m.capacidades || []).includes('insert');
+
+        selects.forEach(sel => {
+            const rol = sel.dataset.rol;
+            const elegido = (cfg && cfg[window.PrigModelos.ROLES[rol]]) || '';
+            let lista = [...modelos].sort((a, b) => (a.bytes || 0) - (b.bytes || 0));
+            if (rol === 'autocompletar') lista.sort((a, b) => rellena(b) - rellena(a));
+            const auto = {
+                codigo: 'Automático (el del chat)',
+                explicar: 'Automático (el de cada sección)',
+                autocompletar: 'Automático (el más pequeño que rellene al medio)',
+            }[rol];
+            let html = `<option value="">${auto}</option>`;
+            html += lista.map(m => `<option value="${esc(m.nombre)}">${esc(m.nombre)}${gb(m.bytes)}${rellena(m) ? ' ✦' : ''}</option>`).join('');
+            if (elegido && !lista.some(m => m.nombre === elegido)) {
+                html += `<option value="${esc(elegido)}">${esc(elegido)} (no instalado)</option>`;
+            }
+            sel.innerHTML = html;
+            sel.value = elegido;
+            sel.onchange = () => this._avisoRoles(modelos);
+        });
+        this._avisoRoles(modelos);
+    }
+
+    _avisoRoles(modelos) {
+        const aviso = document.getElementById('gcfg-roles-aviso');
+        const sel = document.getElementById('gcfg-modelo-autocompletar');
+        if (!aviso || !sel) return;
+        const m = modelos.find(x => x.nombre === sel.value);
+        const sinInsert = m && !(m.capacidades || []).includes('insert');
+        aviso.hidden = !sinInsert;
+        aviso.innerHTML = sinInsert
+            ? `<i class="fa-solid fa-triangle-exclamation"></i> ${m.nombre} no sabe rellenar al medio: solo completará el final de la línea, sin mirar lo que hay después del cursor.`
+            : '';
+    }
+
     async loadSettingsIntoUI() {
         // 1. Cargar Configuración de IA desde el backend (fuente de verdad y persistente)
         try {
@@ -734,6 +784,7 @@ class GlobalConfigManager {
                 };
 
                 setValue('gcfg-tutor-model', cfg.agent1_model || 'qwen2.5-coder:7b');
+                this.pintarModelosPorTarea(cfg);
                 setValue('gcfg-depth-level', cfg.depth_level || 'intermediate');
                 setValue('cfg-num-ctx', cfg.num_ctx);
                 setValue('cfg-num-gpu', cfg.num_gpu);
@@ -928,6 +979,10 @@ class GlobalConfigManager {
         // Ajustes que debe conocer el backend (inferencia y ejecución)
         const payload = {
             agent1_model: document.getElementById('gcfg-tutor-model')?.value || undefined,
+            // "" = automático: se envía igual para poder volver a él
+            ...Object.fromEntries(Object.entries(window.PrigModelos.ROLES)
+                .map(([rol, clave]) => [clave, document.getElementById(`gcfg-modelo-${rol}`)?.value])
+                .filter(([, v]) => v !== undefined)),
             depth_level: document.getElementById('gcfg-depth-level')?.value || undefined,
             temperature: parseFloat(document.getElementById('cfg-temperature')?.value ?? '0.3'),
             num_ctx: parseInt(document.getElementById('cfg-num-ctx')?.value ?? '4096', 10),
@@ -1191,6 +1246,18 @@ window.closeGlobalConfigModal = function() {
     if (window.globalConfigMgr) {
         window.globalConfigMgr.closeModal();
     }
+};
+
+/**
+ * El modelo de cada tarea (Configuración global → Modelos por tarea).
+ * `para(rol, respaldo)`: el elegido para ese rol, o `respaldo` si está en automático.
+ */
+window.PrigModelos = {
+    ROLES: { codigo: 'modelo_codigo', explicar: 'modelo_explicar', autocompletar: 'modelo_autocompletar' },
+    para(rol, respaldo = null) {
+        const cfg = window.aiConfig || {};
+        return String(cfg[this.ROLES[rol]] || '').trim() || respaldo || null;
+    },
 };
 
 document.addEventListener('DOMContentLoaded', () => {

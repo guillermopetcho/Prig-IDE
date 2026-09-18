@@ -139,6 +139,17 @@
           .gh-menu button { display:flex; width:100%; gap:8px; align-items:flex-start; background:none; border:none; color:var(--text-main); padding:7px 9px; border-radius:6px; cursor:pointer; text-align:left; font-size:12px; }
           .gh-menu button:hover { background:rgba(255,255,255,.06); }
           @media (max-width: 1150px) { .gh-repo { grid-template-columns:210px minmax(0,1fr); } .gh-profesor { grid-column:1 / -1; border-left:none; border-top:1px solid var(--border-color); max-height:45vh; } .gh-partes { grid-template-columns:1fr; } }
+          @container (max-width: 1150px) { .gh-repo { grid-template-columns:210px minmax(0,1fr); } .gh-profesor { grid-column:1 / -1; border-left:none; border-top:1px solid var(--border-color); max-height:45vh; } .gh-partes { grid-template-columns:1fr; } .gh-cuadro { border-left:none; border-top:1px solid var(--border-color); } }
+          @container (max-width: 780px) {
+            #github-raiz { grid-template-columns:52px 1fr; }
+            .gh-nav { padding:10px 6px; align-items:center; }
+            .gh-logo { font-size:0; padding:2px 0 12px; gap:0; }
+            .gh-nav-item { font-size:0; gap:0; padding:9px; justify-content:center; }
+            .gh-nav-item i { font-size:14px; }
+            #gh-token { display:none; }
+            .gh-repo { grid-template-columns:160px minmax(0,1fr); }
+          }
+          @container (max-width: 520px) { .gh-repo { grid-template-columns:1fr; grid-auto-rows:max-content; overflow-y:auto; } .gh-arbol { max-height:30vh; border-right:none; border-bottom:1px solid var(--border-color); } .gh-cifras { grid-template-columns:repeat(2,1fr); } }
         `;
         document.head.appendChild(css);
     }
@@ -156,8 +167,8 @@
         r.innerHTML = `
           <nav class="gh-nav" id="gh-nav">
             <div class="gh-logo"><i class="fa-brands fa-github" style="font-size:24px;"></i> GitHub</div>
-            <button class="gh-nav-item" data-vista="buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
-            <button class="gh-nav-item" data-vista="guardados"><i class="fa-solid fa-bookmark"></i> Guardados</button>
+            <button class="gh-nav-item" data-vista="buscar" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+            <button class="gh-nav-item" data-vista="guardados" title="Guardados"><i class="fa-solid fa-bookmark"></i> Guardados</button>
             <button class="gh-nav-item" data-vista="repo" id="gh-nav-repo" hidden><i class="fa-solid fa-book"></i> <span></span></button>
             <span style="flex:1"></span>
             <div id="gh-token" class="gh-ayuda" style="padding:6px;"></div>
@@ -226,7 +237,7 @@
             if (g.configurado) nube = (await json('/api/gemini/modelos')).modelos.map(m => `gemini:${m.id}`);
         } catch (e) { /* sin Gemini */ }
         estado.modelos = [...locales, ...nube];
-        const preferido = leerLocal('prig_github_modelo') || leerLocal('prig_kaggle_modelo') || leerLocal('prig_desafios_modelo');
+        const preferido = (window.PrigModelos && window.PrigModelos.para('explicar')) || leerLocal('prig_github_modelo') || leerLocal('prig_kaggle_modelo') || leerLocal('prig_desafios_modelo');
         estado.modelo = estado.modelos.includes(preferido) ? preferido : (estado.modelos[0] || '');
         const sel = $('gh-modelo');
         if (sel) pintarModelos(sel);

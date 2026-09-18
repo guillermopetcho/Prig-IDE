@@ -1085,6 +1085,17 @@ class AIChatManager {
         }, 400);
     }
 
+    /**
+     * Las explicaciones que se piden desde el editor o el cuaderno usan el modelo de
+     * «Explicar» y los arreglos de errores el de «Código» (Configuración global). El
+     * chat normal, el del selector de este panel.
+     */
+    modeloPara(mode) {
+        const delPanel = (this.modelSelect && this.modelSelect.value) || "qwen2.5-coder:7b";
+        const rol = { explain: 'explicar', explain_flow: 'explicar', fix: 'codigo' }[mode];
+        return (rol && window.PrigModelos) ? window.PrigModelos.para(rol, delPanel) : delPanel;
+    }
+
     async sendMessage(customPrompt = null, mode = "chat", codeContext = null) {
         const prompt = customPrompt || this.inputEl.value.trim();
         if (!prompt) return;
@@ -1098,7 +1109,7 @@ class AIChatManager {
         const chkLib = document.getElementById('chk-usar-biblioteca');
         const useLibrary = chkLib ? chkLib.checked : false;
 
-        const model = this.modelSelect.value || "qwen2.5-coder:7b";
+        const model = this.modeloPara(mode);
 
         // Con la biblioteca activada la respuesta va fundamentada en los documentos
         // del usuario y con citas verificables, que es la diferencia real frente a
@@ -1109,7 +1120,9 @@ class AIChatManager {
 
         const initialStatus = useWeb 
             ? '<span style="color: var(--accent-blue);"><i class="fa-solid fa-globe fa-spin"></i> Buscando información en fuentes oficiales de Internet...</span>'
-            : 'Analizando con detalle...';
+            : (model !== (this.modelSelect && this.modelSelect.value)
+                ? `Analizando con <b>${model.replace(/[<>&]/g, '')}</b> (el modelo para ${mode === 'fix' ? 'escribir código' : 'explicar'})...`
+                : 'Analizando con detalle...');
 
         const aiMsgContentEl = this.appendMessage(initialStatus, false);
         const currentCode = codeContext || window.editorMgr.getAIContext();

@@ -210,7 +210,7 @@
         } catch (e) { estado.gemini.error = e.message; }
         const nube = estado.gemini.modelos.map(m => `gemini:${m.id}`);
         const todos = [...estado.modelos, ...nube];
-        const preferido = preferir || leerLocal('prig_desafios_modelo') || (window.aiConfig && window.aiConfig.agent1_model) || todos[0] || '';
+        const preferido = preferir || (window.PrigModelos && window.PrigModelos.para('codigo')) || leerLocal('prig_desafios_modelo') || (window.aiConfig && window.aiConfig.agent1_model) || todos[0] || '';
         estado.modelo = todos.includes(preferido) ? preferido : (estado.modelos[0] || nube[0] || preferido);
         if (!sel) return;
         const opcion = (valor, texto) => `<option style="background-color:#1e1e2e; color:#cdd6f4;" value="${esc(valor)}" ${valor === estado.modelo ? 'selected' : ''}>${esc(texto)}</option>`;

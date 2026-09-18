@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prig IDE - Editor de Código & Tutor IA</title>
   <link rel="stylesheet" href="/static/css/style.css?v=8">
-  <link rel="stylesheet" href="/static/css/rediseno.css?v=13">
+  <link rel="stylesheet" href="/static/css/rediseno.css?v=16">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -718,6 +718,9 @@
               <button class="cat-pill" data-cat="projects"
                 style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border-color); cursor: pointer;"
                 title="PROJECTS">🚀 PROJECTS</button>
+              <button class="cat-pill" data-cat="librerias"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(166,227,161,0.15); color: var(--accent-green); border: 1px solid rgba(166,227,161,0.3); cursor: pointer;"
+                title="LIBRERÍAS DE ML/DL (NumPy, Matplotlib, PyTorch...)">📦 LIBRERÍAS</button>
             </div>
 
             <div id="book-list-items"
@@ -748,7 +751,11 @@
                 </button>
                 <button id="tab-btn-book-reader" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('reader');">
-                  <i class="fa-solid fa-book-open" style="color: var(--accent-blue);"></i> Lector de Documento / PDF
+                  <i class="fa-solid fa-book-open" style="color: var(--accent-blue);"></i> Lector y Editor de PDF
+                </button>
+                <button id="tab-btn-book-librerias" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
+                  onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('librerias');">
+                  <i class="fa-solid fa-boxes-stacked" style="color: var(--accent-green);"></i> Analista de Librerías
                 </button>
                 <button id="tab-btn-book-flujos" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   title="Encadenar varios modelos pequeños, cada uno con una tarea, para analizar en profundidad"
@@ -779,6 +786,17 @@
               <div id="book-viewer-content" style="height: 100%; overflow: auto;">
                 <div style="padding: 40px; text-align: center; color: var(--text-muted);">Selecciona un libro de la
                   lista para comenzar a estudiar.</div>
+              </div>
+            </div>
+
+            <!-- Contenido Pestaña 3: Analista de Librerías -->
+            <div id="pane-book-librerias" style="flex: 1; overflow: hidden; display: none; background: var(--bg-dark);">
+              <div id="librerias-viewer-content" style="height: 100%; overflow-y: auto; padding: 16px;">
+                <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+                  <i class="fa-solid fa-boxes-stacked fa-bounce" style="font-size: 40px; color: var(--accent-green); margin-bottom: 16px; opacity: 0.8;"></i>
+                  <h3 style="color: #fff; margin-bottom: 8px;">Analista de Librerías y Documentación</h3>
+                  <p style="font-size: 13px; max-width: 500px; margin: 0 auto;">Selecciona una librería (NumPy, Matplotlib, Pandas, PyTorch...) para consultar su documentación oficial, analizar funciones con IA y guardar citas técnicas en <code>&lt;libreria&gt;.json</code>.</p>
+                </div>
               </div>
             </div>
 
@@ -1051,7 +1069,17 @@
               class="fa-solid fa-xmark"></i></button>
         </div>
       </div>
-      <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0;">
+      <!-- Pestañas: Rutas de Estudio vs Diagramas ML/DL -->
+      <div style="display: flex; gap: 8px; padding: 8px 16px; background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--border-color);">
+        <button id="tab-btn-seguimiento-rutas" class="tool-btn active" style="font-size: 12px; padding: 5px 12px;" onclick="window.cambiarPestanaAprendizaje('rutas');">
+          <i class="fa-solid fa-route" style="color: var(--accent-green);"></i> Rutas de Aprendizaje
+        </button>
+        <button id="tab-btn-seguimiento-diagramas" class="tool-btn" style="font-size: 12px; padding: 5px 12px;" onclick="window.cambiarPestanaAprendizaje('diagramas');">
+          <i class="fa-solid fa-diagram-project" style="color: var(--accent-blue);"></i> Diagramas (Graficador Modular ML/DL)
+        </button>
+      </div>
+
+      <div id="pane-aprendizaje-rutas" class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0;">
 
         <!-- Top Pane: Canvas (60%) -->
         <div id="seguimiento-top-pane"
@@ -1204,6 +1232,57 @@
             </div>
           </div>
 
+        </div>
+
+      </div>
+
+      <!-- Pestaña 2: Graficador Modular ML/DL ("Diagramas") -->
+      <div id="pane-aprendizaje-diagramas" class="modal-body" style="flex: 1; overflow: hidden; display: none; flex-direction: column; padding: 12px; background: var(--bg-dark); gap: 10px;">
+        
+        <!-- Barra Superior de Arquetipos y Acciones -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 12px; font-weight: bold; color: var(--accent-blue); margin-right: 4px;"><i class="fa-solid fa-layer-group"></i> Flujos ML/DL:</span>
+            <button class="tool-btn btn-arquetipo-ml active" data-arquetipo="pipeline_ml" style="font-size: 11px; padding: 4px 8px;"><i class="fa-solid fa-filter"></i> Pipeline Clásico</button>
+            <button class="tool-btn btn-arquetipo-ml" data-arquetipo="mlp_dl" style="font-size: 11px; padding: 4px 8px;"><i class="fa-solid fa-network-wired"></i> Red Neuronal (MLP)</button>
+            <button class="tool-btn btn-arquetipo-ml" data-arquetipo="cnn_vision" style="font-size: 11px; padding: 4px 8px;"><i class="fa-solid fa-image"></i> Red Convolucional (CNN)</button>
+            <button class="tool-btn btn-arquetipo-ml" data-arquetipo="transformer_nlp" style="font-size: 11px; padding: 4px 8px;"><i class="fa-solid fa-arrows-to-eye"></i> Transformer</button>
+            <button class="tool-btn btn-arquetipo-ml" data-arquetipo="bucle_entrenamiento" style="font-size: 11px; padding: 4px 8px;"><i class="fa-solid fa-rotate"></i> Bucle de Épocas</button>
+            <button class="tool-btn btn-arquetipo-ml" data-arquetipo="modular" style="font-size: 11px; padding: 4px 8px; background: rgba(203,166,247,0.15); color: var(--accent-purple); border-color: rgba(203,166,247,0.3);"><i class="fa-solid fa-cubes"></i> Diseñador Modular</button>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-copiar-diagrama-ml" class="tool-btn" style="font-size: 11px; padding: 4px 8px;" title="Copiar código Mermaid"><i class="fa-solid fa-copy"></i> Copiar Mermaid</button>
+            <button id="btn-insertar-codigo-diagrama" class="tool-btn" style="font-size: 11px; padding: 4px 8px; background: rgba(166,227,161,0.15); color: var(--accent-green); border-color: rgba(166,227,161,0.3);" title="Insertar código del bloque en el archivo actual"><i class="fa-solid fa-code"></i> Insertar Código</button>
+            <button id="btn-consultar-diagrama-chat" class="tool-btn" style="font-size: 11px; padding: 4px 8px; background: rgba(137,180,250,0.15); color: var(--accent-blue); border-color: rgba(137,180,250,0.3);" title="Preguntar al Tutor IA sobre este componente"><i class="fa-solid fa-brain"></i> Explicar con Tutor</button>
+          </div>
+        </div>
+
+        <!-- Controles Modulares Personalizados (Activos en modo modular) -->
+        <div id="panel-modulos-personalizados" style="display: none; gap: 10px; flex-wrap: wrap; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; font-size: 11px; align-items: center;">
+          <span style="font-weight: bold; color: var(--accent-purple);"><i class="fa-solid fa-sliders"></i> Módulos:</span>
+          <label style="color: var(--text-muted);">Entrada: <select id="sel-mod-entrada" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="tabular">Tabular CSV</option><option value="imagen">Imagen RGB</option><option value="texto">Texto Tokenizado</option><option value="tensores">Tensores Numéricos</option></select></label>
+          <label style="color: var(--text-muted);">Preproceso: <select id="sel-mod-preproceso" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="standard_scaler">StandardScaler</option><option value="imputer">Imputación</option><option value="tokenizacion">Tokenizador BPE</option><option value="augment">Data Augmentation</option></select></label>
+          <label style="color: var(--text-muted);">Modelo: <select id="sel-mod-modelo" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="random_forest">Random Forest</option><option value="xgboost">XGBoost</option><option value="mlp">MLP Neural Net</option><option value="cnn">CNN Visión</option><option value="transformer">Transformer</option></select></label>
+          <label style="color: var(--text-muted);">Pérdida: <select id="sel-mod-perdida" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="cross_entropy">Cross-Entropy</option><option value="mse">MSE</option><option value="bce">BCE</option><option value="focal">Focal Loss</option></select></label>
+          <label style="color: var(--text-muted);">Optimizador: <select id="sel-mod-optimizador" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="adam">Adam</option><option value="adamw">AdamW</option><option value="sgd">SGD Momentum</option><option value="rmsprop">RMSprop</option></select></label>
+          <label style="color: var(--text-muted);">Métricas: <select id="sel-mod-metricas" style="padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;"><option value="accuracy_f1">Accuracy & F1</option><option value="roc_auc">ROC-AUC</option><option value="r2_rmse">R² & RMSE</option><option value="confusion">Matriz Confusión</option></select></label>
+        </div>
+
+        <!-- Contenedor Principal: Diagrama + Inspector Lateral -->
+        <div style="flex: 1; display: flex; gap: 12px; overflow: hidden;">
+          <!-- Lienzo del Diagrama -->
+          <div style="flex: 2; height: 100%; overflow: auto; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; align-items: center; justify-content: center;">
+            <div id="diagrama-ml-canvas" style="width: 100%; text-align: center;"></div>
+          </div>
+          <!-- Inspector Lateral -->
+          <div style="flex: 1; height: 100%; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+            <div id="diagrama-ml-inspector">
+              <div style="color: var(--text-muted); font-size: 12px; text-align: center; margin-top: 40px;">
+                <i class="fa-solid fa-arrow-pointer fa-bounce" style="font-size: 28px; color: var(--accent-blue); margin-bottom: 12px; opacity: 0.7;"></i>
+                <p>Haz clic en cualquier caja del diagrama para inspeccionar su rol, fórmulas matemáticas en KaTeX y código Python.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -1887,6 +1966,30 @@
                 <i class="fa-solid fa-cubes"></i> Abrir Modelos</button>
             </div>
 
+            <!-- Un modelo por tarea: se cargan solo cuando se usan (global_config.js · pintarModelosPorTarea) -->
+            <div id="gcfg-roles" class="gcfg-roles">
+              <div class="gcfg-roles-cab">
+                <span><i class="fa-solid fa-layer-group" style="color: var(--accent-purple);"></i> <b>Modelos por tarea</b></span>
+                <span class="gcfg-roles-ayuda">Cada uno se carga solo cuando hace falta y se libera según «Liberar modelo de VRAM». «Automático» deja que cada sección use su propio selector.</span>
+              </div>
+              <div class="gcfg-rol">
+                <label for="gcfg-modelo-codigo"><i class="fa-solid fa-code" style="color: var(--accent-green);"></i> Escribir código</label>
+                <select id="gcfg-modelo-codigo" data-rol="codigo"></select>
+                <span class="gcfg-rol-uso">Instrucciones <code>Prig//:</code> del editor, arreglar errores y crear desafíos.</span>
+              </div>
+              <div class="gcfg-rol">
+                <label for="gcfg-modelo-explicar"><i class="fa-solid fa-chalkboard-user" style="color: var(--accent-blue);"></i> Explicar</label>
+                <select id="gcfg-modelo-explicar" data-rol="explicar"></select>
+                <span class="gcfg-rol-uso">Kaggle, GitHub y las explicaciones del editor y del cuaderno.</span>
+              </div>
+              <div class="gcfg-rol">
+                <label for="gcfg-modelo-autocompletar"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-yellow, #f9e2af);"></i> Rellenar código</label>
+                <select id="gcfg-modelo-autocompletar" data-rol="autocompletar"></select>
+                <span class="gcfg-rol-uso">Autocompletado mientras escribes. Mejor uno pequeño que sepa <b>rellenar al medio</b> (marcados con ✦).</span>
+              </div>
+              <div id="gcfg-roles-aviso" class="gcfg-rol-uso" hidden></div>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
               <div>
                 <label style="font-weight: 600; color: #eee; margin-bottom: 4px; display: block;">Liberar Modelo de VRAM (keep_alive):</label>
@@ -2164,18 +2267,18 @@
   <script src="/static/js/prig_net.js?v=6"></script>
   <script src="/static/js/apariencia.js?v=7"></script>
   <script src="/static/js/shortcuts.js?v=8"></script>
-  <script src="/static/js/commands.js?v=16"></script>
+  <script src="/static/js/commands.js?v=17"></script>
   <script src="/static/js/menubar.js?v=9"></script>
   <script src="/static/js/layout.js?v=8"></script>
-  <script src="/static/js/workarea.js?v=11"></script>
+  <script src="/static/js/workarea.js?v=12"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
-  <script src="/static/js/editor.js?v=10"></script>
+  <script src="/static/js/editor.js?v=11"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=8"></script>
   <script src="/static/js/terminal.js?v=6"></script>
-  <script src="/static/js/ai_chat.js?v=10"></script>
-  <script src="/static/js/kaggle_lector.js?v=7"></script>
-  <script src="/static/js/github_lector.js?v=2"></script>
+  <script src="/static/js/ai_chat.js?v=11"></script>
+  <script src="/static/js/kaggle_lector.js?v=9"></script>
+  <script src="/static/js/github_lector.js?v=4"></script>
   <script src="/static/js/inicio.js?v=3"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
@@ -2188,12 +2291,13 @@
   <script src="/static/js/buscador_modelos.js?v=5"></script>
   <script src="/static/js/temperaturas.js?v=3"></script>
   <script src="/static/js/aprendizaje_guiado.js?v=7"></script>
+  <script src="/static/js/diagramas_ml.js?v=1"></script>
   <script src="/static/js/progreso.js?v=2"></script>
   <script src="/static/js/perfil.js?v=9"></script>
   <script src="/static/js/note_window.js?v=6"></script>
-  <script src="/static/js/global_config.js?v=9"></script>
+  <script src="/static/js/global_config.js?v=10"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>
-  <script src="/static/js/desafios.js?v=6"></script>
+  <script src="/static/js/desafios.js?v=7"></script>
   <script src="/static/js/ide.js?v=3"></script>
   <script src="/static/js/app.js?v=7"></script>
 

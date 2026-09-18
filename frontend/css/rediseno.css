@@ -493,23 +493,28 @@ body.modo-zen .trabajo-tabs { display: none; }
     border-bottom-color: var(--acento-usuario);
     color: #fff;
 }
-.tab-mover {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font-size: 9px;
-    padding: 2px 4px;
-    border-radius: 3px;
-    cursor: pointer;
-    opacity: 0.5;
-    transition: all 0.15s ease;
+/* Con dos paneles, la pestaña activa del panel sin foco se ve atenuada (como en VS Code) */
+.dividido .trabajo-tab.activo:not(.foco) { border-bottom-color: rgba(137, 180, 250, 0.35); color: var(--text-main); }
+
+/* Arrastrar pestañas */
+.trabajo-tab.arrastrando { opacity: 0.35; }
+body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-select: none !important; }
+.wa-fantasma {
+    position: fixed; left: 0; top: 0; z-index: 20000; pointer-events: none;
+    height: 26px; border-radius: 5px; opacity: 0.92;
+    background: var(--bg-card, #1e1e2e) !important; color: #fff !important;
+    border: 1px solid var(--acento-usuario, #89b4fa); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
-.trabajo-tab:hover .tab-mover { opacity: 0.9; }
-.tab-mover:hover {
-    opacity: 1 !important;
-    background: rgba(137, 180, 250, 0.25);
-    color: var(--acento-usuario, #89b4fa);
+.wa-zona-drop {
+    position: fixed; z-index: 19999; pointer-events: none; border-radius: 4px;
+    background: rgba(137, 180, 250, 0.14); border: 2px solid rgba(137, 180, 250, 0.55);
+    transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
 }
+.wa-marca-drop {
+    position: fixed; z-index: 20000; pointer-events: none; width: 2px; border-radius: 1px;
+    background: var(--acento-usuario, #89b4fa); box-shadow: 0 0 6px var(--acento-usuario, #89b4fa);
+}
+.wa-zona-drop[hidden], .wa-marca-drop[hidden] { display: none; }
 .tab-cerrar { opacity: 0.5; font-size: 10px; padding: 2px; border-radius: 3px; }
 .tab-cerrar:hover { opacity: 1; background: rgba(243, 139, 168, 0.25); color: var(--accent-red); }
 
@@ -519,6 +524,9 @@ body.modo-zen .trabajo-tabs { display: none; }
 
 /* Una herramienta incrustada ocupa la pestaña entera, sin cromo de ventana */
 #vista-herramienta .modal-content.incrustado,
+/* Cada herramienta incrustada es un «container»: con @container se adapta al ancho de
+   su panel (al dividir, media ventana), cosa que @media no ve */
+.vista-herramienta-contenedor { container-type: inline-size; }
 .vista-herramienta-contenedor .modal-content.incrustado {
     width: 100% !important;
     max-width: none !important;
@@ -736,3 +744,15 @@ select optgroup {
 .editor-vacio-acciones { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
 .editor-vacio-acciones button { background:rgba(255,255,255,.05); color:var(--text-main); border:1px solid var(--border-color); border-radius:7px; padding:7px 13px; font-size:12px; cursor:pointer; display:inline-flex; gap:7px; align-items:center; }
 .editor-vacio-acciones button:hover { border-color:var(--accent-blue); }
+
+/* Configuración global · Modelos por tarea */
+.gcfg-roles { border: 1px solid rgba(203, 166, 247, 0.35); background: rgba(203, 166, 247, 0.06); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.gcfg-roles-cab { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: #eee; }
+.gcfg-roles-ayuda, .gcfg-rol-uso { font-size: 10.5px; color: var(--text-muted); line-height: 1.4; }
+.gcfg-rol { display: grid; grid-template-columns: 150px 1fr; gap: 3px 12px; align-items: center; }
+.gcfg-rol label { font-weight: 600; color: #eee; font-size: 12px; }
+.gcfg-rol select { width: 100%; padding: 7px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px; }
+.gcfg-rol .gcfg-rol-uso { grid-column: 2; }
+.gcfg-rol code { font-size: 10.5px; }
+#gcfg-roles-aviso { color: var(--accent-yellow, #f9e2af); }
+@media (max-width: 640px) { .gcfg-rol { grid-template-columns: 1fr; } .gcfg-rol .gcfg-rol-uso { grid-column: 1; } }

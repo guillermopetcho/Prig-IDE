@@ -10,7 +10,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Linux](https://img.shields.io/badge/plataforma-Linux-FCC624?logo=linux&logoColor=black)
 ![Ollama](https://img.shields.io/badge/modelos-Ollama-000000)
-![Tests](https://img.shields.io/badge/tests-686%20en%20verde-brightgreen)
+![Tests](https://img.shields.io/badge/tests-694%20en%20verde-brightgreen)
 
 ![Inicio de Prig](docs/capturas/inicio.png)
 
@@ -75,12 +75,26 @@ corrige ejecutándola, no preguntándole al modelo. Las pistas son graduadas
 
 - Editor con pestañas, vista dividida, minimapa, paleta de comandos (`Ctrl+Shift+P`) y
   modo concentración.
+- **Ventanas como en VS Code**: el editor, Kaggle, GitHub y demás herramientas se
+  arrastran de pestaña en pestaña o a la mitad derecha para ponerlas lado a lado.
+  También se mueven con el teclado:
+
+  | Atajo | Acción |
+  |---|---|
+  | `Ctrl+K Ctrl+→` / `Ctrl+K Ctrl+←` | Mover la ventana al panel derecho / izquierdo |
+  | `Ctrl+K Ctrl+1` / `Ctrl+K Ctrl+2` | Ir al panel izquierdo / derecho |
+  | `Ctrl+Alt+AvPág` / `Ctrl+Alt+RePág` | Ventana siguiente / anterior |
+  | `Ctrl+Shift+AvPág` / `Ctrl+Shift+RePág` | Correr la pestaña un lugar |
 - **Cuadernos Jupyter** con kernel persistente: las celdas comparten espacio de nombres,
   `Ctrl+Enter` ejecuta y un botón reinicia el intérprete. Exportación a PDF.
 - Consola integrada, bloc de notas, flujo de agentes y analizador de flujos de ML.
 
 ### Modelos y máquina
 
+- **Modelos por tarea** (Configuración global): uno para **escribir código** (`Prig//:`,
+  arreglar errores, crear desafíos), otro para **explicar** (Kaggle, GitHub,
+  explicaciones del editor) y otro para **rellenar código** mientras escribes. Cada uno
+  se carga solo cuando se usa.
 - **Buscador de modelos** en Ollama, Hugging Face y ModelScope, con descarga y una
   estimación de si caben en tu máquina.
 - **Temperaturas** en vivo de GPU, CPU, placa y SSD, con un gobernador térmico que pausa

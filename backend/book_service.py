@@ -36,7 +36,7 @@ CATEGORIES = {
 class BookService:
     def __init__(self, books_dir: str = None):
         if not books_dir:
-            books_dir = os.path.expanduser("~/.prig_books")
+            books_dir = os.environ.get("PRIG_BOOKS_DIR", os.path.expanduser("~/.prig_books"))
         self.books_dir = os.path.abspath(books_dir)
         os.makedirs(self.books_dir, exist_ok=True)
 
@@ -47,7 +47,13 @@ class BookService:
         self.metadata_dir = os.path.join(self.books_dir, "metadata")
         os.makedirs(self.metadata_dir, exist_ok=True)
 
-        self.snippets_file = os.path.expanduser("~/.prig_book_snippets.json")
+        self.citas_dir = os.path.join(self.books_dir, "citas")
+        os.makedirs(self.citas_dir, exist_ok=True)
+        self.edits_dir = os.path.join(self.citas_dir, "ediciones")
+        os.makedirs(self.edits_dir, exist_ok=True)
+
+        snippets_env = os.environ.get("PRIG_SNIPPETS_FILE")
+        self.snippets_file = snippets_env if snippets_env else os.path.join(self.books_dir, "snippets.json")
         self._init_sample_books()
 
     def _init_sample_books(self):
@@ -208,9 +214,10 @@ class BookService:
         if not book_id:
             return None
 
-        # El primer candidato es la ruta relativa exacta (uid, p. ej. "books/notas.md"):
-        # resuelve sin ambigüedad cuando hay archivos homónimos en varias categorías.
-        candidates = [os.path.join(self.books_dir, book_id)]
+        candidates = []
+        if os.path.isabs(book_id):
+            candidates.append(book_id)
+        candidates.append(os.path.join(self.books_dir, book_id))
         candidates += [os.path.join(self.books_dir, cat, book_id) for cat in CATEGORIES.keys()]
 
         for candidate in candidates:
@@ -540,3 +547,285 @@ class BookService:
     def get_snippet(self, snippet_id: str) -> Dict[str, Any]:
         snippets = self.load_snippets()
         return snippets.get(snippet_id, {"error": "Cita no encontrada"})
+
+    # =========================================================================
+    # LECTOR / EDITOR DE TEXTO PDF Y CITAS (nombre_libro.json)
+    # =========================================================================
+
+    def _book_stem(self, fpath: str) -> str:
+        fname = os.path.basename(fpath)
+        return os.path.splitext(fname)[0]
+
+    def _get_page_edit_path(self, stem: str, page: int) -> str:
+        return os.path.join(self.edits_dir, f"{stem}_p{page}.txt")
+
+    def get_pdf_pages(self, book_id: str, page: Optional[int] = 1, search_query: Optional[str] = None) -> Dict[str, Any]:
+        fpath = self._resolve_item(book_id)
+        if not fpath:
+            return {"error": f"Documento no encontrado: {book_id}"}
+
+        stem = self._book_stem(fpath)
+        meta = self.get_metadata(fpath) or {}
+        title = meta.get("title") or self._fallback_title(os.path.basename(fpath))
+
+        ext = os.path.splitext(fpath)[1].lower()
+        if ext != '.pdf':
+            # Para archivos de texto o markdown, tratamos el archivo completo como página 1
+            try:
+                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read(400_000)
+                return {
+                    "id": os.path.basename(fpath),
+                    "uid": os.path.relpath(fpath, self.books_dir),
+                    "title": title,
+                    "filename": os.path.basename(fpath),
+                    "is_pdf": False,
+                    "total_pages": 1,
+                    "current_page": 1,
+                    "page_text": content,
+                    "has_edit": False,
+                    "stem": stem
+                }
+            except Exception as e:
+                return {"error": f"Error leyendo documento: {str(e)}"}
+
+        if not PYPDF_AVAILABLE:
+            return {"error": "pypdf no está instalado en el entorno. No se puede leer el PDF página por página."}
+
+        try:
+            reader = pypdf.PdfReader(fpath)
+            total_pages = len(reader.pages)
+            if total_pages == 0:
+                return {"error": "El archivo PDF no contiene páginas legibles."}
+
+            page_idx = max(1, min(int(page or 1), total_pages))
+            
+            # Verificar si existe una edición manual guardada de esta página
+            edit_path = self._get_page_edit_path(stem, page_idx)
+            has_edit = False
+            page_text = ""
+            if os.path.exists(edit_path):
+                try:
+                    with open(edit_path, 'r', encoding='utf-8') as ef:
+                        page_text = ef.read()
+                    has_edit = True
+                except Exception:
+                    pass
+
+            if not page_text:
+                try:
+                    raw_text = reader.pages[page_idx - 1].extract_text() or ""
+                    # Limpiar saltos de línea excesivos
+                    page_text = raw_text.replace("\r\n", "\n")
+                except Exception as ex:
+                    page_text = f"(No se pudo extraer texto de la página {page_idx}: {ex})"
+
+            matches = []
+            if search_query and search_query.strip():
+                sq = search_query.strip().lower()
+                for i in range(min(total_pages, 200)):
+                    try:
+                        p_txt = reader.pages[i].extract_text() or ""
+                        if sq in p_txt.lower():
+                            pos = p_txt.lower().find(sq)
+                            start = max(0, pos - 40)
+                            end = min(len(p_txt), pos + len(sq) + 40)
+                            snippet = p_txt[start:end].replace('\n', ' ')
+                            matches.append({"page": i + 1, "snippet": f"...{snippet}..."})
+                    except Exception:
+                        continue
+
+            return {
+                "id": os.path.basename(fpath),
+                "uid": os.path.relpath(fpath, self.books_dir),
+                "title": title,
+                "filename": os.path.basename(fpath),
+                "is_pdf": True,
+                "total_pages": total_pages,
+                "current_page": page_idx,
+                "page_text": page_text,
+                "has_edit": has_edit,
+                "stem": stem,
+                "search_matches": matches
+            }
+
+        except Exception as e:
+            return {"error": f"Error abriendo PDF con pypdf: {str(e)}"}
+
+    def save_pdf_page_edit(self, book_id: str, page: int, edited_text: str) -> Dict[str, Any]:
+        fpath = self._resolve_item(book_id)
+        stem = self._book_stem(fpath) if fpath else self._book_stem(book_id)
+        edit_path = self._get_page_edit_path(stem, page)
+        try:
+            with open(edit_path, 'w', encoding='utf-8') as f:
+                f.write(edited_text)
+            return {"success": True, "ok": True, "book_id": book_id, "page": page, "path": edit_path}
+        except Exception as e:
+            return {"error": f"No se pudo guardar la edición de la página: {e}"}
+
+    def _citation_file_path(self, stem: str) -> str:
+        return os.path.join(self.citas_dir, f"{stem}.json")
+
+    def get_book_citations(self, book_id: str) -> Dict[str, Any]:
+        fpath = self._resolve_item(book_id)
+        stem = self._book_stem(fpath) if fpath else self._fallback_title(book_id).replace(" ", "_")
+        citas_path = self._citation_file_path(stem)
+
+        if os.path.exists(citas_path):
+            try:
+                with open(citas_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data
+            except Exception as e:
+                print(f"Error leyendo archivo de citas {citas_path}: {e}")
+
+        # Plantilla inicial de citas si no existía aún
+        meta = self.get_metadata(fpath) if fpath else None
+        title = (meta or {}).get("title") or self._fallback_title(os.path.basename(fpath) if fpath else book_id)
+        fname = os.path.basename(fpath) if fpath else f"{stem}.pdf"
+
+        initial = {
+            "libro": fname,
+            "titulo": title,
+            "stem": stem,
+            "archivo_json": f"{stem}.json",
+            "total_citas": 0,
+            "fecha_actualizacion": datetime.now().isoformat(),
+            "citas": []
+        }
+        try:
+            with open(citas_path, 'w', encoding='utf-8') as f:
+                json.dump(initial, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+        return initial
+
+    def save_book_citation(self, book_id: str, citation_data: Dict[str, Any]) -> Dict[str, Any]:
+        current = self.get_book_citations(book_id)
+        stem = current.get("stem") or self._book_stem(book_id)
+        citas_path = self._citation_file_path(stem)
+
+        cid = citation_data.get("id") or f"cita_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:4]}"
+        
+        entry = {
+            "id": cid,
+            "pagina": int(citation_data.get("pagina", 1)),
+            "capitulo": (citation_data.get("capitulo") or "").strip(),
+            "texto": (citation_data.get("texto") or "").strip(),
+            "nota": (citation_data.get("nota") or "").strip(),
+            "tags": citation_data.get("tags") if isinstance(citation_data.get("tags"), list) else [t.strip() for t in str(citation_data.get("tags") or "").split(",") if t.strip()],
+            "fecha": datetime.now().isoformat()
+        }
+
+        # Actualizar o insertar
+        existing = current.get("citas", [])
+        found_idx = next((i for i, c in enumerate(existing) if c.get("id") == cid), None)
+        if found_idx is not None:
+            existing[found_idx] = entry
+        else:
+            existing.append(entry)
+
+        # Ordenar por número de página
+        existing.sort(key=lambda x: (x.get("pagina", 0), x.get("id", "")))
+        current["citas"] = existing
+        current["total_citas"] = len(existing)
+        current["fecha_actualizacion"] = datetime.now().isoformat()
+
+        try:
+            with open(citas_path, 'w', encoding='utf-8') as f:
+                json.dump(current, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            return {"error": f"Error guardando {stem}.json: {e}"}
+
+        return {"success": True, "ok": True, "cita": entry, "book_citations": current, "archivo_json": f"{stem}.json"}
+
+    def delete_book_citation(self, book_id: str, citation_id: str) -> Dict[str, Any]:
+        current = self.get_book_citations(book_id)
+        stem = current.get("stem") or self._book_stem(book_id)
+        citas_path = self._citation_file_path(stem)
+
+        existing = current.get("citas", [])
+        initial_count = len(existing)
+        existing = [c for c in existing if c.get("id") != citation_id]
+
+        if len(existing) == initial_count:
+            return {"error": f"Cita no encontrada: {citation_id}"}
+
+        current["citas"] = existing
+        current["total_citas"] = len(existing)
+        current["fecha_actualizacion"] = datetime.now().isoformat()
+
+        try:
+            with open(citas_path, 'w', encoding='utf-8') as f:
+                json.dump(current, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            return {"error": f"Error actualizando {stem}.json: {e}"}
+
+        return {"success": True, "ok": True, "deleted_id": citation_id, "total_citas": len(existing)}
+
+    def export_citations_to_workspace(self, book_id: str, workspace_path: str) -> Dict[str, Any]:
+        current = self.get_book_citations(book_id)
+        stem = current.get("stem") or self._book_stem(book_id)
+        src_path = self._citation_file_path(stem)
+        
+        if not os.path.exists(src_path):
+            return {"error": f"No hay archivo de citas para {book_id}"}
+
+        dest_dir = os.path.abspath(workspace_path)
+        os.makedirs(dest_dir, exist_ok=True)
+        dest_file = os.path.join(dest_dir, f"{stem}.json")
+
+        try:
+            shutil.copy2(src_path, dest_file)
+            return {
+                "success": True,
+                "ok": True,
+                "exported_to": dest_file,
+                "filename": f"{stem}.json",
+                "total_citas": current.get("total_citas", 0)
+            }
+        except Exception as e:
+            return {"error": f"Error copiando al espacio de trabajo: {e}"}
+
+    def get_all_citations_for_ai(self, query: Optional[str] = None, max_results: int = 12) -> List[Dict[str, Any]]:
+        """ Recolecta todas las citas de libros y las prepara para que el modelo razone con ellas """
+        results = []
+        if not os.path.isdir(self.citas_dir):
+            return []
+
+        q_terms = [t.lower() for t in (query or "").split() if len(t) > 2]
+
+        for fname in os.listdir(self.citas_dir):
+            if not fname.endswith(".json") or fname == "ediciones":
+                continue
+            fpath = os.path.join(self.citas_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    book_data = json.load(f)
+                b_title = book_data.get("titulo") or book_data.get("libro") or fname
+                b_name = book_data.get("libro") or fname
+                for c in book_data.get("citas", []):
+                    item = {
+                        "libro": b_name,
+                        "titulo": b_title,
+                        "pagina": c.get("pagina", 1),
+                        "capitulo": c.get("capitulo", ""),
+                        "texto": c.get("texto", ""),
+                        "nota": c.get("nota", ""),
+                        "tags": c.get("tags", []),
+                        "id": c.get("id", "")
+                    }
+                    if not q_terms:
+                        results.append(item)
+                    else:
+                        match_count = sum(1 for term in q_terms if term in item["texto"].lower() or term in item["nota"].lower() or any(term in str(tg).lower() for tg in item["tags"]))
+                        if match_count > 0:
+                            item["_score"] = match_count
+                            results.append(item)
+            except Exception:
+                continue
+
+        if q_terms:
+            results.sort(key=lambda x: x.get("_score", 0), reverse=True)
+        return results[:max_results]
+

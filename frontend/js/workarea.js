@@ -62,6 +62,17 @@ class WorkAreaManager {
         this.vistas = [{ id: 'editor', ...this.FIJAS.editor }];
         this.aplicarDisposicion();
         this.initResizer();
+        // El panel en el que se hace clic recibe el foco: los atajos actúan sobre él
+        [['izq', this.panelIzq], ['der', this.panelDer]].forEach(([lado, panel]) => {
+            if (!panel) return;
+            panel.addEventListener('pointerdown', (e) => {
+                const header = lado === 'izq' ? this.headerIzq : this.headerDer;
+                if (!this.splitActivo || this.ladoFoco === lado || (header && header.contains(e.target))) return;
+                this.ladoFoco = lado;
+                if (this.paneles[lado].activa) this.activa = this.paneles[lado].activa;
+                this.pintar();
+            }, true);
+        });
         this.pintar();
         this.initTabsModelo();
     }
@@ -307,55 +318,113 @@ class WorkAreaManager {
     }
 
     moverALado(id, ladoDestino) {
-        const ladoOrigen = (ladoDestino === 'izq') ? 'der' : 'izq';
-        if (!this.paneles[ladoOrigen].vistas.includes(id)) return;
+        this.moverA(id, ladoDestino);
+    }
 
-        this.paneles[ladoOrigen].vistas = this.paneles[ladoOrigen].vistas.filter(x => x !== id);
+    ladoDe(id) {
+        if (this.paneles.izq.vistas.includes(id)) return 'izq';
+        if (this.paneles.der.vistas.includes(id)) return 'der';
+        return null;
+    }
 
-        if (!this.paneles[ladoDestino].vistas.includes(id)) {
-            this.paneles[ladoDestino].vistas.push(id);
-        }
-        this.paneles[ladoDestino].activa = id;
+    /**
+     * Mueve una pestaña a un panel y a una posición, como al arrastrarla en VS Code:
+     *  · en el mismo panel, solo cambia de orden;
+     *  · al otro panel, lo abre si hacía falta (dividir);
+     *  · un panel que se queda vacío se cierra y el otro ocupa todo el ancho.
+     */
+    moverA(id, destino, indice = null) {
+        const origen = this.ladoDe(id);
+        if (!origen || !this.paneles[destino]) return;
+        const insertar = (lista) => {
+            const resto = lista.filter(x => x !== id);
+            const i = indice == null ? resto.length : Math.max(0, Math.min(indice, resto.length));
+            resto.splice(i, 0, id);
+            return resto;
+        };
 
-        // Si el origen era la derecha y quedó vacío, cerrar división
-        if (ladoOrigen === 'der' && this.paneles.der.vistas.length === 0) {
-            this.cerrarDivision();
+        if (origen === destino) {
+            this.paneles[destino].vistas = insertar(this.paneles[destino].vistas);
+            this.activar(id, destino);
             return;
         }
 
-        // Si el origen era la izquierda y quedó vacío
-        if (ladoOrigen === 'izq' && this.paneles.izq.vistas.length === 0) {
-            // Asegurar que el editor esté en la izquierda si no está en la derecha
-            if (!this.paneles.der.vistas.includes('editor')) {
-                this.paneles.izq.vistas.push('editor');
-                this.paneles.izq.activa = 'editor';
-            } else if (this.paneles.der.vistas.length > 1) {
-                // Trasladar otra vista a la izquierda para equilibrar
-                const otra = this.paneles.der.vistas.find(x => x !== id);
-                if (otra) {
-                    this.paneles.der.vistas = this.paneles.der.vistas.filter(x => x !== otra);
-                    this.paneles.izq.vistas.push(otra);
-                    this.paneles.izq.activa = otra;
-                }
-            }
-        } else if (this.paneles[ladoOrigen].activa === id) {
-            this.paneles[ladoOrigen].activa = this.paneles[ladoOrigen].vistas[0] || null;
+        // La única pestaña no puede irse a un lado que todavía no existe: no habría nada que dividir
+        if (this.paneles[origen].vistas.length === 1 && this.paneles[destino].vistas.length === 0) {
+            window.layoutMgr?.mensajeEstado('Abre otra ventana para ponerlas lado a lado', 2000);
+            return;
         }
 
-        if (ladoDestino === 'der' && !this.splitActivo) {
-            this.splitActivo = true;
+        const vecina = this._vecina(origen, id);
+        this.paneles[origen].vistas = this.paneles[origen].vistas.filter(x => x !== id);
+        if (this.paneles[origen].activa === id) this.paneles[origen].activa = vecina;
+        this.paneles[destino].vistas = insertar(this.paneles[destino].vistas);
+        this.paneles[destino].activa = id;
+
+        // El panel izquierdo nunca queda vacío: si se vacía, el derecho pasa a ocupar su lugar
+        if (!this.paneles.izq.vistas.length) {
+            this.paneles.izq = this.paneles.der;
+            this.paneles.der = { vistas: [], activa: null };
+        }
+        const dividido = this.paneles.der.vistas.length > 0;
+        if (dividido !== this.splitActivo) {
+            this.splitActivo = dividido;
             this.aplicarDisposicion();
         }
 
-        if (this.paneles.izq.activa) this.activar(this.paneles.izq.activa, 'izq');
-        if (this.splitActivo && this.paneles.der.activa) this.activar(this.paneles.der.activa, 'der');
+        const ladoFinal = this.ladoDe(id);
+        const otro = ladoFinal === 'izq' ? 'der' : 'izq';
+        if (this.splitActivo && this.paneles[otro].activa) this.activar(this.paneles[otro].activa, otro);
+        this.activar(id, ladoFinal);
+    }
 
-        this.pintar();
+    /** La pestaña que queda activa al quitar `id` de un panel: la de su derecha, o la de su izquierda */
+    _vecina(lado, id) {
+        const lista = this.paneles[lado].vistas;
+        const i = lista.indexOf(id);
+        return lista[i + 1] || lista[i - 1] || null;
+    }
+
+    // ------------------------------------------------------------------
+    // Teclado: moverse entre ventanas y moverlas, sin ratón
+    // ------------------------------------------------------------------
+
+    /** Ventana siguiente (+1) o anterior (-1) del panel con el foco, dando la vuelta */
+    ventanaSiguiente(delta) {
+        const lado = this.ladoFoco || 'izq';
+        const lista = this.paneles[lado].vistas;
+        if (lista.length < 2) return;
+        const i = lista.indexOf(this.paneles[lado].activa);
+        this.activar(lista[(i + delta + lista.length) % lista.length], lado);
+    }
+
+    /** Cambia de lugar la ventana activa dentro de su barra (Ctrl+Shift+RePág/AvPág) */
+    moverPestana(delta) {
+        const lado = this.ladoFoco || 'izq';
+        const id = this.paneles[lado].activa;
+        const i = this.paneles[lado].vistas.indexOf(id);
+        if (!id || i < 0) return;
+        this.moverA(id, lado, Math.max(0, i + delta));
+    }
+
+    /** Lleva la ventana activa al panel izquierdo o derecho, dividiendo si hace falta */
+    moverActivaA(destino) {
+        const lado = this.ladoFoco || 'izq';
+        const id = this.paneles[lado].activa;
+        if (id) this.moverA(id, destino);
+    }
+
+    /** Pasa el foco al otro panel, sin mover nada */
+    enfocarPanel(lado) {
+        if (lado === 'der' && !this.splitActivo) return;
+        const id = this.paneles[lado].activa;
+        if (id) this.activar(id, lado);
     }
 
     aplicarDisposicion() {
         if (!this.panelIzq || !this.panelDer || !this.resizer) return;
 
+        document.getElementById('trabajo-split-contenedor')?.classList.toggle('dividido', this.splitActivo);
         if (this.splitActivo) {
             this.panelDer.hidden = false;
             this.resizer.hidden = false;
@@ -449,30 +518,21 @@ class WorkAreaManager {
                 if (!v) return;
 
                 const t = document.createElement('div');
-                t.className = 'trabajo-tab' + (v.id === activaId ? ' activo' : '');
-                t.title = `${v.titulo} (clic derecho para más opciones)`;
-
-                const otroLadoTexto = (lado === 'izq') ? 'Mover a la derecha' : 'Mover a la izquierda';
-                const flechaIcono = (lado === 'izq') ? 'fa-arrow-right' : 'fa-arrow-left';
+                t.className = 'trabajo-tab' + (v.id === activaId ? ' activo' : '')
+                    + (this.splitActivo && lado === this.ladoFoco && v.id === activaId ? ' foco' : '');
+                t.dataset.id = v.id;
+                t.title = `${v.titulo} · arrastra para moverla o ponerla al lado · clic derecho para más opciones`;
 
                 t.innerHTML = `
                     <i class="fa-solid ${v.icono}"></i>
                     <span class="tab-txt">${v.titulo}</span>
-                    <button class="tab-mover" title="${otroLadoTexto}">
-                        <i class="fa-solid ${flechaIcono}"></i>
-                    </button>
                     ${v.fija ? '' : '<i class="fa-solid fa-xmark tab-cerrar" title="Cerrar pestaña"></i>'}
                 `;
 
-                t.onclick = () => this.activar(v.id, lado);
-
-                const btnMover = t.querySelector('.tab-mover');
-                if (btnMover) {
-                    btnMover.onclick = (e) => {
-                        e.stopPropagation();
-                        this.moverALado(v.id, lado === 'izq' ? 'der' : 'izq');
-                    };
-                }
+                t.onclick = () => { if (!this._recienArrastrada) this.activar(v.id, lado); };
+                t.addEventListener('pointerdown', (e) => this._alPresionarPestana(e, v.id, lado, t));
+                // Clic con la rueda: cerrar, como en VS Code
+                t.addEventListener('auxclick', (e) => { if (e.button === 1 && !v.fija) { e.preventDefault(); this.cerrar(v.id); } });
 
                 const btnCerrar = t.querySelector('.tab-cerrar');
                 if (btnCerrar) {
@@ -535,6 +595,141 @@ class WorkAreaManager {
         });
     }
 
+    // ------------------------------------------------------------------
+    // Arrastrar pestañas (clic sostenido), como en VS Code
+    // ------------------------------------------------------------------
+
+    _alPresionarPestana(e, id, lado, tabEl) {
+        if (e.button !== 0 || e.target.closest('.tab-cerrar')) return;
+        const inicio = { x: e.clientX, y: e.clientY };
+        let arrastre = null;
+
+        const mover = (ev) => {
+            if (!arrastre) {
+                if (Math.hypot(ev.clientX - inicio.x, ev.clientY - inicio.y) < 6) return;
+                arrastre = this._empezarArrastre(ev, id, tabEl);
+            }
+            arrastre.fantasma.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 10}px)`;
+            arrastre.destino = this._destinoArrastre(ev.clientX, ev.clientY, id);
+            this._pintarDestino(arrastre.destino);
+        };
+        const terminar = (ev, cancelado = false) => {
+            tabEl.removeEventListener('pointermove', mover);
+            tabEl.removeEventListener('pointerup', soltar);
+            tabEl.removeEventListener('pointercancel', cancelar);
+            document.removeEventListener('keydown', teclaEsc, true);
+            try { tabEl.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberado */ }
+            if (!arrastre) return;
+            this._terminarArrastre(arrastre, tabEl);
+            // El clic que sigue al soltar no debe activar la pestaña de origen
+            this._recienArrastrada = true;
+            setTimeout(() => { this._recienArrastrada = false; }, 0);
+            const d = arrastre.destino;
+            if (!cancelado && d) this._soltar(id, lado, d);
+        };
+        const soltar = (ev) => terminar(ev);
+        const cancelar = (ev) => terminar(ev, true);
+        const teclaEsc = (ev) => {
+            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); terminar(ev, true); }
+        };
+
+        // Con la captura, el movimiento llega aunque el puntero pase sobre Monaco o un iframe
+        try { tabEl.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+        tabEl.addEventListener('pointermove', mover);
+        tabEl.addEventListener('pointerup', soltar);
+        tabEl.addEventListener('pointercancel', cancelar);
+        document.addEventListener('keydown', teclaEsc, true);
+    }
+
+    _empezarArrastre(ev, id, tabEl) {
+        const fantasma = tabEl.cloneNode(true);
+        fantasma.classList.add('wa-fantasma');
+        fantasma.classList.remove('foco');
+        fantasma.removeAttribute('title');
+        document.body.appendChild(fantasma);
+        const zona = document.createElement('div');
+        zona.className = 'wa-zona-drop';
+        zona.hidden = true;
+        const marca = document.createElement('div');
+        marca.className = 'wa-marca-drop';
+        marca.hidden = true;
+        document.body.append(zona, marca);
+        tabEl.classList.add('arrastrando');
+        document.body.classList.add('wa-arrastrando');
+        return { id, fantasma, zona, marca, destino: null };
+    }
+
+    _terminarArrastre(arrastre, tabEl) {
+        arrastre.fantasma.remove();
+        arrastre.zona.remove();
+        arrastre.marca.remove();
+        tabEl.classList.remove('arrastrando');
+        document.body.classList.remove('wa-arrastrando');
+    }
+
+    /**
+     * ¿Dónde caería la pestaña si se suelta en (x, y)?
+     *  · sobre una barra de pestañas: en ese panel, en la posición marcada;
+     *  · sobre el contenido de un panel: al final de ese panel;
+     *  · sobre la mitad derecha con un solo panel: se abre al lado (dividir).
+     */
+    _destinoArrastre(x, y, id) {
+        const el = document.elementFromPoint(x, y);
+        if (!el) return null;
+        for (const lado of ['izq', 'der']) {
+            const barra = lado === 'izq' ? this.barraIzq : this.barraDer;
+            const header = lado === 'izq' ? this.headerIzq : this.headerDer;
+            if (header && !header.hidden && header.contains(el)) {
+                const tabs = [...barra.querySelectorAll('.trabajo-tab')].filter(t => t.dataset.id !== id);
+                let indice = tabs.length;
+                for (let i = 0; i < tabs.length; i++) {
+                    const r = tabs[i].getBoundingClientRect();
+                    if (x < r.left + r.width / 2) { indice = i; break; }
+                }
+                const ref = tabs[indice] || tabs[indice - 1];
+                let marcaX;
+                if (!ref) marcaX = barra.getBoundingClientRect().left + 2;
+                else if (tabs[indice]) marcaX = ref.getBoundingClientRect().left;
+                else marcaX = ref.getBoundingClientRect().right;
+                return { tipo: 'barra', lado, indice, marca: { x: marcaX, rect: header.getBoundingClientRect() } };
+            }
+        }
+        for (const lado of ['izq', 'der']) {
+            const panel = lado === 'izq' ? this.panelIzq : this.panelDer;
+            if (!panel || panel.hidden || !panel.contains(el)) continue;
+            const r = panel.getBoundingClientRect();
+            if (!this.splitActivo && x > r.left + r.width * 0.6) {
+                return { tipo: 'dividir', lado: 'der',
+                         rect: { left: r.left + r.width / 2, top: r.top, width: r.width / 2, height: r.height } };
+            }
+            return { tipo: 'panel', lado, rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
+        }
+        return null;
+    }
+
+    _pintarDestino(d) {
+        const zona = document.querySelector('.wa-zona-drop');
+        const marca = document.querySelector('.wa-marca-drop');
+        if (!zona || !marca) return;
+        zona.hidden = !(d && d.rect);
+        marca.hidden = !(d && d.marca);
+        if (d && d.rect) {
+            Object.assign(zona.style, { left: `${d.rect.left}px`, top: `${d.rect.top}px`,
+                                        width: `${d.rect.width}px`, height: `${d.rect.height}px` });
+        }
+        if (d && d.marca) {
+            Object.assign(marca.style, { left: `${d.marca.x - 1}px`, top: `${d.marca.rect.top + 3}px`,
+                                         height: `${d.marca.rect.height - 6}px` });
+        }
+    }
+
+    _soltar(id, ladoOrigen, d) {
+        if (d.tipo === 'barra') this.moverA(id, d.lado, d.indice);
+        else if (d.tipo === 'dividir') this.moverA(id, 'der');
+        else if (d.tipo === 'panel' && d.lado !== ladoOrigen) this.moverA(id, d.lado);
+        else this.activar(id, ladoOrigen);     // soltada en su propio panel: nada cambia
+    }
+
     _mostrarMenuContextualTab(e, vistaId, ladoActual) {
         // Remover menú anterior si existe
         const anterior = document.getElementById('menu-ctx-tab-trabajo');
@@ -555,15 +750,22 @@ class WorkAreaManager {
 
         const itemEstilo = 'padding:6px 14px; cursor:pointer; display:flex; align-items:center; gap:8px; color:var(--text-main);';
 
+        const atajo = (cmd) => {
+            const a = window.shortcutMgr ? window.shortcutMgr.accel(cmd) : '';
+            return a ? window.shortcutMgr.bonito(a) : '';
+        };
+        const destino = ladoActual === 'izq' ? 'der' : 'izq';
         const opciones = [
             {
-                texto: (ladoActual === 'izq') ? 'Mover a la derecha' : 'Mover a la izquierda',
-                icono: (ladoActual === 'izq') ? 'fa-arrow-right' : 'fa-arrow-left',
-                accion: () => this.moverALado(vistaId, ladoActual === 'izq' ? 'der' : 'izq')
+                texto: ladoActual === 'izq' ? (this.splitActivo ? 'Mover al panel derecho' : 'Abrir al lado (dividir)') : 'Mover al panel izquierdo',
+                icono: ladoActual === 'izq' ? 'fa-arrow-right' : 'fa-arrow-left',
+                atajo: atajo(destino === 'der' ? 'vista.moverVentanaDerecha' : 'vista.moverVentanaIzquierda'),
+                accion: () => this.moverA(vistaId, destino)
             },
             {
                 texto: 'Intercambiar lados (Izquierda ↔ Derecha)',
                 icono: 'fa-right-left',
+                atajo: atajo('vista.intercambiarPaneles'),
                 accion: () => this.intercambiarPaneles()
             }
         ];
@@ -575,12 +777,21 @@ class WorkAreaManager {
                 icono: 'fa-xmark',
                 accion: () => this.cerrar(vistaId)
             });
+            const otras = this.paneles[ladoActual].vistas.filter(x => x !== vistaId && !(this.vistas.find(w => w.id === x) || {}).fija);
+            if (otras.length) {
+                opciones.push({
+                    texto: 'Cerrar las demás de este panel',
+                    icono: 'fa-xmarks-lines',
+                    accion: () => otras.forEach(x => this.cerrar(x))
+                });
+            }
         }
 
         opciones.forEach(op => {
             const div = document.createElement('div');
             div.style.cssText = itemEstilo;
-            div.innerHTML = `<i class="fa-solid ${op.icono}" style="width:14px;"></i> <span>${op.texto}</span>`;
+            div.innerHTML = `<i class="fa-solid ${op.icono}" style="width:14px;"></i> <span style="flex:1;">${op.texto}</span>`
+                + (op.atajo ? `<span style="color:var(--text-muted); font-size:11px; margin-left:18px;">${op.atajo}</span>` : '');
             div.onmouseover = () => { div.style.background = 'rgba(137, 180, 250, 0.15)'; };
             div.onmouseout = () => { div.style.background = 'transparent'; };
             div.onclick = () => {
@@ -633,24 +844,7 @@ class WorkAreaManager {
             contenido.dataset.modalOrigen = vista.modalId;
             contenido.classList.add('incrustado');
 
-            // Inyectar botón de lado en la cabecera si aún no existe
-            const header = contenido.querySelector('.modal-header');
-            if (header && !header.querySelector('.modal-header-acciones-lado')) {
-                const divLado = document.createElement('div');
-                divLado.className = 'modal-header-acciones-lado';
-                const btnLado = document.createElement('button');
-                btnLado.className = 'btn-herramienta-lado';
-                btnLado.title = 'Mover herramienta al panel opuesto (Izquierda ↔ Derecha)';
-                btnLado.innerHTML = '<i class="fa-solid fa-right-left"></i> Cambiar lado';
-                btnLado.onclick = (e) => {
-                    e.stopPropagation();
-                    const enDer = this.paneles.der.vistas.includes(`h:${vista.modalId}`);
-                    this.moverALado(`h:${vista.modalId}`, enDer ? 'izq' : 'der');
-                };
-                divLado.appendChild(btnLado);
-                header.insertBefore(divLado, header.querySelector('.modal-close-btn') || header.lastElementChild);
-            }
-
+            // Moverla de lado ya no necesita botón propio: se arrastra su pestaña o se usa el teclado
             destino.appendChild(contenido);
             modal.style.display = 'none';
         }

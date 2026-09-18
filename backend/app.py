@@ -22,6 +22,7 @@ from runner import CodeRunner
 from ai_engine import AIEngine
 from ai_engine.ai_engine_class import explicar_error_motor
 from book_service import BookService
+from librerias_service import LibreriasService
 from knowledge_service import KnowledgeService
 from knowledge_base import KnowledgeBase
 from pack_importer import PackImporter, PackImportError
@@ -100,6 +101,7 @@ ai_engine = AIEngine()
 # local, no solo a los flujos y al chat: Desafíos, Kaggle, GitHub y el profesor también
 ai_engine.gobernador = recursos_termico.gobernador()
 book_service = BookService()
+librerias_service = LibreriasService(book_service.books_dir)
 # Único punto de indexación y consulta del conocimiento. Comparte carpeta con
 # book_service: los mismos archivos, pero fragmentados y buscables.
 knowledge_service = KnowledgeService(book_service.books_dir)
@@ -251,6 +253,7 @@ class AIChatRequest(BaseModel):
     mode: str = "chat"
     code_context: Optional[str] = None
     hooked_files: Optional[List[Dict[str, str]]] = None  # [{"path": "...", "content": "..."}]
+    selected_citations: Optional[List[Dict[str, Any]]] = None  # Citas de libros o librerías seleccionadas para razonar
     use_web: bool = False
     # Modo por eventos (NDJSON): razonamiento, métricas, confianza y herramientas
     eventos: bool = False
@@ -398,6 +401,146 @@ def list_snippets():
 @app.get("/api/books/snippet/{snippet_id}")
 def get_snippet(snippet_id: str):
     return book_service.get_snippet(snippet_id)
+
+# =========================================================================
+# LECTOR DE TEXTO PDF Y CITAS (nombre_libro.json)
+# =========================================================================
+
+class BookPageEditRequest(BaseModel):
+    book_id: str
+    page: int
+    text: str
+
+class BookCitationSaveRequest(BaseModel):
+    book_id: str
+    citation: Dict[str, Any]
+
+class BookCitationDeleteRequest(BaseModel):
+    book_id: str
+    citation_id: str
+
+class BookCitationExportRequest(BaseModel):
+    book_id: str
+    workspace_path: Optional[str] = None
+
+@app.get("/api/books/pdf-pages")
+def get_book_pdf_pages(id: str = Query(...), page: int = Query(default=1), search: Optional[str] = Query(default=None)):
+    res = book_service.get_pdf_pages(id, page=page, search_query=search)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/books/pdf-page-save")
+def save_book_pdf_page_edit(req: BookPageEditRequest):
+    res = book_service.save_pdf_page_edit(req.book_id, req.page, req.text)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.get("/api/books/citations")
+def get_book_citations(id: str = Query(...)):
+    return book_service.get_book_citations(id)
+
+@app.post("/api/books/citations/save")
+def save_book_citation(req: BookCitationSaveRequest):
+    res = book_service.save_book_citation(req.book_id, req.citation)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/books/citations/delete")
+def delete_book_citation(req: BookCitationDeleteRequest):
+    res = book_service.delete_book_citation(req.book_id, req.citation_id)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/books/citations/export")
+def export_book_citations(req: BookCitationExportRequest):
+    ws_path = req.workspace_path or file_mgr.base_dir
+    res = book_service.export_citations_to_workspace(req.book_id, ws_path)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.get("/api/books/all-citations")
+def get_all_book_citations(query: Optional[str] = Query(default=None)):
+    return book_service.get_all_citations_for_ai(query=query)
+
+# =========================================================================
+# ANALISTA DE LIBRERÍAS Y CITAS TÉCNICAS (libreria.json)
+# =========================================================================
+
+class LibraryAddRequest(BaseModel):
+    repo: str
+    name: Optional[str] = None
+    desc: Optional[str] = None
+
+class LibraryCitationSaveRequest(BaseModel):
+    lib_id: str
+    citation: Dict[str, Any]
+
+class LibraryCitationDeleteRequest(BaseModel):
+    lib_id: str
+    citation_id: str
+
+class LibraryCitationExportRequest(BaseModel):
+    lib_id: str
+    workspace_path: Optional[str] = None
+
+class LibraryAnalyzeRequest(BaseModel):
+    lib_id: str
+    topic: str
+    model: Optional[str] = "qwen2.5-coder:7b"
+
+@app.get("/api/librerias/list")
+def list_libraries():
+    return librerias_service.list_libraries()
+
+@app.post("/api/librerias/add")
+def add_library(req: LibraryAddRequest):
+    res = librerias_service.add_library(req.repo, req.name, req.desc)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.get("/api/librerias/citations")
+def get_library_citations(id: str = Query(...)):
+    return librerias_service.get_library_citations(id)
+
+@app.post("/api/librerias/citations/save")
+def save_library_citation(req: LibraryCitationSaveRequest):
+    res = librerias_service.save_library_citation(req.lib_id, req.citation)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/librerias/citations/delete")
+def delete_library_citation(req: LibraryCitationDeleteRequest):
+    res = librerias_service.delete_library_citation(req.lib_id, req.citation_id)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/librerias/citations/export")
+def export_library_citations(req: LibraryCitationExportRequest):
+    ws_path = req.workspace_path or file_mgr.base_dir
+    res = librerias_service.export_library_citations(req.lib_id, ws_path)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/librerias/analyze")
+def analyze_library(req: LibraryAnalyzeRequest):
+    model = req.model or "qwen2.5-coder:7b"
+    res = librerias_service.analyze_library_topic(req.lib_id, req.topic, ai_engine, model=model)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.get("/api/librerias/all-citations")
+def get_all_library_citations(query: Optional[str] = Query(default=None)):
+    return librerias_service.get_all_library_citations_for_ai(query=query)
 
 
 # ==========================================
@@ -1996,8 +2139,8 @@ def kaggle_archivo(ruta: str):
 @app.post("/api/kaggle/explicar_datos")
 def kaggle_explicar_datos(req: KaggleDatosRequest):
     ficha = _kaggle_ficha(req.tipo, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
-    modelo = _modelo_desafios(req.modelo)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
+    modelo = _modelo_desafios(req.modelo, "explicar")
     huella = kaggle_explorar.huella(ficha)
     guardada = None if req.regenerar else kaggle_explorar.explicacion_datos(req.tipo, ficha["ref"], modelo, huella)
     if guardada:
@@ -2090,8 +2233,8 @@ def _github_con_cache(info, ruta, nivel, modelo, regenerar, generador):
 def github_explicar(req: GithubRefRequest):
     """ Sin «ruta», el repositorio en conjunto; con ella, ese archivo """
     info = _github(github_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
-    modelo = _modelo_desafios(req.modelo)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
+    modelo = _modelo_desafios(req.modelo, "explicar")
     nivel = req.nivel if req.nivel in github_lector.NIVELES else "intermedio"
     if req.ruta:
         if not any(a["ruta"] == req.ruta for a in info["archivos"]):
@@ -2107,7 +2250,7 @@ def github_preguntar(req: GithubRefRequest):
     if not req.mensajes:
         raise HTTPException(status_code=400, detail="Escribe una pregunta.")
     info = _github(github_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
 
     def trabajo(avisar):
         return {"texto": _consumir(github_lector.preguntar(motor, nombre, info, req.ruta, req.mensajes), avisar)}
@@ -2228,8 +2371,8 @@ def _kaggle_con_cache(nb, indice, nivel, modelo, regenerar, generador):
 @app.post("/api/kaggle/explicar")
 def kaggle_explicar(req: KaggleExplicarRequest):
     nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
-    modelo = _modelo_desafios(req.modelo)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
+    modelo = _modelo_desafios(req.modelo, "explicar")
     nivel = req.nivel if req.nivel in kaggle_lector.NIVELES else "intermedio"
     if not 0 <= req.indice < len(nb["celdas"]):
         raise HTTPException(status_code=400, detail="Esa celda no existe.")
@@ -2240,8 +2383,8 @@ def kaggle_explicar(req: KaggleExplicarRequest):
 @app.post("/api/kaggle/guia")
 def kaggle_guia(req: KaggleRefRequest):
     nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
-    return _kaggle_con_cache(nb, None, "", _modelo_desafios(req.modelo), req.regenerar,
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
+    return _kaggle_con_cache(nb, None, "", _modelo_desafios(req.modelo, "explicar"), req.regenerar,
                              lambda: kaggle_lector.guia(motor, nombre, nb))
 
 
@@ -2250,7 +2393,7 @@ def kaggle_preguntar(req: KagglePreguntarRequest):
     if not req.mensajes:
         raise HTTPException(status_code=400, detail="Escribe una pregunta.")
     nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
 
     def trabajo(avisar):
         return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, req.mensajes), avisar)}
@@ -2708,6 +2851,9 @@ class AIConfigUpdateRequest(BaseModel):
     agent2_model: Optional[str] = None
     agent3_model: Optional[str] = None
     designer_model: Optional[str] = None
+    modelo_codigo: Optional[str] = None
+    modelo_explicar: Optional[str] = None
+    modelo_autocompletar: Optional[str] = None
     depth_level: Optional[str] = None
     temperature: Optional[float] = None
     num_ctx: Optional[int] = None
@@ -2893,7 +3039,12 @@ def _modelo_autocompletado(pedido: Optional[str]) -> Optional[str]:
 def inline_complete(req: AIInlineCompleteRequest):
     # Con lo que hay DESPUÉS del cursor el modelo rellena el medio (verificado con
     # qwen2.5-coder: completó el cuerpo de una función que ya tenía su return)
-    modelo_fim = _modelo_autocompletado(req.model or ai_engine.config.get("autocomplete_model"))
+    elegido = ai_engine.modelo_para("autocompletar", req.model)
+    if elegido and "insert" not in ai_engine.capacidades(elegido):
+        # El elegido no sabe rellenar al medio: se respeta la elección y completa la línea
+        modelo_fim = None
+    else:
+        modelo_fim = _modelo_autocompletado(elegido)
     if modelo_fim:
         payload = {"model": modelo_fim, "prompt": req.code_prefix[-4000:], "suffix": req.code_suffix[:2000],
                    "stream": False,
@@ -2912,7 +3063,7 @@ def inline_complete(req: AIInlineCompleteRequest):
     
     completion_parts = []
     try:
-        for chunk in ai_engine.generate_response(prompt, model=req.model or "qwen2.5-coder:7b", system_prompt=sys_prompt,
+        for chunk in ai_engine.generate_response(prompt, model=elegido or "qwen2.5-coder:7b", system_prompt=sys_prompt,
                                                  uso="autocompletado"):
             completion_parts.append(chunk)
             if len("".join(completion_parts)) > 100:
@@ -2987,7 +3138,7 @@ def ai_inline_prompt(req: AIInlinePromptRequest):
     )
 
     # 3. Determinar el modelo local o fallback seguro
-    raw_model = req.model or ai_engine.config.get("default_model") or "qwen2.5-coder:7b"
+    raw_model = ai_engine.modelo_para("codigo", req.model) or ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
     clean_model = (raw_model or "qwen2.5-coder:7b").split(" (")[0].strip()
 
     # Comprobar modelos instalados en Ollama para no lanzar 404
@@ -3064,10 +3215,65 @@ def _formatear_gancho(hooked_files: Optional[List[Dict[str, str]]]) -> str:
         + "\n\n".join(bloques)
     )
 
+def _formatear_citas(citas: Optional[List[Dict[str, Any]]] = None, citas_lib: Optional[List[Dict[str, Any]]] = None) -> str:
+    todas = []
+    if isinstance(citas, list):
+        for c in citas:
+            copia = dict(c)
+            if citas_lib is not None:
+                copia.setdefault("tipo", "libro")
+            todas.append(copia)
+    if isinstance(citas_lib, list):
+        for c in citas_lib:
+            copia = dict(c)
+            copia.setdefault("tipo", "libreria")
+            todas.append(copia)
+
+    if not todas:
+        return ""
+
+    lineas = []
+    for c in todas:
+        tipo = c.get("tipo", "libro")
+        if tipo == "libreria":
+            lib = c.get("libreria", "Librería")
+            func = c.get("funcion") or c.get("funcion_o_clase") or c.get("tema") or "API"
+            snip = c.get("snippet") or c.get("codigo_ejemplo") or ""
+            exp = c.get("explicacion", "")
+            lineas.append(f"- [Librería {lib} | API/Función: {func}]\n  Explicación: {exp}\n  Snippet de código verificado:\n  ```python\n  {snip}\n  ```")
+        else:
+            libro = c.get("titulo") or c.get("libro", "Libro")
+            pag = c.get("pagina", "?")
+            txt = c.get("texto", "")
+            nota = c.get("nota", "")
+            tags = ", ".join(c.get("tags", [])) if isinstance(c.get("tags"), list) else str(c.get("tags", ""))
+            lineas.append(f"- [Libro: {libro} | Pág. {pag} | Tags: {tags}]\n  Cita: \"{txt}\"" + (f"\n  Nota del usuario: {nota}" if nota else ""))
+    return (
+        "CITAS BIBLIOGRÁFICAS Y DE LIBRERÍAS CARGADAS (FUNDAMENTACIÓN):\n"
+        "El usuario ha aportado estas citas extraídas de libros y documentación oficial de librerías.\n"
+        "Razona sobre ellas y fundamenta tu respuesta citando expresamente el libro, la página o la librería correspondiente para enriquecer tu explicación técnica y teórica:\n\n"
+        + "\n\n".join(lineas)
+    )
+
 @app.post("/api/ai/chat")
 def ai_chat(req: AIChatRequest):
     sys_prompt = ai_engine.get_tutor_system_prompt(req.mode)
     prompt = req.prompt
+
+    citas_contexto = _formatear_citas(req.selected_citations)
+    if not citas_contexto:
+        try:
+            auto_citas = []
+            auto_citas.extend(book_service.get_all_citations_for_ai(req.prompt, max_results=4))
+            auto_citas.extend(librerias_service.get_all_library_citations_for_ai(req.prompt, max_results=3))
+            if auto_citas:
+                citas_contexto = _formatear_citas(auto_citas)
+        except Exception:
+            pass
+
+    if citas_contexto:
+        prompt = f"{citas_contexto}\n\n{prompt}"
+
     gancho_contexto = _formatear_gancho(req.hooked_files)
     if gancho_contexto:
         prompt = f"{gancho_contexto}\n\n{prompt}"
@@ -4656,13 +4862,14 @@ def _desafio(fn, *args, **kwargs):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def _modelo_desafios(modelo: Optional[str]) -> str:
-    return (modelo or "").strip() or ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
+def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
+    """ El pedido; si no, el modelo elegido para ese rol en Configuración; si no, el del tutor """
+    return ai_engine.modelo_para(rol, modelo) or ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
 
 
-def _motor_desafios(modelo: Optional[str]):
+def _motor_desafios(modelo: Optional[str], rol: Optional[str] = None):
     """ (motor, nombre del modelo): Ollama en local o Gemini en la nube si el nombre empieza por «gemini:» """
-    nombre = _modelo_desafios(modelo)
+    nombre = _modelo_desafios(modelo, rol)
     if gemini_motor.es_gemini(nombre):
         if not gemini_motor.clave_actual()[0]:
             raise HTTPException(status_code=400, detail="Gemini no está conectado: conéctalo o elige un modelo local.")
@@ -4930,7 +5137,7 @@ def desafios_importar(req: DesafioImportarRequest):
 @app.post("/api/desafios/crear")
 def desafios_crear(req: DesafioCrearRequest):
     """ El modelo crea el desafío; solo se entrega si se comprueba ejecutándolo (NDJSON) """
-    modelo = _modelo_desafios(req.modelo)
+    modelo = _modelo_desafios(req.modelo, "codigo")
     motor, nombre_modelo = _motor_desafios(modelo)
     bloque = _contexto_bloque(req.ruta_id, req.bloque_id)
     partes, tema, nivel = [], req.tema.strip(), req.nivel
