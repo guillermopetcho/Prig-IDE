@@ -4,6 +4,8 @@
 - **LSTM (Long Short-Term Memory)**: Sepp Hochreiter y Jürgen Schmidhuber (1997). *Long Short-Term Memory*. *Neural Computation*, 9(8), 1735-1780.
 - **GRU (Gated Recurrent Unit)**: Kyunghyun Cho, Bart van Merriënboer, Caglar Gulcehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, Yoshua Bengio (2014). *Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation*. arXiv:1406.1078.
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/19_rnn_lstm_y_gru.md)
+
 ---
 
 ## 2. Formulación Matemática y Mecanismo de Compuertas

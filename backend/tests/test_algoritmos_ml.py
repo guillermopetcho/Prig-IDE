@@ -836,6 +836,46 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("BloqueResidual_Puro", contenido)
 
 
+    def test_monografia_19_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 19 (RNN, LSTM y GRU) exista y sea riguroso."""
+        ruta_19 = os.path.join(DOCS_DIR, "analisis_papers", "19_rnn_lstm_y_gru.md")
+        self.assertTrue(os.path.exists(ruta_19), f"Falta el archivo: {ruta_19}")
+
+        with open(ruta_19, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Elman", contenido)
+        self.assertIn("Hochreiter", contenido)
+        self.assertIn("Schmidhuber", contenido)
+        self.assertIn("Gers", contenido)
+        self.assertIn("Cho", contenido)
+        self.assertIn("Bengio", contenido)
+        self.assertIn("Jozefowicz", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "BPTT",
+            "Desvanecimiento",
+            "Carrusel de Error Constante",
+            "Compuerta de Olvido",
+            "Estado de Celda",
+            "GRU",
+            "Gradient Clipping",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 19 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("LSTM_Puro", contenido)
+        self.assertIn("forward", contenido)
+        self.assertIn("backward", contenido)
+        self.assertIn("forget_bias", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
