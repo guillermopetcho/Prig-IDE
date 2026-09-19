@@ -414,3 +414,4 @@ Cuando un modelo de lenguaje en Prig IDE analice código, celdas de Jupyter o pi
    - Recordar que los árboles de decisión son **completamente invariantes a transformaciones monótonas de las variables**. No requieren estandarización (`StandardScaler`) ni normalización (`MinMaxScaler`), a diferencia de modelos lineales o redes neuronales.
 4. **Tratamiento en Competencias y Producción:**
    - Un árbol de decisión solitario debe utilizarse primordialmente con fines de **auditoría, interpretabilidad estricta o explicabilidad regulatoria**. Si el objetivo principal es **maximizar la métrica predictiva** (ej. competencias de Kaggle), recomendar la transición inmediata hacia ensambles de reducción de varianza (Random Forest) o reducción de sesgo (XGBoost, LightGBM, CatBoost).
+

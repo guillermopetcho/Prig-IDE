@@ -279,6 +279,43 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("calcular_impureza_gini", contenido)
         self.assertIn("mejor_division_cart", contenido)
 
+    def test_monografia_04_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 04 exista y sea riguroso."""
+        ruta_04 = os.path.join(DOCS_DIR, "analisis_papers", "04_random_forest.md")
+        self.assertTrue(os.path.exists(ruta_04), f"Falta el archivo: {ruta_04}")
+
+        with open(ruta_04, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Breiman", contenido)
+        self.assertIn("Tin Kam Ho", contenido)
+        self.assertIn("Geurts", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Bagging",
+            "Random Subspace",
+            "Varianza del Ensamble",
+            "Out-Of-Bag",
+            "OOB",
+            "Permutation Importance",
+            "MDA",
+            "MDI",
+            "Extra-Trees",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 04 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("RandomForestClasificador", contenido)
+        self.assertIn("mejor_corte_rf", contenido)
+        self.assertIn("oob_score_", contenido)
+        self.assertIn("permutation_importance_mda", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()

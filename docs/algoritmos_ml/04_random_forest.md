@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autor & Año**: Leo Breiman (2001). *Random Forests*. *Machine Learning*, 45(1), 5-32.
 - **Precursor (Random Subspace Method)**: Tin Kam Ho (1995). *Random Decision Forests*. *Proceedings of 3rd International Conference on Document Analysis and Recognition (ICDAR)*.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/04_random_forest.md)
 
 ---
 
