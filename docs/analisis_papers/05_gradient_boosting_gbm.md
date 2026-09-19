@@ -393,3 +393,4 @@ Cuando un modelo de lenguaje en Prig IDE audite, optimice o explique un pipeline
    - Si el dataset contiene más de 10,000 muestras, recomendar activar `subsample=0.8` para activar el **Stochastic Gradient Boosting**, reduciendo la varianza entre iteraciones y acelerando el cálculo en un 20%.
 4. **Elección de Pérdida en Presencia de Outliers en Regresión:**
    - Si el target continuo posee colas pesadas o anomalías extremas, desaconsejar `loss='squared_error'` (L2) y prescribir `loss='huber'` o `loss='absolute_error'` (L1), aprovechando la inmunidad del pseudo-residuo signoidal frente a errores cuadráticos gigantescos.
+

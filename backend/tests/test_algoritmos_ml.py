@@ -350,6 +350,37 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("construir_arbol_gbm", contenido)
         self.assertIn("mejor_corte_mse", contenido)
 
+    def test_monografia_06_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 06 exista y sea riguroso."""
+        ruta_06 = os.path.join(DOCS_DIR, "analisis_papers", "06_xgboost.md")
+        self.assertTrue(os.path.exists(ruta_06), f"Falta el archivo: {ruta_06}")
+
+        with open(ruta_06, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Tianqi Chen", contenido)
+        self.assertIn("Carlos Guestrin", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Expansión en Serie de Taylor de Segundo Orden",
+            "Split Gain",
+            "Sparsity-Aware",
+            "Weighted Quantile Sketch",
+            "Column Block Structure",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 06 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("XGBoostClasificador", contenido)
+        self.assertIn("mejor_corte_xgboost_sparsity", contenido)
+        self.assertIn("calcular_gradientes_logloss", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()

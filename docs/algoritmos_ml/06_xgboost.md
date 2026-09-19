@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Tianqi Chen y Carlos Guestrin (2016). *XGBoost: A Scalable Tree Boosting System*. *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '16)*, 785-794. arXiv:1603.02754.
 - **Impacto**: Dominador histórico en competiciones de Kaggle y benchmarks en datos tabulares.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/06_xgboost.md)
 
 ---
 
