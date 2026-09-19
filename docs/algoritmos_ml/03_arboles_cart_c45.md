@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **CART**: Leo Breiman, Jerome Friedman, Richard Olshen, Charles Stone (1984). *Classification and Regression Trees*. Wadsworth.
 - **ID3 & C4.5**: J. Ross Quinlan (1986). *Induction of Decision Trees*. *Machine Learning*, 1(1), 81-106. Quinlan (1993), *C4.5: Programs for Machine Learning*.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/03_arboles_cart_c45.md)
 
 ---
 

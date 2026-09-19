@@ -243,6 +243,42 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("sigmoide_estable", contenido)
         self.assertIn("entrenar_regresion_logistica_irls", contenido)
 
+    def test_monografia_03_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 03 exista y sea riguroso."""
+        ruta_03 = os.path.join(DOCS_DIR, "analisis_papers", "03_arboles_cart_c45.md")
+        self.assertTrue(os.path.exists(ruta_03), f"Falta el archivo: {ruta_03}")
+
+        with open(ruta_03, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Breiman", contenido)
+        self.assertIn("Friedman", contenido)
+        self.assertIn("Quinlan", contenido)
+        self.assertIn("Morgan", contenido)
+        self.assertIn("Sonquist", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Impureza de Gini",
+            "Entropía de Shannon",
+            "Gain Ratio",
+            "Poda de Complejidad de Coste",
+            "eslabón más débil",
+            "Variables Sustitutas",
+            "1-SE",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 03 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("ArbolDecisionCART", contenido)
+        self.assertIn("calcular_impureza_gini", contenido)
+        self.assertIn("mejor_division_cart", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()

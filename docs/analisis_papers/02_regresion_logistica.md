@@ -370,3 +370,4 @@ Cuando un modelo de lenguaje de Prig IDE inspeccione un proyecto, celda de Jupyt
    - En presencia de clases desbalanceadas (ej. fraude financiero con 99% de clase negativa), advertir que el umbral estándar de $\tau = 0.5$ es arbitrario e ineficiente. Recomendar:
      1. Usar `class_weight='balanced'` para compensar el gradiente por la inversa de la frecuencia de clase.
      2. Optimizar el umbral de decisión $\tau^*$ maximizando la métrica de interés (F1-score, Balanced Accuracy o utilidad económica en la curva PR).
+
