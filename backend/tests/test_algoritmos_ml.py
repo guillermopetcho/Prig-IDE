@@ -419,6 +419,40 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("ArbolLeafWiseLightGBM", contenido)
 
 
+    def test_monografia_08_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 08 (CatBoost) exista y sea riguroso."""
+        ruta_08 = os.path.join(DOCS_DIR, "analisis_papers", "08_catboost.md")
+        self.assertTrue(os.path.exists(ruta_08), f"Falta el archivo: {ruta_08}")
+
+        with open(ruta_08, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Prokhorenkova", contenido)
+        self.assertIn("Dorogush", contenido)
+        self.assertIn("Gulin", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Prediction Shift",
+            "Target Leakage",
+            "Ordered Target Statistics",
+            "Ordered Boosting",
+            "Oblivious Trees",
+            "Bitwise",
+            "Cross-Features",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 08 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("CodificadorOrderedTargetStatistics", contenido)
+        self.assertIn("ArbolObliviousRegressor", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 

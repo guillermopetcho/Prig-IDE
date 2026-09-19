@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Liudmila Prokhorenkova, Gleb Gusev, Aleksandr Vorobev, Anna Veronika Dorogush, Andrey Gulin (2018). *CatBoost: unbiased boosting with categorical features*. *Advances in Neural Information Processing Systems (NeurIPS 31)*, 6638-6648. arXiv:1706.09516.
 - **Innovaciones Clave**: Ordered Boosting, Ordered Target Statistics (TS) y Árboles Simétricos Oblivious.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/08_catboost.md)
 
 ---
 
