@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Richard O. Duda y Peter E. Hart (1973). *Pattern Classification and Scene Analysis*. John Wiley & Sons.
 - **Teorema de Base**: Thomas Bayes (1763). *An Essay towards solving a Problem in the Doctrine of Chances*.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/11_naive_bayes.md)
 
 ---
 

@@ -526,6 +526,45 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("KNNClasificadorPuro", contenido)
 
 
+    def test_monografia_11_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 11 (Naive Bayes) exista y sea riguroso."""
+        ruta_11 = os.path.join(DOCS_DIR, "analisis_papers", "11_naive_bayes.md")
+        self.assertTrue(os.path.exists(ruta_11), f"Falta el archivo: {ruta_11}")
+
+        with open(ruta_11, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Bayes", contenido)
+        self.assertIn("Laplace", contenido)
+        self.assertIn("Duda", contenido)
+        self.assertIn("Domingos", contenido)
+        self.assertIn("Pazzani", contenido)
+        self.assertIn("McCallum", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Independencia Condicional",
+            "Maximum A Posteriori",
+            "Gaussiano",
+            "Multinomial",
+            "Bernoulli",
+            "Laplace",
+            "Domingos",
+            "Log-Sum-Exp",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 11 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("GaussianNaiveBayesPuro", contenido)
+        self.assertIn("MultinomialNaiveBayesPuro", contenido)
+        self.assertIn("log_sum_exp", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
