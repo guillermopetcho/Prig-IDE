@@ -4,6 +4,7 @@
 - **Clasificador de Margen Óptimo**: Bernardo Boser, Isabelle Guyon, Vladimir Vapnik (1992). *A training algorithm for optimal margin classifiers*. *COLT '92*, 144-152.
 - **Redes de Vectores de Soporte (Kernel Trick & Soft Margin)**: Corinna Cortes y Vladimir Vapnik (1995). *Support-Vector Networks*. *Machine Learning*, 20(3), 273-297.
 - **Regresión por Vectores de Soporte (SVR)**: Harris Drucker, Christopher J. C. Burges, Linda Kaufman, Alex Smola, Vladimir Vapnik (1997). *Support Vector Regression Machines*. *NeurIPS 9*.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/09_svm_y_svr.md)
 
 ---
 

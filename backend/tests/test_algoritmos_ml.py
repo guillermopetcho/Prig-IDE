@@ -453,6 +453,42 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("ArbolObliviousRegressor", contenido)
 
 
+    def test_monografia_09_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 09 (SVM y SVR) exista y sea riguroso."""
+        ruta_09 = os.path.join(DOCS_DIR, "analisis_papers", "09_svm_y_svr.md")
+        self.assertTrue(os.path.exists(ruta_09), f"Falta el archivo: {ruta_09}")
+
+        with open(ruta_09, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Vapnik", contenido)
+        self.assertIn("Cortes", contenido)
+        self.assertIn("Boser", contenido)
+        self.assertIn("Smola", contenido)
+        self.assertIn("Platt", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Dimensión VC",
+            "Margen",
+            "Dual de Wolfe",
+            "KKT",
+            "Mercer",
+            "Sequential Minimal Optimization",
+            "SVR",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 09 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("SVM_SMO", contenido)
+        self.assertIn("_computar_kernel", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
