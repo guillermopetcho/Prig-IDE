@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **k-Means (Algoritmo de Lloyd)**: Stuart P. Lloyd (1957 / 1982). *Least squares quantization in PCM*. *IEEE Transactions on Information Theory*, 28(2), 129-137. J. MacQueen (1967). *Some Methods for classification and Analysis of Multivariate Observations*.
 - **k-Means++**: David Arthur y Sergei Vassilvitskii (2007). *k-means++: the advantages of careful seeding*. *Proceedings of the 18th Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)*, 1027-1035.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/12_kmeans_clustering.md)
 
 ---
 

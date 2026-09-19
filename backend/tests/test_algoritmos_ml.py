@@ -565,6 +565,43 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("log_sum_exp", contenido)
 
 
+    def test_monografia_12_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 12 (k-Means) exista y sea riguroso."""
+        ruta_12 = os.path.join(DOCS_DIR, "analisis_papers", "12_kmeans_clustering.md")
+        self.assertTrue(os.path.exists(ruta_12), f"Falta el archivo: {ruta_12}")
+
+        with open(ruta_12, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Lloyd", contenido)
+        self.assertIn("MacQueen", contenido)
+        self.assertIn("Arthur", contenido)
+        self.assertIn("Vassilvitskii", contenido)
+        self.assertIn("Elkan", contenido)
+        self.assertIn("Rousseeuw", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Lloyd",
+            "Inercia",
+            "k-means++",
+            "Desigualdad Triangular",
+            "Silueta",
+            "NP-Hard",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 12 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("inicializar_kmeans_plus_plus", contenido)
+        self.assertIn("KMeansPuro", contenido)
+        self.assertIn("calcular_coeficiente_silueta", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
