@@ -4,6 +4,8 @@
 - **PCA**: Karl Pearson (1901). *On lines and planes of closest fit to systems of points in space*. *Philosophical Magazine*, 2(11), 559-572. Harold Hotelling (1933). *Analysis of a complex of statistical variables into principal components*. *Journal of Educational Psychology*, 24(6), 417-441.
 - **Kernel PCA**: Bernhard Schölkopf, Alexander Smola, Klaus-Robert Müller (1998). *Nonlinear Component Analysis as a Kernel Eigenvalue Problem*. *Neural Computation*, 10(5), 1299-1319.
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/15_pca_y_kernel_pca.md)
+
 ---
 
 ## 2. Formulación Matemática

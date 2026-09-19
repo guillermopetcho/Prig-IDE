@@ -675,6 +675,46 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("bic", contenido)
 
 
+    def test_monografia_15_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 15 (PCA y Kernel PCA) exista y sea riguroso."""
+        ruta_15 = os.path.join(DOCS_DIR, "analisis_papers", "15_pca_y_kernel_pca.md")
+        self.assertTrue(os.path.exists(ruta_15), f"Falta el archivo: {ruta_15}")
+
+        with open(ruta_15, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Pearson", contenido)
+        self.assertIn("Hotelling", contenido)
+        self.assertIn("Eckart", contenido)
+        self.assertIn("Young", contenido)
+        self.assertIn("Golub", contenido)
+        self.assertIn("Schölkopf", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Varianza",
+            "Reconstrucción",
+            "Autovectores",
+            "SVD",
+            "Eckart-Young",
+            "Gram",
+            "Hilbert",
+            "Blanqueamiento",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 15 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("PCA_Puro", contenido)
+        self.assertIn("KernelPCA_Puro", contenido)
+        self.assertIn("explained_variance_ratio_", contenido)
+        self.assertIn("_calcular_matriz_kernel", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
