@@ -26,7 +26,16 @@ ID_VALIDO = re.compile(r"^des_[0-9a-f]{10}$")
 
 
 def carpeta_base() -> str:
-    return os.environ.get("PRIG_DESAFIOS_DIR") or os.path.expanduser("~/.prig_desafios")
+    pref = os.environ.get("PRIG_DESAFIOS_DIR")
+    if pref:
+        return pref
+    d = os.path.expanduser("~/.prig_desafios")
+    try:
+        os.makedirs(d, exist_ok=True)
+        return d
+    except OSError:
+        import tempfile
+        return os.path.join(tempfile.gettempdir(), "prig_desafios")
 
 
 def ahora() -> str:

@@ -23,7 +23,9 @@
 
     const FUENTES = {
         exercism: ['Exercism', 'fa-dumbbell', 'var(--accent-green)'],
+        exercism_cpp: ['Exercism (C++)', 'fa-dumbbell', 'var(--accent-green)'],
         thealgorithms: ['TheAlgorithms', 'fa-diagram-project', 'var(--accent-blue)'],
+        thealgorithms_cpp: ['TheAlgorithms (C++)', 'fa-diagram-project', 'var(--accent-blue)'],
         projecteuler: ['Project Euler', 'fa-square-root-variable', 'var(--accent-yellow)'],
         modelo: ['Modelo', 'fa-robot', 'var(--accent-purple)'],
         plan: ['Plan de estudios', 'fa-route', 'var(--accent-purple)'],
@@ -34,9 +36,10 @@
 
     const estado = {
         panel: 'chat', modelo: null, modelos: [],
-        chat: [{ rol: 'tutor', texto: '¿Qué quieres practicar hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.' }],
+        lenguaje: leerLocal('prig_desafios_lenguaje') || 'python',
+        chat: [{ rol: 'tutor', texto: '¿Qué quieres practicar hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios», «punteros» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.' }],
         chatNivel: 'intermedio',
-        internet: { tema: '', nivel: '', fuentes: new Set(['exercism', 'thealgorithms', 'projecteuler']), datos: null, cargando: false, error: null },
+        internet: { tema: '', nivel: '', fuentes: new Set(), datos: null, cargando: false, error: null },
         plan: { rutas: null, rutaId: null, ruta: null, bloqueDestacado: null },
         mis: null,
         d: null,               // desafío abierto (vista pública)
@@ -89,10 +92,18 @@
     const flujo = (url, cuerpo, alEvento) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}) })
         .then(res => leerNdjson(res, alEvento || (() => {})));
 
-    const nombreModulo = (texto) => {
-        let n = String(texto || '').trim().replace(/\.py$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+    const nombreModulo = (texto, defExt = null) => {
+        const esCpp = (estado.d && estado.d.lenguaje === 'cpp') || estado.lenguaje === 'cpp';
+        let ext = defExt || (esCpp ? 'cpp' : 'py');
+        let n = String(texto || '').trim();
+        const mExt = n.match(/\.(py|cpp|hpp|h|cc|cxx|c)$/i);
+        if (mExt) {
+            ext = mExt[1].toLowerCase();
+            n = n.slice(0, -mExt[0].length);
+        }
+        n = n.replace(/[^A-Za-z0-9_]/g, '_');
         if (!/^[A-Za-z_]/.test(n)) n = 'pagina_' + n;
-        return (n || 'pagina') + '.py';
+        return (n || 'pagina') + '.' + ext;
     };
 
     // ================================================================== estilos
@@ -182,6 +193,12 @@
             </div>
             <div class="des-modelo"><i class="fa-solid fa-microchip"></i> Modelo <select id="des-modelo" class="des-campo"></select>
               <span class="des-mini" id="des-modelo-nube" hidden title="Este modelo funciona en los servidores de Google" style="color:var(--accent-yellow);"><i class="fa-solid fa-cloud"></i> nube</span></div>
+            <div class="des-fila" style="padding:6px 10px; border-bottom:1px solid var(--border-color); font-size:11px; gap:4px; align-items:center;">
+              <span style="color:var(--text-muted); font-size:11px;"><i class="fa-solid fa-code"></i> Lenguaje:</span>
+              <span style="flex:1"></span>
+              <button class="des-btn ${estado.lenguaje === 'python' ? 'amarillo' : ''}" id="des-lang-py" style="padding:2px 8px; font-size:11px;" title="Aprender y practicar con Python"><i class="fa-brands fa-python"></i> Python</button>
+              <button class="des-btn ${estado.lenguaje === 'cpp' ? 'azul' : ''}" id="des-lang-cpp" style="padding:2px 8px; font-size:11px;" title="Aprender y practicar con C++ (C++20)"><i class="fa-solid fa-code"></i> C++</button>
+            </div>
             <div class="des-lado-cuerpo" id="des-lado-cuerpo"></div>
           </aside>
           <main class="des-hoja" id="des-hoja"><div class="des-hoja-interior" id="des-hoja-interior"></div></main>`;
@@ -192,6 +209,29 @@
             guardarLocal('prig_desafios_modelo', estado.modelo);
             marcarNube();
         };
+        const actualizarBotonesLang = () => {
+            const bp = $('des-lang-py');
+            const bc = $('des-lang-cpp');
+            if (bp) bp.className = `des-btn ${estado.lenguaje === 'python' ? 'amarillo' : ''}`;
+            if (bc) bc.className = `des-btn ${estado.lenguaje === 'cpp' ? 'azul' : ''}`;
+        };
+        const fijarLenguaje = (lang) => {
+            estado.lenguaje = lang;
+            guardarLocal('prig_desafios_lenguaje', lang);
+            actualizarBotonesLang();
+            if (estado.panel === 'internet') panelInternet();
+            else if (estado.panel === 'chat') {
+                estado.chat[0] = {
+                    rol: 'tutor',
+                    texto: lang === 'cpp'
+                        ? '¿Qué quieres practicar en C++ hoy? Cuéntame el tema (por ejemplo «punteros y referencias», «vectores STL», «clases y RAII» o «templates») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.'
+                        : '¿Qué quieres practicar en Python hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.'
+                };
+                panelChat();
+            }
+        };
+        $('des-lang-py').onclick = () => fijarLenguaje('python');
+        $('des-lang-cpp').onclick = () => fijarLenguaje('cpp');
         cargarModelos();
         cambiarPanel(estado.panel);
         pintarHoja();
@@ -443,9 +483,12 @@
             <select id="des-int-nivel" class="des-campo" style="width:auto;"><option value="">Cualquier nivel</option>${NIVELES.map(n => `<option ${n === i.nivel ? 'selected' : ''}>${n}</option>`).join('')}</select>
             <button class="des-btn azul" id="des-int-buscar" style="flex:1;"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
           </div>
-          <div class="des-fila">${Object.entries(FUENTES).filter(([k]) => ['exercism', 'thealgorithms', 'projecteuler'].includes(k))
+          <div class="des-fila">${Object.entries(FUENTES).filter(([k]) => {
+              if (estado.lenguaje === 'cpp') return ['exercism_cpp', 'thealgorithms_cpp', 'projecteuler'].includes(k);
+              return ['exercism', 'thealgorithms', 'projecteuler'].includes(k);
+          })
             .map(([k, [n, ic, col]]) => `<label class="des-mini" style="cursor:pointer; ${i.fuentes.has(k) ? `color:${col};` : ''}"><input type="checkbox" data-fuente="${k}" ${i.fuentes.has(k) ? 'checked' : ''} style="vertical-align:middle;"> ${n}</label>`).join('')}</div>
-          <div class="des-ayuda">Solo fuentes cuya licencia permite copiar: Exercism y TheAlgorithms (MIT, con pruebas) y Project Euler (CC BY-NC-SA, sin respuestas publicadas).</div>
+          <div class="des-ayuda">Fuentes para practicar en ${estado.lenguaje === 'cpp' ? 'C++' : 'Python'} con licencias abiertas (MIT / CC BY-NC-SA).</div>
           <div id="des-int-res"></div>`;
         $('des-int-tema').onkeydown = (e) => { if (e.key === 'Enter') { i.bloque = null; buscarInternet(); } };
         $('des-int-buscar').onclick = () => { i.bloque = null; buscarInternet(); };
@@ -463,7 +506,7 @@
         if (!i.tema) { if (campo) campo.focus(); return; }
         i.cargando = true; i.error = null;
         pintarResultadosInternet();
-        const q = new URLSearchParams({ tema: i.tema, fuentes: [...i.fuentes].join(',') });
+        const q = new URLSearchParams({ tema: i.tema, fuentes: [...i.fuentes].join(','), lenguaje: estado.lenguaje });
         if (i.nivel) q.set('nivel', i.nivel);
         if (ayudaModelo) { q.set('ayuda_modelo', 'true'); q.set('modelo', estado.modelo || ''); }
         try { i.datos = await json(`/api/desafios/internet/buscar?${q}`); } catch (e) { i.error = e.message; }
@@ -506,7 +549,9 @@
             ? 'Se descarga el enunciado, el código de partida y las pruebas, y se comprueba ejecutándolos que funcionan en tu equipo…'
             : 'Se descarga el enunciado…']);
         try {
-            const d = await enviar('/api/desafios/internet/importar', { fuente: x.fuente, ref: x.ref, funcion, tema: i.tema, ...(i.bloque || {}) });
+            const d = await enviar('/api/desafios/internet/importar', {
+                fuente: x.fuente, ref: x.ref, funcion, tema: i.tema, lenguaje: x.lenguaje || estado.lenguaje, ...(i.bloque || {})
+            });
             abrirDesafio(d);
         } catch (e) {
             estado.tarea.error = e.message;
@@ -518,28 +563,44 @@
     async function panelMis() {
         const c = $('des-lado-cuerpo');
         c.innerHTML = '<div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Cargando…</div>';
-        try { estado.mis = (await json('/api/desafios')).desafios; } catch (e) { c.innerHTML = `<div class="des-error">${esc(e.message)}</div>`; return; }
-        if (estado.panel !== 'mis') return;
-        if (!estado.mis.length) { c.innerHTML = '<div class="des-ayuda">Aún no empezaste ningún desafío.</div>'; return; }
-        const resueltos = estado.mis.filter(x => x.estado === 'resuelto').length;
-        c.innerHTML = `<div class="des-fila"><span class="des-ayuda" style="flex:1;">${estado.mis.length} desafíos · ${resueltos} resueltos</span>
-            <button class="des-btn" id="des-ver-perfil" title="Historial completo, dominio por concepto y análisis del tutor"><i class="fa-solid fa-chart-line"></i> Mi avance</button></div>`
-          + estado.mis.map(x => {
-            const [en, ie, ce] = ESTADOS[x.estado] || ESTADOS.nuevo;
-            const [fn, fi, fc] = FUENTES[x.origen.tipo] || FUENTES.modelo;
-            return `<div class="des-item ${estado.d && estado.d.id === x.id ? 'destacado' : ''}" data-id="${esc(x.id)}">
-              <div class="des-fila"><i class="fa-solid ${ie}" style="color:${ce};" title="${en}"></i><span class="des-item-titulo" style="flex:1;">${esc(x.titulo)}</span>
-                <button class="des-btn rojo" data-borrar title="Borrar" style="padding:2px 6px;"><i class="fa-solid fa-trash"></i></button></div>
-              <div class="des-ayuda"><i class="fa-solid ${fi}" style="color:${fc};"></i> ${fn} · ${esc(x.nivel || '')} · ${x.verificable ? `${x.mejor ? x.mejor.pasados : 0}/${x.mejor ? x.mejor.total : '?'} pruebas` : 'sin pruebas'} · ${x.intentos} intentos${x.pistas ? ` · ${x.pistas} pistas` : ''}</div>
+        try {
+            estado.mis = await json('/api/desafios');
+            pintarMis();
+        } catch (e) { c.innerHTML = `<div class="des-error">${esc(e.message)}</div>`; }
+    }
+
+    function pintarMis() {
+        const c = $('des-lado-cuerpo');
+        if (!c || !estado.mis) return;
+        const lista = estado.mis.desafios || [];
+        if (!lista.length) { c.innerHTML = '<div class="des-ayuda">Todavía no has abierto ningún desafío. Conversa en el chat, busca en internet o parte de tu plan.</div>'; return; }
+        c.innerHTML = lista.map((d, n) => {
+            const p = d.progreso || {};
+            const [estNom, estIc, estCol] = ESTADOS[p.estado] || ESTADOS.nuevo;
+            const [fNom, fIc, fCol] = FUENTES[d.origen?.tipo] || FUENTES.modelo;
+            const activo = estado.d && estado.d.id === d.id;
+            return `<div class="des-item ${activo ? 'destacado' : ''}" data-id="${d.id}" style="margin-top:6px;">
+              <div class="des-fila"><span class="des-mini" style="color:${estCol};"><i class="fa-solid ${estIc}"></i> ${estNom}</span>
+                <span class="des-mini" style="color:${fCol};"><i class="fa-solid ${fIc}"></i> ${fNom}</span>
+                ${d.nivel ? `<span class="des-mini">${esc(d.nivel)}</span>` : ''}
+                <span style="flex:1"></span>
+                <button class="des-btn rojo" data-borrar="${d.id}" style="padding:1px 5px;" title="Borrar de la lista"><i class="fa-solid fa-trash"></i></button></div>
+              <div class="des-item-titulo" style="margin-top:4px;">${esc(d.titulo)}</div>
+              <div class="des-ayuda">${p.intentos ? `${p.intentos} intentos` : 'sin empezar'}${p.mejor && p.mejor.total ? ` · mejor ${p.mejor.pasados}/${p.mejor.total}` : ''}</div>
             </div>`;
         }).join('');
-        $('des-ver-perfil').onclick = () => window.PrigCommands && window.PrigCommands.ejecutar('herr.perfil');
-        c.querySelectorAll('[data-id]').forEach(el => {
-            el.onclick = (e) => { if (!e.target.closest('[data-borrar]')) abrirPorId(el.dataset.id); };
-            el.querySelector('[data-borrar]').onclick = async () => {
-                if (!confirm('¿Borrar este desafío y tu trabajo en él?')) return;
-                await fetch(`/api/desafios/${el.dataset.id}`, { method: 'DELETE' });
-                if (estado.d && estado.d.id === el.dataset.id) { cerrarDesafio(); }
+        c.querySelectorAll('.des-item').forEach(el => {
+            el.onclick = (e) => {
+                if (e.target.closest('[data-borrar]')) return;
+                abrirPorId(el.dataset.id);
+            };
+        });
+        c.querySelectorAll('[data-borrar]').forEach(b => {
+            b.onclick = async (e) => {
+                e.stopPropagation();
+                if (!confirm('¿Borrar este desafío de la lista?')) return;
+                await fetch(`/api/desafios/${encodeURIComponent(b.dataset.borrar)}`, { method: 'DELETE' });
+                if (estado.d && estado.d.id === b.dataset.borrar) { estado.d = null; pintarHoja(); }
                 panelMis();
             };
         });
@@ -551,7 +612,7 @@
         mostrarTarea(`Creando un desafío sobre ${tema}`, ['El modelo escribe el enunciado, el código de partida, la solución y las pruebas. Después se ejecutan: solo llega a ti si la solución pasa y el código de partida no.']);
         const pedido = ++estado.pedido;
         try {
-            const d = await flujo('/api/desafios/crear', { ...cuerpo, modelo: estado.modelo }, (ev) => {
+            const d = await flujo('/api/desafios/crear', { lenguaje: estado.lenguaje, ...cuerpo, modelo: estado.modelo }, (ev) => {
                 if (ev.tipo === 'progreso' && estado.tarea && pedido === estado.pedido) { estado.tarea.lineas.push(ev.mensaje); pintarHoja(); }
             });
             if (pedido !== estado.pedido) return;
@@ -654,10 +715,11 @@
           <section class="des-seccion" id="des-sec-paginas">
             <div class="des-seccion-titulo"><span class="num">4</span> Páginas de código <span style="flex:1"></span>
               <button class="des-btn" id="des-pagina-nueva"><i class="fa-solid fa-file-circle-plus"></i> Nueva página</button>
-              <button class="des-btn" id="des-pagina-importar"><i class="fa-solid fa-file-import"></i> Importar archivo .py</button>
-              <input type="file" id="des-pagina-archivo" accept=".py,text/x-python" multiple hidden></div>
-            <div class="des-ayuda">Cada página es un archivo de Python. Desde una página se usa otra con <code>import</code>:
-              ${estado.paginas.length > 1 ? `por ejemplo <code>from ${esc(estado.paginas[0].nombre.replace(/\.py$/, ''))} import …</code>` : 'si creas <code>utiles.py</code>, en otra página escribe <code>from utiles import …</code>'}.
+              <button class="des-btn" id="des-pagina-importar"><i class="fa-solid fa-file-import"></i> Importar archivo</button>
+              <input type="file" id="des-pagina-archivo" accept=".py,.cpp,.hpp,.h,.cc,.cxx,.c,text/x-python,text/x-c,text/x-c++" multiple hidden></div>
+            <div class="des-ayuda">${((estado.d && estado.d.lenguaje) || estado.lenguaje) === 'cpp'
+              ? 'Cada página es un archivo de C++ o cabecera (.h/.hpp). Puedes usar unas desde otras con <code>#include "archivo.h"</code>.'
+              : `Cada página es un archivo de Python. Desde una página se usa otra con <code>import</code>: ${estado.paginas.length > 1 ? `por ejemplo <code>from ${esc(estado.paginas[0].nombre.replace(/\.py$/, ''))} import …</code>` : 'si creas <code>utiles.py</code>, en otra página escribe <code>from utiles import …</code>'}.`}
               <b>Mayús+Enter</b> ejecuta la página · <b>Ctrl+Enter</b> comprueba · se guarda solo <span id="des-guardado"></span></div>
             <div id="des-paginas"></div>
           </section>
@@ -709,7 +771,11 @@
               <div><i class="fa-solid fa-pen"></i>Tu plan</div><div><i class="fa-solid fa-file-code"></i>Páginas de código</div><div><i class="fa-solid fa-vial-circle-check"></i>Pruebas</div>
             </div>
             <div class="des-fila" style="justify-content:center;">
-              <input id="des-rapido" class="des-campo" style="max-width:340px;" placeholder="¿Qué quieres practicar? p. ej. recursividad">
+              <select id="des-rapido-lenguaje" class="des-campo" style="width:auto; font-weight:600;">
+                <option value="python" ${estado.lenguaje === 'python' ? 'selected' : ''}>Python</option>
+                <option value="cpp" ${estado.lenguaje === 'cpp' ? 'selected' : ''}>C++</option>
+              </select>
+              <input id="des-rapido" class="des-campo" style="max-width:340px;" placeholder="${estado.lenguaje === 'cpp' ? '¿Qué quieres practicar en C++? p. ej. punteros o templates' : '¿Qué quieres practicar? p. ej. recursividad'}">
               <select id="des-rapido-nivel" class="des-campo" style="width:auto;">${NIVELES.map(n => `<option ${n === 'intermedio' ? 'selected' : ''}>${n}</option>`).join('')}</select>
             </div>
             <div class="des-fila" style="justify-content:center; margin-top:8px;">
@@ -719,13 +785,27 @@
             <p class="des-ayuda" style="margin-top:14px;">También puedes conversarlo en el <b>Chat</b>, partir de un bloque de tu <b>Plan</b> o retomar uno de <b>Mis desafíos</b>.</p>
           </div>`;
         const tema = () => $('des-rapido').value.trim();
+        const langSel = $('des-rapido-lenguaje');
+        if (langSel) langSel.onchange = () => {
+            estado.lenguaje = langSel.value;
+            const bPy = $('des-lang-py'), bCpp = $('des-lang-cpp');
+            if (bPy && bCpp) {
+                bPy.classList.toggle('activa', estado.lenguaje === 'python');
+                bCpp.classList.toggle('activa', estado.lenguaje === 'cpp');
+            }
+            $('des-rapido').placeholder = estado.lenguaje === 'cpp' ? '¿Qué quieres practicar en C++? p. ej. punteros o templates' : '¿Qué quieres practicar? p. ej. recursividad';
+        };
         $('des-rapido').value = estado.internet.tema || '';
-        $('des-rapido').onkeydown = (e) => { if (e.key === 'Enter' && tema()) crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value }); };
-        $('des-rapido-crear').onclick = () => { if (!tema()) return $('des-rapido').focus(); crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value }); };
+        $('des-rapido').onkeydown = (e) => { if (e.key === 'Enter' && tema()) crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje }); };
+        $('des-rapido-crear').onclick = () => { if (!tema()) return $('des-rapido').focus(); crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje }); };
         $('des-rapido-internet').onclick = () => {
             if (!tema()) return $('des-rapido').focus();
-            estado.internet.tema = tema(); estado.internet.nivel = $('des-rapido-nivel').value; estado.internet.bloque = null;
-            cambiarPanel('internet'); buscarInternet();
+            estado.internet.tema = tema();
+            estado.internet.nivel = $('des-rapido-nivel').value;
+            estado.internet.bloque = null;
+            if (langSel) estado.internet.lenguaje = langSel.value;
+            cambiarPanel('internet');
+            buscarInternet();
         };
     }
 
@@ -840,9 +920,13 @@
         const base = iniciales();
         c.innerHTML = estado.paginas.map((p, i) => {
             const deBase = base.get(p.nombre);
+            const esCpp = /\.(cpp|hpp|h|cc|cxx|c)$/i.test(p.nombre);
+            const icono = esCpp
+                ? '<i class="fa-solid fa-code" style="color:var(--accent-blue);" title="C++"></i>'
+                : '<i class="fa-brands fa-python" style="color:var(--accent-yellow);" title="Python"></i>';
             return `<div class="des-pagina" data-i="${i}">
               <div class="des-pagina-cab">
-                <i class="fa-brands fa-python" style="color:var(--accent-yellow);"></i>
+                ${icono}
                 <span class="des-pagina-nombre">${esc(p.nombre)}</span>
                 ${p.solo_lectura ? '<span class="des-mini" title="Página de apoyo del ejercicio">solo lectura</span>' : ''}
                 <span class="des-ayuda" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.descripcion || (deBase || {}).descripcion || '')}</span>
@@ -857,6 +941,7 @@
         c.querySelectorAll('.des-pagina').forEach(el => {
             const i = +el.dataset.i;
             const pagina = estado.paginas[i];
+            const esCpp = /\.(cpp|hpp|h|cc|cxx|c)$/i.test(pagina.nombre);
             crearEditor(el.querySelector('.des-pagina-editor'), pagina);
             el.querySelector('[data-ejecutar]').onclick = () => ejecutarPagina(pagina.nombre);
             const restaurar = el.querySelector('[data-restaurar]');
@@ -867,7 +952,7 @@
             };
             const renombrar = el.querySelector('[data-renombrar]');
             if (renombrar) renombrar.onclick = () => {
-                const nuevo = prompt('Nuevo nombre de la página (termina en .py):', pagina.nombre);
+                const nuevo = prompt(`Nuevo nombre de la página (${esCpp ? '.cpp, .h, etc.' : '.py'}):`, pagina.nombre);
                 if (!nuevo) return;
                 const nombre = nombreModulo(nuevo);
                 if (estado.paginas.some(x => x !== pagina && x.nombre.toLowerCase() === nombre.toLowerCase())) return alert('Ya hay una página con ese nombre.');
@@ -893,8 +978,10 @@
             ta.oninput = () => { pagina.contenido = ta.value; guardarPronto(); };
             return;
         }
+        const ext = (pagina.nombre.split('.').pop() || '').toLowerCase();
+        const lang = ['cpp', 'hpp', 'h', 'cc', 'cxx'].includes(ext) ? 'cpp' : (ext === 'c' ? 'c' : 'python');
         const ed = monaco.editor.create(cont, {
-            value: pagina.contenido || '', language: 'python', readOnly: !!pagina.solo_lectura,
+            value: pagina.contenido || '', language: lang, readOnly: !!pagina.solo_lectura,
             theme: leerLocal('prig_editor_theme') || 'prig-dark',
             fontSize: parseInt(leerLocal('prig_editor_font_size') || '14', 10),
             fontFamily: leerLocal('prig_editor_font_family') || "'Fira Code', monospace",
@@ -946,8 +1033,11 @@
 
     function nuevaPagina(nombre, contenido) {
         let n = nombreModulo(nombre);
+        const esCpp = /\.(cpp|hpp|h|cc|cxx|c)$/i.test(n);
         let k = 2;
-        while (estado.paginas.some(p => p.nombre.toLowerCase() === n.toLowerCase())) n = n.replace(/(_\d+)?\.py$/, `_${k++}.py`);
+        while (estado.paginas.some(p => p.nombre.toLowerCase() === n.toLowerCase())) {
+            n = esCpp ? n.replace(/(_\d+)?(\.(cpp|hpp|h|cc|cxx|c))$/i, `_${k++}$2`) : n.replace(/(_\d+)?\.py$/, `_${k++}.py`);
+        }
         estado.paginas.push({ nombre: n, contenido: contenido || '', descripcion: '' });
         guardarPronto();
         pintarPaginas();
@@ -1219,7 +1309,9 @@
             } catch (e) { c.innerHTML = `<div class="des-error">${esc(e.message)}</div>`; }
         });
         on('des-pagina-nueva', () => {
-            const nombre = prompt('Nombre de la nueva página (por ejemplo utiles.py):', 'utiles.py');
+            const esCpp = ((estado.d && estado.d.lenguaje) || estado.lenguaje) === 'cpp';
+            const sugerido = esCpp ? 'utiles.cpp' : 'utiles.py';
+            const nombre = prompt(`Nombre de la nueva página (por ejemplo ${sugerido}):`, sugerido);
             if (nombre) nuevaPagina(nombre, '');
         });
         on('des-pagina-importar', () => $('des-pagina-archivo').click());

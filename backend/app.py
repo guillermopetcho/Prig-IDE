@@ -5026,6 +5026,7 @@ def _consumir(generador, avisar):
 class DesafioCrearRequest(BaseModel):
     tema: str = ""
     nivel: str = "intermedio"
+    lenguaje: str = "python"
     modelo: Optional[str] = None
     conversacion: List[Dict[str, str]] = []
     ruta_id: Optional[str] = None
@@ -5038,6 +5039,7 @@ class DesafioImportarRequest(BaseModel):
     fuente: str
     ref: str
     funcion: Optional[str] = None
+    lenguaje: Optional[str] = "python"
     tema: Optional[str] = None
     ruta_id: Optional[str] = None
     bloque_id: Optional[str] = None
@@ -5246,26 +5248,30 @@ def desafios_fuentes():
 
 @app.get("/api/desafios/internet/buscar")
 def desafios_buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[str] = None,
-                    modelo: Optional[str] = None, ayuda_modelo: bool = False):
+                    modelo: Optional[str] = None, ayuda_modelo: bool = False,
+                    lenguaje: Optional[str] = None):
     """ Desafíos de internet sobre un tema. Con ayuda_modelo, si no hay nada, el modelo
     propone términos en inglés y se vuelve a buscar. """
     lista = [f for f in (fuentes or "").split(",") if f] or None
-    r = _desafio(des_fuentes.buscar, tema, nivel, lista)
+    r = _desafio(des_fuentes.buscar, tema, nivel, lista, lenguaje=lenguaje)
     if not r["resultados"] and ayuda_modelo and tema.strip():
         motor, nombre = _motor_desafios(modelo)
         extra = des_tutor.palabras_clave(motor, nombre, tema)
         if extra:
-            r = _desafio(des_fuentes.buscar, tema, nivel, lista, extra)
+            r = _desafio(des_fuentes.buscar, tema, nivel, lista, extra, lenguaje=lenguaje)
             r["terminos_del_modelo"] = extra
     return r
 
 
 @app.post("/api/desafios/internet/importar")
 def desafios_importar(req: DesafioImportarRequest):
-    d = _desafio(des_fuentes.importar, req.fuente, req.ref, runner, req.funcion)
+    d = _desafio(des_fuentes.importar, req.fuente, req.ref, runner, req.funcion, req.lenguaje)
     d["origen"].update({k: v for k, v in _contexto_bloque(req.ruta_id, req.bloque_id).items()})
     if req.tema:
         d["origen"]["tema"] = req.tema
+    if req.lenguaje:
+        d["lenguaje"] = req.lenguaje
+        d["origen"]["lenguaje"] = req.lenguaje
     d = desafios_almacen.guardar(d)
     _registrar_telemetria(d, "generated")
     return AlmacenDesafios.publico(d)
@@ -5299,11 +5305,13 @@ def desafios_crear(req: DesafioCrearRequest):
             nivel = previo.get("nivel") or nivel
 
     def trabajo(avisar):
-        d = des_tutor.crear(motor, runner, nombre_modelo, tema, nivel, "\n\n".join(partes), avisar=avisar)
+        d = des_tutor.crear(motor, runner, nombre_modelo, tema, nivel, "\n\n".join(partes), avisar=avisar, lenguaje=req.lenguaje)
         nube = gemini_motor.es_gemini(modelo)
+        d["lenguaje"] = req.lenguaje
         d["origen"] = {"tipo": "plan" if bloque else "modelo",
                        "nombre": ("Plan de estudios" if bloque else "Modelo") + (" · Google Gemini" if nube else ""),
-                       "modelo": modelo, "motor": "gemini" if nube else "ollama", "tema": tema, **bloque}
+                       "modelo": modelo, "motor": "gemini" if nube else "ollama", "tema": tema,
+                       "lenguaje": req.lenguaje, **bloque}
         if req.basado_en:
             d["origen"]["basado_en"] = req.basado_en
         d = desafios_almacen.guardar(d)

@@ -1,12 +1,13 @@
 import os
 import sys
 import json
+import shutil
 import signal
 import subprocess
 import tempfile
 import threading
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from kernel_session import KernelSessionManager
 
@@ -119,7 +120,7 @@ class CodeRunner:
         return {"status": "ok", "restarted": existed}
 
     def run_file(self, file_path: str, cwd: str = None, timeout: Optional[int] = None,
-                 run_id: Optional[str] = None) -> Dict[str, Any]:
+                 run_id: Optional[str] = None, extra_sources: Optional[List[str]] = None) -> Dict[str, Any]:
         effective_timeout = timeout or self.timeout_seconds
         abs_path = os.path.abspath(file_path)
         if not os.path.exists(abs_path):
@@ -130,6 +131,19 @@ class CodeRunner:
 
         target_executable_script = abs_path
         temp_script_path = None
+        temp_bin_path = None
+
+        def _cleanup():
+            if temp_script_path and os.path.exists(temp_script_path):
+                try:
+                    os.remove(temp_script_path)
+                except OSError:
+                    pass
+            if temp_bin_path and os.path.exists(temp_bin_path):
+                try:
+                    os.remove(temp_bin_path)
+                except OSError:
+                    pass
 
         if ext == '.ipynb':
             try:
@@ -159,7 +173,54 @@ class CodeRunner:
                 }
 
         cmd = None
-        if ext == '.py':
+        if ext in ['.cpp', '.cc', '.cxx', '.c']:
+            compiler = 'gcc' if ext == '.c' else 'g++'
+            if shutil.which(compiler) is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Error: No se encontró el compilador '{compiler}' en el sistema.",
+                    "exit_code": 1,
+                    "elapsed": 0
+                }
+            temp_bin = tempfile.NamedTemporaryFile(prefix="prig_bin_", delete=False)
+            temp_bin_path = temp_bin.name
+            temp_bin.close()
+
+            all_sources = [target_executable_script] + [os.path.abspath(s) for s in (extra_sources or [])]
+            std_flag = '-std=c11' if compiler == 'gcc' else '-std=c++20'
+            compile_cmd = [compiler, std_flag, '-O2'] + all_sources + ['-o', temp_bin_path, '-lm']
+
+            compile_start = time.time()
+            try:
+                compile_proc = subprocess.run(
+                    compile_cmd,
+                    cwd=working_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=25
+                )
+            except subprocess.TimeoutExpired:
+                _cleanup()
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Error: Tiempo límite excedido durante la compilación ({compiler}).",
+                    "exit_code": 1,
+                    "elapsed": round(time.time() - compile_start, 3)
+                }
+
+            if compile_proc.returncode != 0:
+                _cleanup()
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Error de compilación ({compiler}):\n{compile_proc.stderr}",
+                    "exit_code": compile_proc.returncode,
+                    "elapsed": round(time.time() - compile_start, 3)
+                }
+            cmd = [temp_bin_path]
+        elif ext == '.py':
             cmd = [sys.executable, target_executable_script]
         elif ext == '.js':
             cmd = ['node', target_executable_script]
@@ -184,8 +245,7 @@ class CodeRunner:
 
             # returncode negativo = terminado por señal, típicamente nuestra cancelación
             if process.returncode is not None and process.returncode < 0:
-                if temp_script_path and os.path.exists(temp_script_path):
-                    os.remove(temp_script_path)
+                _cleanup()
                 return {
                     "success": False,
                     "cancelled": True,
@@ -196,8 +256,7 @@ class CodeRunner:
                 }
             elapsed = round(time.time() - start_time, 3)
 
-            if temp_script_path and os.path.exists(temp_script_path):
-                os.remove(temp_script_path)
+            _cleanup()
 
             return {
                 "success": process.returncode == 0,
@@ -210,8 +269,7 @@ class CodeRunner:
             self._unregister(run_id)
             process.kill()
             stdout, stderr = process.communicate()
-            if temp_script_path and os.path.exists(temp_script_path):
-                os.remove(temp_script_path)
+            _cleanup()
             return {
                 "success": False,
                 "stdout": stdout,
@@ -221,8 +279,7 @@ class CodeRunner:
             }
         except Exception as e:
             self._unregister(run_id)
-            if temp_script_path and os.path.exists(temp_script_path):
-                os.remove(temp_script_path)
+            _cleanup()
             return {
                 "success": False,
                 "stdout": "",

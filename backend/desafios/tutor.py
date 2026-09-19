@@ -135,15 +135,46 @@ REGLAS:
 6. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
 
 
-def _normalizar_creado(datos: Dict[str, Any]) -> Dict[str, Any]:
+SISTEMA_CREAR_CPP = """Eres un CREADOR DE DESAFÍOS DE PROGRAMACIÓN en C++ (estándar C++20) para aprender razonando.
+
+Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown alrededor) con esta forma:
+{
+  "titulo": "Título breve",
+  "enunciado": "Contexto del problema, qué hay que construir, firmas de funciones o clases, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
+  "nivel": "principiante | intermedio | avanzado",
+  "conceptos": ["concepto 1", "concepto 2"],
+  "paginas": [
+    {"nombre": "solucion.h", "descripcion": "declaraciones de la clase o funciones", "contenido": "código de cabecera con comentarios"},
+    {"nombre": "solucion.cpp", "descripcion": "implementación a completar", "contenido": "esqueleto con TODOs y valores por defecto"}
+  ],
+  "referencia": [
+    {"nombre": "solucion.h", "contenido": "cabecera completa"},
+    {"nombre": "solucion.cpp", "contenido": "implementación correcta y completa"}
+  ],
+  "pruebas": [
+    "REQUIRE(funcion(2) == 4);",
+    "REQUIRE(funcion(0) == 0);"
+  ]
+}
+
+REGLAS:
+1. PÁGINAS: define una cabecera (.h) con las declaraciones e interfaces, y una implementación (.cpp) con el esqueleto. Nombres en minúsculas y guiones bajos (solucion.h, solucion.cpp).
+2. El código de partida DEBE compilar limpiamente pero FALLAR las pruebas (devuelve 0, false, "", etc., con comentarios // TODO). NUNCA dejes la solución completa en las páginas de partida.
+3. "referencia" tiene exactamente las mismas páginas que "paginas", con la solución completa, eficiente y correcta.
+4. "pruebas": entre 4 y 8 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE, solo la línea con REQUIRE o bloque).
+5. Solo biblioteca estándar C++ (STL). Nada de librerías externas ni entrada interactiva std::cin.
+6. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
+
+
+def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[str, Any]:
     def paginas(lista, con_desc=True):
         salida = []
         for p in lista or []:
             if not isinstance(p, dict):
                 continue
             nombre = str(p.get("nombre") or p.get("name") or "").strip()
-            if nombre and not nombre.endswith(".py"):
-                nombre += ".py"
+            if nombre and not (nombre.endswith(".py") or nombre.endswith((".cpp", ".h", ".hpp", ".cc", ".cxx"))):
+                nombre += ".cpp" if lenguaje == "cpp" else ".py"
             item = {"nombre": nombre, "contenido": str(p.get("contenido") or p.get("content") or "")}
             if con_desc:
                 item["descripcion"] = str(p.get("descripcion") or "")
@@ -162,6 +193,7 @@ def _normalizar_creado(datos: Dict[str, Any]) -> Dict[str, Any]:
         "paginas": paginas(datos.get("paginas")),
         "referencia": paginas(datos.get("referencia"), con_desc=False),
         "pruebas": [str(t) for t in pruebas if str(t).strip()],
+        "lenguaje": lenguaje,
     }
 
 
@@ -192,7 +224,9 @@ def reparar_cuerpos_vacios(codigo: str, maximo: int = 30) -> str:
     return "\n".join(lineas)
 
 
-def _sin_compilar(paginas: List[Dict[str, Any]]) -> Optional[str]:
+def _sin_compilar(paginas: List[Dict[str, Any]], lenguaje: str = "python") -> Optional[str]:
+    if lenguaje == "cpp":
+        return None
     for p in paginas:
         try:
             compile(p["contenido"], p["nombre"], "exec")
@@ -202,36 +236,40 @@ def _sin_compilar(paginas: List[Dict[str, Any]]) -> Optional[str]:
 
 
 def _pagina_ya_resuelta(datos: Dict[str, Any]) -> Optional[str]:
-    """ Página de partida idéntica a su solución y con lógica (funciones o clases) """
-    referencia = {p["nombre"]: p["contenido"] for p in datos["referencia"]}
-    normal = lambda t: re.sub(r"\s+", "", re.sub(r"#.*", "", t or ""))
-    for p in datos["paginas"]:
-        ref = referencia.get(p["nombre"])
-        if ref is not None and normal(ref) == normal(p["contenido"]) and re.search(r"(?m)^\s*(def|class)\s", p["contenido"]):
-            # Lo que las pruebas importan de esa página delata que es parte del trabajo
-            modulo = p["nombre"][:-3]
-            if any(re.search(rf"\b(from {modulo} import|import {modulo}\b)", t) for t in datos["pruebas"]):
-                return p["nombre"]
+    """ Comprueba si alguna página de partida ya es idéntica a la referencia """
+    if datos.get("lenguaje") == "cpp":
+        # En C++ es normal que .h sea igual entre partida y referencia
+        for pi in datos.get("paginas") or []:
+            if pi["nombre"].endswith(('.cpp', '.cc', '.cxx')):
+                pr = next((r for r in datos.get("referencia") or [] if r["nombre"] == pi["nombre"]), None)
+                if pr and pi.get("contenido", "").strip() == pr.get("contenido", "").strip() and len(pi.get("contenido", "").strip()) > 30:
+                    return pi["nombre"]
+        return None
+    for pi in datos.get("paginas") or []:
+        pr = next((r for r in datos.get("referencia") or [] if r["nombre"] == pi["nombre"]), None)
+        if pr and pi.get("contenido", "").strip() == pr.get("contenido", "").strip() and len(pi.get("contenido", "").strip()) > 40:
+            return pi["nombre"]
     return None
 
 
-def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", contexto: str = "",
-          intentos: int = 3, avisar: Callable[[Dict[str, Any]], None] = lambda e: None) -> Dict[str, Any]:
+def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", contexto: str = "", intentos: int = 4,
+          avisar: Callable[[Dict[str, Any]], None] = lambda ev: None, lenguaje: str = "python") -> Dict[str, Any]:
     """ Pide el desafío al modelo y lo comprueba ejecutándolo; reintenta contando qué falló """
     if not (tema or contexto).strip():
         raise ErrorDesafio("Di qué quieres practicar.")
     nivel = nivel if nivel in NIVELES else "intermedio"
     fallo_anterior = ""
     historial = []
+    sistema = SISTEMA_CREAR_CPP if lenguaje == "cpp" else SISTEMA_CREAR
     for n in range(1, intentos + 1):
-        avisar({"tipo": "progreso", "mensaje": f"Intento {n} de {intentos}: el modelo escribe el desafío…", "intento": n})
-        prompt = (f"Tema a practicar: {tema or '(ver conversación)'}\nNivel del alumno: {nivel}\n"
+        avisar({"tipo": "progreso", "mensaje": f"Intento {n} de {intentos}: el modelo escribe el desafío en {lenguaje.upper()}…", "intento": n})
+        prompt = (f"Tema a practicar: {tema or '(ver conversación)'}\nLenguaje: {lenguaje}\nNivel del alumno: {nivel}\n"
                   + (f"\nContexto:\n{contexto[:4000]}\n" if contexto else "")
                   + (f"\nEl intento anterior no sirvió porque: {fallo_anterior}\nCorrígelo.\n" if fallo_anterior else "")
                   + "\nCrea el desafío.")
         try:
-            texto = generar(ai, modelo, prompt, SISTEMA_CREAR, temperatura=0.4)
-            datos = _normalizar_creado(ai._extract_and_parse_json(texto))
+            texto = generar(ai, modelo, prompt, sistema, temperatura=0.4)
+            datos = _normalizar_creado(ai._extract_and_parse_json(texto), lenguaje=lenguaje)
         except ErrorDesafio:
             raise
         except Exception as e:
@@ -239,9 +277,10 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
             historial.append({"intento": n, "motivo": fallo_anterior})
             continue
         datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)
-        for p in datos["paginas"]:
-            p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
-        rota = _sin_compilar(datos["paginas"]) or _sin_compilar(datos["referencia"])
+        if lenguaje == "python":
+            for p in datos["paginas"]:
+                p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+        rota = _sin_compilar(datos["paginas"], lenguaje=lenguaje) or _sin_compilar(datos["referencia"], lenguaje=lenguaje)
         if rota:
             fallo_anterior = f"el código no compila: {rota}. Pon pass en los cuerpos sin implementar"
             historial.append({"intento": n, "motivo": fallo_anterior})
@@ -249,7 +288,7 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
             continue
         resuelta = _pagina_ya_resuelta(datos)
         if resuelta:
-            fallo_anterior = f"la página {resuelta} del código de partida ya trae la solución: deja sus funciones sin implementar"
+            fallo_anterior = f"la página {resuelta} del código de partida ya trae la solución: deja su lógica sin implementar"
             historial.append({"intento": n, "motivo": fallo_anterior})
             avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior}", "intento": n, "descartado": True})
             continue
@@ -258,15 +297,16 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
             historial.append({"intento": n, "motivo": fallo_anterior})
             continue
         avisar({"tipo": "progreso", "mensaje": f"Intento {n}: comprobando que la solución pasa las pruebas y el código de partida no…", "intento": n})
-        privado = {"comprobacion": {"tipo": "asserts", "asserts": datos["pruebas"]}, "referencia": datos["referencia"]}
+        tipo_comprobacion = "cpp_asserts" if lenguaje == "cpp" else "asserts"
+        privado = {"comprobacion": {"tipo": tipo_comprobacion, "asserts": datos["pruebas"]}, "referencia": datos["referencia"]}
         v = ejecucion.validar_desafio(runner, datos["paginas"], datos["referencia"], privado, minimo_pruebas=3)
         historial.append({"intento": n, "valido": v["valido"], "motivo": v["motivo"]})
         if v["valido"]:
             return {
                 "titulo": datos["titulo"], "enunciado": datos["enunciado"], "idioma": "es", "teoria": "",
-                "nivel": datos["nivel"], "conceptos": datos["conceptos"] or [tema],
+                "nivel": datos["nivel"], "conceptos": datos["conceptos"] or [tema], "lenguaje": lenguaje,
                 "paginas": [{**p, "descripcion": p.get("descripcion", "")} for p in datos["paginas"]],
-                "comprobacion": {"tipo": "asserts", "pruebas": v["pruebas"], "pruebas_visibles": False},
+                "comprobacion": {"tipo": tipo_comprobacion, "pruebas": v["pruebas"], "pruebas_visibles": False},
                 "privado": privado, "intentos_creacion": historial,
             }
         fallo_anterior = v["motivo"]
@@ -307,7 +347,7 @@ Cómo verificar que funciona (qué probar) y su coste en tiempo y memoria explic
 Empieza cada sección con una o dos PREGUNTAS que el alumno debería hacerse, en cursiva."""
 
 _CODIGO = re.compile(r"```[\w+-]*\n(.*?)```", re.S)
-_PARECE_CODIGO = re.compile(r"(^|\n)\s*(def |class |import |from \w+ import|return\b|for \w+ in |while .+:|print\(|\w+\s*=\s*\[)", re.M)
+_PARECE_CODIGO = re.compile(r"(^|\n)\s*(def |class |import |from \w+ import|return\b|for \w+ in |while .+:|print\(|\w+\s*=\s*\[|#include|std::|template\s*<|cout\s*<<|int\s+main\s*\()", re.M)
 
 
 def _sin_codigo(texto: str) -> str:

@@ -46,9 +46,15 @@ MES = 30 * 86400
 # ===========================================================================
 
 def _cache_dir() -> str:
-    d = os.path.join(carpeta_base(), "cache")
-    os.makedirs(d, exist_ok=True)
-    return d
+    try:
+        d = os.path.join(carpeta_base(), "cache")
+        os.makedirs(d, exist_ok=True)
+        return d
+    except OSError:
+        import tempfile
+        d = os.path.join(tempfile.gettempdir(), "prig_desafios_cache")
+        os.makedirs(d, exist_ok=True)
+        return d
 
 
 def descargar(url: str, ttl: float, obligatorio: bool = True) -> Optional[str]:
@@ -142,6 +148,9 @@ SINONIMOS: Dict[str, List[str]] = {
     "quicksort": ["sorts", "quick"], "rapido": ["quick"], "mezcla": ["sorts", "merge"], "merge sort": ["sorts", "merge"],
     "anchura": ["graphs", "breadth-first"], "profundidad": ["graphs", "depth-first"], "camino mas corto": ["graphs", "dijkstra"],
     "parentesis": ["balanced-parentheses", "matching-brackets"], "anagrama": ["anagram"], "subcadena": ["substring"],
+    "puntero": ["pointers", "memory"], "punteros": ["pointers", "memory"], "referencia": ["references"],
+    "referencias": ["references"], "template": ["templates", "generics"], "templates": ["templates", "generics"],
+    "stl": ["containers", "standard-library"], "vector": ["lists", "vectors"], "c++": ["cpp", "c++"], "cpp": ["cpp", "c++"],
 }
 VACIAS = set("de la el los las un una y o en a con para por que del al como sobre practicar quiero ejercicio "
              "ejercicios desafio desafios python nivel basico intermedio avanzado principiante the of and to".split())
@@ -251,6 +260,79 @@ class Exercism:
                        "atribucion": "Ejercicio de Exercism (github.com/exercism/python), licencia MIT."},
             "privado": {"comprobacion": {"tipo": "unittest", "archivos": tests}, "referencia": referencia,
                         "pistas_fuente": self._admoniciones(docs["hints.md"] or "")},
+        }
+
+
+class ExercismCpp:
+    ID = "exercism_cpp"
+    NOMBRE = "Exercism (C++)"
+    RAW = "https://raw.githubusercontent.com/exercism/cpp/main"
+    LICENCIA = "MIT"
+    LENGUAJE = "cpp"
+
+    def indice(self) -> List[Dict[str, Any]]:
+        cfg = json.loads(descargar(f"{self.RAW}/config.json", SEMANA))
+        salida = []
+        for tipo in ("concept", "practice"):
+            for e in cfg["exercises"].get(tipo, []):
+                if e.get("status") in ("deprecated", "wip") or e["slug"] == "hello-world":
+                    continue
+                principales = e.get("practices") or e.get("concepts") or []
+                salida.append({
+                    "fuente": self.ID, "ref": f"{tipo}/{e['slug']}", "titulo": f"{e['name']} (C++)",
+                    "etiquetas": principales + ["cpp", "c++"], "previas": e.get("prerequisites") or [],
+                    "palabras": normalizar(e["slug"] + " " + e["name"] + " cpp c++").split(),
+                    "nivel": "principiante" if tipo == "concept" else _nivel_por(e.get("difficulty"), (2, 5)),
+                    "tipo": "concepto" if tipo == "concept" else "práctica", "verificable": True,
+                    "lenguaje": "cpp",
+                    "url": f"https://exercism.org/tracks/cpp/exercises/{e['slug']}", "licencia": self.LICENCIA,
+                })
+        return salida
+
+    def cargar(self, ref: str) -> Dict[str, Any]:
+        if not re.fullmatch(r"(concept|practice)/[a-z0-9\-]+", ref or ""):
+            raise ErrorDesafio("Ejercicio de Exercism no válido")
+        tipo, slug = ref.split("/")
+        base = f"{self.RAW}/exercises/{tipo}/{slug}"
+        meta = json.loads(descargar(f"{base}/.meta/config.json", MES))
+        archivos = meta.get("files") or {}
+        solucion = archivos.get("solution") or []
+        pruebas = archivos.get("test") or []
+        ejemplo = archivos.get("example") or archivos.get("exemplar") or []
+        editor = archivos.get("editor") or []
+        if not solucion or not pruebas or not ejemplo:
+            raise ErrorDesafio(f"«{slug}» no trae código de partida, pruebas y solución.")
+
+        paginas = [{"nombre": os.path.basename(n), "contenido": descargar(f"{base}/{n}", MES), "descripcion": ""} for n in solucion]
+        paginas += [{"nombre": os.path.basename(n), "contenido": descargar(f"{base}/{n}", MES),
+                     "descripcion": "Página de apoyo: no hace falta cambiarla.", "solo_lectura": True} for n in editor]
+        referencia = []
+        for i, n in enumerate(ejemplo):
+            destino = os.path.basename(n) if os.path.basename(n) in {os.path.basename(s) for s in solucion} else os.path.basename(solucion[min(i, len(solucion) - 1)])
+            referencia.append({"nombre": destino, "contenido": descargar(f"{base}/{n}", MES)})
+        referencia += [p for p in paginas if p.get("solo_lectura")]
+        tests = {os.path.basename(n): descargar(f"{base}/{n}", MES) for n in pruebas}
+
+        docs = {n: descargar(f"{base}/.docs/{n}", MES, obligatorio=False)
+                for n in ("introduction.md", "instructions.md", "instructions.append.md", "hints.md")}
+        enunciado = "\n\n".join(Exercism._admoniciones(docs[n]) for n in ("instructions.md", "instructions.append.md") if docs[n])
+        teoria = Exercism._admoniciones(docs["introduction.md"] or "")
+        indice = {e["ref"]: e for e in self.indice()}
+        e = indice.get(ref, {})
+        autores = (meta.get("authors") or []) + (meta.get("contributors") or [])
+        return {
+            "titulo": e.get("titulo") or f"{slug.replace('-', ' ').title()} (C++)",
+            "enunciado": enunciado.strip(), "teoria": teoria.strip(), "idioma": "en",
+            "nivel": e.get("nivel", "intermedio"), "conceptos": (e.get("etiquetas") or []) + (e.get("previas") or [])[:3],
+            "paginas": paginas,
+            "lenguaje": "cpp",
+            "comprobacion": {"tipo": "cpp_test", "pruebas_visibles": False},
+            "origen": {"tipo": self.ID, "nombre": "Exercism · pista de C++", "ref": ref, "url": e.get("url") or f"https://exercism.org/tracks/cpp/exercises/{slug}",
+                       "codigo": f"https://github.com/exercism/cpp/tree/main/exercises/{tipo}/{slug}",
+                       "licencia": self.LICENCIA, "autores": autores[:8], "lenguaje": "cpp",
+                       "atribucion": "Ejercicio de Exercism (github.com/exercism/cpp), licencia MIT."},
+            "privado": {"comprobacion": {"tipo": "cpp_test", "archivos": tests}, "referencia": referencia,
+                        "pistas_fuente": Exercism._admoniciones(docs["hints.md"] or "")},
         }
 
 
@@ -415,6 +497,68 @@ class TheAlgorithms:
 
 
 # ===========================================================================
+# TheAlgorithms/C-Plus-Plus
+# ===========================================================================
+
+class TheAlgorithmsCpp:
+    ID = "thealgorithms_cpp"
+    NOMBRE = "TheAlgorithms (C++)"
+    RAW = "https://raw.githubusercontent.com/TheAlgorithms/C-Plus-Plus/master"
+    LICENCIA = "MIT"
+    LENGUAJE = "cpp"
+    EXCLUIDAS = {"docs", "scripts", "build", "cmake"}
+
+    def indice(self) -> List[Dict[str, Any]]:
+        texto = descargar(f"{self.RAW}/DIRECTORY.md", SEMANA, obligatorio=False)
+        salida = []
+        if not texto:
+            return salida
+        categoria, sub = None, None
+        for linea in texto.splitlines():
+            m = re.match(r"^## \[([^\]]+)\]\(([^)]+)\)", linea)
+            if m:
+                categoria, sub = m.group(2).strip("/"), None
+                continue
+            if not categoria or categoria in self.EXCLUIDAS:
+                continue
+            m = re.match(r"^\s*\* \[([^\]]+)\]\((?:https://github\.com/TheAlgorithms/C-Plus-Plus/blob/master/)?([^)]+\.cpp)\)", linea)
+            if m:
+                ruta = m.group(2)
+                salida.append({
+                    "fuente": self.ID, "ref": ruta, "titulo": f"{m.group(1)} (C++)",
+                    "etiquetas": [categoria.replace("_", "-"), "cpp", "c++"] + ([sub] if sub else []), "previas": [],
+                    "palabras": normalizar(m.group(1) + " " + os.path.basename(ruta)[:-4] + " cpp c++ " + (sub or "")).split(),
+                    "nivel": "avanzado" if categoria in ("dynamic_programming", "graphs", "backtracking") else "intermedio",
+                    "tipo": categoria.replace("_", " "), "verificable": False, "lenguaje": "cpp",
+                    "url": f"https://github.com/TheAlgorithms/C-Plus-Plus/blob/master/{ruta}", "licencia": self.LICENCIA,
+                })
+                continue
+        return salida
+
+    def cargar(self, ref: str) -> Dict[str, Any]:
+        if not re.fullmatch(r"[a-z0-9_]+(?:/[a-z0-9_]+)*\.cpp", ref or "", re.I) or ".." in ref:
+            raise ErrorDesafio("Archivo de TheAlgorithms C++ no válido")
+        fuente = descargar(f"{self.RAW}/{ref}", MES)
+        nombre = os.path.basename(ref)
+        e = next((x for x in self.indice() if x["ref"] == ref), {})
+        return {
+            "titulo": e.get("titulo") or nombre.replace(".cpp", "").replace("_", " ").title(),
+            "enunciado": f"Implementa y experimenta con el algoritmo `{nombre}` de TheAlgorithms C++.\n\n"
+                         f"Examina el archivo de partida, adapta la solución y ejecuta tu código.",
+            "teoria": "", "idioma": "en", "nivel": e.get("nivel", "intermedio"),
+            "conceptos": e.get("etiquetas") or ["cpp"],
+            "paginas": [{"nombre": nombre, "contenido": fuente, "descripcion": "Código de partida en C++"}],
+            "lenguaje": "cpp",
+            "comprobacion": {"tipo": "ninguna", "pruebas_visibles": False},
+            "origen": {"tipo": self.ID, "nombre": "TheAlgorithms · C++", "ref": ref,
+                       "url": f"https://github.com/TheAlgorithms/C-Plus-Plus/blob/master/{ref}", "licencia": self.LICENCIA,
+                       "lenguaje": "cpp",
+                       "atribucion": "Algoritmo de TheAlgorithms/C-Plus-Plus, licencia MIT."},
+            "privado": {"comprobacion": {"tipo": "ninguna"}, "referencia": [{"nombre": nombre, "contenido": fuente}]},
+        }
+
+
+# ===========================================================================
 # Project Euler
 # ===========================================================================
 
@@ -456,7 +600,7 @@ class ProjectEuler:
         t = re.sub(r"<(?!/?(table|tr|td|th|tbody|thead)\b)[^>]+>", "", t)
         return html.unescape(t).strip()
 
-    def cargar(self, ref: str) -> Dict[str, Any]:
+    def cargar(self, ref: str, lenguaje: str = "python") -> Dict[str, Any]:
         if not re.fullmatch(r"\d{1,4}", ref or ""):
             raise ErrorDesafio("Problema de Project Euler no válido")
         n = int(ref)
@@ -464,15 +608,30 @@ class ProjectEuler:
         if not texto.strip():
             raise ErrorDesafio(f"No existe el problema {n} de Project Euler.")
         e = next((x for x in self.indice() if x["ref"] == ref), {})
+        if lenguaje == "cpp":
+            pag = [{"nombre": f"euler_{n}.cpp", "descripcion": "",
+                    "contenido": (f"#include <iostream>\n\n"
+                                  f"// Resuelve el problema {n} de Project Euler\n"
+                                  f"long long solucion() {{\n"
+                                  f"    // Escribe aquí tu solución\n"
+                                  f"    return 0;\n"
+                                  f"}}\n\n"
+                                  f"int main() {{\n"
+                                  f"    std::cout << solucion() << std::endl;\n"
+                                  f"    return 0;\n"
+                                  f"}}\n")}]
+        else:
+            pag = [{"nombre": f"euler_{n}.py", "descripcion": "",
+                    "contenido": (f'def solucion():\n    """Devuelve la respuesta del problema {n}."""\n    # Escribe aquí tu solución\n'
+                                  f'    raise NotImplementedError\n\n\nif __name__ == "__main__":\n    print(solucion())\n')}]
         return {
             "titulo": e.get("titulo") or f"Problema {n}", "enunciado": self.a_markdown(texto), "teoria": "", "idioma": "en",
             "nivel": e.get("nivel", "intermedio"), "conceptos": ["maths"],
-            "paginas": [{"nombre": f"euler_{n}.py", "descripcion": "",
-                         "contenido": (f'def solucion():\n    """Devuelve la respuesta del problema {n}."""\n    # Escribe aquí tu solución\n'
-                                       f'    raise NotImplementedError\n\n\nif __name__ == "__main__":\n    print(solucion())\n')}],
+            "paginas": pag,
+            "lenguaje": lenguaje,
             "comprobacion": {"tipo": "ninguna", "pruebas_visibles": False},
             "origen": {"tipo": self.ID, "nombre": "Project Euler", "ref": ref, "url": f"https://projecteuler.net/problem={n}",
-                       "licencia": self.LICENCIA,
+                       "licencia": self.LICENCIA, "lenguaje": lenguaje,
                        "atribucion": f"Problema {n} de Project Euler (projecteuler.net), licencia CC BY-NC-SA 4.0. "
                                      "Si se traduce, la traducción se comparte con la misma licencia.",
                        "nota": "Project Euler no publica las respuestas: ejecuta tu página y compruébala en su web (hace falta cuenta)."},
@@ -480,15 +639,21 @@ class ProjectEuler:
         }
 
 
-FUENTES = {f.ID: f for f in (Exercism(), TheAlgorithms(), ProjectEuler())}
+FUENTES = {f.ID: f for f in (Exercism(), ExercismCpp(), TheAlgorithms(), TheAlgorithmsCpp(), ProjectEuler())}
 
 
 def buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[List[str]] = None,
-           extra: Optional[List[str]] = None, por_fuente: int = 8) -> Dict[str, Any]:
+           extra: Optional[List[str]] = None, por_fuente: int = 8, lenguaje: Optional[str] = None) -> Dict[str, Any]:
     """ Desafíos de cada fuente que tratan `tema`, de más a menos relacionado """
     etiquetas, palabras = terminos(tema, extra)
     resultados, errores = [], {}
-    for fid in fuentes or list(FUENTES):
+    fuentes_disponibles = list(FUENTES)
+    if lenguaje == "cpp":
+        fuentes_disponibles = ["exercism_cpp", "thealgorithms_cpp", "projecteuler"]
+    elif lenguaje == "python":
+        fuentes_disponibles = ["exercism", "thealgorithms", "projecteuler"]
+
+    for fid in fuentes or fuentes_disponibles:
         if fid not in FUENTES:
             continue
         try:
@@ -498,13 +663,15 @@ def buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[List[str]] 
             continue
         puntuados = []
         for it in items:
+            if lenguaje and it.get("lenguaje") and it.get("lenguaje") != lenguaje and fid != "projecteuler":
+                continue
             p = 0.0
             p += 5 * len(etiquetas & set(it["etiquetas"]))
             p += 2 * len(etiquetas & set(it["previas"]))
             propias = set(it["palabras"])
             coincidencias = palabras & propias
             p += 3 * len(coincidencias)
-            # Etiqueta traducida que aparece en el nombre: «busqueda binaria» → binary_search.py
+            # Etiqueta traducida que aparece en el nombre: «busqueda binaria» → binary_search.py / binary_search.cpp
             for et in etiquetas:
                 trozos = [t for t in et.split("-") if t]
                 if trozos and all(any(w == t or (len(t) >= 6 and w[:6] == t[:6]) for w in propias) for t in trozos):
@@ -523,11 +690,16 @@ def buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[List[str]] 
     return {"resultados": resultados, "etiquetas": sorted(etiquetas), "palabras": sorted(palabras), "errores": errores}
 
 
-def importar(fuente: str, ref: str, runner, funcion: Optional[str] = None) -> Dict[str, Any]:
+def importar(fuente: str, ref: str, runner, funcion: Optional[str] = None, lenguaje: Optional[str] = None) -> Dict[str, Any]:
     """ Trae el desafío y, si es verificable, comprueba ejecutándolo que sus pruebas funcionan aquí """
     if fuente not in FUENTES:
         raise ErrorDesafio("Fuente desconocida")
-    d = FUENTES[fuente].cargar(ref, funcion) if fuente == "thealgorithms" else FUENTES[fuente].cargar(ref)
+    if fuente == "thealgorithms":
+        d = FUENTES[fuente].cargar(ref, funcion)
+    elif fuente == "projecteuler":
+        d = FUENTES[fuente].cargar(ref, lenguaje=lenguaje or "python")
+    else:
+        d = FUENTES[fuente].cargar(ref)
     priv = d["privado"]
     if priv["comprobacion"]["tipo"] != "ninguna":
         v = ejecucion.validar_desafio(runner, [p for p in d["paginas"]], priv["referencia"], priv)
