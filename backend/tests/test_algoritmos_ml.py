@@ -489,6 +489,43 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("_computar_kernel", contenido)
 
 
+    def test_monografia_10_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 10 (k-NN) exista y sea riguroso."""
+        ruta_10 = os.path.join(DOCS_DIR, "analisis_papers", "10_knn_vecinos_cercanos.md")
+        self.assertTrue(os.path.exists(ruta_10), f"Falta el archivo: {ruta_10}")
+
+        with open(ruta_10, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Cover", contenido)
+        self.assertIn("Hart", contenido)
+        self.assertIn("Fix", contenido)
+        self.assertIn("Hodges", contenido)
+        self.assertIn("Bentley", contenido)
+        self.assertIn("Omohundro", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Cover",
+            "Riesgo de Bayes",
+            "Voronoi",
+            "Minkowski",
+            "KD-Tree",
+            "Ball-Tree",
+            "Maldición de la Dimensionalidad",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 10 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("KDTreePuro", contenido)
+        self.assertIn("KNNClasificadorPuro", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 

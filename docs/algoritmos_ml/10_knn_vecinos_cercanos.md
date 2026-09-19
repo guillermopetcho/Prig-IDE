@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Thomas Cover y Peter Hart (1967). *Nearest Neighbor Pattern Classification*. *IEEE Transactions on Information Theory*, 13(1), 21-27.
 - **Precursores**: Evelyn Fix y Joseph L. Hodges Jr. (1951). *Discriminatory Analysis: Nonparametric Discrimination: Consistency Properties*. Report Number 4, Project Number 21-49-004, USAF School of Aviation Medicine.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/10_knn_vecinos_cercanos.md)
 
 ---
 
