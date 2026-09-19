@@ -296,6 +296,8 @@
           run: () => window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route') },
         { id: 'herr.diagramas', menu: 'Herramientas', label: 'Diagramas de Flujo ML/DL', accel: 'Ctrl+Alt+D',
           run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('diagramas'); } },
+        { id: 'herr.papers', menu: 'Herramientas', label: 'Papers Seminales y Algoritmos ML', accel: 'Ctrl+Alt+P',
+          run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('papers'); } },
         { id: 'herr.practica', menu: 'Herramientas', label: 'Desafíos', accel: 'Ctrl+3',
           run: () => window.Desafios && window.Desafios.abrir() },
         { id: 'herr.perfil', menu: 'Herramientas', label: 'Perfil de aprendizaje', accel: 'Ctrl+4',

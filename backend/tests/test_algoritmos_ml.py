@@ -957,6 +957,41 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("p_sample_step", contenido)
         self.assertIn("cosine", contenido)
 
+    def test_papers_service_list_and_get(self):
+        """Verifica que PapersService liste, filtre y cargue las 21 monografías y metadatos."""
+        from backend.papers_service import PapersService
+        ps = PapersService()
+        papers = ps.list_papers()
+        self.assertEqual(len(papers), 21)
+
+        # Búsqueda por concepto técnico
+        rope_results = ps.list_papers(q="RoPE")
+        self.assertTrue(any("transformer" in p["id"] for p in rope_results))
+
+        goss_results = ps.list_papers(q="GOSS")
+        self.assertTrue(any("lightgbm" in p["id"] for p in goss_results))
+
+        # Filtro por categoría
+        dl_results = ps.list_papers(categoria="Deep Learning")
+        self.assertGreaterEqual(len(dl_results), 4)
+
+        # Carga de detalle de paper
+        doc20 = ps.get_paper("20_transformer_y_atencion", tipo="analisis")
+        self.assertTrue(doc20.get("success"))
+        self.assertGreater(doc20.get("tamano_bytes", 0), 20000)
+        self.assertIn("Vaswani", doc20.get("contenido", ""))
+
+    def test_papers_service_download(self):
+        """Verifica que PapersService descargue y guarde la monografía en la carpeta del workspace."""
+        import tempfile
+        from backend.papers_service import PapersService
+        ps = PapersService()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            res = ps.download_paper("20_transformer_y_atencion", tmpdir, tipo="analisis")
+            self.assertTrue(res.get("success"))
+            self.assertTrue(os.path.isfile(res["saved_to"]))
+            self.assertGreater(res["bytes"], 20000)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1121,20 +1121,30 @@ if (document.readyState === 'loading') {
 window.cambiarPestanaAprendizaje = function(tabName) {
     const paneRutas = document.getElementById('pane-aprendizaje-rutas');
     const paneDiagramas = document.getElementById('pane-aprendizaje-diagramas');
+    const panePapers = document.getElementById('pane-aprendizaje-papers');
     const btnRutas = document.getElementById('tab-btn-seguimiento-rutas');
     const btnDiagramas = document.getElementById('tab-btn-seguimiento-diagramas');
+    const btnPapers = document.getElementById('tab-btn-seguimiento-papers');
+
+    if (paneRutas) paneRutas.style.display = 'none';
+    if (paneDiagramas) paneDiagramas.style.display = 'none';
+    if (panePapers) panePapers.style.display = 'none';
+    if (btnRutas) btnRutas.classList.remove('active');
+    if (btnDiagramas) btnDiagramas.classList.remove('active');
+    if (btnPapers) btnPapers.classList.remove('active');
 
     if (tabName === 'diagramas') {
-        if (paneRutas) paneRutas.style.display = 'none';
         if (paneDiagramas) paneDiagramas.style.display = 'flex';
-        if (btnRutas) btnRutas.classList.remove('active');
         if (btnDiagramas) btnDiagramas.classList.add('active');
         if (window.diagramasML) window.diagramasML.render();
+    } else if (tabName === 'papers') {
+        if (panePapers) panePapers.style.display = 'flex';
+        if (btnPapers) btnPapers.classList.add('active');
+        if (window.papersML) window.papersML.init();
     } else {
-        if (paneDiagramas) paneDiagramas.style.display = 'none';
         if (paneRutas) paneRutas.style.display = 'flex';
-        if (btnDiagramas) btnDiagramas.classList.remove('active');
         if (btnRutas) btnRutas.classList.add('active');
         if (window.guiadoMgr) window.guiadoMgr.drawConnectors();
     }
 };
+

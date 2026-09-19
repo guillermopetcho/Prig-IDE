@@ -321,7 +321,20 @@
             + (!b.cargando && b.datos && !repos.length ? '<div class="gh-ayuda" style="margin:12px;">Sin resultados.</div>' : '')
             + (!b.cargando && b.datos && b.datos.hay_mas ? '<button class="gh-btn" id="gh-mas" style="margin:12px 0;">Cargar más</button>' : '')
             + (!b.datos && !b.cargando ? `<div class="gh-vacio"><i class="fa-brands fa-github" style="font-size:44px;"></i>
-                <h2>Busca repositorios o pega su enlace</h2><p>Elige uno para ver su ficha; ábrelo para leer su código con el profesor,<br>guardarlo o bajarlo al proyecto.</p></div>` : '');
+                <h2>Busca repositorios o pega su enlace</h2><p>Elige uno para ver su ficha; ábrelo para leer su código con el profesor,<br>guardarlo o bajarlo al proyecto.</p>
+                <div style="margin-top:16px; padding:12px 16px; background:rgba(203,166,247,0.08); border:1px solid rgba(203,166,247,0.3); border-radius:10px; max-width:480px; text-align:left;">
+                    <div style="font-weight:700; color:var(--accent-purple); font-size:13px; display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                        <i class="fa-solid fa-graduation-cap"></i> Compendio de Papers Seminales de Prig IDE
+                    </div>
+                    <div style="font-size:11.5px; color:var(--text-main); margin-bottom:10px; line-height:1.4;">
+                        Las 21 monografías doctorales y algoritmos de Machine Learning ya están publicados en el repositorio de Prig-IDE en GitHub.
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="gh-btn morado" onclick="window.GitHubLector.abrirRepo('guillermopetcho/Prig-IDE')"><i class="fa-brands fa-github"></i> Abrir guillermopetcho/Prig-IDE</button>
+                        <button class="gh-btn" onclick="if(window.cambiarPestanaAprendizaje){window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); window.cambiarPestanaAprendizaje('papers');}"><i class="fa-solid fa-book-open"></i> Ver Papers en Prig Hub</button>
+                    </div>
+                </div>
+            </div>` : '');
         c.querySelectorAll('[data-i]').forEach(el => {
             el.onclick = () => { estado.elegido = repos[+el.dataset.i]; pintarResultados(); pintarCuadro(); };
             el.ondblclick = () => abrirRepo(repos[+el.dataset.i].ref);

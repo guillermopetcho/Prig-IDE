@@ -23,6 +23,7 @@ from ai_engine import AIEngine
 from ai_engine.ai_engine_class import explicar_error_motor
 from book_service import BookService
 from librerias_service import LibreriasService
+from papers_service import PapersService
 from knowledge_service import KnowledgeService
 from knowledge_base import KnowledgeBase
 from pack_importer import PackImporter, PackImportError
@@ -102,6 +103,7 @@ ai_engine = AIEngine()
 ai_engine.gobernador = recursos_termico.gobernador()
 book_service = BookService()
 librerias_service = LibreriasService(book_service.books_dir)
+papers_service = PapersService()
 # Único punto de indexación y consulta del conocimiento. Comparte carpeta con
 # book_service: los mismos archivos, pero fragmentados y buscables.
 knowledge_service = KnowledgeService(book_service.books_dir)
@@ -541,6 +543,58 @@ def analyze_library(req: LibraryAnalyzeRequest):
 @app.get("/api/librerias/all-citations")
 def get_all_library_citations(query: Optional[str] = Query(default=None)):
     return librerias_service.get_all_library_citations_for_ai(query=query)
+
+
+# ==========================================
+# ENDPOINTS: PAPERS Y ALGORITMOS SEMINALES ML
+# ==========================================
+
+class PaperDownloadRequest(BaseModel):
+    paper_id: str
+    tipo: Optional[str] = "analisis"
+    workspace_path: Optional[str] = None
+
+class PaperAskRequest(BaseModel):
+    paper_id: str
+    pregunta: str
+    modelo: Optional[str] = None
+    tipo: Optional[str] = "analisis"
+    historial: Optional[List[Dict[str, Any]]] = None
+
+@app.get("/api/papers/list")
+def list_papers(q: Optional[str] = Query(default=None), categoria: Optional[str] = Query(default=None)):
+    return {"papers": papers_service.list_papers(q=q, categoria=categoria), "total": len(papers_service.catalogo)}
+
+@app.get("/api/papers/detail")
+def get_paper_detail(id: str = Query(...), tipo: str = Query(default="analisis")):
+    res = papers_service.get_paper(id, tipo=tipo)
+    if "error" in res:
+        raise HTTPException(status_code=404, detail=res["error"])
+    return res
+
+@app.post("/api/papers/download")
+def download_paper(req: PaperDownloadRequest):
+    ws_path = req.workspace_path or file_mgr.base_dir
+    res = papers_service.download_paper(req.paper_id, ws_path, tipo=req.tipo or "analisis")
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/papers/ask")
+def ask_paper(req: PaperAskRequest):
+    modelo = req.modelo or ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
+    return StreamingResponse(
+        papers_service.ask_paper_stream(
+            paper_id=req.paper_id,
+            pregunta=req.pregunta,
+            ai_engine=ai_engine,
+            modelo=modelo,
+            tipo=req.tipo or "analisis",
+            historial=req.historial
+        ),
+        media_type="text/plain; charset=utf-8"
+    )
+
 
 
 # ==========================================
