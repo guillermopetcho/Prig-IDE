@@ -1529,6 +1529,30 @@ select optgroup {
 }
 
 /* Agent Workflow Visual Nodes & Studio SOTA */
+.wf-studio-content {
+  background: var(--bg-panel, #1e1e2e) !important;
+  color: var(--text-main, #cdd6f4);
+}
+
+.vista-herramienta-contenedor .modal-content.incrustado.wf-studio-content,
+.vista-herramienta-contenedor .modal-content[data-modal-origen="modal-agent-workflow"] {
+  background: var(--bg-panel, #1e1e2e) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.wf-studio-body {
+  display: flex !important;
+  flex-direction: row !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  background: var(--bg-dark, #11111b) !important;
+  overflow: hidden !important;
+}
+
 .wf-canvas {
   display: flex;
   flex-direction: column;

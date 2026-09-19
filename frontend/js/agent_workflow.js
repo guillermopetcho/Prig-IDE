@@ -11,17 +11,9 @@
 class AgentWorkflowManager {
     constructor() {
         this.modal = document.getElementById('modal-agent-workflow');
-        this.stepsContainer = document.getElementById('wf-steps-container');
-        this.resultsContainer = document.getElementById('wf-results-container');
-        this.statusEl = document.getElementById('wf-execution-status');
-        this.timerEl = document.getElementById('wf-timer');
-        this.statsEl = document.getElementById('wf-stats');
-        this.iterationTabsEl = document.getElementById('wf-iteration-tabs');
-        this.initialInputEl = document.getElementById('wf-initial-input');
-        this.templateSelect = document.getElementById('wf-template-select');
-        this.btnRun = document.getElementById('btn-run-workflow');
-        this.btnStop = document.getElementById('btn-stop-workflow');
-        this.btnCopy = document.getElementById('btn-copy-wf-result');
+        if (this.modal) this.modal.style.display = 'none';
+
+        this.ensureDomRefs();
 
         this.models = [];
         this.nodes = [];
@@ -37,33 +29,53 @@ class AgentWorkflowManager {
         this.initEvents();
     }
 
+    ensureDomRefs() {
+        this.stepsContainer = document.getElementById('wf-steps-container');
+        this.resultsContainer = document.getElementById('wf-results-container');
+        this.statusEl = document.getElementById('wf-execution-status');
+        this.timerEl = document.getElementById('wf-timer');
+        this.statsEl = document.getElementById('wf-stats');
+        this.iterationTabsEl = document.getElementById('wf-iteration-tabs');
+        this.initialInputEl = document.getElementById('wf-initial-input');
+        this.templateSelect = document.getElementById('wf-template-select');
+        this.btnRun = document.getElementById('btn-run-workflow');
+        this.btnStop = document.getElementById('btn-stop-workflow');
+        this.btnCopy = document.getElementById('btn-copy-wf-result');
+    }
+
     initEvents() {
         // Evento de apertura desde barra de herramientas / workArea
-        document.addEventListener('prig:herramienta-abierta', (e) => {
+        document.addEventListener('prig:herramienta-abierta', async (e) => {
             if (e.detail && e.detail.modalId === 'modal-agent-workflow') {
-                this.openModal();
+                await this.initStudio();
             }
         });
 
         window.abrirStudioAgentes = (preset = null) => {
             if (window.workArea) {
-                window.workArea.abrirHerramienta('modal-agent-workflow', 'Studio Agentes', 'fa-diagram-project');
+                window.workArea.abrirHerramienta('modal-agent-workflow', 'Agentes', 'fa-diagram-project');
+                this.initStudio(preset);
             } else {
                 this.openModal(preset);
             }
-            if (preset) this.loadTemplate(preset);
         };
 
         // Modal cerrar
         const btnClose = document.getElementById('btn-close-workflow-modal');
         if (btnClose) btnClose.onclick = () => this.closeModal();
 
-        // Tecla escape
+        // Tecla escape o clic fuera en overlay
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.modal && this.modal.style.display === 'flex') {
+            if (e.key === 'Escape' && ((this.modal && this.modal.style.display === 'flex') || (window.workArea && window.workArea.activa === 'h:modal-agent-workflow'))) {
                 this.closeModal();
             }
         });
+
+        if (this.modal) {
+            this.modal.addEventListener('click', (e) => {
+                if (e.target === this.modal) this.closeModal();
+            });
+        }
 
         // Selector de Plantillas SOTA
         if (this.templateSelect) {
@@ -175,9 +187,28 @@ class AgentWorkflowManager {
         }
     }
 
+    async initStudio(preset = null) {
+        this.ensureDomRefs();
+        // Asegurar que el modal overlay flotante permanezca oculto
+        if (this.modal) this.modal.style.display = 'none';
+
+        await this.fetchModels();
+
+        if (this.nodes.length === 0) {
+            this.loadTemplate(preset || 'sota_self_healing_code');
+        }
+    }
+
     async openModal(preset = null) {
-        if (!this.modal) return;
-        this.modal.style.display = 'flex';
+        this.ensureDomRefs();
+        if (window.workArea) {
+            window.workArea.abrirHerramienta('modal-agent-workflow', 'Agentes', 'fa-diagram-project');
+            await this.initStudio(preset);
+            return;
+        }
+
+        // Fallback sólo si workArea no existe
+        if (this.modal) this.modal.style.display = 'flex';
         await this.fetchModels();
 
         if (this.nodes.length === 0) {
@@ -187,6 +218,9 @@ class AgentWorkflowManager {
 
     closeModal() {
         if (this.modal) this.modal.style.display = 'none';
+        if (window.workArea && window.workArea.vistas && window.workArea.vistas.some(v => v.id === 'h:modal-agent-workflow')) {
+            window.workArea.cerrar('h:modal-agent-workflow');
+        }
         if (this.abortController) {
             this.stopWorkflow();
         }

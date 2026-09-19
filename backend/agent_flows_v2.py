@@ -838,3 +838,4 @@ def plantillas_profesionales_sota(modelo_base: str = "qwen2.5-coder:7b", modelo_
             ]
         }
     ]
+
