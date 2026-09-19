@@ -469,3 +469,4 @@ Los modelos de razonamiento de Prig IDE pueden consultar esta base canónica par
    - **Inferencia y Decisión** (Umbralización, votación ponderada, softmax, desruidificado).
 2. Generar diagramas de flujo Mermaid formalmente correctos con esquemas de nodos y colores consistentes.
 3. Explicar códigos de Kaggle identificando qué ecuación matemática y qué paper fundamenta cada línea de código.
+

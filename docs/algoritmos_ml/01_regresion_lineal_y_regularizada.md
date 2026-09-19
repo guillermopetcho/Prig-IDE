@@ -5,6 +5,7 @@
 - **Regresión Ridge ($L_2$)**: Hoerl & Kennard (1970). *Technometrics*, 12(1), 55-67.
 - **Lasso ($L_1$)**: Tibshirani (1996). *JRSS-B*, 58(1), 267-288.
 - **Elastic Net**: Zou & Hastie (2005). *JRSS-B*, 67(2), 301-320.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/01_regresion_lineal_y_regularizada.md)
 
 ---
 
@@ -94,3 +95,4 @@ modelo = make_pipeline(
 modelo.fit(X_train, y_train)
 predicciones = modelo.predict(X_test)
 ```
+

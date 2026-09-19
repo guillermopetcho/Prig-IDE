@@ -167,5 +167,47 @@ class TestIntegracionModularKaggle(unittest.TestCase):
         self.assertIn("Abrir en Graficador Modular", codigo_js)
 
 
+class TestAnalisisPapersSeminales(unittest.TestCase):
+    """Verifica la integridad de las monografías de análisis profundo de papers."""
+
+    def test_monografia_01_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 01 exista y sea riguroso."""
+        ruta_01 = os.path.join(DOCS_DIR, "analisis_papers", "01_regresion_lineal_y_regularizada.md")
+        self.assertTrue(os.path.exists(ruta_01), f"Falta el archivo: {ruta_01}")
+
+        with open(ruta_01, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Hoerl & Kennard", contenido)
+        self.assertIn("Tibshirani", contenido)
+        self.assertIn("Zou & Hastie", contenido)
+        self.assertIn("Efron", contenido)
+        self.assertIn("Friedman", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Teorema de Gauss-Markov",
+            "Teorema de Existencia",
+            "Ridge Trace",
+            "Soft-Thresholding",
+            "Grouping Effect",
+            "Double Shrinkage",
+            "Descenso por Coordenadas",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c, contenido, f"Falta concepto '{c}' en la monografía 01 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("soft_thresholding", contenido)
+        self.assertIn("resolver_elastic_net", contenido)
+        self.assertIn("Double Shrinkage", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+

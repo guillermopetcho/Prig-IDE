@@ -102,3 +102,4 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         return self.relu(self.conv(x) + x)  # Skip Connection directa
 ```
+

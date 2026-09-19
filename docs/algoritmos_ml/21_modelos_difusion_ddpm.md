@@ -105,3 +105,4 @@ def paso_entrenamiento_difusion(model, x_0, scheduler):
     loss = F.mse_loss(pred_noise, noise)
     return loss
 ```
+

@@ -88,3 +88,4 @@ pca_pipe = make_pipeline(
 Z = pca_pipe.fit_transform(X)
 print(f"Dimensiones reducidas: de {X.shape[1]} a {Z.shape[1]} componentes.")
 ```
+

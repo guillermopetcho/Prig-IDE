@@ -87,3 +87,4 @@ kmeans = make_pipeline(
 )
 etiquetas = kmeans.fit_predict(X)
 ```
+

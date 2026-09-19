@@ -112,3 +112,4 @@ class LSTMClassifier(nn.Module):
         out, (hn, cn) = self.lstm(emb)
         return self.fc(hn[-1])
 ```
+

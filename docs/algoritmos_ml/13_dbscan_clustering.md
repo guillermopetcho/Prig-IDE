@@ -91,3 +91,4 @@ n_clusters = len(set(etiquetas)) - (1 if -1 in etiquetas else 0)
 n_ruido = list(etiquetas).count(-1)
 print(f"Clústeres descubiertos: {n_clusters}, Muestras de ruido: {n_ruido}")
 ```
+

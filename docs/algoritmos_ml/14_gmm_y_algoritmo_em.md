@@ -93,3 +93,4 @@ gmm = GaussianMixture(
 gmm.fit(X)
 probabilidades = gmm.predict_proba(X)
 ```
+

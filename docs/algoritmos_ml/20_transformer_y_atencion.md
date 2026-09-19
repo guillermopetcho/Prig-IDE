@@ -110,3 +110,4 @@ class SelfAttentionBlock(nn.Module):
         out = out.transpose(1, 2).contiguous().view(B, T, C)
         return self.out_proj(out)
 ```
+

@@ -85,3 +85,4 @@ clf = make_pipeline(
 clf.fit(X_train, y_train)
 probabilidades = clf.predict_proba(X_test)
 ```
+

@@ -98,3 +98,4 @@ X_tsne = tsne.fit_transform(X)
 reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=2, random_state=42)
 X_umap = reducer.fit_transform(X)
 ```
+
