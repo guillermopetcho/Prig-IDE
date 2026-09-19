@@ -36,10 +36,13 @@
     const NIVELES = ['principiante', 'intermedio', 'avanzado', 'senior'];
 
     const estado = {
-        panel: 'chat', modelo: null, modelos: [],
+        panel: 'armar', modelo: null, modelos: [],
         lenguaje: leerLocal('prig_desafios_lenguaje') || 'python',
-        chat: [{ rol: 'tutor', texto: '¿Qué quieres practicar hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios», «punteros» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.' }],
-        chatNivel: 'intermedio',
+        propuesta: '',
+        propuestaNivel: 'intermedio',
+        propuestaAnalisis: null,
+        propuestaCargando: false,
+        propuestaError: null,
         internet: {
             tema: '', nivel: '', fuentes: new Set(), datos: null, cargando: false, error: null,
             subvista: 'buscar', catalogo: null, catalogoCargando: false, catalogoError: null,
@@ -53,11 +56,11 @@
         pasosVisibles: 0,
         ultimo: null,          // última comprobación
         tarea: null,           // {titulo, lineas[], error} mientras el modelo crea
-        chatDesafio: {},       // id → mensajes del tutor del desafío
         guardado: null,
         idioma: 'es',
         pedido: 0,
     };
+
 
     // ================================================================== utilidades
     function md(texto) {
@@ -193,7 +196,7 @@
         r.innerHTML = `
           <aside class="des-lado" id="des-lado">
             <div class="des-pestanas" id="des-pestanas">
-              ${[['chat', 'fa-comments', 'Chat'], ['plan', 'fa-route', 'Plan'], ['internet', 'fa-globe', 'Internet'], ['mis', 'fa-list-check', 'Mis desafíos']]
+              ${[['armar', 'fa-wand-magic-sparkles', 'Armar'], ['internet', 'fa-globe', 'Buscar'], ['plan', 'fa-route', 'Plan'], ['mis', 'fa-list-check', 'Mis desafíos']]
                 .map(([id, ic, t]) => `<button data-panel="${id}"><i class="fa-solid ${ic}"></i><br>${t}</button>`).join('')}
             </div>
             <div class="des-modelo"><i class="fa-solid fa-microchip"></i> Modelo <select id="des-modelo" class="des-campo"></select>
@@ -225,16 +228,9 @@
             guardarLocal('prig_desafios_lenguaje', lang);
             actualizarBotonesLang();
             if (estado.panel === 'internet') panelInternet();
-            else if (estado.panel === 'chat') {
-                estado.chat[0] = {
-                    rol: 'tutor',
-                    texto: lang === 'cpp'
-                        ? '¿Qué quieres practicar en C++ hoy? Cuéntame el tema (por ejemplo «punteros y referencias», «vectores STL», «clases y RAII» o «templates») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.'
-                        : '¿Qué quieres practicar en Python hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.'
-                };
-                panelChat();
-            }
+            else if (estado.panel === 'armar') panelArmar();
         };
+
         $('des-lang-py').onclick = () => fijarLenguaje('python');
         $('des-lang-cpp').onclick = () => fijarLenguaje('cpp');
         cargarModelos();
@@ -355,88 +351,150 @@
     function cambiarPanel(p) {
         estado.panel = p;
         document.querySelectorAll('#des-pestanas button').forEach(b => b.classList.toggle('activa', b.dataset.panel === p));
-        ({ chat: panelChat, plan: panelPlan, internet: panelInternet, mis: panelMis }[p] || panelChat)();
+        ({ armar: panelArmar, plan: panelPlan, internet: panelInternet, mis: panelMis }[p] || panelArmar)();
     }
 
-    // ================================================================== panel: chat
-    function panelChat() {
+    // ================================================================== panel: armar / propuesta
+    function panelArmar() {
         const c = $('des-lado-cuerpo');
+        const lang = estado.lenguaje;
+        const esCpp = lang === 'cpp';
         c.innerHTML = `
-          <div id="des-chat-msgs" style="display:flex; flex-direction:column; gap:6px; flex:1;"></div>
-          <textarea id="des-chat-texto" class="des-campo" rows="3" placeholder="Escribe al entrenador… (Enter envía, Mayús+Enter salto de línea)"></textarea>
-          <div class="des-fila"><button class="des-btn azul" id="des-chat-enviar"><i class="fa-solid fa-paper-plane"></i> Enviar</button>
-            <span style="flex:1"></span>
-            <select id="des-chat-nivel" class="des-campo" style="width:auto;">${NIVELES.map(n => `<option ${n === estado.chatNivel ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-          <div class="des-fila">
-            <button class="des-btn primario" id="des-chat-crear" style="flex:1;"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear desafío</button>
-            <button class="des-btn" id="des-chat-internet" style="flex:1;"><i class="fa-solid fa-globe"></i> Buscar en internet</button>
+          <div class="des-seccion" style="padding:10px; margin-bottom:8px;">
+            <div class="des-seccion-titulo" style="font-size:11px; margin-bottom:6px;">
+              <i class="fa-solid fa-lightbulb" style="color:var(--accent-yellow);"></i> Propuesta o solicitud
+            </div>
+            <textarea id="des-propuesta-texto" class="des-campo" rows="4" style="resize:vertical; min-height:80px; width:100%;" placeholder="${esCpp ? 'Escribe tu propuesta o tema en C++ (p. ej. punteros y referencias, templates, grafos con matrices o pega un ejercicio para armarlo/analizarlo)…' : 'Escribe tu propuesta o tema en Python (p. ej. recursividad, árboles binarios, decoradores o pega un ejercicio para armarlo/analizarlo)…'}">${esc(estado.propuesta || '')}</textarea>
+            <div class="des-fila" style="margin-top:6px; align-items:center;">
+              <span style="color:var(--text-muted); font-size:11px;"><i class="fa-solid fa-layer-group"></i> Nivel:</span>
+              <select id="des-propuesta-nivel" class="des-campo" style="width:auto; flex:1;">${NIVELES.map(n => `<option value="${n}" ${n === (estado.propuestaNivel || 'intermedio') ? 'selected' : ''}>${n.charAt(0).toUpperCase() + n.slice(1)}</option>`).join('')}</select>
+            </div>
+            <div class="des-fila" style="margin-top:8px; gap:6px;">
+              <button class="des-btn primario" id="des-btn-armar" style="flex:1;"><i class="fa-solid fa-wand-magic-sparkles"></i> Armar desafío</button>
+              <button class="des-btn" id="des-btn-buscar" style="flex:1;"><i class="fa-solid fa-globe"></i> Buscar</button>
+            </div>
+            <div style="margin-top:6px;">
+              <button class="des-btn morado" id="des-btn-analizar" style="width:100%; justify-content:center;"><i class="fa-solid fa-brain"></i> Analizar propuesta</button>
+            </div>
           </div>
-          <div class="des-ayuda">«Crear desafío» usa toda la conversación. El desafío solo aparece si su solución pasa las pruebas ejecutándolas.</div>`;
-        pintarChat();
-        const texto = $('des-chat-texto');
-        texto.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } };
-        $('des-chat-enviar').onclick = enviarChat;
-        $('des-chat-nivel').onchange = (e) => { estado.chatNivel = e.target.value; };
-        const avisarChatVacio = (mensaje) => {
+          <div id="des-propuesta-resultado"></div>`;
+
+        const texto = $('des-propuesta-texto');
+        if (texto) {
+            texto.oninput = () => { estado.propuesta = texto.value; };
+            texto.onkeydown = (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    $('des-btn-armar').click();
+                }
+            };
+        }
+        const nivel = $('des-propuesta-nivel');
+        if (nivel) nivel.onchange = (e) => { estado.propuestaNivel = e.target.value; };
+
+        const avisarPropuestaVacia = (msg) => {
             if (texto) {
                 texto.focus();
                 texto.style.outline = '2px solid var(--accent-red, #f38ba8)';
                 const origPh = texto.placeholder;
-                texto.placeholder = mensaje;
+                texto.placeholder = msg;
                 setTimeout(() => { if (texto) { texto.style.outline = ''; texto.placeholder = origPh; } }, 2500);
             }
         };
-        $('des-chat-crear').onclick = () => {
-            const usuario = estado.chat.filter(m => m.rol === 'usuario');
-            if (!usuario.length && !texto.value.trim()) {
-                avisarChatVacio('Primero cuéntame qué quieres practicar o envía un mensaje.');
-                return;
-            }
-            if (texto.value.trim()) estado.chat.push({ rol: 'usuario', texto: texto.value.trim() });
-            crearConModelo({ tema: usuario.length ? '' : texto.value.trim(), nivel: estado.chatNivel, conversacion: estado.chat.slice(1) });
+
+        $('des-btn-armar').onclick = () => {
+            const prop = (texto ? texto.value : estado.propuesta || '').trim();
+            if (!prop) return avisarPropuestaVacia('Escribe primero el tema o propuesta del desafío a armar.');
+            estado.propuesta = prop;
+            crearConModelo({ tema: prop, nivel: estado.propuestaNivel || 'intermedio', lenguaje: estado.lenguaje });
         };
-        $('des-chat-internet').onclick = () => {
-            const tema = texto.value.trim() || estado.chat.filter(m => m.rol === 'usuario').map(m => m.texto).join(' ');
-            if (!tema) {
-                avisarChatVacio('Escribe primero qué tema o concepto quieres buscar en internet.');
-                return;
-            }
-            estado.internet.tema = tema.slice(0, 200);
+
+        $('des-btn-buscar').onclick = () => {
+            const prop = (texto ? texto.value : estado.propuesta || '').trim();
+            if (prop) estado.internet.tema = prop;
+            estado.internet.nivel = estado.propuestaNivel || '';
             cambiarPanel('internet');
-            buscarInternet();
+            if (prop) buscarInternet();
         };
+
+        $('des-btn-analizar').onclick = () => {
+            const prop = (texto ? texto.value : estado.propuesta || '').trim();
+            if (!prop) return avisarPropuestaVacia('Escribe tu propuesta, algoritmo o planteo a analizar.');
+            estado.propuesta = prop;
+            ejecutarAnalisisPropuesta();
+        };
+
+        pintarResultadoPropuesta();
     }
 
-
-    function pintarChat() {
-        const c = $('des-chat-msgs');
-        if (!c) return;
-        c.innerHTML = estado.chat.map((m, i) => `<div class="des-msg ${m.rol}" data-i="${i}"></div>`).join('');
-        c.querySelectorAll('.des-msg').forEach(el => pintarMd(el, estado.chat[+el.dataset.i].texto || '…'));
-        const cuerpo = $('des-lado-cuerpo');
-        if (cuerpo) cuerpo.scrollTop = cuerpo.scrollHeight;
-    }
-
-    async function enviarChat() {
-        const texto = $('des-chat-texto');
-        const t = texto.value.trim();
-        if (!t) return;
-        texto.value = '';
-        estado.chat.push({ rol: 'usuario', texto: t });
-        const respuesta = { rol: 'tutor', texto: '' };
-        estado.chat.push(respuesta);
-        pintarChat();
-        const burbuja = () => document.querySelector(`#des-chat-msgs .des-msg[data-i="${estado.chat.indexOf(respuesta)}"]`);
+    async function ejecutarAnalisisPropuesta() {
+        const prop = (estado.propuesta || '').trim();
+        if (!prop) return;
+        estado.propuestaCargando = true;
+        estado.propuestaError = null;
+        estado.propuestaAnalisis = '';
+        pintarResultadoPropuesta();
         try {
-            await flujo('/api/desafios/chat', { mensajes: estado.chat.slice(1, -1), modelo: estado.modelo }, (ev) => {
-                if (ev.tipo === 'texto') { respuesta.texto += ev.delta; const b = burbuja(); if (b) pintarMd(b, respuesta.texto); }
-                else if (ev.tipo === 'pensando' && !respuesta.texto) { const b = burbuja(); if (b) b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> pensando…'; }
+            await flujo('/api/desafios/analizar-propuesta', {
+                propuesta: prop,
+                lenguaje: estado.lenguaje,
+                nivel: estado.propuestaNivel || 'intermedio',
+                modelo: estado.modelo
+            }, (ev) => {
+                if (ev.tipo === 'texto') {
+                    estado.propuestaAnalisis = (estado.propuestaAnalisis || '') + ev.delta;
+                    const r = $('des-analisis-md');
+                    if (r) pintarMd(r, estado.propuestaAnalisis);
+                }
             });
         } catch (e) {
-            respuesta.texto = `*No pude responder: ${e.message}*`;
+            estado.propuestaError = e.message;
         }
-        pintarChat();
+        estado.propuestaCargando = false;
+        pintarResultadoPropuesta();
     }
+
+    function pintarResultadoPropuesta() {
+        const c = $('des-propuesta-resultado');
+        if (!c) return;
+        if (estado.propuestaCargando) {
+            c.innerHTML = `
+              <div class="des-seccion" style="padding:10px;">
+                <div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Analizando la propuesta y evaluando complejidad…</div>
+                <div class="des-md" id="des-analisis-md" style="margin-top:6px;">${estado.propuestaAnalisis ? md(estado.propuestaAnalisis) : ''}</div>
+              </div>`;
+            return;
+        }
+        if (estado.propuestaError) {
+            c.innerHTML = `<div class="des-error">${esc(estado.propuestaError)}</div>`;
+            return;
+        }
+        if (!estado.propuestaAnalisis) {
+            c.innerHTML = '';
+            return;
+        }
+        c.innerHTML = `
+          <div class="des-seccion" style="padding:10px;">
+            <div class="des-seccion-titulo" style="margin-bottom:6px;">
+              <i class="fa-solid fa-brain" style="color:var(--accent-purple);"></i> Análisis del modelo
+              <span style="flex:1"></span>
+              <button class="des-btn" id="des-analisis-cerrar" style="padding:1px 6px; font-size:10px;">✕</button>
+            </div>
+            <div class="des-md" id="des-analisis-md">${md(estado.propuestaAnalisis)}</div>
+            <div style="margin-top:8px;">
+              <button class="des-btn verde" id="des-analisis-armar-btn" style="width:100%; justify-content:center;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Armar desafío con esta propuesta
+              </button>
+            </div>
+          </div>`;
+        const cerr = $('des-analisis-cerrar');
+        if (cerr) cerr.onclick = () => { estado.propuestaAnalisis = null; pintarResultadoPropuesta(); };
+        const armarBtn = $('des-analisis-armar-btn');
+        if (armarBtn) armarBtn.onclick = () => {
+            crearConModelo({ tema: estado.propuesta, nivel: estado.propuestaNivel || 'intermedio', lenguaje: estado.lenguaje });
+        };
+    }
+
 
     // ================================================================== panel: plan de estudios
     async function panelPlan() {
@@ -822,7 +880,7 @@
         const c = $('des-lado-cuerpo');
         if (!c || !estado.mis) return;
         const lista = estado.mis.desafios || [];
-        if (!lista.length) { c.innerHTML = '<div class="des-ayuda">Todavía no has abierto ningún desafío. Conversa en el chat, busca en internet o parte de tu plan.</div>'; return; }
+        if (!lista.length) { c.innerHTML = '<div class="des-ayuda">Todavía no has abierto ningún desafío. Define una propuesta, busca en el catálogo o parte de tu plan.</div>'; return; }
         c.innerHTML = lista.map((d, n) => {
             const p = d.progreso || {};
             const [estNom, estIc, estCol] = ESTADOS[p.estado] || ESTADOS.nuevo;
@@ -857,8 +915,9 @@
 
     // ================================================================== crear con el modelo
     async function crearConModelo(cuerpo) {
-        const tema = cuerpo.tema || (cuerpo.bloque_id ? 'el bloque del plan' : cuerpo.basado_en ? 'el siguiente desafío' : 'lo hablado en el chat');
+        const tema = cuerpo.tema || (cuerpo.bloque_id ? 'el bloque del plan' : cuerpo.basado_en ? 'el siguiente desafío' : 'la propuesta indicada');
         mostrarTarea(`Creando un desafío sobre ${tema}`, ['El modelo escribe el enunciado, el código de partida, la solución y las pruebas. Después se ejecutan: solo llega a ti si la solución pasa y el código de partida no.']);
+
         const pedido = ++estado.pedido;
         try {
             const d = await flujo('/api/desafios/crear', { lenguaje: estado.lenguaje, ...cuerpo, modelo: estado.modelo }, (ev) => {
@@ -997,15 +1056,6 @@
             <div id="des-resultado" style="margin-top:10px;"></div>
             <div id="des-pistas" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
             <div id="des-solucion-caja" style="margin-top:8px;"></div>
-          </section>
-
-          <section class="des-seccion" id="des-sec-tutor">
-            <details><summary class="des-seccion-titulo" style="cursor:pointer; margin:0;"><i class="fa-solid fa-comments"></i> Preguntar al tutor sobre este desafío</summary>
-              <div id="des-tutor-msgs" style="display:flex; flex-direction:column; gap:6px; margin:8px 0;"></div>
-              <div class="des-fila"><input id="des-tutor-texto" class="des-campo" style="flex:1;" placeholder="¿Por qué falla la prueba…? ¿Qué es un generador…?">
-                <button class="des-btn azul" id="des-tutor-enviar"><i class="fa-solid fa-paper-plane"></i></button></div>
-              <div class="des-ayuda" style="margin-top:4px;">El tutor ve tu código y la última comprobación, pero no te da la solución.</div>
-            </details>
           </section>`;
 
         pintarEnunciado();
@@ -1013,7 +1063,6 @@
         pintarPaginas();
         pintarContadores();
         pintarResultado();
-        pintarTutor();
         conectarHoja();
         if (estado.solucion) pintarSolucion(estado.solucion);
     }
@@ -1033,14 +1082,15 @@
                 <option value="python" ${estado.lenguaje === 'python' ? 'selected' : ''}>Python</option>
                 <option value="cpp" ${estado.lenguaje === 'cpp' ? 'selected' : ''}>C++</option>
               </select>
-              <input id="des-rapido" class="des-campo" style="max-width:340px;" placeholder="${estado.lenguaje === 'cpp' ? '¿Qué quieres practicar en C++? p. ej. punteros o templates' : '¿Qué quieres practicar? p. ej. recursividad'}">
-              <select id="des-rapido-nivel" class="des-campo" style="width:auto;">${NIVELES.map(n => `<option ${n === 'intermedio' ? 'selected' : ''}>${n}</option>`).join('')}</select>
+              <input id="des-rapido" class="des-campo" style="max-width:360px;" placeholder="${estado.lenguaje === 'cpp' ? 'Escribe tu propuesta en C++ o tema a practicar' : 'Escribe tu propuesta en Python o tema a practicar'}">
+              <select id="des-rapido-nivel" class="des-campo" style="width:auto;">${NIVELES.map(n => `<option ${n === 'intermedio' ? 'selected' : ''}>${n.charAt(0).toUpperCase() + n.slice(1)}</option>`).join('')}</select>
             </div>
-            <div class="des-fila" style="justify-content:center; margin-top:8px;">
-              <button class="des-btn primario" id="des-rapido-crear"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear con el modelo</button>
-              <button class="des-btn" id="des-rapido-internet"><i class="fa-solid fa-globe"></i> Buscar en internet</button>
+            <div class="des-fila" style="justify-content:center; margin-top:10px; gap:8px; flex-wrap:wrap;">
+              <button class="des-btn primario" id="des-rapido-crear"><i class="fa-solid fa-wand-magic-sparkles"></i> Armar desafío con IA</button>
+              <button class="des-btn" id="des-rapido-internet"><i class="fa-solid fa-globe"></i> Buscar desafíos</button>
+              <button class="des-btn morado" id="des-rapido-analizar"><i class="fa-solid fa-brain"></i> Analizar propuesta</button>
             </div>
-            <p class="des-ayuda" style="margin-top:14px;">También puedes conversarlo en el <b>Chat</b>, partir de un bloque de tu <b>Plan</b> o retomar uno de <b>Mis desafíos</b>.</p>
+            <p class="des-ayuda" style="margin-top:14px;">Escribe una propuesta o tema, búscalo en el catálogo o plan de estudios, o retoma uno de <b>Mis desafíos</b>.</p>
           </div>`;
         const tema = () => $('des-rapido').value.trim();
         const langSel = $('des-rapido-lenguaje');
@@ -1051,7 +1101,7 @@
                 bPy.classList.toggle('activa', estado.lenguaje === 'python');
                 bCpp.classList.toggle('activa', estado.lenguaje === 'cpp');
             }
-            $('des-rapido').placeholder = estado.lenguaje === 'cpp' ? '¿Qué quieres practicar en C++? p. ej. punteros o templates' : '¿Qué quieres practicar? p. ej. recursividad';
+            $('des-rapido').placeholder = estado.lenguaje === 'cpp' ? 'Escribe tu propuesta en C++ o tema a practicar' : 'Escribe tu propuesta en Python o tema a practicar';
         };
         const avisarRapidoVacio = () => {
             const el = $('des-rapido');
@@ -1059,7 +1109,7 @@
                 el.focus();
                 el.style.outline = '2px solid var(--accent-red, #f38ba8)';
                 const origPh = el.placeholder;
-                el.placeholder = '¡Escribe aquí qué concepto o tema deseas practicar!';
+                el.placeholder = '¡Escribe aquí qué concepto o propuesta deseas practicar o analizar!';
                 setTimeout(() => {
                     if (el) {
                         el.style.outline = '';
@@ -1068,7 +1118,7 @@
                 }, 2500);
             }
         };
-        $('des-rapido').value = estado.internet.tema || '';
+        $('des-rapido').value = estado.propuesta || estado.internet.tema || '';
         $('des-rapido').onkeydown = (e) => {
             if (e.key === 'Enter') {
                 if (!tema()) return avisarRapidoVacio();
@@ -1088,7 +1138,15 @@
             cambiarPanel('internet');
             buscarInternet();
         };
+        $('des-rapido-analizar').onclick = () => {
+            if (!tema()) return avisarRapidoVacio();
+            estado.propuesta = tema();
+            estado.propuestaNivel = $('des-rapido-nivel').value;
+            cambiarPanel('armar');
+            ejecutarAnalisisPropuesta();
+        };
     }
+
 
 
     function pintarTarea(c) {
@@ -1523,37 +1581,6 @@
         } catch (e) { boton.disabled = false; alert(e.message); }
     }
 
-    // ------------------------------------------------------------------ tutor del desafío
-    function pintarTutor() {
-        const c = $('des-tutor-msgs');
-        if (!c || !estado.d) return;
-        const msgs = estado.chatDesafio[estado.d.id] || [];
-        c.innerHTML = msgs.map((m, i) => `<div class="des-msg ${m.rol}" data-i="${i}"></div>`).join('');
-        c.querySelectorAll('.des-msg').forEach(el => pintarMd(el, msgs[+el.dataset.i].texto || '…'));
-    }
-
-    async function preguntarTutor() {
-        const campo = $('des-tutor-texto');
-        const t = campo.value.trim();
-        const d = estado.d;
-        if (!t || !d) return;
-        campo.value = '';
-        const msgs = estado.chatDesafio[d.id] = estado.chatDesafio[d.id] || [];
-        msgs.push({ rol: 'usuario', texto: t });
-        const respuesta = { rol: 'tutor', texto: '' };
-        msgs.push(respuesta);
-        pintarTutor();
-        try {
-            await flujo('/api/desafios/chat', { mensajes: msgs.slice(0, -1), modelo: estado.modelo, desafio_id: d.id, paginas: paginasActuales() }, (ev) => {
-                if (ev.tipo === 'texto' && estado.d && estado.d.id === d.id) {
-                    respuesta.texto += ev.delta;
-                    const el = document.querySelector(`#des-tutor-msgs .des-msg[data-i="${msgs.indexOf(respuesta)}"]`);
-                    if (el) pintarMd(el, respuesta.texto);
-                }
-            });
-        } catch (e) { respuesta.texto = `*No pude responder: ${e.message}*`; }
-        if (estado.d && estado.d.id === d.id) pintarTutor();
-    }
 
     // ------------------------------------------------------------------ eventos de la hoja
     function conectarHoja() {
@@ -1609,9 +1636,6 @@
         on('des-pista', () => pedirPista(false));
         on('des-pista-autor', () => pedirPista(true));
         on('des-solucion', verSolucion);
-        on('des-tutor-enviar', preguntarTutor);
-        const tt = $('des-tutor-texto');
-        if (tt) tt.onkeydown = (e) => { if (e.key === 'Enter') preguntarTutor(); };
     }
 
     // ================================================================== entrada pública

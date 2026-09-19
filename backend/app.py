@@ -5092,7 +5092,15 @@ class DesafioChatRequest(BaseModel):
     paginas: List[Dict[str, Any]] = []
 
 
+class DesafioAnalizarPropuestaRequest(BaseModel):
+    propuesta: str
+    lenguaje: Optional[str] = "python"
+    nivel: Optional[str] = "intermedio"
+    modelo: Optional[str] = None
+
+
 def _contexto_bloque(ruta_id: Optional[str], bloque_id: Optional[str]) -> Dict[str, Any]:
+
     if not ruta_id:
         return {}
     ruta = guided.get(ruta_id)
@@ -5562,6 +5570,21 @@ def desafios_chat(req: DesafioChatRequest):
         return {"texto": _consumir(des_tutor.chat(motor, nombre_modelo, req.mensajes, d, paginas,
                                                   (d or {}).get("ultima_comprobacion")), avisar)}
     return _ndjson_en_hilo(trabajo)
+
+
+@app.post("/api/desafios/analizar-propuesta")
+def desafios_analizar_propuesta(req: DesafioAnalizarPropuestaRequest):
+    """ Analiza la propuesta o idea del usuario y devuelve evaluación, complejidad y lo solicitado (NDJSON). """
+    if not (req.propuesta or "").strip():
+        raise HTTPException(status_code=400, detail="Escribe tu propuesta o planteo.")
+    motor, nombre_modelo = _motor_desafios(req.modelo)
+
+    def trabajo(avisar):
+        return {"texto": _consumir(des_tutor.analizar_propuesta(motor, nombre_modelo, req.propuesta,
+                                                               req.lenguaje or "python",
+                                                               req.nivel or "intermedio"), avisar)}
+    return _ndjson_en_hilo(trabajo)
+
 
 
 # Serve frontend static assets

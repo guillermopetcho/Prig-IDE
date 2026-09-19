@@ -548,6 +548,30 @@ def revisar_plan(ai, modelo: str, d: Dict[str, Any], plan: str):
     return (yield from flujo(ai, modelo, prompt, sistema, temperatura=0.3))
 
 
+def analizar_propuesta(ai, modelo: str, propuesta: str, lenguaje: str = "python", nivel: str = "intermedio"):
+    """ Analiza la propuesta, idea de desafío o planteamiento algorítmico del usuario y devuelve
+    una evaluación técnica completa (viabilidad, complejidad asintótica, casos límite y recomendaciones). """
+    if not (propuesta or "").strip():
+        raise ErrorDesafio("Escribe primero tu propuesta o planteo.")
+    es_cpp = (lenguaje or "").lower() == "cpp"
+    lang_label = "C++ (C++20)" if es_cpp else "Python 3"
+    sistema = (
+        f"Eres un ingeniero senior y especialista en algoritmia y estructuras de datos para {lang_label}.\n"
+        f"El usuario te presenta una propuesta técnica o tema a nivel {nivel}.\n"
+        "Tu objetivo es analizar su propuesta y devolver exactamente lo que el usuario pide o necesita en Markdown conciso y estructurado:\n\n"
+        "1. **Evaluación de la Propuesta**: Viabilidad técnica, pertinencia algorítmica y enfoque general.\n"
+        "2. **Complejidad y Rendimiento**: Cota asintótica Big-O esperada de tiempo y espacio (O(N), O(log N), etc.) y cómo optimizarla.\n"
+        "3. **Casos Críticos y de Borde**: Casos extremos que deben considerarse.\n"
+        "4. **Recomendaciones de Implementación**: Estructuras de datos óptimas y mejores prácticas idiomáticas para "
+        + ("C++20 (STL, semántica de movimiento, gestión de memoria RAII)" if es_cpp else "Python 3 (estructuras estándar, generadores, legibilidad)")
+        + ".\n\n"
+        "Responde en español de forma directa, sin introducciones innecesarias."
+    )
+    prompt = f"LENGUAJE: {lang_label}\nNIVEL: {nivel}\n\nPROPUESTA O SOLICITUD:\n{propuesta.strip()[:4000]}"
+    return (yield from flujo(ai, modelo, prompt, sistema, temperatura=0.3))
+
+
+
 NIVELES_PISTA = {
     1: ("Pista conceptual", "Da UNA pista CONCEPTUAL: qué idea o estructura resuelve esto. Sin código. Máximo 2 frases."),
     2: ("Pista de estructura", "Describe los PASOS en una lista breve, en lenguaje natural, sin escribir Python. Máximo 5 líneas."),

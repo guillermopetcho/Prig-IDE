@@ -282,6 +282,50 @@ class PruebaReplicacionGitHub(unittest.TestCase):
         self.assertIn("fenwick-tree", d["conceptos"])
 
 
+class PruebaAnalizarPropuesta(unittest.TestCase):
+
+    def test_analizar_propuesta_vacia_falla(self):
+        ai = ModeloFalsoReplicar([""])
+        with self.assertRaises(ErrorDesafio):
+            list(tu.analizar_propuesta(ai=ai, modelo="test", propuesta="   ", lenguaje="python"))
+
+    def test_analizar_propuesta_python(self):
+        respuesta = "## Análisis de la propuesta\nEl algoritmo planteado tiene complejidad O(N log N)."
+        ai = ModeloFalsoReplicar([respuesta])
+        gen = tu.analizar_propuesta(
+            ai=ai,
+            modelo="test-model",
+            propuesta="Quiero implementar un Segment Tree con Lazy Propagation",
+            lenguaje="python",
+            nivel="senior"
+        )
+        eventos = list(gen)
+        salida = "".join(ev.get("delta", "") for ev in eventos if ev.get("tipo") == "texto")
+        self.assertEqual(salida, respuesta)
+        prompt, sys_prompt, _ = ai.prompts[0]
+        self.assertIn("Segment Tree", prompt)
+        self.assertIn("Python 3", prompt)
+        self.assertIn("senior", prompt)
+        self.assertIn("especialista en algoritmia", sys_prompt)
+
+    def test_analizar_propuesta_cpp(self):
+        respuesta = "## Análisis C++20\nUso de std::span y complejidad O(V + E)."
+        ai = ModeloFalsoReplicar([respuesta])
+        gen = tu.analizar_propuesta(
+            ai=ai,
+            modelo="test-model",
+            propuesta="Grafo bipartito con BFS usando C++",
+            lenguaje="cpp",
+            nivel="medio"
+        )
+        eventos = list(gen)
+        salida = "".join(ev.get("delta", "") for ev in eventos if ev.get("tipo") == "texto")
+        self.assertEqual(salida, respuesta)
+        prompt, sys_prompt, _ = ai.prompts[0]
+        self.assertIn("C++20", prompt)
+        self.assertIn("especialista en algoritmia", sys_prompt)
+
+
 if __name__ == "__main__":
     unittest.main()
 
