@@ -636,6 +636,45 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("_calcular_vecinos", contenido)
 
 
+    def test_monografia_14_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 14 (GMM y Algoritmo EM) exista y sea riguroso."""
+        ruta_14 = os.path.join(DOCS_DIR, "analisis_papers", "14_gmm_y_algoritmo_em.md")
+        self.assertTrue(os.path.exists(ruta_14), f"Falta el archivo: {ruta_14}")
+
+        with open(ruta_14, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Dempster", contenido)
+        self.assertIn("Laird", contenido)
+        self.assertIn("Rubin", contenido)
+        self.assertIn("Bishop", contenido)
+        self.assertIn("Schwarz", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Responsabilidades",
+            "Log-Verosimilitud",
+            "Paso E",
+            "Paso M",
+            "ELBO",
+            "BIC",
+            "AIC",
+            "Colapso",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 14 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("GMM_EMPuro", contenido)
+        self.assertIn("_evaluar_log_gaussiana", contenido)
+        self.assertIn("predict_proba", contenido)
+        self.assertIn("bic", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 

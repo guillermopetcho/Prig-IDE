@@ -4,6 +4,8 @@
 - **Algoritmo EM (Expectation-Maximization)**: Arthur P. Dempster, Nan M. Laird, Donald B. Rubin (1977). *Maximum Likelihood from Incomplete Data via the EM Algorithm*. *Journal of the Royal Statistical Society: Series B*, 39(1), 1-38.
 - **Formulación Probabilística**: C. M. Bishop (2006). *Pattern Recognition and Machine Learning*. Springer (Capítulo 9: Mixture Models and EM).
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/14_gmm_y_algoritmo_em.md)
+
 ---
 
 ## 2. Formulación Matemática y Algoritmo EM
