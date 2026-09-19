@@ -4,6 +4,8 @@
 - **Paper Seminal**: Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin (2017). *Attention Is All You Need*. *Advances in Neural Information Processing Systems (NeurIPS 30)*, 5998-6008. arXiv:1706.03762.
 - **Evolución**: BERT (Devlin et al. 2018), GPT (Radford et al. 2018/2019), LLaMA (Touvron et al. 2023), Vision Transformer (Dosovitskiy et al. 2020).
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/20_transformer_y_atencion.md)
+
 ---
 
 ## 2. Formulación Matemática y Arquitectura de Autoatención

@@ -875,6 +875,46 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("backward", contenido)
         self.assertIn("forget_bias", contenido)
 
+    def test_monografia_20_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 20 (Transformers y Autoatención) exista y sea riguroso."""
+        ruta_20 = os.path.join(DOCS_DIR, "analisis_papers", "20_transformer_y_atencion.md")
+        self.assertTrue(os.path.exists(ruta_20), f"Falta el archivo: {ruta_20}")
+
+        with open(ruta_20, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Vaswani", contenido)
+        self.assertIn("Shazeer", contenido)
+        self.assertIn("Bahdanau", contenido)
+        self.assertIn("Luong", contenido)
+        self.assertIn("Xiong", contenido)
+        self.assertIn("Su", contenido)
+        self.assertIn("Dao", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Scaled Dot-Product",
+            "Multi-Head",
+            "RoPE",
+            "Pre-LN",
+            "KV-Cache",
+            "FlashAttention",
+            "SwiGLU",
+            "RMSNorm",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 20 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("RotaryEmbedding_Puro", contenido)
+        self.assertIn("MultiHeadAttention_Puro", contenido)
+        self.assertIn("TransformerBlock_Puro", contenido)
+        self.assertIn("use_cache", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()
