@@ -34,8 +34,10 @@
     }
 
     function md(el, texto) {
-        let html = window.marked ? window.marked.parse(String(texto || '')) : `<pre>${esc(texto)}</pre>`;
-        if (window.DOMPurify) html = DOMPurify.sanitize(html);
+        let html = typeof window.prigRenderMarkdown === 'function'
+            ? window.prigRenderMarkdown(texto)
+            : (window.marked ? window.marked.parse(String(texto || '')) : `<pre>${esc(texto)}</pre>`);
+        if (window.DOMPurify && typeof window.prigRenderMarkdown !== 'function') html = DOMPurify.sanitize(html);
         el.innerHTML = html;
         el.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
         if (window.hljs) el.querySelectorAll('pre code').forEach(b => { try { hljs.highlightElement(b); } catch (e) { /* sin resaltado */ } });

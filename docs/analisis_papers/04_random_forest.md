@@ -51,7 +51,7 @@ $$\lim_{B \to \infty} \text{Var}(\bar{f}_B(x)) = \rho(x) \sigma^2(x)$$
 
 **Conclusión Teórica Vital:**  
 Aumentar el número de réplicas bootstrap $B$ amortigua el segundo término $\frac{1-\rho}{B}\sigma^2 \to 0$, pero **la varianza del ensamble está acotada inferiormente por $\rho \sigma^2$**.  
-En el Bagging estándar, dado que todas las réplicas bootstrap provienen del mismo dataset original, los árboles entrenados en ellas tienden a parecerse mucho entre sí, seleccionando las mismas variables dominantes en los primeros niveles. En consecuencia, la correlación $\rho$ permanece significativamente alta ($\rho \approx 0.6–0.8$), limitando el techo de reducción de varianza.  
+En el Bagging estándar, dado que todas las réplicas bootstrap provienen del mismo dataset original, los árboles entrenados en ellas tienden a parecerse mucho entre sí, seleccionando las mismas variables dominantes en los primeros niveles. En consecuencia, la correlación $\rho$ permanece significativamente alta ($\rho \approx 0.6-0.8$), limitando el techo de reducción de varianza.  
 Para derribar esa barrera, era matemáticamente imperativo **diseñar un mecanismo que forzara a los árboles a decorrelacionarse ($\rho \to 0$) sin inflar su sesgo**.
 
 ---
@@ -91,7 +91,7 @@ flowchart TD
 
 #### ¿Por qué el muestreo por nodo es superior al muestreo por árbol?
 Si existe una variable predictora extraordinariamente dominante en el dataset (ej. una correlación masiva con el target), el Bagging clásico la elegirá como la raíz en casi el 100% de los árboles, haciendo que todos los árboles sean idénticos en su nivel superior y manteniendo $\rho$ elevado.  
-Al forzar que en cada división solo se consideren $m = \sqrt{p}$ variables elegidas al azar, existe una probabilidad de $1 - \frac{m}{p}$ de que la variable dominante **ni siquiera esté disponible** para esa bifurcación. Esto obliga al árbol a explorar variables secundarias, terciarias o interacciones sutiles que de otro modo jamás habrían sido descubiertas, **desplomando la correlación $\rho$ entre árboles a valores cercanos a $0.1–0.2$**.
+Al forzar que en cada división solo se consideren $m = \sqrt{p}$ variables elegidas al azar, existe una probabilidad de $1 - \frac{m}{p}$ de que la variable dominante **ni siquiera esté disponible** para esa bifurcación. Esto obliga al árbol a explorar variables secundarias, terciarias o interacciones sutiles que de otro modo jamás habrían sido descubiertas, **desplomando la correlación $\rho$ entre árboles a valores cercanos a $0.1-0.2$**.
 
 ### 3.2. La Ley de los Grandes Números y la Inmunidad al Sobreajuste
 Uno de los temores habituales en Machine Learning es que añadir más capacidad o estimadores a un modelo termine sobreajustando los datos de entrenamiento. Breiman (2001) demostró formalmente que **Random Forest es inmune al sobreajuste por adición de árboles**.

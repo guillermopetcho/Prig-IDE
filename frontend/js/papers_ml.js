@@ -62,7 +62,14 @@
                 .pml-doc-body { flex: 1; overflow-y: auto; padding: 24px 28px; line-height: 1.65; font-size: 13.5px; color: #cdd6f4; }
                 .pml-doc-body pre { background: #181825; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 12px; }
                 .pml-doc-body code { font-family: 'Fira Code', 'Consolas', monospace; }
-                .pml-doc-body h1, .pml-doc-body h2, .pml-doc-body h3 { color: #fff; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; margin-top: 24px; }
+                .pml-doc-body table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 12.5px; }
+                .pml-doc-body th, .pml-doc-body td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+                .pml-doc-body th { background: rgba(255,255,255,0.06); color: #fff; font-weight: 600; }
+                .pml-doc-body tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+                .pml-doc-body .katex { font-size: 1.05em; color: #cdd6f4; }
+                .pml-doc-body .katex-display { margin: 14px 0; overflow-x: auto; overflow-y: hidden; padding: 6px 0; }
+                .pml-doc-body .katex-error, .katex-error { color: var(--accent-purple, #cba6f7) !important; background: rgba(203,166,247,0.1) !important; padding: 1px 5px !important; border-radius: 4px !important; font-family: 'Fira Code', monospace !important; font-size: 0.9em !important; border: 1px solid rgba(203,166,247,0.25) !important; }
+                .katex-fallback { font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-purple, #cba6f7); background: rgba(203,166,247,0.08); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(203,166,247,0.2); }
                 .pml-chat-msg { padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; line-height: 1.5; word-break: break-word; }
                 .pml-chat-user { background: rgba(137,180,250,0.12); border: 1px solid rgba(137,180,250,0.25); color: #89b4fa; margin-left: 14px; }
                 .pml-chat-model { background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: #cdd6f4; margin-right: 14px; }
@@ -246,8 +253,63 @@
 
         renderMarkdown(texto) {
             if (!texto) return '';
-            let html = window.marked ? window.marked.parse(texto) : `<pre>${esc(texto)}</pre>`;
+            if (typeof window.prigRenderMarkdown === 'function') {
+                return window.prigRenderMarkdown(texto);
+            }
+            if (!window.katex) {
+                let html = window.marked ? window.marked.parse(texto) : `<pre>${esc(texto)}</pre>`;
+                return window.DOMPurify ? DOMPurify.sanitize(html) : html;
+            }
+
+            const codeBlocks = [];
+            let proc = String(texto).replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (match) => {
+                const id = codeBlocks.length;
+                codeBlocks.push(match);
+                return `@@PRIG_CODE_${id}@@`;
+            });
+
+            const mathItems = [];
+            proc = proc.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+                const id = mathItems.length;
+                mathItems.push({ formula: formula.trim(), display: true });
+                return `@@PRIG_MATH_${id}@@`;
+            });
+
+            proc = proc.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (match, formula) => {
+                const id = mathItems.length;
+                mathItems.push({ formula: formula.trim(), display: false });
+                return `@@PRIG_MATH_${id}@@`;
+            });
+
+            proc = proc.replace(/@@PRIG_CODE_(\d+)@@/g, (match, idStr) => {
+                return codeBlocks[parseInt(idStr, 10)] || match;
+            });
+
+            let html = window.marked ? window.marked.parse(proc) : proc;
             if (window.DOMPurify) html = DOMPurify.sanitize(html);
+
+            const macros = {
+                '\\argmax': '\\operatorname*{arg\\,max}',
+                '\\argmin': '\\operatorname*{arg\\,min}',
+                '\\bm': '\\boldsymbol'
+            };
+
+            html = html.replace(/@@PRIG_MATH_(\d+)@@/g, (match, idStr) => {
+                const item = mathItems[parseInt(idStr, 10)];
+                if (!item) return match;
+                const formulaLimpia = item.formula.replace(/[–—]/g, '-').replace(/\u2212/g, '-');
+                try {
+                    return window.katex.renderToString(formulaLimpia, {
+                        displayMode: item.display,
+                        throwOnError: false,
+                        macros: macros
+                    });
+                } catch (e) {
+                    const tag = item.display ? 'div' : 'span';
+                    return `<${tag} class="katex-fallback">${item.formula}</${tag}>`;
+                }
+            });
+
             return html;
         }
 
@@ -479,3 +541,4 @@
 
     window.papersML = new PapersMLManager();
 })();
+

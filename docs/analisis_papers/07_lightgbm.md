@@ -126,7 +126,7 @@ flowchart LR
 
 ### 5.1. Cuantización de Punto Flotante a 8 Bits
 En lugar de procesar valores continuos en coma flotante (`float32` o `float64`), LightGBM divide el rango de cada variable en $K$ contenedores discretos (típicamente $K = 256$):
-$$\text{bin}(x_{ij}) \in \{0, 1, 2, \dots, 255\} \implies \text{Almacenable en 1 solo byte (`uint8`)}$$
+$$\text{bin}(x_{ij}) \in \{0, 1, 2, \dots, 255\} \implies \text{Almacenable en 1 solo byte (\texttt{uint8})}$$
 
 #### Impacto en Rendimiento:
 - **Reducción de Memoria:** Almacenar un millón de flotantes de 64 bits consume 8 MB; almacenar los bins en `uint8` consume únicamente 1 MB (**reducción del 87.5% de memoria RAM**).

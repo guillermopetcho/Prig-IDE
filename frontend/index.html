@@ -44,17 +44,116 @@
 
 
 
-  <!-- Global Marked Configuration -->
+  <!-- Global Markdown & KaTeX Math Renderer for Prig IDE -->
+  <style>
+    .katex { font-size: 1.05em; color: #cdd6f4; }
+    .katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .katex-error {
+      color: var(--accent-purple, #cba6f7) !important;
+      background: rgba(203, 166, 247, 0.1) !important;
+      padding: 1px 5px !important;
+      border-radius: 4px !important;
+      font-family: 'Fira Code', 'Consolas', monospace !important;
+      font-size: 0.9em !important;
+      border: 1px solid rgba(203, 166, 247, 0.25) !important;
+    }
+    .katex-fallback {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      color: var(--accent-purple, #cba6f7);
+      background: rgba(203, 166, 247, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(203, 166, 247, 0.2);
+    }
+  </style>
   <script>
     if (typeof marked !== 'undefined') {
       marked.setOptions({
         gfm: true,
         breaks: true
       });
-      if (typeof markedKatex !== 'undefined') {
-        marked.use(markedKatex({ throwOnError: false, displayMode: true }));
-      }
     }
+
+    /**
+     * Pipeline universal de Markdown + LaTeX para Prig IDE.
+     * Tokeniza y aísla las expresiones matemáticas antes del parseo de Marked,
+     * evitando que guiones bajos (_) o pipes (|) en tablas fragmenten fórmulas LaTeX.
+     */
+    window.prigRenderMarkdown = function(texto) {
+      if (!texto) return '';
+      let raw = String(texto);
+
+      if (typeof katex === 'undefined') {
+        let h = window.marked ? window.marked.parse(raw) : `<pre>${raw}</pre>`;
+        return window.DOMPurify ? DOMPurify.sanitize(h) : h;
+      }
+
+      // 1. Proteger bloques de código
+      const codeBlocks = [];
+      let proc = raw.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, function(match) {
+        const id = codeBlocks.length;
+        codeBlocks.push(match);
+        return '@@PRIG_CODE_' + id + '@@';
+      });
+
+      // 2. Extraer y proteger fórmulas display: $$ ... $$
+      const mathItems = [];
+      proc = proc.replace(/\$\$([\s\S]*?)\$\$/g, function(match, formula) {
+        const id = mathItems.length;
+        mathItems.push({ formula: formula.trim(), display: true });
+        return '@@PRIG_MATH_' + id + '@@';
+      });
+
+      // 3. Extraer y proteger fórmulas inline: $ ... $
+      proc = proc.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, function(match, formula) {
+        const id = mathItems.length;
+        mathItems.push({ formula: formula.trim(), display: false });
+        return '@@PRIG_MATH_' + id + '@@';
+      });
+
+      // 4. Restaurar bloques de código antes del parseo Markdown
+      proc = proc.replace(/@@PRIG_CODE_(\d+)@@/g, function(match, idStr) {
+        return codeBlocks[parseInt(idStr, 10)] || match;
+      });
+
+      // 5. Parsear Markdown sin interferencia con sintaxis LaTeX
+      let html = window.marked ? window.marked.parse(proc) : proc;
+
+      // 6. Sanitizar HTML con DOMPurify
+      if (window.DOMPurify) {
+        html = DOMPurify.sanitize(html);
+      }
+
+      // 7. Renderizar fórmulas con KaTeX en los placeholders
+      const macros = {
+        '\\argmax': '\\operatorname*{arg\\,max}',
+        '\\argmin': '\\operatorname*{arg\\,min}',
+        '\\bm': '\\boldsymbol'
+      };
+
+      html = html.replace(/@@PRIG_MATH_(\d+)@@/g, function(match, idStr) {
+        const item = mathItems[parseInt(idStr, 10)];
+        if (!item) return match;
+
+        const formulaLimpia = item.formula
+          .replace(/[–—]/g, '-')
+          .replace(/\u2212/g, '-');
+
+        try {
+          return window.katex.renderToString(formulaLimpia, {
+            displayMode: item.display,
+            throwOnError: false,
+            macros: macros
+          });
+        } catch (e) {
+          const tag = item.display ? 'div' : 'span';
+          return `<${tag} class="katex-fallback">${item.formula}</${tag}>`;
+        }
+      });
+
+      return html;
+    };
   </script>
 </head>
 
