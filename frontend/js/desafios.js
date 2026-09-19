@@ -377,20 +377,36 @@
         texto.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } };
         $('des-chat-enviar').onclick = enviarChat;
         $('des-chat-nivel').onchange = (e) => { estado.chatNivel = e.target.value; };
+        const avisarChatVacio = (mensaje) => {
+            if (texto) {
+                texto.focus();
+                texto.style.outline = '2px solid var(--accent-red, #f38ba8)';
+                const origPh = texto.placeholder;
+                texto.placeholder = mensaje;
+                setTimeout(() => { if (texto) { texto.style.outline = ''; texto.placeholder = origPh; } }, 2500);
+            }
+        };
         $('des-chat-crear').onclick = () => {
             const usuario = estado.chat.filter(m => m.rol === 'usuario');
-            if (!usuario.length && !texto.value.trim()) { texto.focus(); texto.placeholder = 'Primero cuéntame qué quieres practicar'; return; }
+            if (!usuario.length && !texto.value.trim()) {
+                avisarChatVacio('Primero cuéntame qué quieres practicar o envía un mensaje.');
+                return;
+            }
             if (texto.value.trim()) estado.chat.push({ rol: 'usuario', texto: texto.value.trim() });
             crearConModelo({ tema: usuario.length ? '' : texto.value.trim(), nivel: estado.chatNivel, conversacion: estado.chat.slice(1) });
         };
         $('des-chat-internet').onclick = () => {
             const tema = texto.value.trim() || estado.chat.filter(m => m.rol === 'usuario').map(m => m.texto).join(' ');
-            if (!tema) { texto.focus(); return; }
+            if (!tema) {
+                avisarChatVacio('Escribe primero qué tema o concepto quieres buscar en internet.');
+                return;
+            }
             estado.internet.tema = tema.slice(0, 200);
             cambiarPanel('internet');
             buscarInternet();
         };
     }
+
 
     function pintarChat() {
         const c = $('des-chat-msgs');
@@ -592,20 +608,28 @@
             c.innerHTML = '<div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Cargando catálogo de GitHub…</div>';
             return;
         }
+
+        let bannerError = '';
         if (i.catalogoError) {
-            c.innerHTML = `<div class="des-error">${esc(i.catalogoError)}</div>`;
-            return;
+            bannerError = `
+              <div class="des-error" style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span style="flex:1;">${esc(i.catalogoError)}</span>
+                <button class="des-btn" id="des-cat-err-close" style="padding:1px 6px; font-size:10px;" title="Cerrar aviso">✕</button>
+              </div>`;
         }
+
         if (i.ejerciciosRepo) {
             const ep = i.ejerciciosRepo;
             c.innerHTML = `
+              ${bannerError}
               <div class="des-fila" style="margin-bottom:8px;">
                 <button class="des-btn" id="des-cat-volver"><i class="fa-solid fa-arrow-left"></i> Volver al catálogo</button>
                 <button class="des-btn morado" id="des-cat-explorar-actual"><i class="fa-brands fa-github"></i> Abrir en Lector</button>
               </div>
               <div class="des-ayuda" style="margin-bottom:6px;">Archivos de ejercicios en <b>${esc(ep.ref)}</b>:</div>
-              ${!ep.archivos.length ? '<div class="des-ayuda">No se detectaron archivos de ejercicios automáticos en este repositorio. Ábrelo en GitHub Lector para explorar todas sus carpetas.</div>' : ''}
-              ${ep.archivos.map((a, idx) => `
+              ${!ep.archivos || !ep.archivos.length ? '<div class="des-ayuda">No se detectaron archivos de ejercicios automáticos en este repositorio. Ábrelo en GitHub Lector para explorar todas sus carpetas.</div>' : ''}
+              ${(ep.archivos || []).map((a, idx) => `
                 <div class="des-item" style="margin-top:6px;">
                   <div class="des-fila">
                     <span class="des-mini" style="color:${a.lenguaje === 'cpp' ? 'var(--accent-blue)' : 'var(--accent-yellow)'};"><i class="fa-solid fa-file-code"></i> ${a.lenguaje.toUpperCase()}</span>
@@ -617,8 +641,10 @@
                 </div>
               `).join('')}
             `;
+            const cerr = $('des-cat-err-close');
+            if (cerr) cerr.onclick = () => { i.catalogoError = null; pintarCatalogoGitHub(); };
             const volver = $('des-cat-volver');
-            if (volver) volver.onclick = () => { i.ejerciciosRepo = null; pintarCatalogoGitHub(); };
+            if (volver) volver.onclick = () => { i.ejerciciosRepo = null; i.catalogoError = null; pintarCatalogoGitHub(); };
             const exp = $('des-cat-explorar-actual');
             if (exp && window.GitHubLector) exp.onclick = () => window.GitHubLector.abrirRepo(ep.ref);
             c.querySelectorAll('[data-rep-idx]').forEach(btn => {
@@ -630,27 +656,35 @@
 
         const repos = (i.catalogo && i.catalogo.repositorios) || [];
         if (!repos.length) {
-            c.innerHTML = '<div class="des-ayuda">No hay repositorios que coincidan con los filtros actuales.</div>';
+            c.innerHTML = `${bannerError}<div class="des-ayuda">No hay repositorios que coincidan con los filtros actuales.</div>`;
+            const cerr = $('des-cat-err-close');
+            if (cerr) cerr.onclick = () => { i.catalogoError = null; pintarCatalogoGitHub(); };
             return;
         }
 
-        c.innerHTML = repos.map((r, idx) => `
-          <div class="des-item" style="margin-top:6px;" data-repo-idx="${idx}">
-            <div class="des-fila">
-              <span class="des-mini" style="color:var(--accent-purple);"><i class="fa-brands fa-github"></i> ${esc(r.ref)}</span>
-              <span class="des-mini" style="color:var(--accent-green);">${esc(r.licencia)}</span>
-              ${r.estrellas_aprox ? `<span class="des-ayuda"><i class="fa-solid fa-star" style="color:var(--accent-yellow);"></i> ${esc(r.estrellas_aprox)}</span>` : ''}
+        c.innerHTML = `
+          ${bannerError}
+          ${repos.map((r, idx) => `
+            <div class="des-item" style="margin-top:6px;" data-repo-idx="${idx}">
+              <div class="des-fila">
+                <span class="des-mini" style="color:var(--accent-purple);"><i class="fa-brands fa-github"></i> ${esc(r.ref)}</span>
+                <span class="des-mini" style="color:var(--accent-green);">${esc(r.licencia)}</span>
+                ${r.estrellas_aprox ? `<span class="des-ayuda"><i class="fa-solid fa-star" style="color:var(--accent-yellow);"></i> ${esc(r.estrellas_aprox)}</span>` : ''}
+              </div>
+              <div class="des-item-titulo" style="margin-top:4px;">${esc(r.nombre)}</div>
+              <div class="des-ayuda" style="margin-top:2px;">${esc(r.descripcion)}</div>
+              <div class="des-fila" style="margin-top:6px;">
+                ${(r.lenguajes || []).map(l => `<span class="des-mini">${l.toUpperCase()}</span>`).join(' ')}
+                <span style="flex:1"></span>
+                <button class="des-btn morado" data-exp-repo="${esc(r.ref)}" title="Abrir en GitHub Lector"><i class="fa-brands fa-github"></i> Lector</button>
+                <button class="des-btn azul" data-ej-repo="${esc(r.ref)}" title="Ver archivos de ejercicios"><i class="fa-solid fa-list-check"></i> Ejercicios</button>
+              </div>
             </div>
-            <div class="des-item-titulo" style="margin-top:4px;">${esc(r.nombre)}</div>
-            <div class="des-ayuda" style="margin-top:2px;">${esc(r.descripcion)}</div>
-            <div class="des-fila" style="margin-top:6px;">
-              ${(r.lenguajes || []).map(l => `<span class="des-mini">${l.toUpperCase()}</span>`).join(' ')}
-              <span style="flex:1"></span>
-              <button class="des-btn morado" data-exp-repo="${esc(r.ref)}" title="Abrir en GitHub Lector"><i class="fa-brands fa-github"></i> Lector</button>
-              <button class="des-btn azul" data-ej-repo="${esc(r.ref)}" title="Ver archivos de ejercicios"><i class="fa-solid fa-list-check"></i> Ejercicios</button>
-            </div>
-          </div>
-        `).join('');
+          `).join('')}
+        `;
+
+        const cerr = $('des-cat-err-close');
+        if (cerr) cerr.onclick = () => { i.catalogoError = null; pintarCatalogoGitHub(); };
 
         c.querySelectorAll('[data-exp-repo]').forEach(btn => {
             btn.onclick = (e) => {
@@ -665,12 +699,14 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cargando…';
                 try {
+                    i.catalogoError = null;
                     i.ejerciciosRepo = await json(`/api/desafios/github/ejercicios?ref=${encodeURIComponent(ref)}`);
                     pintarCatalogoGitHub();
                 } catch (err) {
-                    alert(`Error al listar ejercicios de ${ref}: ${err.message}`);
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-list-check"></i> Ejercicios';
+                    i.catalogoError = `No se pudieron cargar los ejercicios de ${ref}: ${err.message}`;
+                    pintarCatalogoGitHub();
                 }
             };
         });
@@ -696,8 +732,17 @@
     async function buscarInternet(ayudaModelo = false) {
         const i = estado.internet;
         const campo = $('des-int-tema');
-        if (campo) i.tema = campo.value.trim() || i.tema;
-        if (!i.tema) { if (campo) campo.focus(); return; }
+        if (campo) i.tema = campo.value.trim();
+        if (!i.tema) {
+            if (campo) {
+                campo.focus();
+                campo.style.outline = '2px solid var(--accent-red, #f38ba8)';
+                setTimeout(() => { if (campo) campo.style.outline = ''; }, 2500);
+            }
+            i.error = 'Por favor escribe un tema para buscar desafíos (p. ej. "recursividad", "árboles", "grafos" o "punteros").';
+            pintarResultadosInternet();
+            return;
+        }
         i.cargando = true; i.error = null;
         pintarResultadosInternet();
         const q = new URLSearchParams({ tema: i.tema, fuentes: [...i.fuentes].join(','), lenguaje: estado.lenguaje });
@@ -713,7 +758,17 @@
         if (!c) return;
         const i = estado.internet;
         if (i.cargando) { c.innerHTML = '<div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Buscando…</div>'; return; }
-        if (i.error) { c.innerHTML = `<div class="des-error">${esc(i.error)}</div>`; return; }
+        if (i.error) {
+            c.innerHTML = `
+              <div class="des-error" style="display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span style="flex:1;">${esc(i.error)}</span>
+                <button class="des-btn" id="des-int-error-cerrar" style="padding:1px 6px; font-size:10px;" title="Cerrar aviso">✕</button>
+              </div>`;
+            const cerr = $('des-int-error-cerrar');
+            if (cerr) cerr.onclick = () => { i.error = null; pintarResultadosInternet(); };
+            return;
+        }
         if (!i.datos) { c.innerHTML = ''; return; }
         const r = i.datos.resultados;
         const errores = Object.entries(i.datos.errores || {});
@@ -829,12 +884,21 @@
 
     // ================================================================== abrir / cerrar
     async function abrirPorId(id, silencioso = false) {
-        try { abrirDesafio(await json(`/api/desafios/${encodeURIComponent(id)}`)); }
-        catch (e) {
-            if (silencioso) guardarLocal('prig_desafio_abierto', '');
-            else alert(e.message);
+        try {
+            abrirDesafio(await json(`/api/desafios/${encodeURIComponent(id)}`));
+        } catch (e) {
+            if (silencioso) {
+                guardarLocal('prig_desafio_abierto', '');
+            } else {
+                mostrarTarea('Error al abrir desafío', []);
+                if (estado.tarea) {
+                    estado.tarea.error = `No se pudo abrir el desafío: ${e.message}`;
+                    pintarHoja();
+                }
+            }
         }
     }
+
 
     function abrirDesafio(d) {
         guardarAhora();
@@ -989,11 +1053,34 @@
             }
             $('des-rapido').placeholder = estado.lenguaje === 'cpp' ? '¿Qué quieres practicar en C++? p. ej. punteros o templates' : '¿Qué quieres practicar? p. ej. recursividad';
         };
+        const avisarRapidoVacio = () => {
+            const el = $('des-rapido');
+            if (el) {
+                el.focus();
+                el.style.outline = '2px solid var(--accent-red, #f38ba8)';
+                const origPh = el.placeholder;
+                el.placeholder = '¡Escribe aquí qué concepto o tema deseas practicar!';
+                setTimeout(() => {
+                    if (el) {
+                        el.style.outline = '';
+                        el.placeholder = origPh;
+                    }
+                }, 2500);
+            }
+        };
         $('des-rapido').value = estado.internet.tema || '';
-        $('des-rapido').onkeydown = (e) => { if (e.key === 'Enter' && tema()) crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje }); };
-        $('des-rapido-crear').onclick = () => { if (!tema()) return $('des-rapido').focus(); crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje }); };
+        $('des-rapido').onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                if (!tema()) return avisarRapidoVacio();
+                crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje });
+            }
+        };
+        $('des-rapido-crear').onclick = () => {
+            if (!tema()) return avisarRapidoVacio();
+            crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje });
+        };
         $('des-rapido-internet').onclick = () => {
-            if (!tema()) return $('des-rapido').focus();
+            if (!tema()) return avisarRapidoVacio();
             estado.internet.tema = tema();
             estado.internet.nivel = $('des-rapido-nivel').value;
             estado.internet.bloque = null;
@@ -1002,6 +1089,7 @@
             buscarInternet();
         };
     }
+
 
     function pintarTarea(c) {
         const t = estado.tarea;

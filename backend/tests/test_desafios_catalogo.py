@@ -106,6 +106,25 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         inexistente = cat.obtener_repositorio("usuario/no_existe_12345")
         self.assertIsNone(inexistente)
 
+    def test_todos_los_repos_tienen_destacados(self):
+        for repo in cat.CATALOGO_REPOSITORIOS_GITHUB:
+            ref = repo["ref"].lower()
+            self.assertIn(ref, cat.EJERCICIOS_DESTACADOS_REPO, f"Falta lista destacada para {repo['ref']}")
+            self.assertGreater(len(cat.EJERCICIOS_DESTACADOS_REPO[ref]), 0)
+
+    def test_listar_ejercicios_repo_fallback(self):
+        # Incluso simulando fallo en github_lector o sin conexión / límite superado
+        with mock.patch("github_lector.abrir", side_effect=Exception("API rate limit exceeded")):
+            ejercicios_py = cat.listar_ejercicios_repo("exercism/python")
+            self.assertEqual(ejercicios_py["ref"], "exercism/python")
+            self.assertGreater(len(ejercicios_py["archivos"]), 0)
+            self.assertTrue(any(a["lenguaje"] == "python" for a in ejercicios_py["archivos"]))
+
+            ejercicios_cpp = cat.listar_ejercicios_repo("exercism/cpp")
+            self.assertEqual(ejercicios_cpp["ref"], "exercism/cpp")
+            self.assertGreater(len(ejercicios_cpp["archivos"]), 0)
+            self.assertTrue(any(a["lenguaje"] == "cpp" for a in ejercicios_cpp["archivos"]))
+
 
 class PruebaReplicacionGitHub(unittest.TestCase):
 
