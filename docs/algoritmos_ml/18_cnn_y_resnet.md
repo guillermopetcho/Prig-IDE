@@ -5,6 +5,8 @@
 - **AlexNet**: Alex Krizhevsky, Ilya Sutskever, Geoffrey E. Hinton (2012). *ImageNet Classification with Deep Convolutional Neural Networks*. *NeurIPS 25*.
 - **ResNet (Deep Residual Learning)**: Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun (2016). *Deep Residual Learning for Image Recognition*. *CVPR 2016*, 770-778. arXiv:1512.03385. (Ganador de Best Paper Award).
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/18_cnn_y_resnet.md)
+
 ---
 
 ## 2. Formulación Matemática

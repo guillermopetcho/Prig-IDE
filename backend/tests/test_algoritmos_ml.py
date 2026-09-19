@@ -795,6 +795,47 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("backward", contenido)
 
 
+    def test_monografia_18_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 18 (CNN y ResNet) exista y sea riguroso."""
+        ruta_18 = os.path.join(DOCS_DIR, "analisis_papers", "18_cnn_y_resnet.md")
+        self.assertTrue(os.path.exists(ruta_18), f"Falta el archivo: {ruta_18}")
+
+        with open(ruta_18, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Fukushima", contenido)
+        self.assertIn("LeCun", contenido)
+        self.assertIn("Krizhevsky", contenido)
+        self.assertIn("Simonyan", contenido)
+        self.assertIn("He", contenido)
+        self.assertIn("Zhang", contenido)
+        self.assertIn("Ren", contenido)
+        self.assertIn("Sun", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Convolución",
+            "Compartición de Pesos",
+            "Equivarianza",
+            "Degradación",
+            "Autopista de Gradientes",
+            "Bottleneck",
+            "im2col",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 18 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("im2col_indices", contenido)
+        self.assertIn("col2im_indices", contenido)
+        self.assertIn("Conv2D_Puro", contenido)
+        self.assertIn("BloqueResidual_Puro", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
