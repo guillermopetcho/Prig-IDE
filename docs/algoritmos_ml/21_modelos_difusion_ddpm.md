@@ -5,6 +5,8 @@
 - **Precursor en Física Estadística**: Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan, Surya Ganguli (2015). *Deep Unsupervised Learning using Nonequilibrium Thermodynamics*. *ICML 2015*.
 - **Avances Modernos**: Score-Based Generative Modeling (Song et al. 2020), Latent Diffusion / Stable Diffusion (Rombach et al. 2022).
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/21_modelos_difusion_ddpm.md)
+
 ---
 
 ## 2. Formulación Matemática: Procesos Forward y Reverse

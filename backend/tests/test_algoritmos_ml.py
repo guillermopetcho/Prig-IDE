@@ -915,6 +915,48 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("TransformerBlock_Puro", contenido)
         self.assertIn("use_cache", contenido)
 
+    def test_monografia_21_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 21 (Modelos de Difusión DDPM) exista y sea riguroso."""
+        ruta_21 = os.path.join(DOCS_DIR, "analisis_papers", "21_modelos_difusion_ddpm.md")
+        self.assertTrue(os.path.exists(ruta_21), f"Falta el archivo: {ruta_21}")
+
+        with open(ruta_21, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Ho", contenido)
+        self.assertIn("Sohl-Dickstein", contenido)
+        self.assertIn("Abbeel", contenido)
+        self.assertIn("Song", contenido)
+        self.assertIn("Nichol", contenido)
+        self.assertIn("Rombach", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Markov",
+            "Salto Analítico",
+            "Posterior",
+            "ELBO",
+            "Score",
+            "SDE",
+            "Langevin",
+            "Classifier-Free Guidance",
+            "Latent Diffusion",
+            "DDIM",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 21 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("NoiseScheduler_Puro", contenido)
+        self.assertIn("q_sample", contenido)
+        self.assertIn("DDPMSampler_Puro", contenido)
+        self.assertIn("p_sample_step", contenido)
+        self.assertIn("cosine", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()
