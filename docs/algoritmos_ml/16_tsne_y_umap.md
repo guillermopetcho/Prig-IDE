@@ -4,6 +4,8 @@
 - **t-SNE**: Laurens van der Maaten y Geoffrey Hinton (2008). *Visualizing Data using t-SNE*. *Journal of Machine Learning Research*, 9, 2579-2605.
 - **UMAP**: Leland McInnes, John Healy, James Melville (2018). *UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction*. arXiv:1802.03426.
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/16_tsne_y_umap.md)
+
 ---
 
 ## 2. Formulación Matemática Comparada

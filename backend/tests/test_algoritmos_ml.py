@@ -715,6 +715,45 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("_calcular_matriz_kernel", contenido)
 
 
+    def test_monografia_16_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 16 (t-SNE y UMAP) exista y sea riguroso."""
+        ruta_16 = os.path.join(DOCS_DIR, "analisis_papers", "16_tsne_y_umap.md")
+        self.assertTrue(os.path.exists(ruta_16), f"Falta el archivo: {ruta_16}")
+
+        with open(ruta_16, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("van der Maaten", contenido)
+        self.assertIn("Hinton", contenido)
+        self.assertIn("McInnes", contenido)
+        self.assertIn("Healy", contenido)
+        self.assertIn("Melville", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Perplejidad",
+            "Hacinamiento",
+            "Cauchy",
+            "Kullback-Leibler",
+            "Entropía Cruzada Difusa",
+            "Riemann",
+            "Barnes-Hut",
+            "Early Exaggeration",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 16 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("tSNE_Puro", contenido)
+        self.assertIn("UMAP_MinimoPuro", contenido)
+        self.assertIn("_calcular_probabilidades_p", contenido)
+        self.assertIn("_construir_grafo_difuso", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
