@@ -465,3 +465,4 @@ class PapersService:
                 yield chunk
         except Exception as e:
             yield f"\n[Error consultando al modelo {modelo}: {str(e)}]"
+

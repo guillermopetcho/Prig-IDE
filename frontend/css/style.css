@@ -1528,14 +1528,14 @@ select optgroup {
   color: var(--accent-blue);
 }
 
-/* Agent Workflow Visual Nodes */
+/* Agent Workflow Visual Nodes & Studio SOTA */
 .wf-canvas {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  overflow-x: auto;
-  gap: 15px;
-  padding: 10px 0;
+  flex-direction: column;
+  align-items: stretch;
+  overflow-y: auto;
+  gap: 12px;
+  padding: 10px;
 }
 
 .wf-node {
@@ -1543,64 +1543,126 @@ select optgroup {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 12px;
-  min-width: 250px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
   flex-shrink: 0;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: all 0.25s ease;
 }
 
 .wf-node:hover {
-  border-color: var(--accent-purple);
-  box-shadow: 0 4px 12px rgba(203, 166, 247, 0.2);
+  border-color: rgba(203, 166, 247, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.wf-node.node-type-agent {
+  border-left: 4px solid var(--accent-purple);
+}
+
+.wf-node.node-type-critic {
+  border-left: 4px solid var(--accent-red);
+}
+
+.wf-node.node-type-router {
+  border-left: 4px solid #89dceb;
+}
+
+.wf-node.node-type-tool {
+  border-left: 4px solid var(--accent-green);
+}
+
+.wf-node.running {
+  border-color: var(--accent-yellow) !important;
+  box-shadow: 0 0 16px rgba(249, 226, 175, 0.4) !important;
+  animation: pulseNode 1.5s infinite alternate;
+}
+
+.wf-node.completed {
+  border-color: rgba(166, 227, 161, 0.5);
+}
+
+@keyframes pulseNode {
+  0% { box-shadow: 0 0 8px rgba(249, 226, 175, 0.2); }
+  100% { box-shadow: 0 0 18px rgba(249, 226, 175, 0.6); }
 }
 
 .wf-node-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .wf-node-title {
-  color: var(--accent-purple);
+  color: #fff;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.wf-node-controls select {
+.wf-node-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+.wf-badge-agent { background: rgba(203,166,247,0.15); color: var(--accent-purple); border: 1px solid rgba(203,166,247,0.3); }
+.wf-badge-critic { background: rgba(243,139,168,0.15); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.3); }
+.wf-badge-router { background: rgba(137,220,235,0.15); color: #89dceb; border: 1px solid rgba(137,220,235,0.3); }
+.wf-badge-tool { background: rgba(166,227,161,0.15); color: var(--accent-green); border: 1px solid rgba(166,227,161,0.3); }
+
+.wf-node-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-node-controls select, .wf-node-input {
   background: var(--bg-dark);
   color: var(--text-main);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 4px;
+  border-radius: 5px;
+  padding: 5px 8px;
   font-size: 12px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .wf-node textarea {
   background: var(--bg-dark);
   color: var(--text-main);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 8px;
-  font-size: 13px;
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 12px;
   resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-.wf-node-input {
-  background: var(--bg-dark);
-  color: var(--text-main);
+.wf-chip-btn {
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 4px;
-  font-size: 12px;
-  width: 100%;
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wf-chip-btn:hover {
+  background: rgba(203, 166, 247, 0.15);
+  color: var(--accent-purple);
+  border-color: rgba(203, 166, 247, 0.3);
 }
 
 .wf-node-slider-container {
@@ -1620,9 +1682,9 @@ select optgroup {
   display: none;
   flex-direction: column;
   gap: 8px;
-  margin-top: 5px;
+  margin-top: 4px;
   padding-top: 8px;
-  border-top: 1px dashed var(--border-color);
+  border-top: 1px dashed rgba(255,255,255,0.1);
 }
 
 .wf-adv-toggle {
@@ -1633,7 +1695,9 @@ select optgroup {
   cursor: pointer;
   text-align: left;
   padding: 0;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .wf-adv-toggle:hover {
   text-decoration: underline;
@@ -1643,9 +1707,27 @@ select optgroup {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent-blue);
-  padding: 6px 0;
-  font-size: 14px;
+  color: var(--border-color);
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.wf-iteration-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.wf-iteration-tab.active {
+  background: rgba(203, 166, 247, 0.2);
+  color: var(--accent-purple);
+  border-color: var(--accent-purple);
+  font-weight: 600;
 }
 
 /* ML/DL Flow Analyzer Styles */

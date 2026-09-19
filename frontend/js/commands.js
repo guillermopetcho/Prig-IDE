@@ -304,8 +304,6 @@
           run: () => window.workArea.abrirHerramienta('modal-perfil', 'Perfil', 'fa-chart-pie') },
         { id: 'herr.kaggle', menu: 'Herramientas', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
           run: () => window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k') },
-        { id: 'herr.kaggleDerecha', menu: 'Herramientas', label: 'Kaggle: abrir a la derecha (Lado a lado)',
-          run: () => window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k', { lado: 'der' }) },
         { id: 'herr.github', menu: 'Herramientas', label: 'GitHub', accel: 'Ctrl+Shift+G',
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
         { id: 'herr.agentes', menu: 'Herramientas', label: 'Flujo de agentes', accel: 'Ctrl+6',

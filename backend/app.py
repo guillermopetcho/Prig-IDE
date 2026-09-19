@@ -33,6 +33,8 @@ from indice_semantico import IndiceSemantico
 from job_exporter import JobExporter
 import agent_flows
 from agent_flows import FlowEngine, FlowStore
+import agent_flows_v2
+from agent_flows_v2 import DynamicFlowEngine, plantillas_profesionales_sota, ROLES_V2
 from perfil_libro import PerfilLibro
 from explorador import Explorador
 from sondeo_libro import SondeoLibro
@@ -282,16 +284,24 @@ class ModelPullRequest(BaseModel):
     model: str = "qwen2.5-coder:7b"
 
 class WorkflowStep(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = "Agente"
-    model: str
+    model: str = "qwen2.5-coder:7b"
     role: str = "programmer"
-    prompt: str
+    prompt: str = ""
     temperature: Optional[float] = 0.3
     system_prompt: Optional[str] = ""
+    tipo: Optional[str] = "agent"
+    loop: Optional[Dict[str, Any]] = None
+    routing_rules: Optional[List[Dict[str, Any]]] = None
+    herramienta: Optional[str] = None
+    next_node: Optional[str] = None
 
 class WorkflowRequest(BaseModel):
     initial_input: str
-    steps: List[WorkflowStep]
+    steps: Optional[List[WorkflowStep]] = []
+    nodos: Optional[List[Dict[str, Any]]] = None
+    grafo: Optional[Dict[str, Any]] = None
 
 class BookSnippetRequest(BaseModel):
     book_id: str
@@ -1441,6 +1451,22 @@ def _motor_flujos() -> FlowEngine:
     return _active_flow_engine
 
 
+_active_flow_engine_v2 = None
+
+def _motor_flujos_v2() -> DynamicFlowEngine:
+    global _active_flow_engine_v2
+    try:
+        num_ctx = int(ai_engine.config.get("num_ctx", 8192))
+    except (TypeError, ValueError):
+        num_ctx = 8192
+    _active_flow_engine_v2 = DynamicFlowEngine(
+        ai_engine,
+        gobernador=recursos_termico.gobernador(),
+        num_ctx=num_ctx
+    )
+    return _active_flow_engine_v2
+
+
 def _veredictos_flujos():
     """ Veredicto de la calculadora para cada modelo, en el uso "flujos".
 
@@ -1682,9 +1708,24 @@ def flujos_listar():
     guardados = flow_store.listar()
     sugerido = _modelo_que_razona()
     base = ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
+    plantillas_v1 = agent_flows.plantillas(base, sugerido)
+    plantillas_v2 = agent_flows_v2.plantillas_profesionales_sota(base, sugerido)
     return {"flujos": guardados,
-            "plantillas": agent_flows.plantillas(base, sugerido),
+            "plantillas": plantillas_v2 + plantillas_v1,
+            "plantillas_sota": plantillas_v2,
             "modelo_base": base, "modelo_razona": sugerido}
+
+
+@app.get("/api/flujos/v2/plantillas")
+def flujos_v2_plantillas():
+    sugerido = _modelo_que_razona()
+    base = ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
+    return {
+        "plantillas": agent_flows_v2.plantillas_profesionales_sota(base, sugerido),
+        "roles": agent_flows_v2.ROLES_V2,
+        "modelo_base": base,
+        "modelo_razona": sugerido
+    }
 
 
 def _modelo_que_razona() -> str:
@@ -1726,14 +1767,24 @@ def flujos_borrar(flujo_id: str):
 @app.post("/api/flujos/ejecutar")
 def flujos_ejecutar(req: FlujoEjecutar):
     """ Ejecuta el flujo emitiendo cada paso según va ocurriendo.
-
-    Va en flujo continuo porque una cadena de cinco agentes locales tarda minutos:
-    una pantalla parada durante ese rato no distingue entre ir bien, haberse
-    atascado y estar cargando un modelo de 4,7 GB.
+    Soporta automáticamente grafos v2 dinámicos y recursivos con sandbox, o flujos clásicos v1.
     """
     flujo = req.flujo or flow_store.obtener(req.flujo_id or "")
     if not flujo:
         raise HTTPException(status_code=404, detail="No se encontró el flujo")
+
+    # Detectar si es un grafo dinámico / recursivo v2
+    es_v2 = bool(flujo.get("nodos") or flujo.get("nodo_inicial") or flujo.get("es_v2") or str(flujo.get("id", "")).startswith("sota_"))
+
+    if es_v2:
+        motor_v2 = _motor_flujos_v2()
+        def emitir_v2():
+            try:
+                for evento in motor_v2.ejecutar_grafo(flujo, entrada_inicial=req.entrada):
+                    yield json.dumps(evento, ensure_ascii=False) + "\n"
+            except Exception as err:
+                yield json.dumps({"tipo": "error", "mensaje": str(err)}, ensure_ascii=False) + "\n"
+        return StreamingResponse(emitir_v2(), media_type="application/x-ndjson")
 
     motor = _motor_flujos()
 
@@ -1745,8 +1796,6 @@ def flujos_ejecutar(req: FlujoEjecutar):
                 if evento.get("tipo") == "fin":
                     registro = evento.get("registro", [])
                     segundos = evento.get("segundos", 0)
-                    # El registro completo no viaja por el flujo: pesa y la interfaz
-                    # ya ha ido recibiendo cada paso.
                     evento = {k: v for k, v in evento.items() if k != "registro"}
                 yield json.dumps(evento, ensure_ascii=False) + "\n"
         except Exception as err:
@@ -3043,9 +3092,43 @@ def pull_model(req: ModelPullRequest):
 @app.post("/api/ai/workflow/run")
 def run_workflow(req: WorkflowRequest):
     def event_stream():
-        current_context = req.initial_input
+        # Detectar si el workflow usa características v2 (bucles, tipos de nodo, router o grafo)
+        es_v2 = bool(req.grafo or req.nodos or any((s.loop or (s.tipo and s.tipo != "agent") or s.herramienta) for s in (req.steps or [])))
         
-        for idx, step in enumerate(req.steps):
+        if es_v2:
+            if req.grafo:
+                grafo = req.grafo
+            elif req.nodos:
+                grafo = {"nodos": req.nodos, "nodo_inicial": req.nodos[0].get("id", "step_1")}
+            else:
+                nodos = []
+                for idx, s in enumerate(req.steps or []):
+                    sid = s.id or f"step_{idx+1}"
+                    next_id = (s.next_node or (f"step_{idx+2}" if idx + 1 < len(req.steps) else None))
+                    nodos.append({
+                        "id": sid,
+                        "nombre": s.name or f"Agente {idx+1}",
+                        "tipo": s.tipo or "agent",
+                        "rol": s.role or "programmer",
+                        "modelo": s.model,
+                        "prompt": s.prompt,
+                        "temperature": s.temperature,
+                        "system_prompt": s.system_prompt,
+                        "loop": s.loop,
+                        "routing_rules": s.routing_rules,
+                        "herramienta": s.herramienta,
+                        "next_node": next_id
+                    })
+                grafo = {"nodos": nodos, "nodo_inicial": nodos[0]["id"] if nodos else None}
+            
+            motor_v2 = _motor_flujos_v2()
+            for evento in motor_v2.ejecutar_grafo(grafo, entrada_inicial=req.initial_input):
+                yield json.dumps(evento, ensure_ascii=False) + "\n"
+            return
+
+        # Modo secuencial clásico si no hay bucles ni herramientas complejas
+        current_context = req.initial_input
+        for idx, step in enumerate(req.steps or []):
             yield json.dumps({"step": idx, "status": "running", "model": step.model, "name": step.name}) + "\n"
             
             prompt = f"{step.prompt}\n\nContexto / Input Anterior:\n{current_context}"
