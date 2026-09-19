@@ -316,6 +316,40 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("oob_score_", contenido)
         self.assertIn("permutation_importance_mda", contenido)
 
+    def test_monografia_05_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 05 exista y sea riguroso."""
+        ruta_05 = os.path.join(DOCS_DIR, "analisis_papers", "05_gradient_boosting_gbm.md")
+        self.assertTrue(os.path.exists(ruta_05), f"Falta el archivo: {ruta_05}")
+
+        with open(ruta_05, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Friedman", contenido)
+        self.assertIn("Schapire", contenido)
+        self.assertIn("Freund", contenido)
+        self.assertIn("Mason", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Pseudo-Residuos",
+            "Espacio de Funciones",
+            "Shrinkage",
+            "AdaBoost",
+            "Stochastic Gradient Boosting",
+            "Pérdida de Huber",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 05 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("GradientBoostingClasificador", contenido)
+        self.assertIn("construir_arbol_gbm", contenido)
+        self.assertIn("mejor_corte_mse", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()

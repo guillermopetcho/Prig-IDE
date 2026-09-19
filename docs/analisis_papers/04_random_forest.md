@@ -434,3 +434,4 @@ Cuando un modelo de lenguaje en Prig IDE audite, optimice o explique pipelines d
 4. **Elección entre Random Forest y Gradient Boosting en Kaggle:**
    - **Elegir Random Forest cuando:** Se requiera un clasificador sumamente robusto sin necesidad de afinar decenas de hiperparámetros, con capacidad de paralelización trivial en todos los cores de CPU (`n_jobs=-1`), y resistente a ruidos o etiquetas incorrectas.
    - **Elegir Gradient Boosting cuando:** Se busque exprimir hasta la última milésima de precisión en competencias de datos tabulares limpios, asumiendo la necesidad de regularización temprana (`early_stopping_rounds`, learning rate bajo).
+

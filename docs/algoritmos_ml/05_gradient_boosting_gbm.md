@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autor & Año**: Jerome H. Friedman (2001). *Greedy Function Approximation: A Gradient Boosting Machine*. *The Annals of Statistics*, 29(5), 1189-1232.
 - **Precursor**: Leo Breiman (1998). *Arcing Classifiers*. (Interpretó boosting como descenso de gradiente sobre una función de coste).
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/05_gradient_boosting_gbm.md)
 
 ---
 
