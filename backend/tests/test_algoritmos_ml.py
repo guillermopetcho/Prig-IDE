@@ -206,6 +206,43 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("resolver_elastic_net", contenido)
         self.assertIn("Double Shrinkage", contenido)
 
+    def test_monografia_02_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 02 exista y sea riguroso."""
+        ruta_02 = os.path.join(DOCS_DIR, "analisis_papers", "02_regresion_logistica.md")
+        self.assertTrue(os.path.exists(ruta_02), f"Falta el archivo: {ruta_02}")
+
+        with open(ruta_02, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("David R. Cox", contenido)
+        self.assertIn("Verhulst", contenido)
+        self.assertIn("Nelder", contenido)
+        self.assertIn("McFadden", contenido)
+        self.assertIn("Nocedal", contenido)
+        self.assertIn("Albert & Anderson", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Transformación Logit",
+            "Entropía Cruzada Binaria",
+            "Matriz Hessiana",
+            "Convexidad Estricta",
+            "IRLS",
+            "Softmax",
+            "L-BFGS",
+            "Separabilidad Perfecta",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c, contenido, f"Falta concepto '{c}' en la monografía 02 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("sigmoide_estable", contenido)
+        self.assertIn("entrenar_regresion_logistica_irls", contenido)
+
 
 if __name__ == "__main__":
     unittest.main()

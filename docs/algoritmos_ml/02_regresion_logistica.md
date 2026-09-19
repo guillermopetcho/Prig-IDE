@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autor & Año**: David R. Cox (1958). *The Regression Analysis of Binary Sequences*. *Journal of the Royal Statistical Society: Series B*, 20(2), 215-242.
 - **Optimizador de Referencia**: C. Zhu, R. H. Byrd, P. Lu, J. Nocedal (1997). *Algorithm 778: L-BFGS-B: Fortran subroutines for large-scale bound-constrained optimization*.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/02_regresion_logistica.md)
 
 ---
 

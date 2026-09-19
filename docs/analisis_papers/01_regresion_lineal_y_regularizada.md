@@ -412,3 +412,4 @@ Cuando un modelo de lenguaje en Prig IDE analice código, celdas de Jupyter o pi
    - Cuando $p > N$ (ej. bioinformática, procesamiento de genomas, análisis textual en matrices TF-IDF esparsas con vocabulario gigante) o cuando existen grupos conocidos de predictores mutuamente correlacionados (ej. sensores espaciales contiguos, variables macroeconómicas agregadas), **desaconsejar el uso de Lasso aislado y prescribir rigurosamente Elastic Net** para evitar la selección arbitraria de variables y la saturación en $N$.
 4. **Validación del Preprocesamiento:**
    - Toda regularización basada en normas $\ell_1$ o $\ell_2$ es **sensible a la escala de las variables**. El modelo debe verificar activamente que se haya aplicado un escalador (`StandardScaler` o `RobustScaler`) antes de invocar los modelos lineales penalizados. De lo contrario, las variables con escalas numéricas mayores sufrirán una penalización artificialmente reducida.
+
