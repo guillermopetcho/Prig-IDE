@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Guolin Ke, Qi Meng, Thomas Finley, Taifeng Wang, Wei Chen, Weidong Ma, Qiwei Ye, Tie-Yan Liu (2017). *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*. *Advances in Neural Information Processing Systems (NeurIPS 30)*, 3146-3154.
 - **Innovaciones Clave**: GOSS (Gradient-based One-Side Sampling), EFB (Exclusive Feature Bundling), Histogram-based splits y Leaf-wise tree growth.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/07_lightgbm.md)
 
 ---
 

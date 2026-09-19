@@ -438,3 +438,4 @@ Cuando un modelo de lenguaje en Prig IDE audite, optimice o genere código de **
      Esto escala los gradientes de la clase minoritaria por dicho factor, calibrando la frontera de decisión.
 4. **Selección del Método de Construcción (`tree_method`):**
    - Para datasets masivos ($N > 100,000$), fijar `tree_method='hist'`. Utiliza la discretización en histogramas con enteros de 8 bits (uint8) para multiplicar la velocidad de entrenamiento por $10\times$ sin pérdida medible de precisión.
+

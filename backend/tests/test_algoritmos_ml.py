@@ -382,6 +382,43 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("calcular_gradientes_logloss", contenido)
 
 
+    def test_monografia_07_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 07 (LightGBM) exista y sea riguroso."""
+        ruta_07 = os.path.join(DOCS_DIR, "analisis_papers", "07_lightgbm.md")
+        self.assertTrue(os.path.exists(ruta_07), f"Falta el archivo: {ruta_07}")
+
+        with open(ruta_07, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Guolin Ke", contenido)
+        self.assertIn("Qi Meng", contenido)
+        self.assertIn("Tie-Yan Liu", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "GOSS",
+            "Gradient-based One-Side Sampling",
+            "EFB",
+            "Exclusive Feature Bundling",
+            "Leaf-Wise",
+            "Histograma",
+            "uint8",
+            "Fisher",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 07 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("discretizar_en_histograma_uint8", contenido)
+        self.assertIn("aplicar_muestreo_goss", contenido)
+        self.assertIn("evaluar_division_histograma", contenido)
+        self.assertIn("ArbolLeafWiseLightGBM", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
