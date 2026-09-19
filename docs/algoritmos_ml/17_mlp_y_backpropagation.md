@@ -4,6 +4,8 @@
 - **Retropropagación del Error (Backpropagation)**: David E. Rumelhart, Geoffrey E. Hinton, Ronald J. Williams (1986). *Learning representations by back-propagating errors*. *Nature*, 323, 533-536.
 - **Teorema de Aproximación Universal**: George Cybenko (1989). *Approximation by superpositions of a sigmoidal function*. Kurt Hornik (1991). *Approximation capabilities of multilayer feedforward networks*.
 
+🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/17_mlp_y_backpropagation.md)
+
 ---
 
 ## 2. Formulación Matemática y Propagación del Error

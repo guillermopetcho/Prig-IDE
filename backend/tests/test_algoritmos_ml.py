@@ -754,6 +754,47 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("_construir_grafo_difuso", contenido)
 
 
+    def test_monografia_17_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 17 (MLP y Backprop) exista y sea riguroso."""
+        ruta_17 = os.path.join(DOCS_DIR, "analisis_papers", "17_mlp_y_backpropagation.md")
+        self.assertTrue(os.path.exists(ruta_17), f"Falta el archivo: {ruta_17}")
+
+        with open(ruta_17, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Rumelhart", contenido)
+        self.assertIn("Hinton", contenido)
+        self.assertIn("Williams", contenido)
+        self.assertIn("Cybenko", contenido)
+        self.assertIn("Hornik", contenido)
+        self.assertIn("Minsky", contenido)
+        self.assertIn("Loshchilov", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Aproximación Universal",
+            "Backpropagation",
+            "XOR",
+            "Cross-Entropy",
+            "Softmax",
+            "AdamW",
+            "Dropout",
+            "He Normal",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 17 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("MLP_Puro", contenido)
+        self.assertIn("step_adamw", contenido)
+        self.assertIn("forward", contenido)
+        self.assertIn("backward", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 
