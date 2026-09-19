@@ -26,6 +26,7 @@ def normalizar(texto: str) -> str:
 
 CATEGORIAS = [
     {"id": "todos", "nombre": "Todas las categorías"},
+    {"id": "senior_avanzado", "nombre": "Nivel Senior: Algoritmos y Sistemas Complejos"},
     {"id": "algoritmos", "nombre": "Algoritmos y Estructuras de Datos"},
     {"id": "entrevistas", "nombre": "Entrevistas y LeetCode"},
     {"id": "sintaxis", "nombre": "Sintaxis y Conceptos del Lenguaje"},
@@ -234,11 +235,11 @@ CATALOGO_REPOSITORIOS_GITHUB: List[Dict[str, Any]] = [
         "descripcion": "Algoritmos avanzados de programación competitiva (geometría, combinatoria, grafos, álgebra) con código en C++.",
         "lenguajes": ["cpp"],
         "categoria": "competitiva",
-        "etiquetas": ["competitiva", "geometria", "grafos", "algebra", "c++"],
+        "etiquetas": ["competitiva", "geometria", "grafos", "algebra", "c++", "senior"],
         "ruta_ejercicios": "src",
         "licencia": "CC BY-SA 4.0",
         "estrellas_aprox": "7k",
-        "dificultad": "avanzado"
+        "dificultad": "avanzado a senior"
     },
     {
         "ref": "kth-competitive-programming/kactl",
@@ -246,11 +247,11 @@ CATALOGO_REPOSITORIOS_GITHUB: List[Dict[str, Any]] = [
         "descripcion": "Librería ultracompacta y testeada de algoritmos en C++ para ICPC y concursos de programación.",
         "lenguajes": ["cpp"],
         "categoria": "competitiva",
-        "etiquetas": ["icpc", "competitiva", "c++", "algoritmos-optimizados"],
+        "etiquetas": ["icpc", "competitiva", "c++", "algoritmos-optimizados", "senior"],
         "ruta_ejercicios": "content",
         "licencia": "CC0",
         "estrellas_aprox": "3.5k",
-        "dificultad": "avanzado"
+        "dificultad": "avanzado a senior"
     },
     {
         "ref": "timvisee/advent-of-code-2023",
@@ -275,6 +276,150 @@ CATALOGO_REPOSITORIOS_GITHUB: List[Dict[str, Any]] = [
         "licencia": "GFDL 1.2",
         "estrellas_aprox": "1.3k",
         "dificultad": "todos los niveles"
+    },
+    {
+        "ref": "atcoder/ac-library",
+        "nombre": "AtCoder Library (ACL) en C++",
+        "descripcion": "Biblioteca oficial de AtCoder para programación competitiva y algoritmia de élite: Segment Trees con Lazy Propagation, Fenwick Trees, DSU, Dinic Max Flow, Min-Cost Flow, 2-SAT, SCC, NTT Convolution y Suffix Array.",
+        "lenguajes": ["cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["atcoder", "senior", "segment-tree", "lazy-propagation", "fenwick", "dsu", "max-flow", "dinic", "min-cost-flow", "2-sat", "scc", "ntt", "c++20"],
+        "ruta_ejercicios": "atcoder",
+        "licencia": "CC0",
+        "estrellas_aprox": "4.5k",
+        "dificultad": "senior a experto"
+    },
+    {
+        "ref": "cheran-senthil/PyRival",
+        "nombre": "PyRival: Estructuras y Algoritmos Avanzados en Python",
+        "descripcion": "La colección más completa de estructuras de datos no triviales y algoritmos de alta velocidad para Python: Segment Trees, Fenwick, Treap, DSU, Dinic, LCA, Hopcroft-Karp, NTT, Suffix Automaton y Convex Hull.",
+        "lenguajes": ["python"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["pyrival", "senior", "segment-tree", "fenwick", "treap", "dsu", "dinic", "lca", "matching", "ntt", "suffix-automaton", "geometria"],
+        "ruta_ejercicios": "pyrival",
+        "licencia": "Apache-2.0",
+        "estrellas_aprox": "3k",
+        "dificultad": "senior"
+    },
+    {
+        "ref": "destinationunknown/CSES",
+        "nombre": "CSES Problem Set Solutions (Python & C++)",
+        "descripcion": "Soluciones comentadas en Python3 y C++ al CSES Problem Set: Range Queries (Segment Tree, Fenwick), Tree Algorithms, Dynamic Programming avanzada, Graph Algorithms, Mathematics y String Algorithms.",
+        "lenguajes": ["python", "cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["cses", "senior", "range-queries", "segment-tree", "arboles", "dp-avanzado", "grafos", "geometria"],
+        "ruta_ejercicios": "src",
+        "licencia": "MIT",
+        "estrellas_aprox": "1k",
+        "dificultad": "senior"
+    },
+    {
+        "ref": "Jonathan-Uy/CSES-Solutions",
+        "nombre": "CSES Master Solutions (C++)",
+        "descripcion": "Más de 300 soluciones aceptadas en C++ cubriendo todo el espectro de CSES: Heavy-Light Decomposition (HLD), Centroid Decomposition, Min-Cost Flow, 2-SAT, Geometry y FFT.",
+        "lenguajes": ["cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["cses", "senior", "hld", "centroid-decomposition", "flujos", "2-sat", "fft", "c++20", "experto"],
+        "ruta_ejercicios": "",
+        "licencia": "MIT",
+        "estrellas_aprox": "1.2k",
+        "dificultad": "senior a experto"
+    },
+    {
+        "ref": "jaehyunp/stanfordacm",
+        "nombre": "Stanford ACM-ICPC Team Notebook",
+        "descripcion": "Cuaderno oficial de algoritmos de Stanford University para ACM-ICPC: flujos de redes (Dinic, Push-Relabel, MCMF), geometría computacional (Convex Hull, KD-Tree), matching bipolar y FFT en C++.",
+        "lenguajes": ["cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["stanford", "icpc", "senior", "flujos", "dinic", "mcmf", "geometria", "matching", "fft"],
+        "ruta_ejercicios": "code",
+        "licencia": "MIT",
+        "estrellas_aprox": "3.8k",
+        "dificultad": "senior a experto"
+    },
+    {
+        "ref": "jilljenn/tryalgo",
+        "nombre": "TryAlgo: Algoritmos y Estructuras Avanzadas en Python",
+        "descripcion": "Librería de algoritmos y estructuras complejas en Python para concursos y entrevistas Senior: Tarjan SCC, 2-SAT, Hopcroft-Karp, Edmonds-Karp, Bellman-Ford, Fenwick Trees y optimizaciones DP.",
+        "lenguajes": ["python"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["python", "senior", "tarjan", "scc", "2-sat", "matching", "fenwick", "grafos"],
+        "ruta_ejercicios": "tryalgo",
+        "licencia": "MIT",
+        "estrellas_aprox": "1.5k",
+        "dificultad": "avanzado a senior"
+    },
+    {
+        "ref": "djeada/Algorithms-And-Data-Structures",
+        "nombre": "Algorithms & Data Structures (C++ & Python)",
+        "descripcion": "Implementación modular y desacoplada de estructuras y algoritmos en C++ y Python con pruebas unitarias: árboles binarios balanceados, grafos dirigidos, backtracking y optimización de complejidad.",
+        "lenguajes": ["python", "cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["estructuras-de-datos", "grafos", "arboles", "dp", "c++", "python", "senior", "tdd"],
+        "ruta_ejercicios": "src",
+        "licencia": "MIT",
+        "estrellas_aprox": "5k",
+        "dificultad": "avanzado a senior"
+    },
+    {
+        "ref": "KMORaza/Advanced_Data_Structures_using_Python",
+        "nombre": "Advanced Data Structures Suite (Python)",
+        "descripcion": "Estructuras de datos complejas en Python: Segment Trees con Lazy Propagation, Fenwick Trees, Treaps, Árboles AVL y Rojo-Negro, Suffix Trees y Fibonacci Heaps.",
+        "lenguajes": ["python"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["segment-tree", "lazy-propagation", "fenwick", "treap", "rojo-negro", "fibonacci-heap", "senior"],
+        "ruta_ejercicios": "",
+        "licencia": "MIT",
+        "estrellas_aprox": "800",
+        "dificultad": "senior"
+    },
+    {
+        "ref": "youngyangyang04/leetcode-master",
+        "nombre": "LeetCode Master: Patrones Algorítmicos Complejos",
+        "descripcion": "Más de 50k estrellas en GitHub. Desglose sistemático de técnicas avanzadas en C++ y Python: Programación Dinámica (0-1 knapsack, complete knapsack, subsecuencias), Pilas Monótonas, Backtracking y Grafos.",
+        "lenguajes": ["python", "cpp"],
+        "categoria": "entrevistas",
+        "etiquetas": ["patrones", "dp-avanzado", "pila-monotona", "backtracking", "c++", "python", "senior"],
+        "ruta_ejercicios": "problems",
+        "licencia": "Apache-2.0",
+        "estrellas_aprox": "52k",
+        "dificultad": "intermedio a senior"
+    },
+    {
+        "ref": "danistefanovic/build-your-own-x",
+        "nombre": "Build Your Own X: Ingeniería y Metodologías Complejas",
+        "descripcion": "Construye desde cero sistemas reales con metodologías algorítmicas complejas: motores de bases de datos (B-Trees / LSM), sistemas de archivos, compiladores, parsers, motores regex y Git en C++ y Python.",
+        "lenguajes": ["python", "cpp"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["sistemas", "motores-bd", "b-tree", "lsm-tree", "compiladores", "parsers", "senior", "arquitectura"],
+        "ruta_ejercicios": "",
+        "licencia": "CC0",
+        "estrellas_aprox": "340k",
+        "dificultad": "senior a arquitecto"
+    },
+    {
+        "ref": "donnemartin/system-design-primer",
+        "nombre": "System Design & Distributed Algorithmic Paradigms",
+        "descripcion": "Patrones algorítmicos para escalabilidad y sistemas distribuidos: Consistent Hashing con nodos virtuales, Bloom Filters, cachés LRU/LFU O(1), Rate Limiting (Token Bucket / Leaky Bucket) y sharding.",
+        "lenguajes": ["python"],
+        "categoria": "senior_avanzado",
+        "etiquetas": ["system-design", "consistent-hashing", "bloom-filter", "lru", "token-bucket", "sistemas-distribuidos", "senior"],
+        "ruta_ejercicios": "solutions",
+        "licencia": "CC BY-SA 4.0",
+        "estrellas_aprox": "280k",
+        "dificultad": "senior a staff"
+    },
+    {
+        "ref": "neetcode-gh/leetcode",
+        "nombre": "NeetCode Practice & Canonical Solutions",
+        "descripcion": "Soluciones canónicas del roadmap NeetCode en Python y C++ ordenadas por patrones algorítmicos esenciales: dos punteros, ventana deslizante, pilas, árboles, grafos, DP y bit manipulation.",
+        "lenguajes": ["python", "cpp"],
+        "categoria": "entrevistas",
+        "etiquetas": ["neetcode", "patrones", "algoritmos", "c++", "python", "entrevistas"],
+        "ruta_ejercicios": "",
+        "licencia": "MIT",
+        "estrellas_aprox": "12k",
+        "dificultad": "intermedio a avanzado"
     }
 ]
 
@@ -338,3 +483,4 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
         "descripcion": info.get("descripcion", ""),
         "archivos": salida
     }
+

@@ -5351,7 +5351,7 @@ def desafios_crear(req: DesafioCrearRequest):
                       f"Crea uno DISTINTO sobre los mismos conceptos, {orden}.")
         if req.ajuste in ("mas_dificil", "mas_facil") and previo.get("nivel") in des_tutor.NIVELES:
             i = des_tutor.NIVELES.index(previo["nivel"]) + (1 if req.ajuste == "mas_dificil" else -1)
-            nivel = des_tutor.NIVELES[max(0, min(2, i))]
+            nivel = des_tutor.NIVELES[max(0, min(len(des_tutor.NIVELES) - 1, i))]
         else:
             nivel = previo.get("nivel") or nivel
 

@@ -33,7 +33,7 @@
     };
     const ESTADOS = { nuevo: ['Nuevo', 'fa-circle', 'var(--text-muted)'], en_curso: ['En curso', 'fa-circle-half-stroke', 'var(--accent-blue)'],
         resuelto: ['Resuelto', 'fa-circle-check', 'var(--accent-green)'], rendido: ['Visto con solución', 'fa-flag', 'var(--accent-yellow)'] };
-    const NIVELES = ['principiante', 'intermedio', 'avanzado'];
+    const NIVELES = ['principiante', 'intermedio', 'avanzado', 'senior'];
 
     const estado = {
         panel: 'chat', modelo: null, modelos: [],
@@ -500,12 +500,13 @@
               <div class="des-fila" style="margin-top:6px;">
                 <select id="des-cat-categoria" class="des-campo" style="width:auto;">
                   <option value="todos">Todas las categorías</option>
+                  <option value="senior_avanzado">🌟 Nivel Senior / Complejos</option>
                   <option value="algoritmos">Algoritmos y ED</option>
                   <option value="entrevistas">Entrevistas y LeetCode</option>
-                  <option value="sintaxis">Sintaxis y Retos</option>
-                  <option value="proyectos">Proyectos y Aplicaciones</option>
-                  <option value="data_science">Data Science / NumPy</option>
                   <option value="competitiva">Programación Competitiva</option>
+                  <option value="proyectos">Proyectos y Arquitectura</option>
+                  <option value="data_science">Data Science / NumPy</option>
+                  <option value="sintaxis">Sintaxis y Retos</option>
                 </select>
                 <button class="des-btn azul" id="des-cat-btn-buscar" style="flex:1;"><i class="fa-solid fa-magnifying-glass"></i> Filtrar</button>
               </div>

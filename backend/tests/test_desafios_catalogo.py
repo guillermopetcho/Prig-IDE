@@ -73,6 +73,30 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         res_ctci = cat.listar_repositorios(busqueda="cracking")
         self.assertGreaterEqual(len(res_ctci), 1)
 
+    def test_categoria_senior_avanzado(self):
+        senior = cat.listar_repositorios(categoria="senior_avanzado")
+        self.assertGreaterEqual(len(senior), 8)
+        self.assertTrue(any(r["ref"] == "atcoder/ac-library" for r in senior))
+        self.assertTrue(any(r["ref"] == "cheran-senthil/PyRival" for r in senior))
+        self.assertTrue(any(r["ref"] == "destinationunknown/CSES" for r in senior))
+        self.assertTrue(any(r["ref"] == "Jonathan-Uy/CSES-Solutions" for r in senior))
+        self.assertTrue(any(r["ref"] == "jaehyunp/stanfordacm" for r in senior))
+        self.assertTrue(any(r["ref"] == "danistefanovic/build-your-own-x" for r in senior))
+        self.assertTrue(any(r["ref"] == "donnemartin/system-design-primer" for r in senior))
+
+    def test_busqueda_estructuras_senior(self):
+        res_st = cat.listar_repositorios(busqueda="segment-tree")
+        self.assertGreaterEqual(len(res_st), 3)
+
+        res_ch = cat.listar_repositorios(busqueda="consistent-hashing")
+        self.assertTrue(any(r["ref"] == "donnemartin/system-design-primer" for r in res_ch))
+
+        res_dinic = cat.listar_repositorios(busqueda="dinic")
+        self.assertGreaterEqual(len(res_dinic), 2)
+
+        res_hld = cat.listar_repositorios(busqueda="hld")
+        self.assertTrue(any(r["ref"] == "Jonathan-Uy/CSES-Solutions" for r in res_hld))
+
     def test_obtener_repositorio(self):
         repo = cat.obtener_repositorio("TheAlgorithms/Python")
         self.assertIsNotNone(repo)
@@ -196,6 +220,49 @@ class PruebaReplicacionGitHub(unittest.TestCase):
         self.assertGreaterEqual(d["comprobacion"]["pruebas"], 2)
         self.assertEqual(d["origen"]["tipo"], "github")
 
+    def test_replicar_nivel_senior(self):
+        respuesta_json = json.dumps({
+            "titulo": "Fenwick Tree (Binary Indexed Tree)",
+            "enunciado": "Implementa un Fenwick Tree con operaciones sum(i) y add(i, delta) en O(log N).",
+            "nivel": "senior",
+            "conceptos": ["fenwick-tree", "range-queries", "bit-manipulation"],
+            "paginas": [
+                {
+                    "nombre": "fenwick.py",
+                    "descripcion": "Árbol binario indexado",
+                    "contenido": "class FenwickTree:\n    def __init__(self, n: int):\n        # TODO: init\n        pass\n    def add(self, i: int, delta: int):\n        # TODO: add\n        pass\n    def query(self, i: int) -> int:\n        # TODO: query\n        return 0\n"
+                }
+            ],
+            "referencia": [
+                {
+                    "nombre": "fenwick.py",
+                    "contenido": "class FenwickTree:\n    def __init__(self, n: int):\n        self.tree = [0] * (n + 1)\n    def add(self, i: int, delta: int):\n        while i < len(self.tree):\n            self.tree[i] += delta\n            i += i & (-i)\n    def query(self, i: int) -> int:\n        s = 0\n        while i > 0:\n            s += self.tree[i]\n            i -= i & (-i)\n        return s\n"
+                }
+            ],
+            "pruebas": [
+                "from fenwick import FenwickTree\nft = FenwickTree(5)\nft.add(1, 10)\nft.add(2, 20)\nassert ft.query(2) == 30",
+                "from fenwick import FenwickTree\nft = FenwickTree(5)\nft.add(3, 5)\nassert ft.query(3) == 5\nassert ft.query(1) == 0"
+            ]
+        })
+
+        ai = ModeloFalsoReplicar([respuesta_json])
+        d = tu.replicar_desde_github(
+            ai=ai,
+            runner=RUNNER,
+            modelo="test-model",
+            ref="cheran-senthil/PyRival",
+            ruta="pyrival/data_structures/fenwick.py",
+            contenido="class FenwickTree: ...",
+            lenguaje="python",
+            nivel="senior"
+        )
+
+        self.assertEqual(d["titulo"], "Fenwick Tree (Binary Indexed Tree)")
+        self.assertEqual(d["nivel"], "senior")
+        self.assertEqual(d["lenguaje"], "python")
+        self.assertIn("fenwick-tree", d["conceptos"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -19,7 +19,7 @@ from . import ejecucion
 from .ejecucion import ErrorDesafio
 
 _PENSAMIENTO = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)\s*", re.S | re.I)
-NIVELES = ("principiante", "intermedio", "avanzado")
+NIVELES = ("principiante", "intermedio", "avanzado", "senior")
 
 
 # ===========================================================================
@@ -104,7 +104,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown alrededor) con esta fo
 {
   "titulo": "Título breve",
   "enunciado": "Contexto del problema, qué hay que construir, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
-  "nivel": "principiante | intermedio | avanzado",
+  "nivel": "principiante | intermedio | avanzado | senior",
   "conceptos": ["concepto 1", "concepto 2"],
   "paginas": [
     {"nombre": "archivo.py", "descripcion": "para qué sirve esta página", "contenido": "código de partida"}
@@ -131,8 +131,10 @@ REGLAS:
 4. "pruebas": entre 4 y 8 fragmentos INDEPENDIENTES; cada uno importa lo que usa y termina en
    assert. Incluye casos normales y casos límite (vacío, cero, negativos, repetidos…).
    Deben PASAR con la referencia y FALLAR con el código de partida.
-5. Solo biblioteca estándar. Nada de input(), red, archivos ni aleatoriedad sin semilla.
-6. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
+5. Si el nivel es 'senior', incluye en el enunciado las cotas asintóticas requeridas (tiempo y espacio O(...))
+   y prueba casos exigentes y límites de escala.
+6. Solo biblioteca estándar. Nada de input(), red, archivos ni aleatoriedad sin semilla.
+7. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
 
 
 SISTEMA_CREAR_CPP = """Eres un CREADOR DE DESAFÍOS DE PROGRAMACIÓN en C++ (estándar C++20) para aprender razonando.
@@ -141,7 +143,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown alrededor) con esta fo
 {
   "titulo": "Título breve",
   "enunciado": "Contexto del problema, qué hay que construir, firmas de funciones o clases, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
-  "nivel": "principiante | intermedio | avanzado",
+  "nivel": "principiante | intermedio | avanzado | senior",
   "conceptos": ["concepto 1", "concepto 2"],
   "paginas": [
     {"nombre": "solucion.h", "descripcion": "declaraciones de la clase o funciones", "contenido": "código de cabecera con comentarios"},
@@ -162,8 +164,9 @@ REGLAS:
 2. El código de partida DEBE compilar limpiamente pero FALLAR las pruebas (devuelve 0, false, "", etc., con comentarios // TODO). NUNCA dejes la solución completa en las páginas de partida.
 3. "referencia" tiene exactamente las mismas páginas que "paginas", con la solución completa, eficiente y correcta.
 4. "pruebas": entre 4 y 8 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE, solo la línea con REQUIRE o bloque).
-5. Solo biblioteca estándar C++ (STL). Nada de librerías externas ni entrada interactiva std::cin.
-6. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
+5. Si el nivel es 'senior', especifica complejidades O(...) en el enunciado, aprovecha características de C++20 (ranges, concepts, move semantics si aplica) y garantiza eficiencia sin copias innecesarias.
+6. Solo biblioteca estándar C++ (STL). Nada de librerías externas ni entrada interactiva std::cin.
+7. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
 
 
 SISTEMA_REPLICAR = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en Python.
@@ -172,7 +175,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código 
 {
   "titulo": "Título breve y descriptivo en español",
   "enunciado": "Explicación clara del problema en español, requisitos, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
-  "nivel": "principiante | intermedio | avanzado",
+  "nivel": "principiante | intermedio | avanzado | senior",
   "conceptos": ["concepto 1", "concepto 2"],
   "paginas": [
     {"nombre": "modulo.py", "descripcion": "Descripción del módulo", "contenido": "código de partida con firmas y pass/TODOs"}
@@ -188,10 +191,11 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código 
 
 REGLAS:
 1. El código de partida ("paginas") NO debe contener la solución: incluye las firmas de funciones/clases, docstrings explicativos y comentarios # TODO con pass o retorno neutro. Debe compilar limpiamente pero fallar las pruebas.
-2. "referencia" debe implementar la solución correcta y completa.
+2. "referencia" debe implementar la solución correcta, eficiente y completa.
 3. "pruebas": de 3 a 6 aserciones independientes con assert, importando el módulo de las páginas.
-4. Solo biblioteca estándar de Python.
-5. Usa \\n para saltos de línea dentro de cadenas JSON."""
+4. Si es de nivel 'senior' o algoritmo complejo, incluye en el enunciado las cotas de complejidad esperadas.
+5. Solo biblioteca estándar de Python.
+6. Usa \\n para saltos de línea dentro de cadenas JSON."""
 
 
 SISTEMA_REPLICAR_CPP = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en C++ (estándar C++20).
@@ -200,7 +204,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código 
 {
   "titulo": "Título breve y descriptivo en español",
   "enunciado": "Explicación clara del problema en español, firmas de funciones o clases, requisitos y 2 o 3 ejemplos de entrada → salida (en markdown)",
-  "nivel": "principiante | intermedio | avanzado",
+  "nivel": "principiante | intermedio | avanzado | senior",
   "conceptos": ["concepto 1", "concepto 2"],
   "paginas": [
     {"nombre": "solucion.h", "descripcion": "declaraciones de clases o funciones", "contenido": "#ifndef SOLUCION_H\\n#define SOLUCION_H\\n...\\n#endif"},
@@ -218,10 +222,11 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código 
 
 REGLAS:
 1. "paginas": define cabecera (.h) e implementación (.cpp) con esqueleto que compila pero falla las pruebas (devuelve 0, false, \\"\\", etc., con // TODO).
-2. "referencia" contiene la solución completa y óptima en C++20.
+2. "referencia" contiene la solución completa, eficiente y óptima en C++20.
 3. "pruebas": de 3 a 6 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE).
-4. Solo biblioteca estándar C++ (STL).
-5. Usa \\n para saltos de línea dentro de cadenas JSON."""
+4. Si es de nivel 'senior', detalla requerimientos de complejidad y asegura el uso óptimo de memoria y STL.
+5. Solo biblioteca estándar C++ (STL).
+6. Usa \\n para saltos de línea dentro de cadenas JSON."""
 
 
 
