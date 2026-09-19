@@ -411,6 +411,8 @@ Las partes importantes del código explicadas en orden; cita el fragmento entre 
 Qué papel cumple en el flujo del notebook (usa el esquema y las celdas anteriores).
 ### Conceptos
 Los conceptos de Python, pandas, estadística o ML que aparecen, en una línea cada uno.
+### Diagrama del Algoritmo (solo si la celda entrena, define o transforma modelos de ML/DL o pipelines)
+Si la celda involucra modelos o pipelines (ej. XGBoost, LightGBM, CatBoost, Random Forest, SVM, k-Means, PCA, CNN, ResNet, Transformer, etc.), incluye un diagrama de flujo modular en bloque de código ```mermaid ... ``` conectando sus 4 bloques: [Entrada] -> [Transformación/División/Atención] -> [Pérdida/Optimización] -> [Inferencia/Métrica].
 ### Para pensar
 Una pregunta o mini-reto para comprobar que se entendió.
 
@@ -428,7 +430,7 @@ Secciones (encabezados «## »):
 Objetivo del notebook y qué datos usa.
 ## El recorrido
 Las etapas (por ejemplo: carga, exploración, limpieza, variables, modelo, evaluación) con los
-números de celda donde empieza cada una: `celdas 3–7`.
+números de celda donde empieza cada una: `celdas 3–7`. Si el notebook entrena modelos, incluye un diagrama de flujo general del pipeline en un bloque ```mermaid ... ```.
 ## Qué vas a aprender
 Técnicas y conceptos concretos que aparecen.
 ## Antes de empezar

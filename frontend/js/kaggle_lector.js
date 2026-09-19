@@ -40,7 +40,57 @@
     function pintarMd(el, texto) {
         el.innerHTML = md(texto);
         el.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
-        if (window.hljs) el.querySelectorAll('pre code').forEach(b => { try { hljs.highlightElement(b); } catch (e) { /* sin resaltado */ } });
+        if (window.hljs) el.querySelectorAll('pre code').forEach(b => { 
+            if (!b.classList.contains('language-mermaid')) {
+                try { hljs.highlightElement(b); } catch (e) { /* sin resaltado */ } 
+            }
+        });
+
+        // Detectar y renderizar bloques Mermaid con enlace al Graficador Modular
+        el.querySelectorAll('pre code').forEach((codeBlock, idx) => {
+            const raw = (codeBlock.textContent || '').trim();
+            if (codeBlock.classList.contains('language-mermaid') || raw.startsWith('graph ') || raw.startsWith('flowchart ') || raw.startsWith('sequenceDiagram')) {
+                const pre = codeBlock.parentElement;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mermaid-kaggle-wrapper';
+                wrapper.style.cssText = 'background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin:10px 0;';
+                
+                const diagramDiv = document.createElement('div');
+                const mid = `mermaid-kg-${Date.now()}-${idx}`;
+                diagramDiv.id = mid;
+                diagramDiv.className = 'mermaid';
+                diagramDiv.style.cssText = 'display:flex; justify-content:center; overflow-x:auto; min-height:60px;';
+                wrapper.appendChild(diagramDiv);
+
+                const btnBar = document.createElement('div');
+                btnBar.style.cssText = 'display:flex; justify-content:flex-end; gap:6px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px;';
+                btnBar.innerHTML = `
+                    <button class="tool-btn" style="font-size:11px; padding:3px 8px; background:rgba(203,166,247,0.15); color:var(--accent-purple); border-color:rgba(203,166,247,0.3);">
+                        <i class="fa-solid fa-cubes"></i> Abrir en Graficador Modular
+                    </button>
+                `;
+                btnBar.querySelector('button').onclick = () => {
+                    if (window.abrirDiagramaEnModular) {
+                        window.abrirDiagramaEnModular(raw, 'Algoritmo de Kaggle');
+                    }
+                };
+                wrapper.appendChild(btnBar);
+
+                pre.parentNode.replaceChild(wrapper, pre);
+
+                if (typeof mermaid !== 'undefined') {
+                    try {
+                        mermaid.render(`${mid}-svg`, raw).then(({ svg }) => {
+                            diagramDiv.innerHTML = svg;
+                        }).catch(() => {
+                            diagramDiv.innerHTML = `<pre style="font-size:11px; color:var(--text-muted);">${esc(raw)}</pre>`;
+                        });
+                    } catch(e) {
+                        diagramDiv.innerHTML = `<pre style="font-size:11px; color:var(--text-muted);">${esc(raw)}</pre>`;
+                    }
+                }
+            }
+        });
     }
 
     function codigoResaltado(texto) {
