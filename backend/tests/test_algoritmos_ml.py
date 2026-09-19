@@ -602,6 +602,40 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
         self.assertIn("calcular_coeficiente_silueta", contenido)
 
 
+    def test_monografia_13_analisis_papers(self):
+        """Verifica que el análisis de papers de la monografía 13 (DBSCAN) exista y sea riguroso."""
+        ruta_13 = os.path.join(DOCS_DIR, "analisis_papers", "13_dbscan_clustering.md")
+        self.assertTrue(os.path.exists(ruta_13), f"Falta el archivo: {ruta_13}")
+
+        with open(ruta_13, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # Debe tener más de 20 KB de análisis técnico exhaustivo
+        self.assertGreater(len(contenido), 20000)
+
+        # Autores y papers seminales
+        self.assertIn("Ester", contenido)
+        self.assertIn("Kriegel", contenido)
+        self.assertIn("Sander", contenido)
+        self.assertIn("Xu", contenido)
+
+        # Teoremas y conceptos matemáticos clave
+        conceptos_clave = [
+            "Vecindario",
+            "Punto Núcleo",
+            "Alcanzable por Densidad",
+            "Conectado por Densidad",
+            "Ruido",
+            "k-Distancias",
+        ]
+        for c in conceptos_clave:
+            self.assertIn(c.lower(), contenido.lower(), f"Falta concepto '{c}' en la monografía 13 de papers")
+
+        # Código de referencia en Python
+        self.assertIn("DBSCANPuro", contenido)
+        self.assertIn("_calcular_vecinos", contenido)
+
+
 if __name__ == "__main__":
     unittest.main()
 

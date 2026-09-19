@@ -3,6 +3,7 @@
 ## 1. Identificación y Referencias Seminales
 - **Autores & Año**: Martin Ester, Hans-Peter Kriegel, Jörg Sander, Xiaowei Xu (1996). *A Density-Based Algorithm for Discovering Clusters in Large Spatial Databases with Noise*. *Proceedings of the 2nd International Conference on Knowledge Discovery and Data Mining (KDD-96)*, 226-231.
 - **Reconocimiento**: Premio SIGKDD Test of Time Award 2014.
+- 🔬 **Análisis exhaustivo de papers y derivaciones:** [Ver Monografía Detallada de Papers](../analisis_papers/13_dbscan_clustering.md)
 
 ---
 
