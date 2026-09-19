@@ -166,6 +166,65 @@ REGLAS:
 6. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
 
 
+SISTEMA_REPLICAR = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en Python.
+
+Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código alrededor) con esta forma:
+{
+  "titulo": "Título breve y descriptivo en español",
+  "enunciado": "Explicación clara del problema en español, requisitos, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
+  "nivel": "principiante | intermedio | avanzado",
+  "conceptos": ["concepto 1", "concepto 2"],
+  "paginas": [
+    {"nombre": "modulo.py", "descripcion": "Descripción del módulo", "contenido": "código de partida con firmas y pass/TODOs"}
+  ],
+  "referencia": [
+    {"nombre": "modulo.py", "contenido": "solución completa, óptima y limpia"}
+  ],
+  "pruebas": [
+    "from modulo import funcion\\nassert funcion(2) == 4",
+    "from modulo import funcion\\nassert funcion(0) == 0"
+  ]
+}
+
+REGLAS:
+1. El código de partida ("paginas") NO debe contener la solución: incluye las firmas de funciones/clases, docstrings explicativos y comentarios # TODO con pass o retorno neutro. Debe compilar limpiamente pero fallar las pruebas.
+2. "referencia" debe implementar la solución correcta y completa.
+3. "pruebas": de 3 a 6 aserciones independientes con assert, importando el módulo de las páginas.
+4. Solo biblioteca estándar de Python.
+5. Usa \\n para saltos de línea dentro de cadenas JSON."""
+
+
+SISTEMA_REPLICAR_CPP = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en C++ (estándar C++20).
+
+Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código alrededor) con esta forma:
+{
+  "titulo": "Título breve y descriptivo en español",
+  "enunciado": "Explicación clara del problema en español, firmas de funciones o clases, requisitos y 2 o 3 ejemplos de entrada → salida (en markdown)",
+  "nivel": "principiante | intermedio | avanzado",
+  "conceptos": ["concepto 1", "concepto 2"],
+  "paginas": [
+    {"nombre": "solucion.h", "descripcion": "declaraciones de clases o funciones", "contenido": "#ifndef SOLUCION_H\\n#define SOLUCION_H\\n...\\n#endif"},
+    {"nombre": "solucion.cpp", "descripcion": "esqueleto de implementación", "contenido": "#include \\"solucion.h\\"\\n... con valores dummy y // TODO"}
+  ],
+  "referencia": [
+    {"nombre": "solucion.h", "contenido": "cabecera completa"},
+    {"nombre": "solucion.cpp", "contenido": "implementación correcta y completa"}
+  ],
+  "pruebas": [
+    "REQUIRE(funcion(2) == 4);",
+    "REQUIRE(funcion(0) == 0);"
+  ]
+}
+
+REGLAS:
+1. "paginas": define cabecera (.h) e implementación (.cpp) con esqueleto que compila pero falla las pruebas (devuelve 0, false, \\"\\", etc., con // TODO).
+2. "referencia" contiene la solución completa y óptima en C++20.
+3. "pruebas": de 3 a 6 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE).
+4. Solo biblioteca estándar C++ (STL).
+5. Usa \\n para saltos de línea dentro de cadenas JSON."""
+
+
+
 def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[str, Any]:
     def paginas(lista, con_desc=True):
         salida = []
@@ -314,6 +373,93 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
     raise ErrorDesafio("El modelo no consiguió un desafío que se pueda comprobar en "
                        f"{intentos} intentos (último motivo: {fallo_anterior[:200]}). "
                        "Prueba con un modelo más capaz o con un tema más concreto.")
+
+
+def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenido: str,
+                          lenguaje: str = "python", tema: str = "", nivel: str = "intermedio",
+                          intentos: int = 3, avisar: Callable[[Dict[str, Any]], None] = lambda ev: None) -> Dict[str, Any]:
+    """ Toma el código/enunciado de un archivo en GitHub y lo replica como un desafío interactivo evaluable en Prig. """
+    if not (contenido or ruta).strip():
+        raise ErrorDesafio("El archivo de GitHub está vacío o no es válido.")
+
+    sistema = SISTEMA_REPLICAR_CPP if lenguaje == "cpp" else SISTEMA_REPLICAR
+    fallo_anterior = ""
+    historial = []
+
+    for n in range(1, intentos + 1):
+        avisar({"tipo": "progreso", "mensaje": f"Intento {n} de {intentos}: el modelo analiza y adapta el desafío desde {ref}/{ruta}…", "intento": n})
+        prompt = (f"Repositorio de origen: {ref}\n"
+                  f"Archivo de origen: {ruta}\n"
+                  f"Lenguaje objetivo: {lenguaje}\n"
+                  f"Nivel sugerido: {nivel}\n"
+                  f"Tema/Contexto: {tema or ruta}\n\n"
+                  f"Contenido original del archivo en GitHub:\n```\n{contenido[:6000]}\n```\n"
+                  + (f"\nEl intento anterior falló porque: {fallo_anterior}\nCorrige este problema.\n" if fallo_anterior else "")
+                  + "\nGenera el desafío didáctico interactivo.")
+        try:
+            texto = generar(ai, modelo, prompt, sistema, temperatura=0.3)
+            datos = _normalizar_creado(ai._extract_and_parse_json(texto), lenguaje=lenguaje)
+        except ErrorDesafio:
+            raise
+        except Exception as e:
+            fallo_anterior = f"no devolviste un JSON válido ({str(e)[:120]})"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            continue
+
+        datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)
+        if lenguaje == "python":
+            for p in datos["paginas"]:
+                p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+
+        rota = _sin_compilar(datos["paginas"], lenguaje=lenguaje) or _sin_compilar(datos["referencia"], lenguaje=lenguaje)
+        if rota:
+            fallo_anterior = f"el código no compila: {rota}. Pon pass en los cuerpos sin implementar"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            continue
+
+        resuelta = _pagina_ya_resuelta(datos)
+        if resuelta:
+            fallo_anterior = f"la página {resuelta} del código de partida ya trae la solución: deja su lógica sin implementar"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            continue
+
+        if len(datos["pruebas"]) < 2:
+            fallo_anterior = "hacen falta al menos 3 pruebas"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            continue
+
+        avisar({"tipo": "progreso", "mensaje": f"Intento {n}: comprobando que la solución pasa las pruebas y el código de partida no…", "intento": n})
+        tipo_comprobacion = "cpp_asserts" if lenguaje == "cpp" else "asserts"
+        privado = {"comprobacion": {"tipo": tipo_comprobacion, "asserts": datos["pruebas"]}, "referencia": datos["referencia"]}
+        v = ejecucion.validar_desafio(runner, datos["paginas"], datos["referencia"], privado, minimo_pruebas=2)
+        historial.append({"intento": n, "valido": v["valido"], "motivo": v["motivo"]})
+        if v["valido"]:
+            return {
+                "titulo": datos["titulo"],
+                "enunciado": datos["enunciado"],
+                "idioma": "es",
+                "teoria": f"Replicado y adaptado automáticamente a partir de `{ref}/{ruta}` en GitHub.",
+                "nivel": datos["nivel"],
+                "conceptos": datos["conceptos"] or [tema or "algoritmos"],
+                "lenguaje": lenguaje,
+                "paginas": [{**p, "descripcion": p.get("descripcion", "")} for p in datos["paginas"]],
+                "comprobacion": {"tipo": tipo_comprobacion, "pruebas": v["pruebas"], "pruebas_visibles": False},
+                "privado": privado,
+                "intentos_creacion": historial,
+                "origen": {
+                    "tipo": "github",
+                    "nombre": f"GitHub · {ref}",
+                    "ref": f"{ref}/{ruta}",
+                    "url": f"https://github.com/{ref}/blob/master/{ruta}",
+                    "licencia": "Open Source",
+                    "lenguaje": lenguaje
+                }
+            }
+        fallo_anterior = v["motivo"]
+        avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {v['motivo'][:160]}", "intento": n, "descartado": True})
+
+    raise ErrorDesafio(f"No se pudo replicar automáticamente el archivo como desafío evaluable tras {intentos} intentos: {fallo_anterior[:200]}")
+
 
 
 # ===========================================================================

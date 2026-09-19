@@ -4983,7 +4983,7 @@ def descargas_limpiar():
 # Desafíos: enunciado, caja de razonamiento, páginas de código y pruebas ocultas
 # ===========================================================================
 
-from desafios import ejecucion as des_ejec, fuentes as des_fuentes, tutor as des_tutor
+from desafios import ejecucion as des_ejec, fuentes as des_fuentes, tutor as des_tutor, catalogo_github as des_catalogo
 import progreso
 import gemini_motor
 from desafios.almacen import Almacen as AlmacenDesafios, ahora as desafios_ahora
@@ -5043,6 +5043,16 @@ class DesafioImportarRequest(BaseModel):
     tema: Optional[str] = None
     ruta_id: Optional[str] = None
     bloque_id: Optional[str] = None
+
+
+class DesafioReplicarGitHubRequest(BaseModel):
+    ref: str
+    ruta: str
+    contenido: Optional[str] = None
+    lenguaje: Optional[str] = "python"
+    tema: Optional[str] = None
+    nivel: Optional[str] = "intermedio"
+    modelo: Optional[str] = None
 
 
 class DesafioPaginasRequest(BaseModel):
@@ -5244,6 +5254,47 @@ def desafios_lista():
 def desafios_fuentes():
     return {"fuentes": [{"id": f.ID, "nombre": f.NOMBRE, "licencia": f.LICENCIA} for f in des_fuentes.FUENTES.values()],
             "no_incluidas": "LeetCode, HackerRank y Codewars no permiten copiar su contenido."}
+
+
+@app.get("/api/desafios/github/catalogo")
+def desafios_github_catalogo(lenguaje: Optional[str] = None, categoria: Optional[str] = None,
+                             q: Optional[str] = None):
+    return {
+        "categorias": des_catalogo.CATEGORIAS,
+        "repositorios": des_catalogo.listar_repositorios(lenguaje=lenguaje, categoria=categoria, busqueda=q)
+    }
+
+
+@app.get("/api/desafios/github/ejercicios")
+def desafios_github_ejercicios(ref: str, ruta: Optional[str] = ""):
+    return _github(des_catalogo.listar_ejercicios_repo, ref, ruta or "")
+
+
+@app.post("/api/desafios/github/replicar")
+def desafios_github_replicar(req: DesafioReplicarGitHubRequest):
+    """ Replica cualquier archivo o ejercicio de GitHub en un desafío interactivo y evaluable de Prig (NDJSON). """
+    modelo = _modelo_desafios(req.modelo, "codigo")
+    motor, nombre_modelo = _motor_desafios(modelo)
+
+    contenido = req.contenido
+    if not contenido:
+        info_archivo = _github(github_lector.leer_archivo, req.ref, req.ruta)
+        contenido = info_archivo.get("contenido") or ""
+
+    lenguaje = req.lenguaje or ("cpp" if req.ruta.endswith((".cpp", ".cc", ".cxx", ".h", ".hpp")) else "python")
+
+    def trabajo(avisar):
+        d = des_tutor.replicar_desde_github(
+            motor, runner, nombre_modelo, req.ref, req.ruta, contenido,
+            lenguaje=lenguaje, tema=req.tema or "", nivel=req.nivel or "intermedio",
+            avisar=avisar
+        )
+        d = desafios_almacen.guardar(d)
+        _registrar_telemetria(d, "replicated_from_github", attempt_num=len(d.get("intentos_creacion") or [1]))
+        return AlmacenDesafios.publico(d)
+
+    return _ndjson_en_hilo(trabajo)
+
 
 
 @app.get("/api/desafios/internet/buscar")

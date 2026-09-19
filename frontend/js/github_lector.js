@@ -547,9 +547,12 @@
             c.innerHTML = `<div class="gh-vacio">${a.binario ? 'Es un archivo binario' : `Pesa ${tam(a.bytes)}: demasiado para leerlo aquí`}.<br>Descarga el repositorio para abrirlo en local.</div>`;
             return;
         }
+        const esCodigo = /\.(py|cpp|cc|cxx|c|hpp|h|ipynb)$/i.test(a.ruta);
         const cabecera = `<div class="gh-fila gh-ayuda" style="padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.06); position:sticky; top:0; background:var(--bg-dark); z-index:1;">
             <i class="fa-regular fa-file-code"></i> <b style="color:#fff;">${esc(a.ruta)}</b> · ${a.lineas} líneas · ${tam(a.bytes)}
-            <span style="flex:1"></span><button class="gh-btn" id="gh-volver-readme">README</button></div>`;
+            <span style="flex:1"></span>
+            ${esCodigo ? '<button class="gh-btn verde" id="gh-replicar-desafio" title="Replicar este archivo como un desafío interactivo en Prig"><i class="fa-solid fa-chess-knight"></i> Replicar como Desafío</button>' : ''}
+            <button class="gh-btn" id="gh-volver-readme">README</button></div>`;
         if (a.lenguaje === 'markdown') {
             c.innerHTML = cabecera + '<div class="gh-md" id="gh-md-archivo"></div>';
             md($('gh-md-archivo'), a.contenido);
@@ -562,6 +565,35 @@
             c.innerHTML = cabecera + `<div class="gh-lineas"><div class="num">${nums}</div><pre class="gh-codigo"><code class="hljs">${html}</code></pre></div>`;
         }
         $('gh-volver-readme').onclick = () => { estado.archivo = null; pintarArbol(); pintarCentro(); pintarExplicacion(); };
+        const btnRep = $('gh-replicar-desafio');
+        if (btnRep) btnRep.onclick = async () => {
+            btnRep.disabled = true;
+            const orig = btnRep.innerHTML;
+            btnRep.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Replicando…';
+            try {
+                const ext = (a.ruta.split('.').pop() || '').toLowerCase();
+                const lang = ['cpp', 'cc', 'cxx', 'c', 'h', 'hpp'].includes(ext) ? 'cpp' : 'python';
+                const r = await flujo('/api/desafios/github/replicar', {
+                    ref: estado.repo.ref,
+                    ruta: a.ruta,
+                    contenido: a.contenido,
+                    lenguaje: lang,
+                    modelo: estado.modelo
+                }, (ev) => {
+                    if (ev.tipo === 'progreso') btnRep.title = ev.mensaje;
+                });
+                if (window.Desafios && window.Desafios.abrir) {
+                    window.Desafios.abrir({ id: r.id });
+                } else {
+                    alert(`¡Desafío «${r.titulo}» creado con éxito! Puedes abrirlo en la herramienta Desafíos.`);
+                }
+            } catch (e) {
+                alert(`Error al replicar como desafío: ${e.message}`);
+            } finally {
+                btnRep.disabled = false;
+                btnRep.innerHTML = orig;
+            }
+        };
     }
 
     async function abrirArchivo(ruta) {

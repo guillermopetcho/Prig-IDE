@@ -29,6 +29,7 @@
         projecteuler: ['Project Euler', 'fa-square-root-variable', 'var(--accent-yellow)'],
         modelo: ['Modelo', 'fa-robot', 'var(--accent-purple)'],
         plan: ['Plan de estudios', 'fa-route', 'var(--accent-purple)'],
+        github: ['GitHub', 'fa-github', 'var(--accent-purple)'],
     };
     const ESTADOS = { nuevo: ['Nuevo', 'fa-circle', 'var(--text-muted)'], en_curso: ['En curso', 'fa-circle-half-stroke', 'var(--accent-blue)'],
         resuelto: ['Resuelto', 'fa-circle-check', 'var(--accent-green)'], rendido: ['Visto con solución', 'fa-flag', 'var(--accent-yellow)'] };
@@ -39,7 +40,11 @@
         lenguaje: leerLocal('prig_desafios_lenguaje') || 'python',
         chat: [{ rol: 'tutor', texto: '¿Qué quieres practicar hoy? Cuéntame el tema (por ejemplo «recursividad», «diccionarios», «punteros» o «una pila con clases») y tu nivel. Cuando lo tengas claro, crea el desafío o búscalo en internet.' }],
         chatNivel: 'intermedio',
-        internet: { tema: '', nivel: '', fuentes: new Set(), datos: null, cargando: false, error: null },
+        internet: {
+            tema: '', nivel: '', fuentes: new Set(), datos: null, cargando: false, error: null,
+            subvista: 'buscar', catalogo: null, catalogoCargando: false, catalogoError: null,
+            catalogoCategoria: 'todos', catalogoBusqueda: '', ejerciciosRepo: null
+        },
         plan: { rutas: null, rutaId: null, ruta: null, bloqueDestacado: null },
         mis: null,
         d: null,               // desafío abierto (vista pública)
@@ -477,26 +482,214 @@
     function panelInternet() {
         const c = $('des-lado-cuerpo');
         const i = estado.internet;
+        i.subvista = i.subvista || 'buscar';
         c.innerHTML = `
+          <div class="des-pestanas" style="margin-bottom:8px;">
+            <button class="${i.subvista === 'buscar' ? 'activa' : ''}" id="des-sub-buscar"><i class="fa-solid fa-globe"></i> Búsqueda en Fuentes</button>
+            <button class="${i.subvista === 'catalogo' ? 'activa' : ''}" id="des-sub-catalogo"><i class="fa-brands fa-github"></i> Catálogo GitHub</button>
+          </div>
+          <div id="des-sub-cuerpo"></div>`;
+
+        $('des-sub-buscar').onclick = () => { i.subvista = 'buscar'; panelInternet(); };
+        $('des-sub-catalogo').onclick = () => { i.subvista = 'catalogo'; panelInternet(); };
+
+        const sc = $('des-sub-cuerpo');
+        if (i.subvista === 'catalogo') {
+            sc.innerHTML = `
+              <input id="des-cat-busqueda" class="des-campo" placeholder="Buscar repositorios: algoritmos, leetcode, numpy…" value="${esc(i.catalogoBusqueda || '')}">
+              <div class="des-fila" style="margin-top:6px;">
+                <select id="des-cat-categoria" class="des-campo" style="width:auto;">
+                  <option value="todos">Todas las categorías</option>
+                  <option value="algoritmos">Algoritmos y ED</option>
+                  <option value="entrevistas">Entrevistas y LeetCode</option>
+                  <option value="sintaxis">Sintaxis y Retos</option>
+                  <option value="proyectos">Proyectos y Aplicaciones</option>
+                  <option value="data_science">Data Science / NumPy</option>
+                  <option value="competitiva">Programación Competitiva</option>
+                </select>
+                <button class="des-btn azul" id="des-cat-btn-buscar" style="flex:1;"><i class="fa-solid fa-magnifying-glass"></i> Filtrar</button>
+              </div>
+              <div class="des-ayuda" style="margin:4px 0 8px;">Repositorios curados de GitHub para practicar en ${estado.lenguaje === 'cpp' ? 'C++' : 'Python'}.</div>
+              <div id="des-cat-contenido"></div>`;
+
+            $('des-cat-categoria').value = i.catalogoCategoria || 'todos';
+            $('des-cat-busqueda').onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    i.catalogoBusqueda = $('des-cat-busqueda').value.trim();
+                    i.catalogoCategoria = $('des-cat-categoria').value;
+                    i.ejerciciosRepo = null;
+                    cargarCatalogoGitHub();
+                }
+            };
+            $('des-cat-btn-buscar').onclick = () => {
+                i.catalogoBusqueda = $('des-cat-busqueda').value.trim();
+                i.catalogoCategoria = $('des-cat-categoria').value;
+                i.ejerciciosRepo = null;
+                cargarCatalogoGitHub();
+            };
+            $('des-cat-categoria').onchange = () => {
+                i.catalogoCategoria = $('des-cat-categoria').value;
+                i.ejerciciosRepo = null;
+                cargarCatalogoGitHub();
+            };
+            if (!i.catalogo && !i.catalogoCargando) {
+                cargarCatalogoGitHub();
+            } else {
+                pintarCatalogoGitHub();
+            }
+            return;
+        }
+
+        // Vista de búsqueda en fuentes tradicionales
+        sc.innerHTML = `
           <input id="des-int-tema" class="des-campo" placeholder="Tema: recursividad, búsqueda binaria, clases…" value="${esc(i.tema)}">
-          <div class="des-fila">
+          <div class="des-fila" style="margin-top:6px;">
             <select id="des-int-nivel" class="des-campo" style="width:auto;"><option value="">Cualquier nivel</option>${NIVELES.map(n => `<option ${n === i.nivel ? 'selected' : ''}>${n}</option>`).join('')}</select>
             <button class="des-btn azul" id="des-int-buscar" style="flex:1;"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
           </div>
-          <div class="des-fila">${Object.entries(FUENTES).filter(([k]) => {
+          <div class="des-fila" style="margin-top:6px;">${Object.entries(FUENTES).filter(([k]) => {
+              if (k === 'github') return false;
               if (estado.lenguaje === 'cpp') return ['exercism_cpp', 'thealgorithms_cpp', 'projecteuler'].includes(k);
               return ['exercism', 'thealgorithms', 'projecteuler'].includes(k);
           })
             .map(([k, [n, ic, col]]) => `<label class="des-mini" style="cursor:pointer; ${i.fuentes.has(k) ? `color:${col};` : ''}"><input type="checkbox" data-fuente="${k}" ${i.fuentes.has(k) ? 'checked' : ''} style="vertical-align:middle;"> ${n}</label>`).join('')}</div>
-          <div class="des-ayuda">Fuentes para practicar en ${estado.lenguaje === 'cpp' ? 'C++' : 'Python'} con licencias abiertas (MIT / CC BY-NC-SA).</div>
+          <div class="des-ayuda" style="margin:4px 0 8px;">Fuentes para practicar en ${estado.lenguaje === 'cpp' ? 'C++' : 'Python'} con licencias abiertas (MIT / CC BY-NC-SA).</div>
           <div id="des-int-res"></div>`;
         $('des-int-tema').onkeydown = (e) => { if (e.key === 'Enter') { i.bloque = null; buscarInternet(); } };
         $('des-int-buscar').onclick = () => { i.bloque = null; buscarInternet(); };
         $('des-int-nivel').onchange = (e) => { i.nivel = e.target.value; };
-        c.querySelectorAll('[data-fuente]').forEach(ch => ch.onchange = () => {
+        sc.querySelectorAll('[data-fuente]').forEach(ch => ch.onchange = () => {
             if (ch.checked) i.fuentes.add(ch.dataset.fuente); else i.fuentes.delete(ch.dataset.fuente);
         });
         pintarResultadosInternet();
+    }
+
+    async function cargarCatalogoGitHub() {
+        const i = estado.internet;
+        i.catalogoCargando = true;
+        i.catalogoError = null;
+        pintarCatalogoGitHub();
+        const q = new URLSearchParams({
+            lenguaje: estado.lenguaje || '',
+            categoria: i.catalogoCategoria || 'todos',
+            q: i.catalogoBusqueda || ''
+        });
+        try {
+            i.catalogo = await json(`/api/desafios/github/catalogo?${q}`);
+        } catch (e) {
+            i.catalogoError = e.message;
+        }
+        i.catalogoCargando = false;
+        pintarCatalogoGitHub();
+    }
+
+    function pintarCatalogoGitHub() {
+        const c = $('des-cat-contenido');
+        if (!c) return;
+        const i = estado.internet;
+        if (i.catalogoCargando) {
+            c.innerHTML = '<div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Cargando catálogo de GitHub…</div>';
+            return;
+        }
+        if (i.catalogoError) {
+            c.innerHTML = `<div class="des-error">${esc(i.catalogoError)}</div>`;
+            return;
+        }
+        if (i.ejerciciosRepo) {
+            const ep = i.ejerciciosRepo;
+            c.innerHTML = `
+              <div class="des-fila" style="margin-bottom:8px;">
+                <button class="des-btn" id="des-cat-volver"><i class="fa-solid fa-arrow-left"></i> Volver al catálogo</button>
+                <button class="des-btn morado" id="des-cat-explorar-actual"><i class="fa-brands fa-github"></i> Abrir en Lector</button>
+              </div>
+              <div class="des-ayuda" style="margin-bottom:6px;">Archivos de ejercicios en <b>${esc(ep.ref)}</b>:</div>
+              ${!ep.archivos.length ? '<div class="des-ayuda">No se detectaron archivos de ejercicios automáticos en este repositorio. Ábrelo en GitHub Lector para explorar todas sus carpetas.</div>' : ''}
+              ${ep.archivos.map((a, idx) => `
+                <div class="des-item" style="margin-top:6px;">
+                  <div class="des-fila">
+                    <span class="des-mini" style="color:${a.lenguaje === 'cpp' ? 'var(--accent-blue)' : 'var(--accent-yellow)'};"><i class="fa-solid fa-file-code"></i> ${a.lenguaje.toUpperCase()}</span>
+                    <span class="des-ayuda">${a.bytes ? Math.round(a.bytes / 1024) + ' KB' : ''}</span>
+                    <span style="flex:1"></span>
+                    <button class="des-btn verde" data-rep-idx="${idx}" style="padding:2px 8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Replicar</button>
+                  </div>
+                  <div class="des-item-titulo" style="margin-top:3px; word-break:break-all;">${esc(a.ruta)}</div>
+                </div>
+              `).join('')}
+            `;
+            const volver = $('des-cat-volver');
+            if (volver) volver.onclick = () => { i.ejerciciosRepo = null; pintarCatalogoGitHub(); };
+            const exp = $('des-cat-explorar-actual');
+            if (exp && window.GitHubLector) exp.onclick = () => window.GitHubLector.abrirRepo(ep.ref);
+            c.querySelectorAll('[data-rep-idx]').forEach(btn => {
+                const a = ep.archivos[+btn.dataset.repIdx];
+                btn.onclick = () => replicarDesdeGitHub(ep.ref, a.ruta, a.lenguaje, a.nombre);
+            });
+            return;
+        }
+
+        const repos = (i.catalogo && i.catalogo.repositorios) || [];
+        if (!repos.length) {
+            c.innerHTML = '<div class="des-ayuda">No hay repositorios que coincidan con los filtros actuales.</div>';
+            return;
+        }
+
+        c.innerHTML = repos.map((r, idx) => `
+          <div class="des-item" style="margin-top:6px;" data-repo-idx="${idx}">
+            <div class="des-fila">
+              <span class="des-mini" style="color:var(--accent-purple);"><i class="fa-brands fa-github"></i> ${esc(r.ref)}</span>
+              <span class="des-mini" style="color:var(--accent-green);">${esc(r.licencia)}</span>
+              ${r.estrellas_aprox ? `<span class="des-ayuda"><i class="fa-solid fa-star" style="color:var(--accent-yellow);"></i> ${esc(r.estrellas_aprox)}</span>` : ''}
+            </div>
+            <div class="des-item-titulo" style="margin-top:4px;">${esc(r.nombre)}</div>
+            <div class="des-ayuda" style="margin-top:2px;">${esc(r.descripcion)}</div>
+            <div class="des-fila" style="margin-top:6px;">
+              ${(r.lenguajes || []).map(l => `<span class="des-mini">${l.toUpperCase()}</span>`).join(' ')}
+              <span style="flex:1"></span>
+              <button class="des-btn morado" data-exp-repo="${esc(r.ref)}" title="Abrir en GitHub Lector"><i class="fa-brands fa-github"></i> Lector</button>
+              <button class="des-btn azul" data-ej-repo="${esc(r.ref)}" title="Ver archivos de ejercicios"><i class="fa-solid fa-list-check"></i> Ejercicios</button>
+            </div>
+          </div>
+        `).join('');
+
+        c.querySelectorAll('[data-exp-repo]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (window.GitHubLector) window.GitHubLector.abrirRepo(btn.dataset.expRepo);
+            };
+        });
+        c.querySelectorAll('[data-ej-repo]').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const ref = btn.dataset.ejRepo;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cargando…';
+                try {
+                    i.ejerciciosRepo = await json(`/api/desafios/github/ejercicios?ref=${encodeURIComponent(ref)}`);
+                    pintarCatalogoGitHub();
+                } catch (err) {
+                    alert(`Error al listar ejercicios de ${ref}: ${err.message}`);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-list-check"></i> Ejercicios';
+                }
+            };
+        });
+    }
+
+    async function replicarDesdeGitHub(ref, ruta, lenguaje, tema) {
+        mostrarTarea(`Replicando «${ruta.split('/').pop()}» desde GitHub`, [
+            `Analizando ${ref}/${ruta} con el modelo de IA…`,
+            'Extrayendo código de partida con TODOs y solución de referencia…',
+            'Generando y validando las pruebas automáticas…'
+        ]);
+        try {
+            const d = await flujo('/api/desafios/github/replicar', {
+                ref, ruta, lenguaje: lenguaje || estado.lenguaje, tema: tema || '', modelo: estado.modelo
+            });
+            abrirDesafio(d);
+        } catch (e) {
+            estado.tarea.error = e.message;
+            pintarHoja();
+        }
     }
 
     async function buscarInternet(ayudaModelo = false) {
