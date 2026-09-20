@@ -435,12 +435,180 @@
     const estado = {
         vista: 'catalogo', // 'catalogo' | 'reproductor'
         filtroCategoria: 'todas',
+        filtroProgreso: 'todos', // 'todos' | 'en_progreso' | 'completados' | 'sin_iniciar'
         busqueda: '',
+        ocultarTexto: localStorage.getItem('prig_yt_ocultar_texto') === 'true',
+        ocultarTextoPlayer: localStorage.getItem('prig_yt_ocultar_texto_player') === 'true',
         videoActual: null,
         pestanaLateral: 'notas', // 'notas' | 'tutor'
         chatTutor: [],
         tutorCargando: false
     };
+
+    // ==================== GESTIÓN DE PROGRESO Y PERSISTENCIA ====================
+    function leerProgresoTodos() {
+        try {
+            const raw = localStorage.getItem('prig_yt_progreso');
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function guardarProgresoTodos(obj) {
+        try {
+            localStorage.setItem('prig_yt_progreso', JSON.stringify(obj));
+        } catch (e) {
+            console.error('Error guardando progreso:', e);
+        }
+    }
+
+    function obtenerProgreso(videoId) {
+        const todos = leerProgresoTodos();
+        return todos[videoId] || {
+            estado: 'sin_iniciar', // 'sin_iniciar' | 'en_progreso' | 'completado'
+            porcentaje: 0,
+            ultimoMinuto: '00:00',
+            segundos: 0,
+            actualizado: null
+        };
+    }
+
+    function guardarProgreso(videoId, cambios) {
+        const todos = leerProgresoTodos();
+        const actual = todos[videoId] || {
+            estado: 'sin_iniciar',
+            porcentaje: 0,
+            ultimoMinuto: '00:00',
+            segundos: 0
+        };
+        const nuevo = { ...actual, ...cambios, actualizado: Date.now() };
+
+        if (nuevo.porcentaje >= 100 || nuevo.estado === 'completado') {
+            nuevo.porcentaje = 100;
+            nuevo.estado = 'completado';
+        } else if (nuevo.porcentaje > 0 || (nuevo.segundos && nuevo.segundos > 0)) {
+            nuevo.estado = 'en_progreso';
+        } else {
+            nuevo.estado = 'sin_iniciar';
+            nuevo.porcentaje = 0;
+        }
+
+        todos[videoId] = nuevo;
+        guardarProgresoTodos(todos);
+        return nuevo;
+    }
+
+    function alternarCompletado(videoId) {
+        const p = obtenerProgreso(videoId);
+        if (p.estado === 'completado') {
+            return guardarProgreso(videoId, { estado: 'en_progreso', porcentaje: 50 });
+        } else {
+            return guardarProgreso(videoId, { estado: 'completado', porcentaje: 100 });
+        }
+    }
+
+    // ==================== GESTIÓN DE NOTAS CON MARCAS DE TIEMPO ====================
+    function leerMarcasVideo(videoId) {
+        try {
+            const raw = localStorage.getItem(`prig_yt_marcas_${videoId}`);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarMarcasVideo(videoId, marcas) {
+        try {
+            localStorage.setItem(`prig_yt_marcas_${videoId}`, JSON.stringify(marcas));
+        } catch (e) {
+            console.error('Error guardando marcas:', e);
+        }
+    }
+
+    function formatearSegundos(s) {
+        s = Math.max(0, Math.floor(Number(s) || 0));
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        if (h > 0) {
+            return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function parsearTimestamp(ts) {
+        if (!ts) return 0;
+        const limpio = String(ts).replace(/[\[\]\(\)\s]/g, '').trim();
+        const partes = limpio.split(':').map(x => parseInt(x, 10));
+        if (partes.some(isNaN)) return 0;
+        if (partes.length === 3) {
+            return partes[0] * 3600 + partes[1] * 60 + partes[2];
+        } else if (partes.length === 2) {
+            return partes[0] * 60 + partes[1];
+        } else if (partes.length === 1) {
+            return partes[0];
+        }
+        return 0;
+    }
+
+    function extraerTimestampsDeTexto(texto) {
+        if (!texto) return [];
+        const regex = /(?:\[\s*)?(\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b)(?:\s*\])?/g;
+        const unicos = new Set();
+        let m;
+        while ((m = regex.exec(texto)) !== null) {
+            unicos.add(m[1]);
+        }
+        return Array.from(unicos).map(ts => ({
+            minuto: ts,
+            segundos: parsearTimestamp(ts)
+        })).sort((a, b) => a.segundos - b.segundos);
+    }
+
+    function saltarAMinuto(segundos, forzarRecarga = false) {
+        const v = estado.videoActual;
+        if (!v) return;
+        segundos = Math.max(0, Math.floor(Number(segundos) || 0));
+        const minStr = formatearSegundos(segundos);
+
+        // Actualizar progreso persistente del video
+        const progActual = obtenerProgreso(v.id);
+        guardarProgreso(v.id, {
+            ultimoMinuto: minStr,
+            segundos: segundos,
+            porcentaje: Math.max(progActual.porcentaje, 5)
+        });
+
+        const iframe = $('yt-iframe-player');
+        if (iframe) {
+            if (forzarRecarga) {
+                iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&autoplay=1&start=${segundos}&rel=0`;
+            } else {
+                try {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                        event: 'command',
+                        func: 'seekTo',
+                        args: [segundos, true]
+                    }), '*');
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                        event: 'command',
+                        func: 'playVideo',
+                        args: []
+                    }), '*');
+                } catch (e) {
+                    iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&autoplay=1&start=${segundos}&rel=0`;
+                }
+            }
+        }
+
+        // Feedback en la interfaz
+        const ind = $('yt-progreso-ultimo-min');
+        if (ind) ind.textContent = minStr;
+        const badgeCur = $('yt-minuto-activo-badge');
+        if (badgeCur) badgeCur.textContent = `Reproduciendo en: ${minStr}`;
+    }
 
     function extraerVideoId(cadena) {
         if (!cadena) return null;
@@ -456,54 +624,116 @@
         s.id = 'youtube-hub-estilos';
         s.textContent = `
             .yt-raiz { display:flex; flex-direction:column; height:100%; width:100%; background:var(--bg-dark, #11111b); color:var(--text-main, #cdd6f4); font-family:inherit; overflow:hidden; }
-            .yt-barra { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); flex-shrink:0; flex-wrap:wrap; }
-            .yt-logo { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:#fff; }
-            .yt-logo i { color:#ff0000; font-size:18px; }
-            .yt-campo-buscar { flex:1; min-width:240px; max-width:540px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:8px; padding:7px 12px; color:#fff; font-size:12px; outline:none; }
+            .yt-barra { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); flex-shrink:0; flex-wrap:wrap; }
+            .yt-logo { display:flex; align-items:center; gap:8px; font-weight:700; font-size:13.5px; color:#fff; }
+            .yt-logo i { color:#ff0000; font-size:17px; }
+            .yt-campo-buscar { flex:1; min-width:220px; max-width:500px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:8px; padding:6px 12px; color:#fff; font-size:12px; outline:none; }
             .yt-campo-buscar:focus { border-color:#ff0000; }
-            .yt-btn { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:7px; padding:6px 12px; color:var(--text-main, #cdd6f4); font-size:11.5px; cursor:pointer; font-weight:600; text-decoration:none; transition:all 0.15s; }
+            .yt-btn { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.06); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:7px; padding:5px 11px; color:var(--text-main, #cdd6f4); font-size:11.5px; cursor:pointer; font-weight:600; text-decoration:none; transition:all 0.15s; user-select:none; }
             .yt-btn:hover { background:rgba(255,255,255,0.12); color:#fff; }
             .yt-btn.rojo { background:rgba(255,0,0,0.16); border-color:rgba(255,0,0,0.4); color:#ff5555; }
             .yt-btn.rojo:hover { background:#ff0000; color:#fff; }
             .yt-btn.azul { background:rgba(137,180,250,0.14); border-color:rgba(137,180,250,0.35); color:var(--accent-blue, #89b4fa); }
-            .yt-btn.verde { background:rgba(166,227,161,0.14); border-color:rgba(166,227,161,0.35); color:var(--accent-green, #a6e3a1); }
+            .yt-btn.azul:hover { background:rgba(137,180,250,0.25); color:#fff; }
+            .yt-btn.verde { background:rgba(16,185,129,0.16); border-color:rgba(16,185,129,0.4); color:#10b981; }
+            .yt-btn.verde:hover { background:#10b981; color:#fff; }
             .yt-btn.morado { background:rgba(203,166,247,0.14); border-color:rgba(203,166,247,0.35); color:var(--accent-purple, #cba6f7); }
 
-            .yt-chips { display:flex; gap:6px; padding:10px 18px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.06)); background:var(--bg-panel, #181825); overflow-x:auto; flex-shrink:0; scrollbar-width:none; }
-            .yt-chip { padding:4px 10px; border-radius:20px; font-size:11px; background:rgba(255,255,255,0.05); color:var(--text-muted, #a6adc8); border:1px solid transparent; cursor:pointer; white-space:nowrap; }
+            .yt-chips { display:flex; gap:6px; padding:8px 16px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.06)); background:var(--bg-panel, #181825); overflow-x:auto; flex-shrink:0; scrollbar-width:none; }
+            .yt-chip { padding:3px 10px; border-radius:20px; font-size:11px; background:rgba(255,255,255,0.05); color:var(--text-muted, #a6adc8); border:1px solid transparent; cursor:pointer; white-space:nowrap; }
             .yt-chip:hover { color:#fff; background:rgba(255,255,255,0.09); }
             .yt-chip.activo { background:rgba(255,0,0,0.15); border-color:rgba(255,0,0,0.4); color:#ff6666; font-weight:700; }
 
-            .yt-cuerpo { flex:1; overflow-y:auto; padding:20px; }
-            .yt-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:16px; }
-            .yt-tarjeta { background:var(--bg-panel, #181825); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+            .yt-cuerpo { flex:1; overflow-y:auto; padding:16px 20px; }
+            
+            /* Resumen de avance en catálogo */
+            .yt-resumen-progreso { display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.03); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:8px 14px; margin-bottom:14px; font-size:12px; gap:10px; flex-wrap:wrap; }
+            .yt-pills-filtro { display:flex; gap:6px; flex-wrap:wrap; }
+            .yt-pill-progreso { font-size:11px; padding:3px 9px; border-radius:12px; background:rgba(255,255,255,0.06); color:var(--text-muted, #a6adc8); border:1px solid transparent; cursor:pointer; transition:all 0.15s; }
+            .yt-pill-progreso:hover { color:#fff; background:rgba(255,255,255,0.12); }
+            .yt-pill-progreso.activo { background:rgba(16,185,129,0.2); border-color:rgba(16,185,129,0.5); color:#10b981; font-weight:700; }
+
+            .yt-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(285px, 1fr)); gap:16px; }
+            .yt-modo-compacto .yt-grid { grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:12px; }
+            .yt-tarjeta { background:var(--bg-panel, #181825); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform 0.15s, border-color 0.15s, box-shadow 0.15s; position:relative; }
             .yt-tarjeta:hover { transform:translateY(-2px); border-color:rgba(255,0,0,0.45); box-shadow:0 6px 18px rgba(0,0,0,0.4); }
             .yt-miniatura { position:relative; width:100%; aspect-ratio:16/9; background:#000; overflow:hidden; }
             .yt-miniatura img { width:100%; height:100%; object-fit:cover; display:block; }
-            .yt-duracion { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.8); color:#fff; font-size:10px; padding:2px 5px; border-radius:4px; font-weight:600; }
-            .yt-nivel { position:absolute; top:6px; left:6px; background:rgba(203,166,247,0.85); color:#111; font-size:9.5px; padding:2px 6px; border-radius:4px; font-weight:700; }
-            .yt-tarjeta-info { padding:12px; display:flex; flex-direction:column; flex:1; gap:6px; }
-            .yt-tarjeta-titulo { font-size:12.5px; font-weight:600; color:#fff; line-height:1.4; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+            .yt-duracion { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); color:#fff; font-size:10px; padding:2px 5px; border-radius:4px; font-weight:600; z-index:2; }
+            .yt-nivel { position:absolute; top:6px; left:6px; background:rgba(203,166,247,0.9); color:#111; font-size:9.5px; padding:2px 6px; border-radius:4px; font-weight:700; z-index:2; }
+            .yt-idioma { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.75); color:#fff; font-size:9.5px; padding:2px 5px; border-radius:4px; font-weight:700; text-transform:uppercase; border:1px solid rgba(255,255,255,0.15); z-index:2; }
+            
+            /* Progreso en tarjeta */
+            .yt-tarjeta-progreso-barra { width:100%; height:4px; background:rgba(255,255,255,0.08); position:relative; }
+            .yt-tarjeta-progreso-fill { height:100%; background:#3b82f6; transition:width 0.25s ease; }
+            .yt-tarjeta-progreso-fill.completado { background:#10b981; }
+
+            .yt-badge-estado { position:absolute; bottom:6px; left:6px; font-size:9.5px; padding:2px 6px; border-radius:4px; font-weight:700; display:inline-flex; align-items:center; gap:4px; z-index:2; }
+            .yt-badge-estado.completado { background:rgba(16,185,129,0.92); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+            .yt-badge-estado.en-progreso { background:rgba(59,130,246,0.92); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+
+            .yt-btn-quick-check { position:absolute; top:6px; right:36px; width:22px; height:22px; border-radius:4px; background:rgba(0,0,0,0.75); border:1px solid rgba(255,255,255,0.25); color:#a6adc8; display:flex; align-items:center; justify-content:center; font-size:10px; cursor:pointer; transition:all 0.15s; z-index:3; }
+            .yt-btn-quick-check:hover { background:rgba(16,185,129,0.35); color:#10b981; border-color:#10b981; transform:scale(1.1); }
+            .yt-btn-quick-check.activo { background:#10b981; color:#fff; border-color:#10b981; }
+
+            .yt-tarjeta-info { padding:10px 12px; display:flex; flex-direction:column; flex:1; gap:5px; }
+            .yt-tarjeta-titulo { font-size:12px; font-weight:600; color:#fff; line-height:1.35; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
             .yt-tarjeta-canal { font-size:11px; color:var(--text-muted, #a6adc8); }
-            .yt-tarjeta-desc { font-size:11px; color:var(--text-muted, #9399b2); line-height:1.35; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+            .yt-tarjeta-desc { font-size:10.5px; color:var(--text-muted, #9399b2); line-height:1.35; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+            .yt-modo-compacto .yt-tarjeta-desc { display:none !important; }
 
             /* Reproductor */
-            .yt-player-layout { display:grid; grid-template-columns:1fr 370px; height:100%; min-height:0; overflow:hidden; }
-            @media (max-width: 900px) { .yt-player-layout { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
-            .yt-player-main { display:flex; flex-direction:column; height:100%; min-height:0; overflow-y:auto; padding:18px; gap:14px; }
+            .yt-player-layout { display:grid; grid-template-columns:1fr 390px; height:100%; min-height:0; overflow:hidden; }
+            @media (max-width: 950px) { .yt-player-layout { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
+            .yt-player-main { display:flex; flex-direction:column; height:100%; min-height:0; overflow-y:auto; padding:16px; gap:12px; }
             .yt-iframe-wrap { width:100%; aspect-ratio:16/9; background:#000; border-radius:10px; overflow:hidden; border:1px solid var(--border-color, rgba(255,255,255,0.1)); flex-shrink:0; }
             .yt-iframe-wrap iframe { width:100%; height:100%; border:none; display:block; }
-            .yt-info-video { display:flex; flex-direction:column; gap:8px; }
-            .yt-video-titulo { font-size:16px; font-weight:700; color:#fff; margin:0; }
+            
+            /* Caja de avance en reproductor */
+            .yt-progreso-caja { background:rgba(255,255,255,0.035); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:9px 12px; display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+            .yt-progreso-fila { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+            .yt-prog-badge { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; }
+            .yt-prog-badge.completado { background:rgba(16,185,129,0.2); color:#10b981; border:1px solid rgba(16,185,129,0.4); }
+            .yt-prog-badge.en_progreso { background:rgba(59,130,246,0.2); color:#89b4fa; border:1px solid rgba(59,130,246,0.4); }
+            .yt-prog-badge.sin_iniciar { background:rgba(255,255,255,0.08); color:var(--text-muted, #a6adc8); }
+            .yt-quick-pct-btns { display:flex; gap:4px; }
+            .yt-btn-pct { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--text-muted, #a6adc8); font-size:10px; padding:2px 5px; cursor:pointer; transition:all 0.15s; }
+            .yt-btn-pct:hover { color:#fff; background:rgba(255,255,255,0.15); }
+
+            .yt-info-video { display:flex; flex-direction:column; gap:6px; }
+            .yt-info-video.oculto { display:none !important; }
+            .yt-video-titulo { font-size:15px; font-weight:700; color:#fff; margin:0; }
             .yt-acciones-video { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
             /* Panel Lateral */
             .yt-lateral { border-left:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
             .yt-lateral-tabs { display:flex; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:rgba(0,0,0,0.15); flex-shrink:0; }
-            .yt-lateral-tab { flex:1; padding:10px; font-size:11.5px; font-weight:600; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; }
+            .yt-lateral-tab { flex:1; padding:9px; font-size:11.5px; font-weight:600; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; }
             .yt-lateral-tab.activo { color:#fff; border-bottom-color:#ff0000; background:rgba(255,255,255,0.03); }
-            .yt-lateral-cuerpo { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
-            .yt-textarea-nota { width:100%; flex:1; min-height:160px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:8px; padding:10px; color:#fff; font-family:'Fira Code', monospace; font-size:11.5px; line-height:1.5; resize:none; outline:none; }
+            .yt-lateral-cuerpo { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+
+            /* Notaciones por minuto */
+            .yt-marcas-seccion { display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,0.22); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:10px; }
+            .yt-marca-input-fila { display:flex; gap:6px; align-items:center; }
+            .yt-input-min { width:78px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.14)); border-radius:6px; padding:5px 8px; color:#fff; font-size:11.5px; font-weight:700; text-align:center; outline:none; font-family:'Fira Code', monospace; }
+            .yt-input-min:focus { border-color:var(--accent-blue, #89b4fa); }
+            .yt-input-txt { flex:1; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.14)); border-radius:6px; padding:5px 10px; color:#fff; font-size:11.5px; outline:none; }
+            .yt-input-txt:focus { border-color:var(--accent-blue, #89b4fa); }
+            .yt-marcas-lista { display:flex; flex-direction:column; gap:5px; max-height:160px; overflow-y:auto; padding-right:2px; }
+            .yt-marca-item { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); border-radius:6px; padding:5px 8px; transition:all 0.15s; }
+            .yt-marca-item:hover { background:rgba(255,255,255,0.08); border-color:rgba(137,180,250,0.3); }
+            .yt-timestamp-btn { display:inline-flex; align-items:center; gap:4px; background:rgba(137,180,250,0.16); border:1px solid rgba(137,180,250,0.35); color:#89b4fa; padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:700; cursor:pointer; transition:all 0.15s; font-family:'Fira Code', monospace; white-space:nowrap; }
+            .yt-timestamp-btn:hover { background:#89b4fa; color:#11111b; transform:scale(1.02); }
+            .yt-marca-texto { flex:1; font-size:11px; color:#cdd6f4; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .yt-marca-btn { background:transparent; border:none; color:var(--text-muted, #a6adc8); cursor:pointer; padding:3px 5px; border-radius:4px; font-size:11px; transition:color 0.15s; }
+            .yt-marca-btn:hover { color:#fff; background:rgba(255,255,255,0.08); }
+            .yt-marca-btn.eliminar:hover { color:#ff5555; }
+
+            .yt-chips-detectados { display:flex; gap:4px; flex-wrap:wrap; align-items:center; padding:2px 0 6px; font-size:10px; color:var(--text-muted, #a6adc8); }
+            .yt-chip-seek { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#89b4fa; padding:2px 6px; font-size:10px; font-family:'Fira Code', monospace; cursor:pointer; font-weight:600; }
+            .yt-chip-seek:hover { background:rgba(137,180,250,0.2); color:#fff; }
+
+            .yt-textarea-nota { width:100%; flex:1; min-height:140px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:8px; padding:10px; color:#fff; font-family:'Fira Code', monospace; font-size:11.5px; line-height:1.5; resize:none; outline:none; }
             .yt-textarea-nota:focus { border-color:var(--accent-blue, #89b4fa); }
             .yt-chat-mensajes { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
             .yt-chat-msg { padding:8px 12px; border-radius:8px; font-size:11.5px; line-height:1.45; }
@@ -530,18 +760,42 @@
 
     function pintarCatalogo(raiz) {
         const busq = estado.busqueda.toLowerCase().trim();
+        const todosProgreso = leerProgresoTodos();
+
+        // Conteo global de avances
+        let totalCompletados = 0;
+        let totalEnProgreso = 0;
+        let totalSinIniciar = 0;
+
+        VIDEOS_CURADOS.forEach(v => {
+            const p = todosProgreso[v.id] || {};
+            if (p.estado === 'completado' || p.porcentaje >= 100) totalCompletados++;
+            else if (p.estado === 'en_progreso' || (p.porcentaje && p.porcentaje > 0)) totalEnProgreso++;
+            else totalSinIniciar++;
+        });
+
         const filtrados = VIDEOS_CURADOS.filter(v => {
+            const p = todosProgreso[v.id] || {};
+            const esComp = p.estado === 'completado' || p.porcentaje >= 100;
+            const esEnProg = p.estado === 'en_progreso' || (p.porcentaje && p.porcentaje > 0 && !esComp);
+            const esSinIni = !esComp && !esEnProg;
+
+            if (estado.filtroProgreso === 'completados' && !esComp) return false;
+            if (estado.filtroProgreso === 'en_progreso' && !esEnProg) return false;
+            if (estado.filtroProgreso === 'sin_iniciar' && !esSinIni) return false;
+
             const coincideCat = estado.filtroCategoria === 'todas' || v.categoria === estado.filtroCategoria;
-            const coincideTexto = !busq || v.titulo.toLowerCase().includes(busq) || v.canal.toLowerCase().includes(busq) || v.descripcion.toLowerCase().includes(busq);
+            const coincideTexto = !busq || v.titulo.toLowerCase().includes(busq) || v.canal.toLowerCase().includes(busq) || (v.descripcion && v.descripcion.toLowerCase().includes(busq));
             return coincideCat && coincideTexto;
         });
 
         raiz.innerHTML = `
-            <div class="yt-raiz">
+            <div class="yt-raiz ${estado.ocultarTexto ? 'yt-modo-compacto' : ''}">
               <div class="yt-barra">
                 <div class="yt-logo"><i class="fa-brands fa-youtube"></i> YouTube en Prig</div>
                 <input id="yt-input-buscar" class="yt-campo-buscar" placeholder="Pega un enlace de YouTube (https://...) o busca por tema..." value="${esc(estado.busqueda)}">
                 <button class="yt-btn rojo" id="yt-btn-cargar"><i class="fa-solid fa-play"></i> Reproducir</button>
+                <button class="yt-btn ${estado.ocultarTexto ? 'azul' : ''}" id="yt-btn-toggle-texto" title="Ocultar o mostrar descripciones de los videos"><i class="fa-solid ${estado.ocultarTexto ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTexto ? 'Mostrar descripciones' : 'Ocultar texto de videos'}</button>
               </div>
 
               <div class="yt-chips">
@@ -551,33 +805,65 @@
               </div>
 
               <div class="yt-cuerpo">
+                <!-- Resumen y Filtro de Avance del Estudiante -->
+                <div class="yt-resumen-progreso">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-graduation-cap" style="color:var(--accent-green, #a6e3a1); font-size:15px;"></i>
+                    <span style="font-weight:700; color:#fff;">Tu avance:</span>
+                    <span style="color:var(--text-muted); font-size:11.5px;"><b>${totalCompletados}</b> completados · <b>${totalEnProgreso}</b> en curso · <b>${totalSinIniciar}</b> pendientes</span>
+                  </div>
+                  <div class="yt-pills-filtro">
+                    <button class="yt-pill-progreso ${estado.filtroProgreso === 'todos' ? 'activo' : ''}" data-prog="todos">Todos (${VIDEOS_CURADOS.length})</button>
+                    <button class="yt-pill-progreso ${estado.filtroProgreso === 'en_progreso' ? 'activo' : ''}" data-prog="en_progreso">🟡 En curso (${totalEnProgreso})</button>
+                    <button class="yt-pill-progreso ${estado.filtroProgreso === 'completados' ? 'activo' : ''}" data-prog="completados">🟢 Completados (${totalCompletados})</button>
+                    <button class="yt-pill-progreso ${estado.filtroProgreso === 'sin_iniciar' ? 'activo' : ''}" data-prog="sin_iniciar">⚪ Pendientes (${totalSinIniciar})</button>
+                  </div>
+                </div>
+
                 ${filtrados.length === 0 ? `
                   <div style="text-align:center; padding:40px; color:var(--text-muted);">
                     <i class="fa-brands fa-youtube" style="font-size:40px; opacity:0.3; margin-bottom:12px; display:block;"></i>
-                    <p style="margin:0; font-size:13px;">No se encontraron videos con ese criterio.</p>
-                    <p style="margin:6px 0 0; font-size:11.5px;">Puedes pegar directamente cualquier URL de video de YouTube arriba y pulsar <b>Reproducir</b>.</p>
+                    <p style="margin:0; font-size:13px;">No se encontraron videos con ese criterio de filtro.</p>
+                    <p style="margin:6px 0 0; font-size:11.5px;">Puedes cambiar el filtro de avance, categoría o pegar una URL de YouTube arriba.</p>
                   </div>
                 ` : `
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:12px; color:var(--text-muted, #a6adc8);">
-                    <span>Mostrando <b>${filtrados.length}</b> cursos curados</span>
-                    <span style="font-size:11px; opacity:0.8;"><i class="fa-brands fa-youtube" style="color:#ff0000;"></i> Python · C++ · Machine Learning · Deep Learning</span>
-                  </div>
                   <div class="yt-grid">
-                    ${filtrados.map(v => `
-                      <div class="yt-tarjeta" data-video-id="${esc(v.id)}">
-                        <div class="yt-miniatura">
-                          <img src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="${esc(v.titulo)}" loading="lazy">
-                          <span class="yt-duracion">${esc(v.duracion)}</span>
-                          <span class="yt-nivel">${esc(v.nivel)}</span>
-                          <span class="yt-idioma" style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.75); color:#fff; font-size:9.5px; padding:2px 5px; border-radius:4px; font-weight:700; text-transform:uppercase; border:1px solid rgba(255,255,255,0.15);">${esc(v.idioma || 'EN')}</span>
-                        </div>
-                        <div class="yt-tarjeta-info">
-                          <h3 class="yt-tarjeta-titulo">${esc(v.titulo)}</h3>
-                          <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
-                          <p class="yt-tarjeta-desc">${esc(v.descripcion)}</p>
-                        </div>
-                      </div>
-                    `).join('')}
+                    ${filtrados.map(v => {
+                        const prog = todosProgreso[v.id] || { estado: 'sin_iniciar', porcentaje: 0, ultimoMinuto: '00:00' };
+                        const esComp = prog.estado === 'completado' || prog.porcentaje >= 100;
+                        const esProg = !esComp && (prog.estado === 'en_progreso' || prog.porcentaje > 0);
+
+                        return `
+                          <div class="yt-tarjeta" data-video-id="${esc(v.id)}">
+                            <div class="yt-miniatura">
+                              <img src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="${esc(v.titulo)}" loading="lazy">
+                              <span class="yt-duracion">${esc(v.duracion)}</span>
+                              <span class="yt-nivel">${esc(v.nivel)}</span>
+                              <span class="yt-idioma">${esc(v.idioma || 'EN')}</span>
+                              
+                              <button class="yt-btn-quick-check ${esComp ? 'activo' : ''}" title="${esComp ? 'Completado (clic para desmarcar)' : 'Marcar como completado'}" data-video-id="${esc(v.id)}">
+                                <i class="fa-solid fa-check"></i>
+                              </button>
+
+                              ${esComp ? `
+                                <span class="yt-badge-estado completado"><i class="fa-solid fa-circle-check"></i> Completado</span>
+                              ` : esProg ? `
+                                <span class="yt-badge-estado en-progreso"><i class="fa-solid fa-clock-rotate-left"></i> ${prog.porcentaje}% (${prog.ultimoMinuto || '00:00'})</span>
+                              ` : ''}
+                            </div>
+                            
+                            <div class="yt-tarjeta-progreso-barra">
+                              <div class="yt-tarjeta-progreso-fill ${esComp ? 'completado' : ''}" style="width:${prog.porcentaje || 0}%;"></div>
+                            </div>
+
+                            <div class="yt-tarjeta-info">
+                              <h3 class="yt-tarjeta-titulo">${esc(v.titulo)}</h3>
+                              <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
+                              <p class="yt-tarjeta-desc">${esc(v.descripcion || '')}</p>
+                            </div>
+                          </div>
+                        `;
+                    }).join('')}
                   </div>
                 `}
               </div>
@@ -597,6 +883,15 @@
             btnCargar.onclick = () => procesarEntradaOUrl(inp.value);
         }
 
+        const btnToggleTexto = $('yt-btn-toggle-texto');
+        if (btnToggleTexto) {
+            btnToggleTexto.onclick = () => {
+                estado.ocultarTexto = !estado.ocultarTexto;
+                localStorage.setItem('prig_yt_ocultar_texto', estado.ocultarTexto);
+                pintar();
+            };
+        }
+
         raiz.querySelectorAll('.yt-chip').forEach(ch => {
             ch.onclick = () => {
                 estado.filtroCategoria = ch.dataset.cat;
@@ -604,8 +899,25 @@
             };
         });
 
+        raiz.querySelectorAll('.yt-pill-progreso').forEach(pl => {
+            pl.onclick = () => {
+                estado.filtroProgreso = pl.dataset.prog;
+                pintar();
+            };
+        });
+
+        raiz.querySelectorAll('.yt-btn-quick-check').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const vidId = btn.dataset.videoId;
+                alternarCompletado(vidId);
+                pintar();
+            };
+        });
+
         raiz.querySelectorAll('.yt-tarjeta').forEach(tar => {
-            tar.onclick = () => {
+            tar.onclick = (e) => {
+                if (e.target.closest('.yt-btn-quick-check')) return;
                 const vidId = tar.dataset.videoId;
                 const encontrado = VIDEOS_CURADOS.find(v => v.id === vidId) || { id: vidId, titulo: 'Video de YouTube', canal: 'YouTube' };
                 reproducir(encontrado);
@@ -638,8 +950,11 @@
 
     function pintarReproductor(raiz) {
         const v = estado.videoActual;
+        const prog = obtenerProgreso(v.id);
+        const marcas = leerMarcasVideo(v.id);
         const notaClave = `prig_yt_nota_${v.id}`;
         const notaGuardada = localStorage.getItem(notaClave) || '';
+        const marcasDetectadas = extraerTimestampsDeTexto(notaGuardada);
 
         raiz.innerHTML = `
             <div class="yt-raiz">
@@ -647,6 +962,9 @@
                 <button class="yt-btn" id="yt-btn-volver"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
                 <div class="yt-logo" style="margin-left:6px;"><i class="fa-brands fa-youtube"></i> ${esc(v.titulo)}</div>
                 <div style="margin-left:auto; display:flex; gap:8px;">
+                  <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video">
+                    <i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Quitar texto (Modo Cine)'}
+                  </button>
                   <a class="yt-btn" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en YouTube</a>
                 </div>
               </div>
@@ -654,15 +972,51 @@
               <div class="yt-player-layout">
                 <div class="yt-player-main">
                   <div class="yt-iframe-wrap">
-                    <iframe src="https://www.youtube-nocookie.com/embed/${esc(v.id)}?autoplay=1&rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <iframe id="yt-iframe-player" src="https://www.youtube-nocookie.com/embed/${esc(v.id)}?enablejsapi=1&autoplay=1&rel=0${prog.segundos > 0 ? `&start=${prog.segundos}` : ''}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                   </div>
 
-                  <div class="yt-info-video">
-                    <h2 class="yt-video-titulo">${esc(v.titulo)}</h2>
-                    <div style="font-size:12px; color:var(--text-muted);">Canal: <b>${esc(v.canal || 'YouTube')}</b> ${v.nivel ? `· Nivel: <span style="color:var(--accent-purple); font-weight:600;">${esc(v.nivel)}</span>` : ''}</div>
-                    ${v.descripcion ? `<p style="margin:4px 0 0; font-size:12px; color:var(--text-muted); line-height:1.45;">${esc(v.descripcion)}</p>` : ''}
+                  <!-- Control de Avance del Curso -->
+                  <div class="yt-progreso-caja">
+                    <div class="yt-progreso-fila">
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-graduation-cap" style="color:var(--accent-green, #a6e3a1); font-size:14px;"></i>
+                        <span style="font-weight:700; font-size:12px; color:#fff;">Avance del curso:</span>
+                        <span id="yt-badge-progreso-texto" class="yt-prog-badge ${prog.estado}">
+                          ${prog.estado === 'completado' ? '¡Completado! 🎉' : (prog.porcentaje > 0 ? `En progreso (${prog.porcentaje}%)` : 'Sin iniciar')}
+                        </span>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                        ${prog.segundos > 0 ? `
+                          <button class="yt-btn azul" id="yt-btn-reanudar-min" style="padding:3px 8px; font-size:11px;" title="Reanudar video en el último minuto visto">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Reanudar en <b id="yt-progreso-ultimo-min">${prog.ultimoMinuto}</b>
+                          </button>
+                        ` : ''}
+                        <button class="yt-btn ${prog.estado === 'completado' ? 'verde' : ''}" id="yt-btn-toggle-completado" style="padding:3px 10px; font-size:11px;">
+                          <i class="fa-solid fa-circle-check"></i> ${prog.estado === 'completado' ? 'Completado ✓' : 'Marcar completado'}
+                        </button>
+                      </div>
+                    </div>
 
-                    <div class="yt-acciones-video" style="margin-top:8px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+                      <input type="range" id="yt-slider-progreso" min="0" max="100" step="5" value="${prog.porcentaje || 0}" style="flex:1; accent-color:#10b981; cursor:pointer;">
+                      <span id="yt-slider-valor" style="font-size:12px; font-weight:700; width:45px; text-align:right; color:var(--accent-green, #a6e3a1);">${prog.porcentaje || 0}%</span>
+                      <div class="yt-quick-pct-btns">
+                        <button class="yt-btn-pct" data-pct="0">0%</button>
+                        <button class="yt-btn-pct" data-pct="25">25%</button>
+                        <button class="yt-btn-pct" data-pct="50">50%</button>
+                        <button class="yt-btn-pct" data-pct="75">75%</button>
+                        <button class="yt-btn-pct" data-pct="100">100%</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Información y Texto del Video (Se puede ocultar a pedido del usuario) -->
+                  <div class="yt-info-video ${estado.ocultarTextoPlayer ? 'oculto' : ''}" id="yt-seccion-info-video">
+                    <h2 class="yt-video-titulo">${esc(v.titulo)}</h2>
+                    <div style="font-size:11.5px; color:var(--text-muted);">Canal: <b>${esc(v.canal || 'YouTube')}</b> ${v.nivel ? `· Nivel: <span style="color:var(--accent-purple); font-weight:600;">${esc(v.nivel)}</span>` : ''}</div>
+                    ${v.descripcion ? `<p style="margin:4px 0 0; font-size:11.5px; color:var(--text-muted); line-height:1.45;">${esc(v.descripcion)}</p>` : ''}
+
+                    <div class="yt-acciones-video" style="margin-top:6px;">
                       <button class="yt-btn azul" id="yt-btn-crear-desafio"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear desafío en Prig con este tema</button>
                       <button class="yt-btn morado" id="yt-btn-explicar-tema"><i class="fa-solid fa-brain"></i> Explicar conceptos con IA</button>
                     </div>
@@ -671,17 +1025,65 @@
 
                 <div class="yt-lateral">
                   <div class="yt-lateral-tabs">
-                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas</div>
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas y Timestamps</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'tutor' ? 'activo' : ''}" data-tab="tutor"><i class="fa-solid fa-robot"></i> Asistente IA</div>
                   </div>
 
                   <div class="yt-lateral-cuerpo">
                     ${estado.pestanaLateral === 'notas' ? `
-                      <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
-                        <span>Apuntes de la clase (guardado automático)</span>
-                        <button class="yt-btn verde" id="yt-btn-guardar-archivo" style="padding:3px 7px; font-size:10px;"><i class="fa-solid fa-file-export"></i> Exportar a archivo</button>
+                      <!-- Sección 1: Notaciones por Minuto -->
+                      <div class="yt-marcas-seccion">
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+                          <span style="font-weight:700; color:#fff;"><i class="fa-solid fa-stopwatch" style="color:var(--accent-blue, #89b4fa);"></i> Notaciones por minuto (${marcas.length})</span>
+                          <span id="yt-minuto-activo-badge" style="font-size:10px; color:var(--text-muted);">Clic en ▶ para saltar al min</span>
+                        </div>
+
+                        <div class="yt-marca-input-fila">
+                          <input id="yt-input-marca-min" class="yt-input-min" placeholder="MM:SS" value="${prog.ultimoMinuto !== '00:00' ? prog.ultimoMinuto : '00:00'}" title="Minuto del video (ej. 05:20 o 1:15:30)">
+                          <input id="yt-input-marca-txt" class="yt-input-txt" placeholder="¿Qué ocurre en este minuto?..." title="Nota del minuto">
+                          <button class="yt-btn azul" id="yt-btn-agregar-marca" style="padding:5px 9px;" title="Agregar anotación en este minuto"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+
+                        <div class="yt-marcas-lista" id="yt-marcas-lista">
+                          ${marcas.length === 0 ? `
+                            <div style="text-align:center; padding:12px; color:var(--text-muted); font-size:11px; font-style:italic;">
+                              Sin notaciones por minuto. Escribe un minuto arriba (ej: 04:30) y una nota para saltar a ese punto clave cuando estudies.
+                            </div>
+                          ` : marcas.map(m => `
+                            <div class="yt-marca-item" data-id="${esc(m.id)}">
+                              <button class="yt-timestamp-btn" data-segundos="${m.segundos}" title="Saltar el reproductor al minuto ${esc(m.minuto)}">
+                                <i class="fa-solid fa-play" style="font-size:9px;"></i> ${esc(m.minuto)}
+                              </button>
+                              <span class="yt-marca-texto" title="${esc(m.texto)}">${esc(m.texto)}</span>
+                              <div style="display:flex; gap:2px;">
+                                <button class="yt-marca-btn" data-accion="recargar" data-segundos="${m.segundos}" title="Forzar salto / recarga en min ${esc(m.minuto)}"><i class="fa-solid fa-rotate-right"></i></button>
+                                <button class="yt-marca-btn" data-accion="copiar" data-id="${esc(m.id)}" title="Copiar al cuaderno de notas"><i class="fa-regular fa-copy"></i></button>
+                                <button class="yt-marca-btn eliminar" data-accion="eliminar" data-id="${esc(m.id)}" title="Eliminar anotación"><i class="fa-regular fa-trash-can"></i></button>
+                              </div>
+                            </div>
+                          `).join('')}
+                        </div>
                       </div>
-                      <textarea id="yt-nota" class="yt-textarea-nota" placeholder="Escribe aquí tus notas, timestamps y fórmulas mientras miras el video...">${esc(notaGuardada)}</textarea>
+
+                      <!-- Sección 2: Cuaderno de Notas Markdown Libre -->
+                      <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <span style="font-weight:600; color:#fff;"><i class="fa-solid fa-book-open"></i> Cuaderno de Apuntes</span>
+                        <div style="display:flex; gap:4px;">
+                          <button class="yt-btn" id="yt-btn-insertar-timestamp" style="padding:2px 7px; font-size:10px;" title="Insertar marca [MM:SS] en el cursor"><i class="fa-regular fa-clock"></i> + [Minuto]</button>
+                          <button class="yt-btn verde" id="yt-btn-guardar-archivo" style="padding:2px 7px; font-size:10px;" title="Exportar apuntes y timestamps a un archivo .md en el proyecto"><i class="fa-solid fa-file-export"></i> Exportar</button>
+                        </div>
+                      </div>
+
+                      ${marcasDetectadas.length > 0 ? `
+                        <div class="yt-chips-detectados">
+                          <span>Saltos en apuntes:</span>
+                          ${marcasDetectadas.map(md => `
+                            <button class="yt-chip-seek" data-segundos="${md.segundos}" title="Saltar al minuto ${md.minuto}">▶ ${md.minuto}</button>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+
+                      <textarea id="yt-nota" class="yt-textarea-nota" placeholder="Escribe aquí tus fórmulas, conceptos clave, código y marcas como [12:34] para saltar directamente...">${esc(notaGuardada)}</textarea>
                     ` : `
                       <div class="yt-chat-mensajes" id="yt-chat-mensajes">
                         ${estado.chatTutor.length === 0 ? `
@@ -709,6 +1111,15 @@
             pintar();
         };
 
+        const btnToggleDetalles = $('yt-btn-toggle-detalles');
+        if (btnToggleDetalles) {
+            btnToggleDetalles.onclick = () => {
+                estado.ocultarTextoPlayer = !estado.ocultarTextoPlayer;
+                localStorage.setItem('prig_yt_ocultar_texto_player', estado.ocultarTextoPlayer);
+                pintar();
+            };
+        }
+
         raiz.querySelectorAll('.yt-lateral-tab').forEach(tb => {
             tb.onclick = () => {
                 estado.pestanaLateral = tb.dataset.tab;
@@ -716,6 +1127,121 @@
             };
         });
 
+        // Controles de Progreso del Curso en Reproductor
+        const btnToggleCompletado = $('yt-btn-toggle-completado');
+        if (btnToggleCompletado) {
+            btnToggleCompletado.onclick = () => {
+                alternarCompletado(v.id);
+                pintar();
+            };
+        }
+
+        const sliderProgreso = $('yt-slider-progreso');
+        const sliderValor = $('yt-slider-valor');
+        if (sliderProgreso) {
+            sliderProgreso.oninput = () => {
+                const val = parseInt(sliderProgreso.value, 10);
+                if (sliderValor) sliderValor.textContent = `${val}%`;
+            };
+            sliderProgreso.onchange = () => {
+                const val = parseInt(sliderProgreso.value, 10);
+                guardarProgreso(v.id, { porcentaje: val });
+                pintar();
+            };
+        }
+
+        raiz.querySelectorAll('.yt-btn-pct').forEach(b => {
+            b.onclick = () => {
+                const pct = parseInt(b.dataset.pct, 10);
+                guardarProgreso(v.id, { porcentaje: pct });
+                pintar();
+            };
+        });
+
+        const btnReanudar = $('yt-btn-reanudar-min');
+        if (btnReanudar && prog.segundos > 0) {
+            btnReanudar.onclick = () => {
+                saltarAMinuto(prog.segundos, false);
+            };
+        }
+
+        // Acciones de Notaciones con Timestamp
+        const inputMarcaMin = $('yt-input-marca-min');
+        const inputMarcaTxt = $('yt-input-marca-txt');
+        const btnAgregarMarca = $('yt-btn-agregar-marca');
+
+        const guardarNuevaMarca = () => {
+            if (!inputMarcaMin || !inputMarcaTxt) return;
+            const minStr = inputMarcaMin.value.trim() || '00:00';
+            const txt = inputMarcaTxt.value.trim();
+            if (!txt) {
+                inputMarcaTxt.focus();
+                return;
+            }
+            const seg = parsearTimestamp(minStr);
+            const formateado = formatearSegundos(seg);
+            const lista = leerMarcasVideo(v.id);
+            lista.push({
+                id: 'm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                minuto: formateado,
+                segundos: seg,
+                texto: txt,
+                fecha: Date.now()
+            });
+            lista.sort((a, b) => a.segundos - b.segundos);
+            guardarMarcasVideo(v.id, lista);
+            inputMarcaTxt.value = '';
+            pintar();
+        };
+
+        if (btnAgregarMarca) btnAgregarMarca.onclick = guardarNuevaMarca;
+        if (inputMarcaTxt) {
+            inputMarcaTxt.onkeydown = (e) => {
+                if (e.key === 'Enter') guardarNuevaMarca();
+            };
+        }
+
+        // Clics en botones de marcas por minuto
+        raiz.querySelectorAll('.yt-timestamp-btn').forEach(tb => {
+            tb.onclick = () => {
+                const s = parseInt(tb.dataset.segundos, 10);
+                saltarAMinuto(s, false);
+            };
+        });
+
+        raiz.querySelectorAll('.yt-chip-seek').forEach(cb => {
+            cb.onclick = () => {
+                const s = parseInt(cb.dataset.segundos, 10);
+                saltarAMinuto(s, false);
+            };
+        });
+
+        raiz.querySelectorAll('.yt-marca-btn').forEach(mb => {
+            mb.onclick = () => {
+                const accion = mb.dataset.accion;
+                const id = mb.dataset.id;
+                const s = parseInt(mb.dataset.segundos, 10);
+
+                if (accion === 'recargar') {
+                    saltarAMinuto(s, true);
+                } else if (accion === 'eliminar') {
+                    const lista = leerMarcasVideo(v.id).filter(m => m.id !== id);
+                    guardarMarcasVideo(v.id, lista);
+                    pintar();
+                } else if (accion === 'copiar') {
+                    const lista = leerMarcasVideo(v.id);
+                    const item = lista.find(m => m.id === id);
+                    if (item && notaEl) {
+                        const insertar = `\n- [${item.minuto}] ${item.texto}\n`;
+                        notaEl.value = (notaEl.value || '') + insertar;
+                        localStorage.setItem(notaClave, notaEl.value);
+                        pintar();
+                    }
+                }
+            };
+        });
+
+        // Cuaderno de Notas Markdown
         const notaEl = $('yt-nota');
         if (notaEl) {
             notaEl.oninput = () => {
@@ -723,18 +1249,61 @@
             };
         }
 
+        const btnInsertarTs = $('yt-btn-insertar-timestamp');
+        if (btnInsertarTs && notaEl) {
+            btnInsertarTs.onclick = () => {
+                const p = obtenerProgreso(v.id);
+                const stamp = prompt('Minuto para la marca (ej: 05:20 o 1:12:00):', p.ultimoMinuto || '00:00');
+                if (!stamp) return;
+                const seg = parsearTimestamp(stamp);
+                const tag = `[${formatearSegundos(seg)}] `;
+                const inicio = notaEl.selectionStart || notaEl.value.length;
+                const fin = notaEl.selectionEnd || notaEl.value.length;
+                notaEl.value = notaEl.value.substring(0, inicio) + tag + notaEl.value.substring(fin);
+                notaEl.selectionStart = notaEl.selectionEnd = inicio + tag.length;
+                notaEl.focus();
+                localStorage.setItem(notaClave, notaEl.value);
+                pintar();
+            };
+        }
+
+        // Exportar a Archivo de Proyecto
         const btnExportar = $('yt-btn-guardar-archivo');
         if (btnExportar && notaEl) {
             btnExportar.onclick = async () => {
                 const contenido = notaEl.value;
-                if (!contenido.trim()) return alert('Escribe primero algunas notas para exportar.');
-                const sugerido = `nota_${v.titulo.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)}.md`;
-                const nombre = prompt('Nombre del archivo de notas:', sugerido);
+                const marcasActuales = leerMarcasVideo(v.id);
+                const progActual = obtenerProgreso(v.id);
+
+                if (!contenido.trim() && marcasActuales.length === 0) {
+                    return alert('Escribe algunos apuntes o añade notas por minuto antes de exportar.');
+                }
+
+                let cuerpoMd = `# Apuntes de Estudio: ${v.titulo}\n\n`;
+                cuerpoMd += `- **Canal**: ${v.canal || 'YouTube'}\n`;
+                cuerpoMd += `- **URL**: https://www.youtube.com/watch?v=${v.id}\n`;
+                cuerpoMd += `- **Avance**: ${progActual.porcentaje}% (${progActual.estado === 'completado' ? 'Completado' : 'En progreso'})\n`;
+                cuerpoMd += `- **Última posición**: ${progActual.ultimoMinuto || '00:00'}\n\n`;
+
+                if (marcasActuales.length > 0) {
+                    cuerpoMd += `## ⏱️ Notaciones y Momentos Clave\n\n`;
+                    marcasActuales.forEach(m => {
+                        cuerpoMd += `- [${m.minuto}](https://www.youtube.com/watch?v=${v.id}&t=${m.segundos}s) — ${m.texto}\n`;
+                    });
+                    cuerpoMd += `\n`;
+                }
+
+                if (contenido.trim()) {
+                    cuerpoMd += `## 📝 Cuaderno de Notas\n\n${contenido}\n`;
+                }
+
+                const sugerido = `notas_${v.titulo.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)}.md`;
+                const nombre = prompt('Nombre del archivo de notas en tu proyecto:', sugerido);
                 if (!nombre) return;
                 try {
                     await window.prigFetchJson('/api/files/write', {
                         method: 'POST',
-                        body: JSON.stringify({ path: nombre, content: `# Notas: ${v.titulo}\nCanal: ${v.canal}\nURL: https://www.youtube.com/watch?v=${v.id}\n\n${contenido}` })
+                        body: JSON.stringify({ path: nombre, content: cuerpoMd })
                     });
                     alert(`Notas guardadas en el proyecto como: ${nombre}`);
                 } catch (e) {

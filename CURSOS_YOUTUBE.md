@@ -89,3 +89,4 @@
 2. Ve a la pestaña o menú **Secciones → YouTube** (o presiona `Ctrl+Shift+Y`).
 3. Elige el curso que deseas estudiar filtrando por categoría (`Python`, `C++`, `Machine Learning`, `Deep Learning`) o escribiendo en el buscador.
 4. Toma notas sincronizadas con el video y consulta con el tutor inteligente cualquier concepto.
+

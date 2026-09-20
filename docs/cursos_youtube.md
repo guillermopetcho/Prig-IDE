@@ -486,3 +486,4 @@ Cada curso está integrado en el ecosistema de **Prig IDE** (sección `YouTube`)
    - **Tutor IA**: Haz preguntas al tutor en el panel lateral para que te explique cualquier fragmento de código, concepto matemático o fórmula vista en la clase.
 4. **Pegar enlaces externos**:
    - Si tienes otro video o lista de YouTube que quieras ver en Prig, simplemente pega la URL en la barra de búsqueda y presiona **Reproducir**.
+
