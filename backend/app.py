@@ -5129,6 +5129,32 @@ class DesafioAnalizarPropuestaRequest(BaseModel):
     modelo: Optional[str] = None
 
 
+class YouTubeAnalisisRequest(BaseModel):
+    video_id: str
+    titulo: str
+    canal: Optional[str] = "YouTube"
+    duracion: Optional[str] = ""
+    descripcion: Optional[str] = ""
+    categoria: Optional[str] = ""
+    nivel: Optional[str] = "intermedio"
+    texto_usuario: Optional[str] = ""
+    notas_usuario: Optional[str] = ""
+    modo: Optional[str] = "ambos"  # "resumen" | "objetivos" | "ambos"
+    modelo: Optional[str] = None
+
+
+class YouTubeCrearDesafioRequest(BaseModel):
+    video_id: str
+    titulo_video: str
+    objetivo_id: Optional[str] = None
+    objetivo_titulo: Optional[str] = ""
+    objetivo_descripcion: Optional[str] = ""
+    conceptos: Optional[List[str]] = None
+    nivel: Optional[str] = "intermedio"
+    lenguaje: Optional[str] = "python"
+    modelo: Optional[str] = None
+
+
 def _contexto_bloque(ruta_id: Optional[str], bloque_id: Optional[str]) -> Dict[str, Any]:
 
     if not ruta_id:
@@ -5614,6 +5640,79 @@ def desafios_analizar_propuesta(req: DesafioAnalizarPropuestaRequest):
                                                                req.lenguaje or "python",
                                                                req.nivel or "intermedio"), avisar)}
     return _ndjson_en_hilo(trabajo)
+
+
+@app.post("/api/youtube/analizar")
+def youtube_analizar(req: YouTubeAnalisisRequest):
+    """ Analiza el texto del video para generar resumen estructurado o dividirlo en objetivos didácticos """
+    motor, nombre_modelo = _motor_desafios(req.modelo, "tutor")
+    import youtube_analisis
+
+    contexto = youtube_analisis.preparar_contexto_video(
+        video_id=req.video_id,
+        titulo=req.titulo,
+        canal=req.canal or "YouTube",
+        duracion=req.duracion or "",
+        descripcion=req.descripcion or "",
+        texto_usuario=req.texto_usuario or "",
+        notas_usuario=req.notas_usuario or ""
+    )
+
+    resultado = {}
+    if req.modo in ("resumen", "ambos"):
+        resultado["resumen"] = youtube_analisis.generar_resumen_estructurado(
+            motor, nombre_modelo, req.titulo, req.canal or "YouTube",
+            req.duracion or "", contexto, req.categoria or ""
+        )
+    if req.modo in ("objetivos", "ambos"):
+        resultado["objetivos"] = youtube_analisis.generar_objetivos_didacticos(
+            motor, nombre_modelo, req.titulo, req.canal or "YouTube",
+            req.duracion or "", contexto, req.nivel or "intermedio", req.categoria or ""
+        )
+
+    return resultado
+
+
+@app.post("/api/youtube/crear-desafio")
+def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
+    """ Crea un desafío de programación didáctico a partir de un objetivo o tema del video (NDJSON) """
+    modelo = _modelo_desafios(req.modelo, "codigo")
+    motor, nombre_modelo = _motor_desafios(modelo)
+
+    tema = req.objetivo_titulo or req.titulo_video
+    conceptos_str = ", ".join(req.conceptos or []) if req.conceptos else "conceptos vistos en la clase"
+    contexto = (
+        f"El alumno está estudiando el curso de YouTube: «{req.titulo_video}» en Prig IDE.\n"
+        f"Objetivo de aprendizaje a dominar: «{tema}».\n"
+        f"Detalles didácticos: {req.objetivo_descripcion or 'Demostrar dominio práctico resolviendo el problema'}.\n"
+        f"Conceptos clave: {conceptos_str}.\n"
+        f"Crea un desafío didáctico e interactivo en {req.lenguaje or 'python'} con pruebas unitarias que verifiquen "
+        f"estos conceptos específicos y un esqueleto limpio con comentarios TODO."
+    )
+
+    def trabajo(avisar):
+        d = des_tutor.crear(
+            motor, runner, nombre_modelo, tema, req.nivel or "intermedio",
+            contexto, avisar=avisar, lenguaje=req.lenguaje or "python"
+        )
+        nube = gemini_motor.es_gemini(modelo)
+        d["lenguaje"] = req.lenguaje or "python"
+        d["origen"] = {
+            "tipo": "youtube",
+            "nombre": f"YouTube · {req.titulo_video}" + (" · Google Gemini" if nube else ""),
+            "modelo": modelo,
+            "motor": "gemini" if nube else "ollama",
+            "video_id": req.video_id,
+            "tema": tema,
+            "objetivo_id": req.objetivo_id,
+            "lenguaje": req.lenguaje or "python"
+        }
+        d = desafios_almacen.guardar(d)
+        _registrar_telemetria(d, "generated", attempt_num=len(d.get("intentos_creacion") or [1]))
+        return AlmacenDesafios.publico(d)
+
+    return _ndjson_en_hilo(trabajo)
+
 
 
 

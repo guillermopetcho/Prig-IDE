@@ -440,9 +440,15 @@
         ocultarTexto: localStorage.getItem('prig_yt_ocultar_texto') === 'true',
         ocultarTextoPlayer: localStorage.getItem('prig_yt_ocultar_texto_player') === 'true',
         videoActual: null,
-        pestanaLateral: 'notas', // 'notas' | 'tutor'
+        pestanaLateral: 'notas', // 'notas' | 'objetivos' | 'resumen' | 'tutor'
         chatTutor: [],
-        tutorCargando: false
+        tutorCargando: false,
+        analisisCargando: false,
+        analisisMensaje: '',
+        desafioCreando: false,
+        desafioMensaje: '',
+        mostrarInputTextoExtra: false,
+        textoExtra: ''
     };
 
     // ==================== GESTIÓN DE PROGRESO Y PERSISTENCIA ====================
@@ -618,6 +624,209 @@
         return m1 ? m1[1] : null;
     }
 
+    // ==================== GESTIÓN DE OBJETIVOS DIDÁCTICOS Y RESÚMENES ====================
+    function leerObjetivos(videoId) {
+        try {
+            const raw = localStorage.getItem(`prig_yt_objetivos_${videoId}`);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarObjetivos(videoId, objs) {
+        try {
+            localStorage.setItem(`prig_yt_objetivos_${videoId}`, JSON.stringify(objs));
+        } catch (e) {
+            console.error('Error guardando objetivos:', e);
+        }
+    }
+
+    function leerResumen(videoId) {
+        try {
+            const raw = localStorage.getItem(`prig_yt_resumen_${videoId}`);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function guardarResumen(videoId, res) {
+        try {
+            localStorage.setItem(`prig_yt_resumen_${videoId}`, JSON.stringify(res));
+        } catch (e) {
+            console.error('Error guardando resumen:', e);
+        }
+    }
+
+    function alternarObjetivoSuperado(videoId, objetivoId, forzarEstado = null) {
+        const lista = leerObjetivos(videoId);
+        let modificado = false;
+        lista.forEach(o => {
+            if (o.id === objetivoId) {
+                o.superado = forzarEstado !== null ? forzarEstado : !o.superado;
+                modificado = true;
+            }
+        });
+        if (modificado) {
+            guardarObjetivos(videoId, lista);
+            // Sincronizar porcentaje con el progreso global del curso
+            const superados = lista.filter(o => o.superado).length;
+            const pct = lista.length > 0 ? Math.round((superados / lista.length) * 100) : 0;
+            guardarProgreso(videoId, {
+                porcentaje: pct,
+                estado: pct >= 100 ? 'completado' : (pct > 0 ? 'en_progreso' : 'sin_iniciar')
+            });
+        }
+        return lista;
+    }
+
+    async function consumirStreamNdjson(res, alProgreso) {
+        if (!res.ok) {
+            let errDetail = 'Error en la comunicación con el servidor.';
+            try {
+                const j = await res.json();
+                errDetail = j.detail || j.message || errDetail;
+            } catch (_) {
+                errDetail = await res.text();
+            }
+            throw new Error(errDetail);
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let resultadoFinal = null;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lineas = buffer.split('\n');
+            buffer = lineas.pop();
+            for (const l of lineas) {
+                if (!l.trim()) continue;
+                try {
+                    const ev = JSON.parse(l);
+                    if (ev.tipo === 'error') throw new Error(ev.mensaje);
+                    if (ev.tipo === 'fin') resultadoFinal = ev.resultado;
+                    else if (alProgreso) alProgreso(ev);
+                } catch (err) {
+                    if (err.message && err.message.startsWith('Error')) throw err;
+                }
+            }
+        }
+        return resultadoFinal;
+    }
+
+    async function solicitarAnalisisIA(v, modo = 'ambos') {
+        if (estado.analisisCargando) return;
+        estado.analisisCargando = true;
+        estado.analisisMensaje = modo === 'resumen'
+            ? 'Analizando video y sintetizando resumen técnico...'
+            : (modo === 'objetivos' ? 'Dividiendo la clase en objetivos de aprendizaje con timestamps...' : 'Analizando clase con IA...');
+        pintar();
+
+        try {
+            const notaActual = localStorage.getItem(`prig_yt_nota_${v.id}`) || '';
+            const r = await window.prigFetchJson('/api/youtube/analizar', {
+                method: 'POST',
+                body: JSON.stringify({
+                    video_id: v.id,
+                    titulo: v.titulo,
+                    canal: v.canal || 'YouTube',
+                    duracion: v.duracion || '',
+                    descripcion: v.descripcion || '',
+                    categoria: v.categoria || '',
+                    nivel: v.nivel ? v.nivel.toLowerCase().split('/')[0].trim() : 'intermedio',
+                    texto_usuario: estado.textoExtra || '',
+                    notas_usuario: notaActual,
+                    modo: modo
+                })
+            });
+
+            if (r) {
+                if (r.resumen) {
+                    guardarResumen(v.id, r.resumen);
+                }
+                if (r.objetivos && Array.isArray(r.objetivos)) {
+                    // Conservar estados previos de superado si ya existían
+                    const previos = leerObjetivos(v.id);
+                    const superadosSet = new Set(previos.filter(p => p.superado).map(p => p.id));
+                    r.objetivos.forEach(o => {
+                        if (superadosSet.has(o.id)) o.superado = true;
+                    });
+                    guardarObjetivos(v.id, r.objetivos);
+                }
+            }
+        } catch (e) {
+            alert('Error al analizar con IA: ' + e.message);
+        } finally {
+            estado.analisisCargando = false;
+            estado.analisisMensaje = '';
+            pintar();
+        }
+    }
+
+    async function solicitarCrearDesafio(v, obj = null) {
+        if (estado.desafioCreando) return;
+        estado.desafioCreando = true;
+        estado.desafioMensaje = 'El modelo está generando tu desafío interactivo con pruebas unitarias y verificación de código...';
+        pintar();
+
+        try {
+            const esCpp = v.categoria === 'cpp' || (v.titulo && v.titulo.toLowerCase().includes('c++'));
+            const lenguaje = esCpp ? 'cpp' : 'python';
+            const temaTitulo = obj ? obj.titulo : v.titulo;
+            const objDesc = obj ? obj.descripcion : (v.descripcion || '');
+            const conceptos = obj ? obj.conceptos : [v.categoria || 'programación'];
+            const nivel = (obj && obj.dificultad) ? obj.dificultad : (v.nivel ? v.nivel.toLowerCase().split('/')[0].trim() : 'intermedio');
+
+            const res = await fetch('/api/youtube/crear-desafio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_id: v.id,
+                    titulo_video: v.titulo,
+                    objetivo_id: obj ? obj.id : 'global',
+                    objetivo_titulo: temaTitulo,
+                    objetivo_descripcion: objDesc,
+                    conceptos: conceptos,
+                    nivel: nivel,
+                    lenguaje: lenguaje
+                })
+            });
+
+            const desafio = await consumirStreamNdjson(res, (ev) => {
+                if (ev.tipo === 'progreso' && ev.mensaje) {
+                    estado.desafioMensaje = ev.mensaje;
+                    const elMsg = $('yt-desafio-mensaje-stream');
+                    if (elMsg) elMsg.textContent = ev.mensaje;
+                }
+            });
+
+            if (desafio && desafio.id) {
+                if (obj) {
+                    alternarObjetivoSuperado(v.id, obj.id, true);
+                }
+                if (window.Desafios) {
+                    window.Desafios.abrir({ id: desafio.id });
+                } else {
+                    alert(`¡Desafío creado exitosamente! Código: ${desafio.id}. Puedes abrirlo en la sección Desafíos.`);
+                }
+            } else {
+                alert('Desafío creado. Puedes encontrarlo en la sección Desafíos.');
+            }
+        } catch (e) {
+            alert('Error creando desafío: ' + e.message);
+        } finally {
+            estado.desafioCreando = false;
+            estado.desafioMensaje = '';
+            pintar();
+        }
+    }
+
+
     function inyectarEstilos() {
         if ($('youtube-hub-estilos')) return;
         const s = document.createElement('style');
@@ -707,9 +916,10 @@
 
             /* Panel Lateral */
             .yt-lateral { border-left:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
-            .yt-lateral-tabs { display:flex; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:rgba(0,0,0,0.15); flex-shrink:0; }
-            .yt-lateral-tab { flex:1; padding:9px; font-size:11.5px; font-weight:600; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; }
-            .yt-lateral-tab.activo { color:#fff; border-bottom-color:#ff0000; background:rgba(255,255,255,0.03); }
+            .yt-lateral-tabs { display:flex; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:rgba(0,0,0,0.18); flex-shrink:0; overflow-x:auto; scrollbar-width:none; }
+            .yt-lateral-tab { flex:1; min-width:68px; padding:9px 4px; font-size:10.5px; font-weight:700; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.15s; }
+            .yt-lateral-tab:hover { color:#fff; background:rgba(255,255,255,0.04); }
+            .yt-lateral-tab.activo { color:#fff; border-bottom-color:#ff0000; background:rgba(255,255,255,0.05); }
             .yt-lateral-cuerpo { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
 
             /* Notaciones por minuto */
@@ -735,6 +945,42 @@
 
             .yt-textarea-nota { width:100%; flex:1; min-height:140px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:8px; padding:10px; color:#fff; font-family:'Fira Code', monospace; font-size:11.5px; line-height:1.5; resize:none; outline:none; }
             .yt-textarea-nota:focus { border-color:var(--accent-blue, #89b4fa); }
+
+            /* Estilos de Objetivos Didácticos */
+            .yt-objetivos-contenedor { display:flex; flex-direction:column; gap:10px; }
+            .yt-objetivo-tarjeta { background:rgba(255,255,255,0.035); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; transition:border-color 0.15s, background 0.15s; }
+            .yt-objetivo-tarjeta:hover { border-color:rgba(137,180,250,0.35); background:rgba(255,255,255,0.05); }
+            .yt-objetivo-tarjeta.superado { border-color:rgba(16,185,129,0.35); background:rgba(16,185,129,0.04); }
+            .yt-obj-header { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+            .yt-obj-titulo { font-size:12px; font-weight:700; color:#fff; flex:1; line-height:1.3; }
+            .yt-badge-dificultad { font-size:9px; padding:2px 6px; border-radius:4px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; }
+            .yt-badge-dificultad.principiante { background:rgba(166,227,161,0.18); color:#a6e3a1; border:1px solid rgba(166,227,161,0.35); }
+            .yt-badge-dificultad.intermedio { background:rgba(137,180,250,0.18); color:#89b4fa; border:1px solid rgba(137,180,250,0.35); }
+            .yt-badge-dificultad.avanzado, .yt-badge-dificultad.senior { background:rgba(203,166,247,0.18); color:#cba6f7; border:1px solid rgba(203,166,247,0.35); }
+            .yt-obj-desc { font-size:11px; color:var(--text-muted, #a6adc8); line-height:1.4; margin:0; }
+            .yt-obj-footer { display:flex; align-items:center; justify-content:space-between; margin-top:4px; gap:8px; flex-wrap:wrap; }
+
+            /* Estilos de Resumen IA */
+            .yt-resumen-contenedor { display:flex; flex-direction:column; gap:12px; }
+            .yt-resumen-caja { background:rgba(255,255,255,0.035); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+            .yt-resumen-subtitulo { font-size:11.5px; font-weight:700; color:#fff; display:flex; align-items:center; gap:6px; }
+            .yt-resumen-texto { font-size:11.5px; color:#cdd6f4; line-height:1.45; margin:0; }
+            .yt-puntos-clave-lista { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:5px; }
+            .yt-punto-clave-item { font-size:11px; color:#cdd6f4; line-height:1.4; display:flex; align-items:flex-start; gap:6px; }
+            .yt-punto-clave-item i { color:var(--accent-green, #10b981); margin-top:2px; font-size:10px; flex-shrink:0; }
+            .yt-snippet-box { background:var(--bg-dark, #11111b); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:8px 10px; position:relative; overflow-x:auto; }
+            .yt-snippet-code { font-family:'Fira Code', monospace; font-size:11px; color:#89b4fa; margin:0; white-space:pre-wrap; }
+            .yt-glosario-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:6px; padding:7px 10px; font-size:11px; }
+
+            /* Caja para pegar texto extra / transcripción */
+            .yt-texto-extra-caja { background:rgba(0,0,0,0.3); border:1px dashed var(--border-color, rgba(255,255,255,0.15)); border-radius:7px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
+            .yt-textarea-extra { width:100%; min-height:70px; background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.1)); border-radius:6px; padding:6px 8px; color:#fff; font-size:11px; outline:none; resize:vertical; font-family:inherit; }
+
+            /* Carga y Spinners */
+            .yt-loading-box { text-align:center; padding:26px 16px; color:var(--text-muted); font-size:12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+            .yt-loading-spinner { font-size:24px; color:var(--accent-blue, #89b4fa); animation:ytSpin 1s linear infinite; }
+            @keyframes ytSpin { 100% { transform:rotate(360deg); } }
+
             .yt-chat-mensajes { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
             .yt-chat-msg { padding:8px 12px; border-radius:8px; font-size:11.5px; line-height:1.45; }
             .yt-chat-msg.usuario { background:rgba(137,180,250,0.15); border:1px solid rgba(137,180,250,0.3); color:#89b4fa; align-self:flex-end; }
@@ -955,6 +1201,9 @@
         const notaClave = `prig_yt_nota_${v.id}`;
         const notaGuardada = localStorage.getItem(notaClave) || '';
         const marcasDetectadas = extraerTimestampsDeTexto(notaGuardada);
+        const objetivos = leerObjetivos(v.id);
+        const resumen = leerResumen(v.id);
+        const superadosObj = objetivos.filter(o => o.superado).length;
 
         raiz.innerHTML = `
             <div class="yt-raiz">
@@ -1017,20 +1266,46 @@
                     ${v.descripcion ? `<p style="margin:4px 0 0; font-size:11.5px; color:var(--text-muted); line-height:1.45;">${esc(v.descripcion)}</p>` : ''}
 
                     <div class="yt-acciones-video" style="margin-top:6px;">
-                      <button class="yt-btn azul" id="yt-btn-crear-desafio"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear desafío en Prig con este tema</button>
-                      <button class="yt-btn morado" id="yt-btn-explicar-tema"><i class="fa-solid fa-brain"></i> Explicar conceptos con IA</button>
+                      <button class="yt-btn azul" id="yt-btn-ir-objetivos" title="Ver o generar objetivos pedagógicos"><i class="fa-solid fa-bullseye"></i> Objetivos didácticos ${objetivos.length > 0 ? `(${superadosObj}/${objetivos.length})` : ''}</button>
+                      <button class="yt-btn verde" id="yt-btn-ir-resumen" title="Ver resumen técnico y snippets"><i class="fa-solid fa-file-lines"></i> Resumen & Cheat-Sheet ${resumen ? '✓' : ''}</button>
+                      <button class="yt-btn morado" id="yt-btn-crear-desafio-video" title="Generar un desafío interactivo de código evaluado por Prig con este video"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear desafío en Prig</button>
+                      <button class="yt-btn" id="yt-btn-toggle-input-extra" title="Agregar texto o transcripción adicional para el análisis de IA"><i class="fa-solid fa-file-pen"></i> ${estado.mostrarInputTextoExtra ? 'Ocultar transcripción extra' : 'Pegar texto/transcripción'}</button>
                     </div>
+
+                    ${estado.mostrarInputTextoExtra ? `
+                      <div class="yt-texto-extra-caja" style="margin-top:8px;">
+                        <div style="font-size:11px; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+                          <span><i class="fa-solid fa-align-left"></i> Texto o Transcripción Adicional del Video:</span>
+                          <span style="font-size:10px; color:var(--text-muted);">Se añadirá al contexto del modelo al generar resúmenes u objetivos</span>
+                        </div>
+                        <textarea id="yt-textarea-extra" class="yt-textarea-extra" placeholder="Pega aquí la transcripción de YouTube, notas del autor o snippets que desees que el modelo considere...">${esc(estado.textoExtra || '')}</textarea>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
 
                 <div class="yt-lateral">
                   <div class="yt-lateral-tabs">
-                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas y Timestamps</div>
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas (${marcas.length})</div>
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'objetivos' ? 'activo' : ''}" data-tab="objetivos"><i class="fa-solid fa-bullseye"></i> Objetivos ${objetivos.length > 0 ? `(${superadosObj}/${objetivos.length})` : ''}</div>
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'resumen' ? 'activo' : ''}" data-tab="resumen"><i class="fa-solid fa-file-lines"></i> Resumen IA ${resumen ? '✓' : ''}</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'tutor' ? 'activo' : ''}" data-tab="tutor"><i class="fa-solid fa-robot"></i> Asistente IA</div>
                   </div>
 
                   <div class="yt-lateral-cuerpo">
-                    ${estado.pestanaLateral === 'notas' ? `
+                    ${estado.analisisCargando ? `
+                      <div class="yt-loading-box">
+                        <i class="fa-solid fa-circle-notch yt-loading-spinner"></i>
+                        <div style="font-weight:700; color:#fff;">Analizando clase con IA...</div>
+                        <div style="font-size:11px; color:var(--text-muted);">${esc(estado.analisisMensaje)}</div>
+                      </div>
+                    ` : estado.desafioCreando ? `
+                      <div class="yt-loading-box">
+                        <i class="fa-solid fa-wand-magic-sparkles yt-loading-spinner" style="color:var(--accent-purple, #cba6f7);"></i>
+                        <div style="font-weight:700; color:#fff;">Creando desafío interactivo...</div>
+                        <div id="yt-desafio-mensaje-stream" style="font-size:11px; color:var(--text-muted);">${esc(estado.desafioMensaje)}</div>
+                      </div>
+                    ` : estado.pestanaLateral === 'notas' ? `
                       <!-- Sección 1: Notaciones por Minuto -->
                       <div class="yt-marcas-seccion">
                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
@@ -1084,7 +1359,143 @@
                       ` : ''}
 
                       <textarea id="yt-nota" class="yt-textarea-nota" placeholder="Escribe aquí tus fórmulas, conceptos clave, código y marcas como [12:34] para saltar directamente...">${esc(notaGuardada)}</textarea>
+                    ` : estado.pestanaLateral === 'objetivos' ? `
+                      <!-- Pestaña de Objetivos Didácticos -->
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-weight:700; font-size:12px; color:#fff;"><i class="fa-solid fa-bullseye" style="color:var(--accent-blue, #89b4fa);"></i> Objetivos de la Clase</span>
+                        <button class="yt-btn azul" id="yt-btn-generar-objetivos" style="padding:2px 8px; font-size:10.5px;" title="Analizar video y dividir en objetivos didácticos">
+                          <i class="fa-solid fa-wand-magic-sparkles"></i> ${objetivos.length > 0 ? 'Regenerar' : 'Generar con IA'}
+                        </button>
+                      </div>
+
+                      ${objetivos.length === 0 ? `
+                        <div style="text-align:center; padding:30px 14px; color:var(--text-muted); font-size:11.5px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                          <i class="fa-solid fa-list-check" style="font-size:32px; opacity:0.35; color:var(--accent-blue);"></i>
+                          <p style="margin:0; line-height:1.4;">Divide esta clase en 3 a 6 hitos didácticos con timestamps exactos, dificultad y criterios de evaluación.</p>
+                          <button class="yt-btn azul" id="yt-btn-generar-objetivos-vacio" style="margin-top:4px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Analizar video y generar objetivos
+                          </button>
+                        </div>
+                      ` : `
+                        <div class="yt-objetivos-contenedor">
+                          <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">
+                            Completados: <b style="color:var(--accent-green);">${superadosObj}</b> de <b>${objetivos.length}</b> (${objetivos.length > 0 ? Math.round((superadosObj / objetivos.length) * 100) : 0}%)
+                          </div>
+                          ${objetivos.map(o => `
+                            <div class="yt-objetivo-tarjeta ${o.superado ? 'superado' : ''}" data-id="${esc(o.id)}">
+                              <div class="yt-obj-header">
+                                <input type="checkbox" class="yt-check-objetivo" data-id="${esc(o.id)}" ${o.superado ? 'checked' : ''} title="Marcar objetivo como completado" style="cursor:pointer; accent-color:#10b981; width:15px; height:15px; margin:0;">
+                                <span class="yt-obj-titulo" style="${o.superado ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${o.numero ? `${o.numero}. ` : ''}${esc(o.titulo)}</span>
+                                <span class="yt-badge-dificultad ${esc((o.dificultad || 'intermedio').toLowerCase())}">${esc(o.dificultad || 'Intermedio')}</span>
+                              </div>
+                              <p class="yt-obj-desc">${esc(o.descripcion)}</p>
+                              ${o.criterio_evaluacion ? `
+                                <div style="font-size:10.5px; color:#a6adc8; display:flex; align-items:flex-start; gap:5px;">
+                                  <i class="fa-solid fa-check-double" style="color:#10b981; margin-top:2px; font-size:10px;"></i>
+                                  <span>${esc(o.criterio_evaluacion)}</span>
+                                </div>
+                              ` : ''}
+                              <div class="yt-obj-footer">
+                                ${o.inicio_timestamp ? `
+                                  <button class="yt-timestamp-btn" data-segundos="${o.inicio_segundos || parsearTimestamp(o.inicio_timestamp)}" title="Saltar al inicio de este objetivo en el video">
+                                    <i class="fa-solid fa-play" style="font-size:9px;"></i> ${esc(o.inicio_timestamp)}
+                                  </button>
+                                ` : '<span></span>'}
+                                <button class="yt-btn morado yt-btn-crear-desafio-obj" data-id="${esc(o.id)}" style="padding:2px 7px; font-size:10.5px;" title="Generar un desafío interactivo de código evaluado por Prig enfocado en este objetivo">
+                                  <i class="fa-solid fa-code"></i> Crear desafío
+                                </button>
+                              </div>
+                            </div>
+                          `).join('')}
+                        </div>
+                      `}
+                    ` : estado.pestanaLateral === 'resumen' ? `
+                      <!-- Pestaña de Resumen y Cheat-Sheet -->
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-weight:700; font-size:12px; color:#fff;"><i class="fa-solid fa-file-lines" style="color:var(--accent-green, #a6e3a1);"></i> Resumen & Cheat-Sheet</span>
+                        <div style="display:flex; gap:4px;">
+                          <button class="yt-btn verde" id="yt-btn-generar-resumen" style="padding:2px 8px; font-size:10.5px;" title="Analizar video y sintetizar resumen técnico con IA">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> ${resumen ? 'Regenerar' : 'Generar con IA'}
+                          </button>
+                          ${resumen ? `
+                            <button class="yt-btn" id="yt-btn-inyectar-resumen" style="padding:2px 7px; font-size:10.5px;" title="Copiar este resumen al cuaderno de apuntes"><i class="fa-solid fa-file-import"></i> Al cuaderno</button>
+                            <button class="yt-btn" id="yt-btn-exportar-resumen" style="padding:2px 7px; font-size:10.5px;" title="Descargar como archivo Markdown"><i class="fa-solid fa-file-arrow-down"></i> .md</button>
+                          ` : ''}
+                        </div>
+                      </div>
+
+                      ${!resumen ? `
+                        <div style="text-align:center; padding:30px 14px; color:var(--text-muted); font-size:11.5px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                          <i class="fa-solid fa-file-circle-check" style="font-size:32px; opacity:0.35; color:var(--accent-green);"></i>
+                          <p style="margin:0; line-height:1.4;">Genera un resumen técnico ejecutivo, puntos clave, glosario y snippets de código listos para usar a partir del contenido de este video.</p>
+                          <button class="yt-btn verde" id="yt-btn-generar-resumen-vacio" style="margin-top:4px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Resumen Técnico con IA
+                          </button>
+                        </div>
+                      ` : `
+                        <div class="yt-resumen-contenedor">
+                          <!-- Resumen Ejecutivo -->
+                          <div class="yt-resumen-caja">
+                            <div class="yt-resumen-subtitulo"><i class="fa-solid fa-compass" style="color:#89b4fa;"></i> Resumen Ejecutivo</div>
+                            <p class="yt-resumen-texto">${esc(resumen.resumen_ejecutivo || '')}</p>
+                          </div>
+
+                          <!-- Puntos Clave -->
+                          ${resumen.puntos_clave && resumen.puntos_clave.length > 0 ? `
+                            <div class="yt-resumen-caja">
+                              <div class="yt-resumen-subtitulo"><i class="fa-solid fa-list-check" style="color:#a6e3a1;"></i> Puntos Clave & Conceptos</div>
+                              <ul class="yt-puntos-clave-lista">
+                                ${resumen.puntos_clave.map(pt => `
+                                  <li class="yt-punto-clave-item"><i class="fa-solid fa-check"></i> <span>${esc(pt)}</span></li>
+                                `).join('')}
+                              </ul>
+                            </div>
+                          ` : ''}
+
+                          <!-- Snippets de Código -->
+                          ${resumen.snippets_codigo && resumen.snippets_codigo.length > 0 ? `
+                            <div class="yt-resumen-caja">
+                              <div class="yt-resumen-subtitulo"><i class="fa-solid fa-code" style="color:#cba6f7;"></i> Snippets & Ejemplos de Código</div>
+                              ${resumen.snippets_codigo.map((sn, idx) => `
+                                <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;">
+                                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px;">
+                                    <span style="font-weight:700; color:#cdd6f4;">${esc(sn.titulo || `Snippet #${idx + 1}`)}</span>
+                                    <button class="yt-btn-copiar-snippet yt-btn" data-code="${esc(sn.codigo)}" style="padding:1px 6px; font-size:9.5px;"><i class="fa-regular fa-copy"></i> Copiar</button>
+                                  </div>
+                                  <div class="yt-snippet-box">
+                                    <pre class="yt-snippet-code"><code>${esc(sn.codigo)}</code></pre>
+                                  </div>
+                                  ${sn.explicacion ? `<span style="font-size:10px; color:var(--text-muted);">${esc(sn.explicacion)}</span>` : ''}
+                                </div>
+                              `).join('')}
+                            </div>
+                          ` : ''}
+
+                          <!-- Glosario -->
+                          ${resumen.glosario && resumen.glosario.length > 0 ? `
+                            <div class="yt-resumen-caja">
+                              <div class="yt-resumen-subtitulo"><i class="fa-solid fa-spell-check" style="color:#f9e2af;"></i> Glosario de Términos</div>
+                              <div style="display:flex; flex-direction:column; gap:5px;">
+                                ${resumen.glosario.map(g => `
+                                  <div class="yt-glosario-card">
+                                    <b style="color:#fff;">${esc(g.termino)}:</b> <span style="color:#cdd6f4;">${esc(g.definicion)}</span>
+                                  </div>
+                                `).join('')}
+                              </div>
+                            </div>
+                          ` : ''}
+
+                          <!-- Conclusiones -->
+                          ${resumen.conclusiones ? `
+                            <div class="yt-resumen-caja">
+                              <div class="yt-resumen-subtitulo"><i class="fa-solid fa-lightbulb" style="color:#fab387;"></i> Conclusión / Siguiente Paso</div>
+                              <p class="yt-resumen-texto">${esc(resumen.conclusiones)}</p>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `}
                     ` : `
+                      <!-- Pestaña Asistente IA -->
                       <div class="yt-chat-mensajes" id="yt-chat-mensajes">
                         ${estado.chatTutor.length === 0 ? `
                           <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:11.5px;">
@@ -1126,6 +1537,145 @@
                 pintar();
             };
         });
+
+        // Botones de acción del video
+        const btnIrObjetivos = $('yt-btn-ir-objetivos');
+        if (btnIrObjetivos) {
+            btnIrObjetivos.onclick = () => {
+                estado.pestanaLateral = 'objetivos';
+                pintar();
+                if (objetivos.length === 0 && !estado.analisisCargando) {
+                    solicitarAnalisisIA(v, 'objetivos');
+                }
+            };
+        }
+
+        const btnIrResumen = $('yt-btn-ir-resumen');
+        if (btnIrResumen) {
+            btnIrResumen.onclick = () => {
+                estado.pestanaLateral = 'resumen';
+                pintar();
+                if (!resumen && !estado.analisisCargando) {
+                    solicitarAnalisisIA(v, 'resumen');
+                }
+            };
+        }
+
+        const btnCrearDesafioVideo = $('yt-btn-crear-desafio-video');
+        if (btnCrearDesafioVideo) {
+            btnCrearDesafioVideo.onclick = () => {
+                solicitarCrearDesafio(v, null);
+            };
+        }
+
+        const btnToggleInputExtra = $('yt-btn-toggle-input-extra');
+        if (btnToggleInputExtra) {
+            btnToggleInputExtra.onclick = () => {
+                estado.mostrarInputTextoExtra = !estado.mostrarInputTextoExtra;
+                pintar();
+            };
+        }
+
+        const textareaExtra = $('yt-textarea-extra');
+        if (textareaExtra) {
+            textareaExtra.oninput = () => {
+                estado.textoExtra = textareaExtra.value;
+            };
+        }
+
+        // Acciones pestaña Objetivos
+        const btnGenObj = $('yt-btn-generar-objetivos');
+        if (btnGenObj) btnGenObj.onclick = () => solicitarAnalisisIA(v, 'objetivos');
+        const btnGenObjVacio = $('yt-btn-generar-objetivos-vacio');
+        if (btnGenObjVacio) btnGenObjVacio.onclick = () => solicitarAnalisisIA(v, 'objetivos');
+
+        raiz.querySelectorAll('.yt-check-objetivo').forEach(chk => {
+            chk.onchange = () => {
+                alternarObjetivoSuperado(v.id, chk.dataset.id, chk.checked);
+                pintar();
+            };
+        });
+
+        raiz.querySelectorAll('.yt-btn-crear-desafio-obj').forEach(btn => {
+            btn.onclick = () => {
+                const obj = objetivos.find(o => o.id === btn.dataset.id);
+                if (obj) solicitarCrearDesafio(v, obj);
+            };
+        });
+
+        // Acciones pestaña Resumen
+        const btnGenRes = $('yt-btn-generar-resumen');
+        if (btnGenRes) btnGenRes.onclick = () => solicitarAnalisisIA(v, 'resumen');
+        const btnGenResVacio = $('yt-btn-generar-resumen-vacio');
+        if (btnGenResVacio) btnGenResVacio.onclick = () => solicitarAnalisisIA(v, 'resumen');
+
+        raiz.querySelectorAll('.yt-btn-copiar-snippet').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const code = btn.getAttribute('data-code') || '';
+                navigator.clipboard.writeText(code).then(() => {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+                    setTimeout(() => { btn.innerHTML = original; }, 1500);
+                }).catch(() => {
+                    alert('No se pudo copiar automáticamente.');
+                });
+            };
+        });
+
+        const btnInyectarResumen = $('yt-btn-inyectar-resumen');
+        if (btnInyectarResumen && resumen) {
+            btnInyectarResumen.onclick = () => {
+                let texto = `\n\n## 💡 Resumen IA\n${resumen.resumen_ejecutivo || ''}\n`;
+                if (resumen.puntos_clave && resumen.puntos_clave.length) {
+                    texto += `\n### Puntos Clave:\n` + resumen.puntos_clave.map(p => `- ${p}`).join('\n') + `\n`;
+                }
+                if (resumen.snippets_codigo && resumen.snippets_codigo.length) {
+                    texto += `\n### Snippets:\n` + resumen.snippets_codigo.map(s => `\`\`\`${s.lenguaje || ''}\n${s.codigo}\n\`\`\``).join('\n\n') + `\n`;
+                }
+                const actual = localStorage.getItem(notaClave) || '';
+                localStorage.setItem(notaClave, (actual + texto).trim());
+                alert('¡Resumen inyectado en el cuaderno de apuntes (pestaña Notas)!');
+            };
+        }
+
+        const btnExportarResumen = $('yt-btn-exportar-resumen');
+        if (btnExportarResumen && resumen) {
+            btnExportarResumen.onclick = async () => {
+                let md = `# Resumen y Cheat-Sheet: ${v.titulo}\n\n`;
+                md += `- **Canal**: ${v.canal || 'YouTube'}\n`;
+                md += `- **URL**: https://www.youtube.com/watch?v=${v.id}\n\n`;
+                md += `## 🧭 Resumen Ejecutivo\n${resumen.resumen_ejecutivo || ''}\n\n`;
+                if (resumen.puntos_clave && resumen.puntos_clave.length) {
+                    md += `## 📌 Puntos Clave\n` + resumen.puntos_clave.map(p => `- ${p}`).join('\n') + `\n\n`;
+                }
+                if (resumen.snippets_codigo && resumen.snippets_codigo.length) {
+                    md += `## 💻 Snippets de Código\n`;
+                    resumen.snippets_codigo.forEach(s => {
+                        md += `### ${s.titulo || 'Snippet'}\n\`\`\`${s.lenguaje || ''}\n${s.codigo}\n\`\`\`\n${s.explicacion ? `${s.explicacion}\n\n` : '\n'}`;
+                    });
+                }
+                if (resumen.glosario && resumen.glosario.length) {
+                    md += `## 📖 Glosario\n` + resumen.glosario.map(g => `- **${g.termino}**: ${g.definicion}`).join('\n') + `\n\n`;
+                }
+                if (resumen.conclusiones) {
+                    md += `## 💡 Conclusión\n${resumen.conclusiones}\n\n`;
+                }
+
+                const sugerido = `resumen_${v.titulo.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)}.md`;
+                const nombre = prompt('Guardar resumen en el proyecto como:', sugerido);
+                if (!nombre) return;
+                try {
+                    await window.prigFetchJson('/api/files/write', {
+                        method: 'POST',
+                        body: JSON.stringify({ path: nombre, content: md })
+                    });
+                    alert(`Resumen guardado como: ${nombre}`);
+                } catch (e) {
+                    alert('Error guardando archivo: ' + e.message);
+                }
+            };
+        }
 
         // Controles de Progreso del Curso en Reproductor
         const btnToggleCompletado = $('yt-btn-toggle-completado');
@@ -1309,25 +1859,6 @@
                 } catch (e) {
                     alert('Error guardando archivo: ' + e.message);
                 }
-            };
-        }
-
-        const btnDesafio = $('yt-btn-crear-desafio');
-        if (btnDesafio) {
-            btnDesafio.onclick = () => {
-                if (window.Desafios) {
-                    window.Desafios.abrir({ tema: v.titulo });
-                }
-            };
-        }
-
-        const btnExplicar = $('yt-btn-explicar-tema');
-        if (btnExplicar) {
-            btnExplicar.onclick = () => {
-                estado.pestanaLateral = 'tutor';
-                pintar();
-                const pregunta = `Explica los conceptos clave, relevancia y mejores prácticas de: "${v.titulo}" (${v.descripcion || ''}).`;
-                enviarPreguntaTutor(pregunta);
             };
         }
 
