@@ -11,113 +11,424 @@
     const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     const VIDEOS_CURADOS = [
+        // ==================== PYTHON ====================
         {
-            id: 'mEsle_RQk70',
-            titulo: "Let's build GPT: from scratch, in code, spelled out",
-            canal: 'Andrej Karpathy',
-            categoria: 'ml',
-            duracion: '1:56:00',
-            nivel: 'Senior',
-            descripcion: 'Implementación completa de un Transformer generativo autorregresivo (GPT) desde cero en PyTorch, explicando self-attention y capas lineales.'
+            id: 'nLRL_NcnK-4',
+            titulo: 'Harvard CS50P – Introduction to Programming with Python',
+            canal: 'freeCodeCamp / Harvard (David J. Malan)',
+            categoria: 'python',
+            duracion: '15:56:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'El curso universitario completo de Harvard sobre Python: funciones, bucles, excepciones, librerías, pruebas unitarias con pytest, POO y expresiones regulares.'
         },
         {
-            id: 'VMj-3S1tku0',
-            titulo: 'Building micrograd: The spelled-out intro to neural networks and backprop',
-            canal: 'Andrej Karpathy',
-            categoria: 'ml',
-            duracion: '2:25:00',
+            id: 'rfscVS0vtbw',
+            titulo: 'Aprende Python – Curso Completo de Python desde Cero',
+            canal: 'freeCodeCamp Español (Estefania)',
+            categoria: 'python',
+            duracion: '4:26:00',
+            nivel: 'Principiante',
+            idioma: 'ES',
+            descripcion: 'Fundamentos exhaustivos de Python 3 en español: tipos de datos, listas, tuplas, diccionarios, bucles for/while, funciones y proyectos prácticos.'
+        },
+        {
+            id: '_uDW4ayzTQg',
+            titulo: 'Python Full Course for Beginners',
+            canal: 'Programming with Mosh',
+            categoria: 'python',
+            duracion: '6:14:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'Formación práctica en Python: control de flujo, estructuras de datos nativas, programación orientada a objetos, manejo de excepciones y automatización.'
+        },
+        {
+            id: 'XKHEtdqhLK8',
+            titulo: 'Python Full Course for free (12 Horas Completas)',
+            canal: 'Bro Code',
+            categoria: 'python',
+            duracion: '12:00:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'Guía enciclopédica de 12 horas: sintaxis, POO, multithreading, decoradores, generadores, interfaces gráficas con Tkinter y sockets de red.'
+        },
+        {
+            id: 'eWRuo9TUUTY',
+            titulo: 'Curso de PYTHON desde CERO (Completo)',
+            canal: 'Soy Dalto',
+            categoria: 'python',
+            duracion: '8:05:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'ES',
+            descripcion: 'Curso intensivo de 8 horas desde nivel cero hasta conceptos avanzados: lambdas, modularización, archivos y programación orientada a objetos en español.'
+        },
+        {
+            id: 'chPhlsHoEPo',
+            titulo: 'Curso Python para Principiantes',
+            canal: 'Fazt Code',
+            categoria: 'python',
+            duracion: '3:55:00',
+            nivel: 'Principiante',
+            idioma: 'ES',
+            descripcion: 'Tutorial integral paso a paso de Python para crear aplicaciones, scripts de automatización y backend estructurado.'
+        },
+        {
+            id: 'ZDa-Z5JzLYM',
+            titulo: 'Python OOP Masterclass: Classes, Inheritance & Dunders',
+            canal: 'Corey Schafer',
+            categoria: 'python',
+            duracion: '45:00',
             nivel: 'Intermedio / Senior',
-            descripcion: 'Construcción de un motor de autograd vectorial escalar y entrenamiento de una red neuronal multicapa paso a paso.'
-        },
-        {
-            id: 'ZA-tUyM_y7s',
-            titulo: 'MIT 6.006: Introduction to Algorithms - Peak Finding & Asymptotic Complexity',
-            canal: 'MIT OpenCourseWare (Erik Demaine)',
-            categoria: 'algoritmos',
-            duracion: '50:00',
-            nivel: 'Avanzado',
-            descripcion: 'Fundamentos de análisis asintótico, cotas Big-O y búsqueda de picos 1D y 2D en tiempo logarítmico.'
-        },
-        {
-            id: 'fNk_zzaMoSs',
-            titulo: 'The essence of linear algebra: Vectors, spans, and basis',
-            canal: '3Blue1Brown',
-            categoria: 'ml',
-            duracion: '10:00',
-            nivel: 'Fundamentos',
-            descripcion: 'Visualización geométrica rigurosa del álgebra lineal indispensable para machine learning y visión computacional.'
-        },
-        {
-            id: 'aircAruvnKk',
-            titulo: 'But what is a neural network? | Deep learning, chapter 1',
-            canal: '3Blue1Brown',
-            categoria: 'ml',
-            duracion: '19:00',
-            nivel: 'Fundamentos',
-            descripcion: 'Explicación intuitiva de perceptrones multicapa, matrices de pesos, sesgos y propagación hacia adelante.'
-        },
-        {
-            id: '18c3MTX0PK0',
-            titulo: 'How C++ Works: Compilation, Linking and Executables',
-            canal: 'The Cherno',
-            categoria: 'cpp',
-            duracion: '20:00',
-            nivel: 'Intermedio',
-            descripcion: 'Qué sucede internamente cuando el compilador g++ traduce unidades de traducción (.cpp) y las enlaza en un binario.'
-        },
-        {
-            id: 'DTxHyVn0ODg',
-            titulo: 'Pointers in C++: Raw pointers, Memory addresses and Lifetimes',
-            canal: 'The Cherno',
-            categoria: 'cpp',
-            duracion: '16:00',
-            nivel: 'Intermedio / Senior',
-            descripcion: 'Gestión directa de direcciones de memoria, tipos de punteros void*, desreferenciación y mejores prácticas con RAII.'
-        },
-        {
-            id: '8hly31xKli0',
-            titulo: 'Algorithms and Data Structures for Beginners - Full Course',
-            canal: 'NeetCode / freeCodeCamp',
-            categoria: 'algoritmos',
-            duracion: '5:20:00',
-            nivel: 'Senior',
-            descripcion: 'Estructuras de datos esenciales: Arrays, Listas Enlazadas, Árboles BST, Heaps, Grafos y Programación Dinámica.'
-        },
-        {
-            id: 'i53Gi_K3o7I',
-            titulo: 'System Design Interview: How to Scale a System to Millions of Users',
-            canal: 'ByteByteGo',
-            categoria: 'system_design',
-            duracion: '16:00',
-            nivel: 'Senior',
-            descripcion: 'Arquitectura escalable: balanceadores de carga, CDN, particionado de bases de datos, caché con Redis y microservicios.'
-        },
-        {
-            id: '5hP30Tqjtt4',
-            titulo: '0/1 Knapsack Problem - Dynamic Programming Formulation',
-            canal: 'Abdul Bari',
-            categoria: 'algoritmos',
-            duracion: '33:00',
-            nivel: 'Avanzado',
-            descripcion: 'Resolución analítica paso a paso del problema de la mochila con programación dinámica y recursión memoizada.'
+            idioma: 'EN',
+            descripcion: 'Explicación magistral sobre programación orientada a objetos: métodos de clase, estáticos, herencia, métodos mágicos dunder y property decorators.'
         },
         {
             id: '4Z8pP4Xj_Yk',
             titulo: 'Python Data Structures and Algorithms Masterclass',
-            canal: 'freeCodeCamp',
+            canal: 'freeCodeCamp / Jovian',
             categoria: 'python',
             duracion: '4:15:00',
             nivel: 'Intermedio / Senior',
-            descripcion: 'Implementación de estructuras idiomáticas en Python 3: colas de prioridad, generadores, grafos y segment trees.'
+            idioma: 'EN',
+            descripcion: 'Implementación de algoritmos y estructuras de datos en Python: árboles binarios de búsqueda, grafos, Dijkstra y programación dinámica.'
+        },
+
+        // ==================== C++ ====================
+        {
+            id: '8jLOx1hD3_o',
+            titulo: 'C++ Programming Course – Beginner to Advanced (C++20)',
+            canal: 'freeCodeCamp (Daniel Gakwaya)',
+            categoria: 'cpp',
+            duracion: '31:20:00',
+            nivel: 'Principiante / Senior',
+            idioma: 'EN',
+            descripcion: 'El curso definitivo de C++ moderno (C++20) de 31 horas: punteros, gestión del heap, RAII, conceptos (concepts), templates y la STL completa.'
+        },
+        {
+            id: 'vLnPwxZdW4Y',
+            titulo: 'C++ Tutorial for Beginners – Full Course',
+            canal: 'freeCodeCamp (Mike Dane)',
+            categoria: 'cpp',
+            duracion: '4:01:00',
+            nivel: 'Principiante',
+            idioma: 'EN',
+            descripcion: 'Fundamentos sólidos de C++: tipos primitivos, condicionales, punteros, direcciones de memoria, constructores y clases.'
+        },
+        {
+            id: '-TkoO8Z07hI',
+            titulo: 'C++ Full Course for free (6 Horas)',
+            canal: 'Bro Code',
+            categoria: 'cpp',
+            duracion: '6:00:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'Sintaxis de C++ moderno, arrays, desreferenciación de punteros, paso por referencia const &, constructores y sobrecarga de operadores.'
+        },
+        {
+            id: 'SfGuIVzE_Os',
+            titulo: 'How C++ Works: Compilation, Linking and Executables',
+            canal: 'The Cherno',
+            categoria: 'cpp',
+            duracion: '21:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'Arquitectura interna de C++: preprocesador, generación de código máquina .obj y enlazado estático/dinámico de ejecutables.'
+        },
+        {
+            id: 'DTxHyVn0ODg',
+            titulo: 'Pointers in C++: Memory Addresses & Lifetimes',
+            canal: 'The Cherno',
+            categoria: 'cpp',
+            duracion: '16:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'El modelo de memoria en C++: direcciones de memoria, desreferenciación, punteros void*, punteros inteligentes y ciclo de vida en el heap.'
+        },
+        {
+            id: 'W9gT9F-vSS8',
+            titulo: 'Welcome to C++ Series / C++ Philosophy and Architecture',
+            canal: 'The Cherno',
+            categoria: 'cpp',
+            duracion: '15:00',
+            nivel: 'Fundamentos',
+            idioma: 'EN',
+            descripcion: 'Por qué C++ es el estándar en motores gráficos, sistemas operativos y motores de inferencia de Inteligencia Artificial.'
+        },
+        {
+            id: 'yBHfWx6_oXQ',
+            titulo: 'Curso Completo de C++ para Principiantes',
+            canal: 'ATL Academy',
+            categoria: 'cpp',
+            duracion: '3:30:00',
+            nivel: 'Principiante',
+            idioma: 'ES',
+            descripcion: 'Fundamentos de C++ en español: algoritmos, memoria, estructuras de control, funciones y programación orientada a objetos con ejercicios.'
+        },
+        {
+            id: '8jOULp9E5-0',
+            titulo: 'Harvard CS50 – Full Computer Science Course (C & Algoritmos)',
+            canal: 'freeCodeCamp / Harvard (David J. Malan)',
+            categoria: 'cpp',
+            duracion: '25:00:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'Arquitectura de bajo nivel en C: gestión manual de memoria (malloc/free), punteros, segmentación de memoria y estructuras de datos complejas.'
+        },
+
+        // ==================== MACHINE LEARNING ====================
+        {
+            id: 'UzxYlbK2c7E',
+            titulo: 'Stanford CS229: Machine Learning Course (Lecture 1)',
+            canal: 'Stanford University (Andrew Ng)',
+            categoria: 'ml',
+            duracion: '1:18:00',
+            nivel: 'Senior / Avanzado',
+            idioma: 'EN',
+            descripcion: 'El curso universitario de referencia de Stanford: formulación matemática de aprendizaje supervisado, gradiente descendente y ecuaciones normales.'
+        },
+        {
+            id: 'i_LwzRVP7bg',
+            titulo: 'Machine Learning for Everybody – Full Course',
+            canal: 'freeCodeCamp (Kylie Ying)',
+            categoria: 'ml',
+            duracion: '3:53:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'Data Science y ML práctico con Python y Scikit-Learn: regresión lineal/logística, KNN, naive bayes, árboles de decisión y métricas de validación.'
+        },
+        {
+            id: 'NWONeJKn6kc',
+            titulo: 'Machine Learning Course for Beginners – Complete End-to-End',
+            canal: 'freeCodeCamp (Ayush Singh)',
+            categoria: 'ml',
+            duracion: '9:52:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'Curso integral de 10 horas: álgebra matricial, feature engineering, Decision Trees, Random Forest, Gradient Boosting y reducción con PCA.'
+        },
+        {
+            id: 'QezIU-8U-D0',
+            titulo: 'Machine Learning From Scratch in Python with NumPy',
+            canal: 'Patrick Loeber',
+            categoria: 'ml',
+            duracion: '5:10:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Construcción pura de algoritmos desde cero en Python y NumPy sin Scikit-Learn: Linear/Logistic Regression, KNN, Naive Bayes, SVM, Árboles y PCA.'
+        },
+        {
+            id: 'ukzFI9xg-M9',
+            titulo: 'Machine Learning Full Course (10 Horas)',
+            canal: 'Edureka',
+            categoria: 'ml',
+            duracion: '10:15:00',
+            nivel: 'Intermedio',
+            idioma: 'EN',
+            descripcion: 'Guía práctica de algoritmos de clasificación, clustering K-Means, aprendizaje supervisado y pipelines de datos con Python.'
+        },
+        {
+            id: 'fNk_zzaMoSs',
+            titulo: 'The Essence of Linear Algebra: Vectors, Spans, Basis & Transformations',
+            canal: '3Blue1Brown (Grant Sanderson)',
+            categoria: 'ml',
+            duracion: '10:00',
+            nivel: 'Fundamentos',
+            idioma: 'EN',
+            descripcion: 'Geometría e intuición visual del álgebra lineal: transformaciones lineales, determinantes, producto escalar, autovalores y autovectores.'
+        },
+
+        // ==================== DEEP LEARNING ====================
+        {
+            id: 'UZZD9d9YqnQ',
+            titulo: 'MIT 6.S191: Introduction to Deep Learning (Lecture 1)',
+            canal: 'MIT OpenCourseWare (Alexander Amini)',
+            categoria: 'dl',
+            duracion: '54:00',
+            nivel: 'Avanzado / Senior',
+            idioma: 'EN',
+            descripcion: 'El curso oficial de Deep Learning del MIT: perceptrones, backpropagation multivariable, optimizadores estocásticos (SGD/Adam) y representaciones latentes.'
+        },
+        {
+            id: 'mEsle_RQk70',
+            titulo: "Let's build GPT: from scratch, in code, spelled out",
+            canal: 'Andrej Karpathy',
+            categoria: 'dl',
+            duracion: '1:56:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Construcción completa de un Transformer autorregresivo (estilo GPT-2) en PyTorch desde cero, explicando self-attention multi-head y skip connections.'
+        },
+        {
+            id: 'VMj-3S1tku0',
+            titulo: 'Building micrograd: Neural networks and backpropagation from scratch',
+            canal: 'Andrej Karpathy',
+            categoria: 'dl',
+            duracion: '2:25:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Creación paso a paso de un motor de autograd escalar en Python y entrenamiento de una red neuronal multicapa sin librerías externas.'
+        },
+        {
+            id: 'kCc8FmEb1nY',
+            titulo: 'Building makemore: Language Modeling from Bigram to Multilayer Perceptron',
+            canal: 'Andrej Karpathy',
+            categoria: 'dl',
+            duracion: '1:57:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Modelado de lenguaje desde bigramas estadísticos hasta redes neuronales densas (Bengio et al. 2003) con embeddings y función Negative Log-Likelihood.'
+        },
+        {
+            id: 'pAU216bjVQ4',
+            titulo: "Let's build the GPT Tokenizer (BPE)",
+            canal: 'Andrej Karpathy',
+            categoria: 'dl',
+            duracion: '2:13:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Implementación del algoritmo Byte Pair Encoding (BPE) a nivel de bytes UTF-8 para tokenización en modelos de lenguaje como GPT-2 y GPT-4.'
+        },
+        {
+            id: 'Z_ikDlimN6A',
+            titulo: 'PyTorch for Deep Learning & Machine Learning – Full Course',
+            canal: 'freeCodeCamp (Daniel Bourke)',
+            categoria: 'dl',
+            duracion: '26:15:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'La formación de PyTorch más completa: tensores, visión computacional con CNNs, Transfer Learning, model deployment y tracking experimental.'
+        },
+        {
+            id: 'c36lUUrRlzs',
+            titulo: 'Deep Learning With PyTorch – Full Course',
+            canal: 'Patrick Loeber',
+            categoria: 'dl',
+            duracion: '4:36:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'Flujo de trabajo profesional en PyTorch: cálculo de gradientes con autograd, DataLoader/Dataset personalizados, CNNs y redes recurrentes.'
+        },
+        {
+            id: 'tPYj3fFJGjk',
+            titulo: 'TensorFlow 2.0 Complete Course – Neural Networks for Beginners',
+            canal: 'freeCodeCamp (Tech With Tim)',
+            categoria: 'dl',
+            duracion: '6:52:00',
+            nivel: 'Principiante / Intermedio',
+            idioma: 'EN',
+            descripcion: 'Ecosistema TensorFlow 2 y Keras: construcción de modelos convolucionales (Conv2D), procesamiento de lenguaje natural y redes recurrentes.'
+        },
+        {
+            id: 'vT1JzLTH4y4',
+            titulo: 'Stanford CS231n: Convolutional Neural Networks for Visual Recognition',
+            canal: 'Stanford (Fei-Fei Li & Andrej Karpathy)',
+            categoria: 'dl',
+            duracion: '1:04:00',
+            nivel: 'Senior / Avanzado',
+            idioma: 'EN',
+            descripcion: 'El curso clásico de Stanford sobre visión computacional: capas convolucionales, pooling, normalización, AlexNet, VGG y ResNet.'
+        },
+        {
+            id: '8rXD5-xhemo',
+            titulo: 'Stanford CS224N: Natural Language Processing with Deep Learning',
+            canal: 'Stanford (Christopher Manning)',
+            categoria: 'dl',
+            duracion: '1:21:00',
+            nivel: 'Senior / Avanzado',
+            idioma: 'EN',
+            descripcion: 'Representación semántica vectorial (Word2Vec, GloVe), redes secuenciales recurrentes, atención y arquitecturas de Transformers para NLP.'
+        },
+        {
+            id: '8SF_h8NW6dc',
+            titulo: 'Practical Deep Learning for Coders (Lesson 1)',
+            canal: 'fast.ai (Jeremy Howard)',
+            categoria: 'dl',
+            duracion: '1:25:00',
+            nivel: 'Intermedio / Senior',
+            idioma: 'EN',
+            descripcion: 'Metodología top-down de fast.ai: entrenar modelos de visión y NLP con estado del arte en pocas líneas de código antes de descender a las matemáticas.'
+        },
+        {
+            id: 'aircAruvnKk',
+            titulo: 'But what is a neural network? | Deep learning, chapter 1',
+            canal: '3Blue1Brown (Grant Sanderson)',
+            categoria: 'dl',
+            duracion: '19:00',
+            nivel: 'Fundamentos',
+            idioma: 'EN',
+            descripcion: 'La mejor explicación visual de cómo una red neuronal clasifica patrones mediante combinaciones lineales, pesos, sesgos y activaciones.'
+        },
+        {
+            id: 'kYJjZ35p3Yg',
+            titulo: 'Tu primera red neuronal en Python y Tensorflow',
+            canal: 'Ringa Tech',
+            categoria: 'dl',
+            duracion: '21:00',
+            nivel: 'Principiante',
+            idioma: 'ES',
+            descripcion: 'Tutorial práctico en español creando y entrenando una red neuronal en Python usando TensorFlow/Keras para conversión de grados Celsius a Fahrenheit.'
+        },
+        {
+            id: 'MRIv2IwFTPg',
+            titulo: '¿Qué es una Red Neuronal? La Neurona y el Perceptrón',
+            canal: 'DotCSV (Carlos Santana)',
+            categoria: 'dl',
+            duracion: '13:00',
+            nivel: 'Fundamentos',
+            idioma: 'ES',
+            descripcion: 'Explicación didáctica y rigurosa en español de la neurona artificial, entradas, pesos sinápticos, sesgo y funciones de activación.'
+        },
+
+        // ==================== ALGORITMOS & SYSTEM DESIGN ====================
+        {
+            id: '8hly31xKli0',
+            titulo: 'Algorithms and Data Structures for Beginners – Full Course',
+            canal: 'NeetCode / freeCodeCamp',
+            categoria: 'algoritmos',
+            duracion: '5:20:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Estructuras de datos esenciales: Arrays estáticos y dinámicos, Listas enlazadas, Árboles BST, Heaps, Grafos y QuickSort.'
+        },
+        {
+            id: 'ZA-tUyM_y7s',
+            titulo: 'MIT 6.006: Introduction to Algorithms – Peak Finding & Complexity',
+            canal: 'MIT OpenCourseWare (Erik Demaine)',
+            categoria: 'algoritmos',
+            duracion: '50:00',
+            nivel: 'Avanzado',
+            idioma: 'EN',
+            descripcion: 'Fundamentos de análisis asintótico, cotas Big-O y búsqueda de picos en tiempo logarítmico con división y conquista.'
+        },
+        {
+            id: '5hP30Tqjtt4',
+            titulo: '0/1 Knapsack Problem – Dynamic Programming Formulation',
+            canal: 'Abdul Bari',
+            categoria: 'algoritmos',
+            duracion: '33:00',
+            nivel: 'Avanzado',
+            idioma: 'EN',
+            descripcion: 'Optimización algorítmica clásica: programación dinámica matricial bottom-up y resolución analítica paso a paso.'
+        },
+        {
+            id: 'i53Gi_K3o7I',
+            titulo: 'System Design Interview: How to Scale a System to Millions of Users',
+            canal: 'ByteByteGo (Alex Xu)',
+            categoria: 'system_design',
+            duracion: '16:00',
+            nivel: 'Senior',
+            idioma: 'EN',
+            descripcion: 'Arquitectura escalable: balanceadores de carga, CDN, particionado de bases de datos, colas asíncronas y caché con Redis.'
         }
     ];
 
     const CATEGORIAS = [
-        { id: 'todas', label: 'Todos los videos' },
-        { id: 'algoritmos', label: 'Algoritmos y Estructuras' },
+        { id: 'todas', label: 'Todos los cursos' },
+        { id: 'python', label: 'Python' },
         { id: 'cpp', label: 'C++ Moderno' },
-        { id: 'python', label: 'Python Senior' },
-        { id: 'ml', label: 'Machine Learning & DL' },
+        { id: 'ml', label: 'Machine Learning' },
+        { id: 'dl', label: 'Deep Learning' },
+        { id: 'algoritmos', label: 'Algoritmos y Estructuras' },
         { id: 'system_design', label: 'System Design' }
     ];
 
@@ -247,6 +558,10 @@
                     <p style="margin:6px 0 0; font-size:11.5px;">Puedes pegar directamente cualquier URL de video de YouTube arriba y pulsar <b>Reproducir</b>.</p>
                   </div>
                 ` : `
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:12px; color:var(--text-muted, #a6adc8);">
+                    <span>Mostrando <b>${filtrados.length}</b> cursos curados</span>
+                    <span style="font-size:11px; opacity:0.8;"><i class="fa-brands fa-youtube" style="color:#ff0000;"></i> Python · C++ · Machine Learning · Deep Learning</span>
+                  </div>
                   <div class="yt-grid">
                     ${filtrados.map(v => `
                       <div class="yt-tarjeta" data-video-id="${esc(v.id)}">
@@ -254,6 +569,7 @@
                           <img src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="${esc(v.titulo)}" loading="lazy">
                           <span class="yt-duracion">${esc(v.duracion)}</span>
                           <span class="yt-nivel">${esc(v.nivel)}</span>
+                          <span class="yt-idioma" style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.75); color:#fff; font-size:9.5px; padding:2px 5px; border-radius:4px; font-weight:700; text-transform:uppercase; border:1px solid rgba(255,255,255,0.15);">${esc(v.idioma || 'EN')}</span>
                         </div>
                         <div class="yt-tarjeta-info">
                           <h3 class="yt-tarjeta-titulo">${esc(v.titulo)}</h3>
@@ -501,11 +817,32 @@
             }
         }
         pintar();
+        cargarCursosJson();
+    }
+
+    async function cargarCursosJson() {
+        try {
+            const r = await fetch('/static/data/cursos_youtube.json');
+            if (r.ok) {
+                const lista = await r.json();
+                if (Array.isArray(lista)) {
+                    let nuevo = false;
+                    lista.forEach(c => {
+                        if (!VIDEOS_CURADOS.some(v => v.id === c.id)) {
+                            VIDEOS_CURADOS.push(c);
+                            nuevo = true;
+                        }
+                    });
+                    if (nuevo && estado.vista === 'catalogo') pintar();
+                }
+            }
+        } catch (e) { /* usa lista interna */ }
     }
 
     document.addEventListener('prig:herramienta-abierta', (e) => {
         if (e.detail && e.detail.modalId === 'modal-youtube') {
             pintar();
+            cargarCursosJson();
         }
     });
 
