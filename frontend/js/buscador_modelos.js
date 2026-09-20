@@ -503,7 +503,7 @@
         try {
             const d = await json('/api/buscador/actualizaciones?max_edad=86400');
             estado.actualizables = d.actualizables || 0;
-            if (estado.actualizables && window.layoutMgr) window.layoutMgr.mensajeEstado(`${estado.actualizables} modelo(s) con versión nueva: Herramientas → Modelos → Buscar`, 8000);
+            if (estado.actualizables && window.layoutMgr) window.layoutMgr.mensajeEstado(`${estado.actualizables} modelo(s) con versión nueva: Secciones → Gestión de modelos`, 8000);
         } catch (e) { /* sin conexión */ }
         pintarIndicador();
     }

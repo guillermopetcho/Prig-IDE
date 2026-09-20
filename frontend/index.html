@@ -565,6 +565,21 @@
       </div>
     </div>
 
+    <!-- YouTube: hub de videos educativos de programación, algoritmos y ML (js/youtube_hub.js) -->
+    <div id="modal-youtube" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1400px; height: 90vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-brands fa-youtube" style="color:#ff0000;"></i> YouTube · videos y clases de programación con notas y tutor IA
+          </div>
+          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="document.getElementById('modal-youtube').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
+          <div id="youtube-raiz" style="height:100%;"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Agent Workflow Modal (Studio de Flujos de Agentes Dinámicos y Recursivos) -->
     <div id="modal-agent-workflow" class="modal-overlay" style="display:none;">
       <div class="modal-content modal-lg wf-studio-content" style="width: 1420px; max-width: 98vw; height: 93vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
@@ -2486,6 +2501,7 @@
   <script src="/static/js/ai_chat.js?v=11"></script>
   <script src="/static/js/kaggle_lector.js?v=9"></script>
   <script src="/static/js/github_lector.js?v=4"></script>
+  <script src="/static/js/youtube_hub.js?v=1"></script>
   <script src="/static/js/inicio.js?v=3"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>

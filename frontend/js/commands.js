@@ -287,41 +287,50 @@
         { id: 'ejecutar.limpiarConsola', menu: 'Ejecutar', label: 'Limpiar consola', accel: 'Ctrl+K Ctrl+L', separadorAntes: true,
           run: () => window.terminalMgr.clear() },
 
-        // ---------------- Herramientas ----------------
-        { id: 'herr.inicio', menu: 'Herramientas', label: 'Inicio', accel: 'Alt+Home',
+        // ---------------- Secciones ----------------
+        // Grupo 1: Inicio, Perfil, Biblioteca, Desafíos, Diagramas, Papers, Agenticos
+        { id: 'herr.inicio', menu: 'Secciones', label: 'Inicio', accel: 'Alt+Home',
           run: () => window.Inicio && window.Inicio.abrir() },
-        { id: 'herr.biblioteca', menu: 'Herramientas', label: 'Biblioteca', accel: 'Ctrl+1',
-          run: () => window.workArea.abrirHerramienta('modal-book-library', 'Biblioteca', 'fa-book-bookmark') },
-        { id: 'herr.guiado', menu: 'Herramientas', label: 'Aprendizaje Guiado', accel: 'Ctrl+2',
-          run: () => window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route') },
-        { id: 'herr.diagramas', menu: 'Herramientas', label: 'Diagramas de Flujo ML/DL', accel: 'Ctrl+Alt+D',
-          run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('diagramas'); } },
-        { id: 'herr.papers', menu: 'Herramientas', label: 'Papers Seminales y Algoritmos ML', accel: 'Ctrl+Alt+P',
-          run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('papers'); } },
-        { id: 'herr.practica', menu: 'Herramientas', label: 'Desafíos', accel: 'Ctrl+3',
-          run: () => window.Desafios && window.Desafios.abrir() },
-        { id: 'herr.perfil', menu: 'Herramientas', label: 'Perfil de aprendizaje', accel: 'Ctrl+4',
+        { id: 'herr.perfil', menu: 'Secciones', label: 'Perfil', accel: 'Ctrl+4',
           run: () => window.workArea.abrirHerramienta('modal-perfil', 'Perfil', 'fa-chart-pie') },
-        { id: 'herr.kaggle', menu: 'Herramientas', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
+        { id: 'herr.biblioteca', menu: 'Secciones', label: 'Biblioteca', accel: 'Ctrl+1',
+          run: () => window.workArea.abrirHerramienta('modal-book-library', 'Biblioteca', 'fa-book-bookmark') },
+        { id: 'herr.practica', menu: 'Secciones', label: 'Desafíos', accel: 'Ctrl+3',
+          run: () => window.Desafios && window.Desafios.abrir() },
+        { id: 'herr.diagramas', menu: 'Secciones', label: 'Diagramas', accel: 'Ctrl+Alt+D',
+          run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('diagramas'); } },
+        { id: 'herr.papers', menu: 'Secciones', label: 'Papers', accel: 'Ctrl+Alt+P',
+          run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('papers'); } },
+        { id: 'herr.agentes', menu: 'Secciones', label: 'Agenticos', accel: 'Ctrl+6',
+          run: () => window.workArea.abrirHerramienta('modal-agent-workflow', 'Agenticos', 'fa-diagram-project') },
+
+        // Grupo 2: Kaggle, GitHub, YouTube
+        { id: 'herr.kaggle', menu: 'Secciones', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
           run: () => window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k') },
-        { id: 'herr.github', menu: 'Herramientas', label: 'GitHub', accel: 'Ctrl+Shift+G',
+        { id: 'herr.github', menu: 'Secciones', label: 'GitHub', accel: 'Ctrl+Shift+G',
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
-        { id: 'herr.agentes', menu: 'Herramientas', label: 'Flujo de agentes', accel: 'Ctrl+6',
-          run: () => window.workArea.abrirHerramienta('modal-agent-workflow', 'Agentes', 'fa-diagram-project') },
-        { id: 'herr.mlflow', menu: 'Herramientas', label: 'Analizador de flujo ML', accel: 'Ctrl+7',
-          run: () => window.workArea.abrirHerramienta('modal-ml-flow', 'Flujo ML', 'fa-project-diagram') },
-        { id: 'herr.note', menu: 'Herramientas', label: 'Bloc de notas', accel: 'Ctrl+8', separadorAntes: true,
-          run: () => window.openNoteWindow() },
-        { id: 'herr.modelos', menu: 'Herramientas', label: 'Modelos', separadorAntes: true,
+        { id: 'herr.youtube', menu: 'Secciones', label: 'YouTube', accel: 'Ctrl+Shift+Y',
+          run: () => window.YouTubeHub && window.YouTubeHub.abrir() },
+
+        // Grupo 3: Modelos, Gestión de modelos, Gestión Ollama, Gestión máquina
+        { id: 'herr.modelos', menu: 'Secciones', label: 'Modelos', separadorAntes: true,
           run: () => window.Modelos && window.Modelos.abrir() },
-        { id: 'herr.buscarModelos', menu: 'Herramientas', label: 'Buscar y descargar modelos (Ollama, Hugging Face, ModelScope)', accel: 'Ctrl+K Ctrl+M',
+        { id: 'herr.buscarModelos', menu: 'Secciones', label: 'Gestión de modelos', accel: 'Ctrl+K Ctrl+M',
           run: () => window.Modelos && window.Modelos.abrir('buscar') },
-        { id: 'herr.encontrarModelo', menu: 'Herramientas', label: 'Encontrar un modelo por nombre o enlace…',
-          run: async () => { if (!window.Modelos) return; await window.Modelos.abrir('buscar'); const c = document.getElementById('bm-loc'); if (c) { c.focus(); c.select(); } } },
-        { id: 'herr.modelosServidor', menu: 'Herramientas', label: 'Servidor de Ollama y registro',
+        { id: 'herr.modelosServidor', menu: 'Secciones', label: 'Gestión Ollama',
           run: () => window.Modelos && window.Modelos.abrir('servidor') },
-        { id: 'herr.temperaturas', menu: 'Herramientas', label: 'Temperaturas de la máquina',
+        { id: 'herr.temperaturas', menu: 'Secciones', label: 'Gestión máquina',
           run: () => window.Temperaturas && window.Temperaturas.abrir() },
+
+        // Comandos auxiliares disponibles por atajo y paleta
+        { id: 'herr.guiado', menu: null, label: 'Aprendizaje Guiado', accel: 'Ctrl+2',
+          run: () => window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route') },
+        { id: 'herr.mlflow', menu: null, label: 'Analizador de flujo ML', accel: 'Ctrl+7',
+          run: () => window.workArea.abrirHerramienta('modal-ml-flow', 'Flujo ML', 'fa-project-diagram') },
+        { id: 'herr.note', menu: null, label: 'Bloc de notas', accel: 'Ctrl+8',
+          run: () => window.openNoteWindow() },
+        { id: 'herr.encontrarModelo', menu: null, label: 'Encontrar un modelo por nombre o enlace…',
+          run: async () => { if (!window.Modelos) return; await window.Modelos.abrir('buscar'); const c = document.getElementById('bm-loc'); if (c) { c.focus(); c.select(); } } },
 
         // ---------------- Configuración ----------------
         { id: 'config.general', menu: 'Configuración', label: 'Configuración global…', accel: 'Ctrl+,',
@@ -359,10 +368,29 @@
     ];
 
     const porId = {};
+    const ALIASES = {
+        'sec.inicio': 'herr.inicio',
+        'sec.perfil': 'herr.perfil',
+        'sec.biblioteca': 'herr.biblioteca',
+        'sec.desafios': 'herr.practica',
+        'sec.diagramas': 'herr.diagramas',
+        'sec.papers': 'herr.papers',
+        'sec.agenticos': 'herr.agentes',
+        'sec.kaggle': 'herr.kaggle',
+        'sec.github': 'herr.github',
+        'sec.youtube': 'herr.youtube',
+        'sec.modelos': 'herr.modelos',
+        'sec.gestionModelos': 'herr.buscarModelos',
+        'sec.gestionOllama': 'herr.modelosServidor',
+        'sec.gestionMaquina': 'herr.temperaturas',
+    };
     COMANDOS.forEach(c => { c.run = seguro(c.run); porId[c.id] = c; });
+    Object.entries(ALIASES).forEach(([alias, id]) => {
+        if (porId[id] && !porId[alias]) porId[alias] = porId[id];
+    });
 
     window.PrigCommands = {
-        MENUS: ['Archivos', 'Edición', 'Selección', 'Vista', 'Ir', 'Ejecutar', 'Herramientas', 'Configuración', 'Ayuda'],
+        MENUS: ['Archivos', 'Edición', 'Selección', 'Vista', 'Ir', 'Ejecutar', 'Secciones', 'Configuración', 'Ayuda'],
         todos: () => COMANDOS,
         porMenu: (menu) => COMANDOS.filter(c => c.menu === menu),
         get: (id) => porId[id],

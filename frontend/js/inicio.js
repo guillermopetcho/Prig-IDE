@@ -8,7 +8,7 @@
  * Kaggle. Todo sale de /api/inicio en una sola petición.
  *
  * Se abre sola al arrancar (se puede desactivar desde la propia pantalla) y siempre
- * con Herramientas → Inicio (Alt+Inicio).
+ * con Secciones → Inicio (Alt+Inicio).
  */
 (function () {
     const $ = (id) => document.getElementById(id);
@@ -18,22 +18,25 @@
 
     const estado = { datos: null, cargando: false, editando: false, error: null, todasHerramientas: false };
 
-    /** Qué se ve de cada herramienta. Lo que ejecuta y su atajo salen de commands.js */
+    /** Qué se ve de cada sección. Lo que ejecuta y su atajo salen de commands.js */
     const HERRAMIENTAS = [
-        ['herr.practica', 'fa-solid fa-chess-knight', '#cba6f7', 'Retos con caja de razonamiento, páginas de código y pruebas automáticas.'],
+        ['herr.inicio', 'fa-solid fa-house', '#89b4fa', 'Vista principal con tablero de bienvenida, métricas y accesos rápidos.'],
+        ['herr.perfil', 'fa-solid fa-chart-pie', '#fab387', 'Historial completo, dominio por concepto y análisis de tu avance.'],
+        ['herr.biblioteca', 'fa-solid fa-book-bookmark', '#f9e2af', 'Tus libros y documentos: pregunta y recibe respuestas con citas.'],
+        ['herr.practica', 'fa-solid fa-chess-knight', '#cba6f7', 'Desafíos interactivos con razonamiento, código y pruebas en Python y C++.'],
+        ['herr.diagramas', 'fa-solid fa-network-wired', '#a6e3a1', 'Diagramas de flujo interactivos para pipelines de ML y Deep Learning.'],
+        ['herr.papers', 'fa-solid fa-book-open', '#fab387', 'Monografías seminales de Machine Learning y algoritmos clave explicados.'],
+        ['herr.agentes', 'fa-solid fa-diagram-project', '#89b4fa', 'Estudio de flujos agénticos colaborativos y recursivos.'],
         ['herr.kaggle', 'fa-brands fa-kaggle', '#20beff', 'Notebooks, datasets y competiciones de la comunidad, con un profesor al lado.'],
         ['herr.github', 'fa-brands fa-github', '#e6edf3', 'Busca repositorios o pega su enlace y léelos con el profesor.'],
-        ['herr.guiado', 'fa-solid fa-route', '#a6e3a1', 'Planes de estudio por bloques que se van desbloqueando.'],
-        ['herr.biblioteca', 'fa-solid fa-book-bookmark', '#f9e2af', 'Tus libros y documentos: pregunta y recibe respuestas con citas.'],
-        ['herr.perfil', 'fa-solid fa-chart-pie', '#fab387', 'Historial completo, dominio por concepto y análisis de tu avance.'],
-        ['herr.agentes', 'fa-solid fa-diagram-project', '#89b4fa', 'Encadena varios modelos para tareas largas.'],
-        ['herr.mlflow', 'fa-solid fa-project-diagram', '#94e2d5', 'Revisa un pipeline de machine learning paso a paso.'],
-        ['herr.note', 'fa-solid fa-note-sticky', '#f5c2e7', 'Notas rápidas en una ventana aparte.'],
+        ['herr.youtube', 'fa-brands fa-youtube', '#ff0000', 'Videos y clases magistrales de programación y ML con notas de IA.'],
         ['herr.modelos', 'fa-solid fa-microchip', '#b4befe', 'Ajustes, pruebas, memoria y servidor de tus modelos.'],
         ['herr.buscarModelos', 'fa-solid fa-cloud-arrow-down', '#74c7ec', 'Busca y descarga modelos de Ollama, Hugging Face y ModelScope.'],
+        ['herr.modelosServidor', 'fa-solid fa-server', '#94e2d5', 'Servidor de Ollama, estado de servicios y registro.'],
         ['herr.temperaturas', 'fa-solid fa-temperature-half', '#f38ba8', 'GPU, CPU, disco y el límite térmico de la GPU.'],
+        ['herr.guiado', 'fa-solid fa-route', '#a6e3a1', 'Planes de estudio por bloques que se van desbloqueando.'],
+        ['herr.note', 'fa-solid fa-note-sticky', '#f5c2e7', 'Notas rápidas en una ventana aparte.'],
         ['archivo.exportarPdf', 'fa-solid fa-file-pdf', '#eba0ac', 'Exporta el código y los cuadernos de una carpeta a PDF.'],
-        ['archivo.abrirCarpeta', 'fa-solid fa-folder-open', '#f9e2af', 'Elige la carpeta del proyecto con el que trabajar.'],
         ['config.general', 'fa-solid fa-gear', '#a6adc8', 'IA, editor, apariencia y atajos de teclado.'],
     ];
 
@@ -338,7 +341,7 @@
         const disponibles = HERRAMIENTAS.filter(([id]) => comando(id));
         const orden = [...disponibles.filter(([id]) => favoritas.includes(id)), ...disponibles.filter(([id]) => !favoritas.includes(id))];
         const visibles = estado.todasHerramientas ? orden : orden.slice(0, Math.max(8, favoritas.length));
-        return `<div class="in-tarjeta in-ancho"><h2><i class="fa-solid fa-toolbox"></i> Herramientas
+        return `<div class="in-tarjeta in-ancho"><h2><i class="fa-solid fa-layer-group"></i> Secciones
               <span class="in-sub" style="margin:0; font-weight:400;">· marca tus favoritas con <i class="fa-solid fa-star" style="color:#f9e2af;"></i> para tenerlas primero</span>
               <button class="in-btn in-accion" data-todas>${estado.todasHerramientas ? 'Ver menos' : `Ver todas (${orden.length})`}</button></h2>
             <div class="in-herramientas">${visibles.map(([id, icono, color, texto]) => {
