@@ -26,8 +26,10 @@
         previaVista: null, codigoFicha: {}, explicacionDatos: {}, descargando: false,
         colecciones: [], guardados: {}, coloresColeccion: [], coleccion: null, filtroColeccion: '',
         lecturas: [], nb: null, explicaciones: {}, abiertas: new Set(), activa: null, pidiendo: new Set(),
-        guia: null, nivel: leerLocal('prig_kaggle_nivel') || 'intermedio', modelo: null, modelos: [],
+        guia: null, estudio: null, nivel: leerLocal('prig_kaggle_nivel') || 'intermedio', modelo: null, modelos: [],
         chat: [], pasoAPaso: false,
+        usarDatos: leerLocal('prig_kaggle_usar_datos') !== 'false',
+        panelDatosAbierto: false, panelEstudioAbierto: false, colsNotebook: [],
     };
 
     // ================================================================== utilidades
@@ -239,6 +241,18 @@
           .kg-lista-fila .kg-guardar { background:none; border-color:transparent; color:var(--text-muted); }
           .kg-lista-fila .kg-guardar.guardado { color:#20beff; }
           .kg-btn[data-guardar].guardado { color:#20beff; border-color:rgba(32,190,255,.45); }
+          .kg-btn-mini { background:rgba(255,255,255,.06); color:var(--text-main); border:1px solid var(--border-color); border-radius:4px; padding:2px 7px; font-size:10.5px; cursor:pointer; display:inline-flex; gap:4px; align-items:center; }
+          .kg-btn-mini:hover { border-color:var(--accent-blue); color:#fff; }
+          .kg-btn-mini.azul { background:rgba(32,190,255,.12); border-color:rgba(32,190,255,.3); color:#20beff; }
+          .kg-celda-barra { display:flex; align-items:center; gap:6px; margin-bottom:5px; flex-wrap:wrap; }
+          .kg-chip-col { background:rgba(203,166,247,.15); color:var(--accent-purple); border:1px solid rgba(203,166,247,.25); border-radius:4px; padding:1px 5px; font-size:9.5px; font-family:'Fira Code',monospace; }
+          .kg-panel-desplegable { margin:10px 16px; border:1px solid var(--border-color); border-radius:10px; background:var(--bg-panel); padding:12px 14px; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+          .kg-tarjeta-datos { border:1px solid rgba(255,255,255,.08); border-radius:8px; background:rgba(0,0,0,.2); padding:10px 12px; margin-top:8px; }
+          .kg-tabla-esquema { width:100%; border-collapse:collapse; font-size:11px; margin-top:6px; }
+          .kg-tabla-esquema th, .kg-tabla-esquema td { border:1px solid rgba(255,255,255,.07); padding:4px 8px; text-align:left; }
+          .kg-tabla-esquema th { background:rgba(255,255,255,.05); color:#cdd6f4; font-weight:600; }
+          .kg-badge-ok { background:rgba(166,227,161,.15); color:var(--accent-green); padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; }
+          .kg-badge-api { background:rgba(32,190,255,.15); color:#20beff; padding:2px 6px; border-radius:4px; font-size:10px; }
           .kg-panel-filtros { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:10px 14px; margin-top:10px; padding:12px; border:1px solid var(--border-color); border-radius:10px; background:var(--bg-panel); }
           .kg-panel-filtros label span { display:block; font-size:10.5px; color:var(--text-muted); margin-bottom:3px; }
           .kg-popover { position:fixed; z-index:10060; width:280px; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.45); }
@@ -1395,13 +1409,16 @@
         try {
             const nb = await json(`/api/kaggle/notebook?ref=${encodeURIComponent(ref)}`);
             estado.nb = nb;
+            estado.colsNotebook = columnasDelNotebook(nb);
             estado.explicaciones = {};
             Object.entries(nb.explicaciones || {}).forEach(([clave, e]) => {
                 if (clave.startsWith('guia:')) { estado.guia = estado.guia && estado.guia.ref === nb.ref ? estado.guia : { ref: nb.ref, texto: e.texto }; return; }
+                if (clave.startsWith('estudio:')) { estado.estudio = estado.estudio && estado.estudio.ref === nb.ref ? estado.estudio : { ref: nb.ref, texto: e.texto }; return; }
                 const i = e.indice;
                 if (!estado.explicaciones[i] || (e.fecha || '') > (estado.explicaciones[i].fecha || '')) estado.explicaciones[i] = e;
             });
             if (estado.guia && estado.guia.ref !== nb.ref) estado.guia = null;
+            if (estado.estudio && estado.estudio.ref !== nb.ref) estado.estudio = null;
             estado.abiertas = new Set(Object.keys(estado.explicaciones).map(Number));
             estado.activa = null;
             estado.chat = [];
@@ -1415,6 +1432,205 @@
         } catch (e) {
             hoja.innerHTML = `<div class="kg-pagina">${barraVolver()}<div class="kg-error">${esc(e.message)}</div></div>`;
             conectarVolver(hoja);
+        }
+    }
+
+    function columnasDelNotebook(nb) {
+        const cols = new Set();
+        const fuentes = (nb && nb.resumen_datos && nb.resumen_datos.fuentes) || [];
+        for (const f of fuentes) {
+            for (const t of f.tablas || []) {
+                for (const c of t.columnas || []) {
+                    if (c && c.nombre && c.nombre.length >= 2) {
+                        cols.add(c.nombre);
+                    }
+                }
+            }
+        }
+        return Array.from(cols);
+    }
+
+    function detectarColumnasEnCelda(fuente, todasCols) {
+        if (!fuente || !todasCols || !todasCols.length) return [];
+        const encontradas = [];
+        for (const col of todasCols) {
+            const re = new RegExp(`(?:['"\`\\.])${col.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:['"\`\\b]|$)`, 'i');
+            if (re.test(fuente)) {
+                encontradas.push(col);
+                if (encontradas.length >= 6) break;
+            }
+        }
+        return encontradas;
+    }
+
+    function pintarPanelDatos() {
+        const c = $('kg-panel-datos');
+        if (!c) return;
+        const nb = estado.nb;
+        const fuentes = (nb && nb.resumen_datos && nb.resumen_datos.fuentes) || [];
+        if (!fuentes.length) {
+            c.innerHTML = `<div class="kg-fila"><b style="color:#20beff; flex:1;"><i class="fa-solid fa-database"></i> Datasets del notebook</b>
+                <button class="kg-btn" id="kg-cerrar-panel-datos"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="kg-ayuda" style="margin-top:8px;">No se encontraron datasets vinculados a este notebook.</div>`;
+            const x = $('kg-cerrar-panel-datos');
+            if (x) x.onclick = () => { estado.panelDatosAbierto = false; c.style.display = 'none'; };
+            return;
+        }
+
+        c.innerHTML = `
+          <div class="kg-fila" style="margin-bottom:8px;">
+            <b style="color:#20beff; font-size:13.5px; flex:1;"><i class="fa-solid fa-database"></i> Gestión de Datasets para el Modelo (${fuentes.length})</b>
+            <span class="kg-ayuda" style="margin-right:12px;">El modelo utiliza estos esquemas, tipos y distribuciones para entender el código.</span>
+            <button class="kg-btn" id="kg-cerrar-panel-datos" style="padding:2px 6px;"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="kg-rejilla-datos">
+            ${fuentes.map((f, fIdx) => `
+              <div class="kg-tarjeta-datos" id="kg-fuente-${fIdx}">
+                <div class="kg-fila" style="justify-content:space-between; margin-bottom:6px;">
+                  <div class="kg-fila">
+                    <i class="fa-solid ${f.tipo === 'competicion' ? 'fa-trophy' : 'fa-table'}" style="color:#20beff;"></i>
+                    <b style="color:#fff; font-size:12.5px;">${esc(f.ref)}</b>
+                    ${f.descargado
+                      ? `<span class="kg-badge-ok"><i class="fa-solid fa-circle-check"></i> Descargado en proyecto</span>`
+                      : `<span class="kg-badge-api"><i class="fa-solid fa-cloud"></i> En Kaggle (Metadatos API)</span>`}
+                  </div>
+                  <div class="kg-fila">
+                    ${!f.descargado ? `<button class="kg-btn solido" data-dl-fuente="${esc(f.tipo)}|${esc(f.ref)}" style="padding:2px 8px; font-size:11px;"><i class="fa-solid fa-download"></i> Descargar al proyecto</button>` : `<span class="kg-ayuda">Carpeta: <code>${esc(f.carpeta || ('kaggle_datos/' + f.slug))}</code></span>`}
+                  </div>
+                </div>
+                <div id="kg-dl-progreso-${fIdx}"></div>
+                <div style="margin-top:6px;">
+                  ${(f.tablas || []).map((tab) => `
+                    <div style="margin-top:6px; padding:6px 8px; background:rgba(255,255,255,.02); border-radius:6px; border:1px solid rgba(255,255,255,.05);">
+                      <div class="kg-fila" style="justify-content:space-between;">
+                        <span style="font-size:11.5px; color:#fff; font-weight:600;"><i class="fa-regular fa-file-lines"></i> ${esc(tab.nombre || 'tabla')}</span>
+                        <span class="kg-ayuda">${tab.total_filas != null ? miles(tab.total_filas) + ' filas · ' : ''}${(tab.columnas || []).length} columnas</span>
+                      </div>
+                      ${(tab.columnas || []).length ? `
+                        <div style="max-height:160px; overflow-y:auto; margin-top:4px;">
+                          <table class="kg-tabla-esquema">
+                            <thead><tr><th>Columna</th><th>Tipo</th><th>Nulos</th><th>Estadísticas / Muestra</th></tr></thead>
+                            <tbody>
+                              ${(tab.columnas || []).map(col => `
+                                <tr>
+                                  <td><b>${esc(col.nombre)}</b></td>
+                                  <td><span class="kg-ayuda">${esc(col.tipo || 'desconocido')}</span></td>
+                                  <td>${col.faltan_pct != null ? `${col.faltan_pct}%` : '0%'}</td>
+                                  <td><span class="kg-ayuda">${col.media != null ? `media: ${col.media}, min: ${col.min}, max: ${col.max}` : (col.frecuentes || []).map(fr => `${esc(fr.valor)} (${fr.conteo})`).slice(0, 3).join(', ')}</span></td>
+                                </tr>
+                              `).join('')}
+                            </tbody>
+                          </table>
+                        </div>
+                      ` : ''}
+                      ${(tab.primeras || []).length ? `
+                        <details style="margin-top:6px;">
+                          <summary class="kg-ayuda" style="cursor:pointer;"><i class="fa-solid fa-eye"></i> Ver primeras filas de muestra (${tab.primeras.length})</summary>
+                          <div style="overflow-x:auto; margin-top:4px;">
+                            <table class="kg-tabla">
+                              <thead><tr>${(tab.columnas || []).map(c => `<th>${esc(c.nombre)}</th>`).join('')}</tr></thead>
+                              <tbody>
+                                ${tab.primeras.map(row => `<tr>${(tab.columnas || []).map(c => `<td>${esc(row[c.nombre] ?? '')}</td>`).join('')}</tr>`).join('')}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        const x = $('kg-cerrar-panel-datos');
+        if (x) x.onclick = () => { estado.panelDatosAbierto = false; c.style.display = 'none'; };
+        c.querySelectorAll('[data-dl-fuente]').forEach(btn => {
+            btn.onclick = async () => {
+                const [tipo, ref] = btn.dataset.dlFuente.split('|');
+                btn.disabled = true;
+                const idx = fuentes.findIndex(x => x.tipo === tipo && x.ref === ref);
+                const progDiv = $(`kg-dl-progreso-${idx}`);
+                if (progDiv) progDiv.innerHTML = `<div class="kg-fila" style="margin-top:4px;"><span class="kg-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Descargando datos al proyecto…</span></div>`;
+                try {
+                    await flujo('/api/kaggle/descargar', { tipo, ref }, (ev) => {
+                        if (ev.tipo === 'progreso' && progDiv) {
+                            progDiv.innerHTML = `<div class="kg-fila" style="margin-top:4px;"><span class="kg-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> ${esc(ev.mensaje)}</span></div>`;
+                        }
+                    });
+                    if (window.fileTreeMgr) window.fileTreeMgr.loadTree();
+                    await abrirNotebook(estado.nb.ref);
+                    estado.panelDatosAbierto = true;
+                    pintarPanelDatos();
+                } catch (e) {
+                    if (progDiv) progDiv.innerHTML = `<div class="kg-error" style="margin-top:4px;">${esc(e.message)}</div>`;
+                    btn.disabled = false;
+                }
+            };
+        });
+    }
+
+    function pintarPanelEstudio(texto, cargando) {
+        const c = $('kg-panel-estudio');
+        if (!c) return;
+        c.innerHTML = `
+          <div class="kg-fila" style="margin-bottom:8px;">
+            <b style="color:var(--accent-purple); font-size:14px; flex:1;"><i class="fa-solid fa-graduation-cap"></i> Metodología de Estudio Óptimo (Kaggle & Data Science)</b>
+            ${cargando ? '' : `<button class="kg-btn morado" id="kg-estudio-regenerar" style="padding:2px 8px; font-size:11px;"><i class="fa-solid fa-rotate"></i> Regenerar</button>`}
+            <button class="kg-btn" id="kg-estudio-cerrar" style="padding:2px 6px;"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="kg-estudio-texto" style="font-size:12.5px; line-height:1.65; color:var(--text-main);"></div>
+        `;
+        const x = $('kg-estudio-cerrar');
+        if (x) x.onclick = () => { estado.panelEstudioAbierto = false; c.style.display = 'none'; };
+        const reg = $('kg-estudio-regenerar');
+        if (reg) reg.onclick = () => pedirEstudioOptimo(true);
+        const t = $('kg-estudio-texto');
+        if (texto) {
+            pintarMd(t, texto.replace(/celdas? (\d+)(?:\s*[–-]\s*(\d+))?/gi, (m, a) => `[${m}](#kg-ir-${a})`));
+            t.querySelectorAll('a[href^="#kg-ir-"]').forEach(a => {
+                a.removeAttribute('target');
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    irACelda(+a.getAttribute('href').replace('#kg-ir-', ''));
+                };
+            });
+        } else {
+            t.innerHTML = '<span class="kg-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Diseñando la ruta pedagógica óptima a partir de los datos reales y el código del notebook…</span>';
+        }
+    }
+
+    async function pedirEstudioOptimo(regenerar = false) {
+        const nb = estado.nb;
+        if (!nb) return;
+        estado.panelEstudioAbierto = true;
+        const c = $('kg-panel-estudio');
+        if (c) c.style.display = 'block';
+        let texto = '';
+        pintarPanelEstudio('', true);
+        try {
+            const r = await flujo('/api/kaggle/notebook/estudio_optimo', {
+                ref: nb.ref,
+                modelo: estado.modelo,
+                regenerar,
+                incluir_datos: estado.usarDatos
+            }, (ev) => {
+                if (ev.tipo === 'texto') {
+                    texto += ev.delta;
+                    pintarPanelEstudio(texto, true);
+                }
+                if (ev.tipo === 'pensando' && !texto) {
+                    const t = $('kg-estudio-texto');
+                    if (t) t.innerHTML = '<span class="kg-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Analizando el problema, las columnas del dataset y la arquitectura del código…</span>';
+                }
+            });
+            if (estado.nb !== nb) return;
+            estado.estudio = { ref: nb.ref, texto: r.texto };
+            pintarPanelEstudio(r.texto, false);
+        } catch (e) {
+            const t = $('kg-estudio-texto');
+            if (t) t.innerHTML = `<div class="kg-error">${esc(e.message)}</div>`;
         }
     }
 
@@ -1434,6 +1650,7 @@
         }
         const leidas = (nb.lectura && nb.lectura.leidas) || [];
         const leidasSet = new Set([...leidas, ...estado.abiertas]);
+        const cantDatos = (nb.datos || []).length;
         hoja.innerHTML = `
           <div class="kg-cabecera">
             ${barraVolver()}
@@ -1442,9 +1659,12 @@
               <button class="kg-btn" id="kg-pdf" title="El notebook con las explicaciones del profesor, en PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
               <a class="kg-btn" href="${esc(nb.url)}" target="_blank" rel="noopener noreferrer" title="Ver en kaggle.com"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
             <div class="kg-fila kg-ayuda" style="margin:3px 0 6px;">${esc(nb.autor || '')} · <i class="fa-solid fa-caret-up"></i> ${miles(nb.votos)} · ${nb.celdas.length} celdas · versión ${esc(nb.version || '')}${nb.gpu ? ' · GPU' : ''}</div>
-            ${(nb.datos || []).length ? `<div class="kg-fila" style="margin-bottom:8px;"><span class="kg-ayuda">Datos:</span>${nb.datos.map((d, i) => `<button class="kg-chip" data-fuente="${i}" title="${d.descargado ? 'Ya está en el proyecto' : 'Ver y descargar'}">
+            ${cantDatos ? `<div class="kg-fila" style="margin-bottom:8px;"><span class="kg-ayuda">Datos:</span>${nb.datos.map((d, i) => `<button class="kg-chip" data-fuente="${i}" title="${d.descargado ? 'Ya está en el proyecto' : 'Ver y descargar'}">
                 <i class="fa-solid ${d.tipo === 'competicion' ? 'fa-trophy' : 'fa-table'}"></i>${esc(d.ref)}${d.descargado ? ' <i class="fa-solid fa-circle-check" style="color:var(--accent-green);"></i>' : ''}</button>`).join('')}</div>` : ''}
             <div class="kg-fila">
+              <button class="kg-btn azul" id="kg-btn-datos" title="Ver estructura y esquema de los datasets"><i class="fa-solid fa-database"></i> Datasets (${cantDatos})</button>
+              <label class="kg-ayuda kg-fila" style="cursor:pointer; user-select:none; margin:0 4px;" title="Permite al modelo de IA leer los esquemas, columnas y muestras de datos al explicar"><input type="checkbox" id="kg-chk-usar-datos" ${estado.usarDatos ? 'checked' : ''}> Leer datos con IA</label>
+              <button class="kg-btn morado" id="kg-btn-estudio" title="Plan pedagógico estructurado para dominar este notebook y sus datos"><i class="fa-solid fa-graduation-cap"></i> Estudio óptimo</button>
               <button class="kg-btn morado" id="kg-guia-btn"><i class="fa-solid fa-map"></i> Guía de lectura</button>
               <button class="kg-btn azul" id="kg-paso"><i class="fa-solid fa-person-chalkboard"></i> Leer paso a paso</button>
               <button class="kg-btn" id="kg-importar" title="Guarda el notebook en kaggle_notebooks/ con las rutas apuntando a kaggle_datos/"><i class="fa-solid fa-file-arrow-down"></i> Guardar en el proyecto</button>
@@ -1458,6 +1678,8 @@
             <div class="kg-barra" style="margin-top:4px;"><div id="kg-progreso" style="width:${Math.round(100 * leidasSet.size / Math.max(1, nb.celdas.length))}%;"></div></div>
             <div id="kg-importado"></div>
           </div>
+          <div id="kg-panel-datos" class="kg-panel-desplegable" style="display:${estado.panelDatosAbierto ? 'block' : 'none'};"></div>
+          <div id="kg-panel-estudio" class="kg-panel-desplegable" style="display:${estado.panelEstudioAbierto ? 'block' : 'none'};"></div>
           <div id="kg-guia"></div>
           <div id="kg-celdas">${nb.celdas.map(c => celdaHtml(c, leidasSet.has(c.indice))).join('')}</div>
           <div class="kg-ayuda" style="padding:10px 16px;">${esc(nb.licencia || '')}</div>
@@ -1470,6 +1692,32 @@
         pintarSelectorModelo($('kg-modelo'));
         $('kg-modelo').onchange = (e) => { estado.modelo = e.target.value; guardarLocal('prig_kaggle_modelo', estado.modelo); };
         $('kg-nivel').onchange = (e) => { estado.nivel = e.target.value; guardarLocal('prig_kaggle_nivel', estado.nivel); };
+        $('kg-btn-datos').onclick = () => {
+            estado.panelDatosAbierto = !estado.panelDatosAbierto;
+            const p = $('kg-panel-datos');
+            if (p) p.style.display = estado.panelDatosAbierto ? 'block' : 'none';
+            if (estado.panelDatosAbierto) pintarPanelDatos();
+        };
+        $('kg-chk-usar-datos').onchange = (e) => {
+            estado.usarDatos = e.target.checked;
+            guardarLocal('prig_kaggle_usar_datos', String(estado.usarDatos));
+        };
+        $('kg-btn-estudio').onclick = () => {
+            if (estado.panelEstudioAbierto && estado.estudio && estado.estudio.ref === nb.ref) {
+                estado.panelEstudioAbierto = !estado.panelEstudioAbierto;
+                const p = $('kg-panel-estudio');
+                if (p) p.style.display = estado.panelEstudioAbierto ? 'block' : 'none';
+            } else {
+                if (estado.estudio && estado.estudio.ref === nb.ref) {
+                    estado.panelEstudioAbierto = true;
+                    const p = $('kg-panel-estudio');
+                    if (p) p.style.display = 'block';
+                    pintarPanelEstudio(estado.estudio.texto, false);
+                } else {
+                    pedirEstudioOptimo(false);
+                }
+            }
+        };
         $('kg-guia-btn').onclick = () => pedirGuia(false);
         $('kg-paso').onclick = () => pasoAPaso();
         $('kg-importar').onclick = () => importar(false);
@@ -1486,13 +1734,22 @@
         document.querySelectorAll('#kg-celdas .kg-celda').forEach(el => conectarCelda(el));
         Object.entries(estado.explicaciones).forEach(([i, e]) => pintarExplicacion(+i, e.texto, true));
         if (estado.guia) pintarGuia(estado.guia.texto);
+        if (estado.panelDatosAbierto) pintarPanelDatos();
+        if (estado.panelEstudioAbierto && estado.estudio) pintarPanelEstudio(estado.estudio.texto, false);
         pintarChat();
     }
 
     function celdaHtml(c, leida) {
+        const cols = c.tipo !== 'markdown' ? detectarColumnasEnCelda(c.fuente, estado.colsNotebook || []) : [];
         const original = c.tipo === 'markdown'
             ? `<div class="kg-md" data-md="${c.indice}"></div>`
-            : `<pre class="kg-codigo"><code class="hljs language-python">${codigoResaltado(c.fuente)}</code></pre>`
+            : `<div class="kg-celda-barra">
+                ${cols.length ? `<span class="kg-ayuda" title="Columnas de datasets referenciadas"><i class="fa-solid fa-table-columns" style="font-size:10px;"></i> ${cols.map(col => `<span class="kg-chip-col">${esc(col)}</span>`).join(' ')}</span>` : ''}
+                <span style="flex:1"></span>
+                <button class="kg-btn-mini" data-copiar="${c.indice}" title="Copiar código al portapapeles"><i class="fa-regular fa-copy"></i> Copiar</button>
+                <button class="kg-btn-mini azul" data-editor="${c.indice}" title="Insertar código en el editor de Prig"><i class="fa-solid fa-code"></i> Al editor</button>
+              </div>
+              <pre class="kg-codigo"><code class="hljs language-python">${codigoResaltado(c.fuente)}</code></pre>`
               + (c.salida ? `<details style="margin-top:4px;"><summary class="kg-ayuda" style="cursor:pointer;">Salida guardada</summary><pre class="kg-codigo" style="color:var(--text-muted);">${esc(c.salida)}</pre></details>` : '');
         return `<div class="kg-celda" data-celda="${c.indice}" id="kg-celda-${c.indice}">
             <div class="kg-original">
@@ -1513,6 +1770,40 @@
         if (md) pintarMd(md, c.fuente);
         const b = el.querySelector('[data-explicar]');
         if (b) b.onclick = () => explicar(i);
+        const btnCopiar = el.querySelector('[data-copiar]');
+        if (btnCopiar) {
+            btnCopiar.onclick = (e) => {
+                e.stopPropagation();
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(c.fuente);
+                    btnCopiar.innerHTML = '<i class="fa-solid fa-check" style="color:var(--accent-green);"></i> Copiado';
+                    setTimeout(() => { btnCopiar.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; }, 1500);
+                }
+            };
+        }
+        const btnEditor = el.querySelector('[data-editor]');
+        if (btnEditor) {
+            btnEditor.onclick = (e) => {
+                e.stopPropagation();
+                if (window.workArea) window.workArea.activar('editor');
+                if (window.editorMgr) {
+                    if (window.editorMgr.insertText) {
+                        window.editorMgr.insertText(c.fuente + '\n');
+                    } else if (window.editorMgr.editor) {
+                        const ed = window.editorMgr.editor;
+                        const pos = ed.getPosition();
+                        if (pos && typeof monaco !== 'undefined') {
+                            ed.executeEdits('kaggle', [{
+                                range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
+                                text: c.fuente + '\n'
+                            }]);
+                        }
+                    }
+                }
+                btnEditor.innerHTML = '<i class="fa-solid fa-check" style="color:var(--accent-green);"></i> Enviado';
+                setTimeout(() => { btnEditor.innerHTML = '<i class="fa-solid fa-code"></i> Al editor'; }, 1500);
+            };
+        }
         el.querySelector('.kg-original').onclick = () => elegirCelda(i);
     }
 
@@ -1550,7 +1841,10 @@
         let texto = '';
         pintarExplicacion(i, '', false, true);
         try {
-            const r = await flujo('/api/kaggle/explicar', { ref: estado.nb.ref, indice: i, nivel: estado.nivel, modelo: estado.modelo, regenerar }, (ev) => {
+            const r = await flujo('/api/kaggle/explicar', {
+                ref: estado.nb.ref, indice: i, nivel: estado.nivel, modelo: estado.modelo, regenerar,
+                incluir_datos: estado.usarDatos
+            }, (ev) => {
                 if (ev.tipo === 'texto') { texto += ev.delta; pintarExplicacion(i, texto, false, true); }
             });
             if (!estado.nb) return;
@@ -1648,7 +1942,10 @@
         let texto = '';
         pintarGuia('', true);
         try {
-            const r = await flujo('/api/kaggle/guia', { ref: nb.ref, modelo: estado.modelo, regenerar }, (ev) => {
+            const r = await flujo('/api/kaggle/guia', {
+                ref: nb.ref, modelo: estado.modelo, regenerar,
+                incluir_datos: estado.usarDatos
+            }, (ev) => {
                 if (ev.tipo === 'texto') { texto += ev.delta; pintarGuia(texto, true); }
                 if (ev.tipo === 'pensando' && !texto) { const t = document.querySelector('#kg-guia [data-texto]'); if (t) t.innerHTML = '<span class="kg-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> El profesor está razonando sobre la estructura…</span>'; }
             });
@@ -1684,6 +1981,7 @@
             await flujo('/api/kaggle/preguntar', {
                 ref: estado.nb.ref, indice: estado.activa, modelo: estado.modelo,
                 mensajes: estado.chat.slice(0, -1).map(m => ({ rol: m.rol === 'usuario' ? 'usuario' : 'tutor', texto: m.texto })),
+                incluir_datos: estado.usarDatos
             }, (ev) => {
                 if (ev.tipo === 'texto') {
                     respuesta.texto += ev.delta;

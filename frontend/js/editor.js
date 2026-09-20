@@ -736,6 +736,21 @@ class EditorManager {
             this._restaurando = false;
         }
     }
+
+    insertText(text) {
+        if (!this.editor) return;
+        const position = this.editor.getPosition();
+        if (position && typeof monaco !== 'undefined') {
+            this.editor.executeEdits('prig-insert', [{
+                range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+                text: text
+            }]);
+        } else {
+            const val = this.editor.getValue();
+            this.editor.setValue(val ? val + '\n' + text : text);
+        }
+        this.editor.focus();
+    }
 }
 
 window.editorMgr = new EditorManager();

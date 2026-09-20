@@ -36,7 +36,7 @@ import threading
 import time
 import zipfile
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 
@@ -576,5 +576,159 @@ def reescribir_rutas(fuente: str, workspace: str) -> str:
 
 def datos_del_notebook(nb: Dict[str, Any], workspace: str) -> List[Dict[str, Any]]:
     """ Cada fuente de datos del notebook y si ya está en el proyecto """
-    fuentes = [("competicion", c) for c in nb.get("competiciones") or []] + [("dataset", d) for d in nb.get("datasets") or []]
-    return [{"tipo": t, "ref": r, "descargado": local(t, r, workspace) is not None} for t, r in fuentes]
+    fuentes_base = [("competicion", c) for c in nb.get("competiciones") or []] + [("dataset", d) for d in nb.get("datasets") or []]
+    fuentes_codigo = detectar_fuentes_en_codigo(nb)
+    todas = []
+    vistos = set()
+    for t, r in fuentes_base + fuentes_codigo:
+        clave = (t, r.lower())
+        if clave not in vistos:
+            vistos.add(clave)
+            todas.append((t, r))
+    return [{"tipo": t, "ref": r, "descargado": local(t, r, workspace) is not None} for t, r in todas]
+
+
+def detectar_fuentes_en_codigo(nb: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """ Encuentra referencias a /kaggle/input/<slug> o ../input/<slug> en las celdas de código """
+    encontrados = set()
+    exts_datos = (".csv", ".tsv", ".txt", ".json", ".parquet", ".zip", ".h5", ".feather", ".pt", ".pkl", ".npy", ".tab", ".data")
+    patron = re.compile(r"(?:/kaggle/input/|(?<![\w/])\.\./input/)([A-Za-z0-9_\-.]+(?:/[A-Za-z0-9_\-.]+)?)(?:/|['\"]|\s|$)")
+    for c in nb.get("celdas") or []:
+        if c.get("tipo") == "code":
+            for m in patron.finditer(c.get("fuente") or ""):
+                raw = m.group(1).strip().strip("/").strip("\\")
+                if not raw or raw in (".", ".."):
+                    continue
+                if "/" in raw:
+                    prim, seg = raw.split("/", 1)
+                    if any(seg.lower().endswith(ext) for ext in exts_datos):
+                        slug = prim
+                    else:
+                        slug = raw
+                else:
+                    slug = raw
+                if slug and not any(slug.lower().endswith(ext) for ext in exts_datos):
+                    encontrados.add(slug)
+    
+    ya_registrados = set((c or "").lower() for c in nb.get("competiciones") or [])
+    for d in nb.get("datasets") or []:
+        ya_registrados.add((d or "").lower())
+        ya_registrados.add((d or "").split("/")[-1].lower())
+
+    nuevos = []
+    for slug in sorted(encontrados):
+        if slug.lower() not in ya_registrados:
+            tipo = "dataset" if "/" in slug else "competicion"
+            nuevos.append((tipo, slug))
+    return nuevos
+
+
+def obtener_contexto_datasets_notebook(nb: Dict[str, Any], workspace: str, max_filas: int = 5) -> Dict[str, Any]:
+    """ Extrae esquemas, columnas, tipos, nulos, estadísticas y muestras de los datasets vinculados
+    al notebook (tanto descargados en kaggle_datos/ como metadatos de Kaggle), formateados para el modelo y la UI. """
+    fuentes_base = [("competicion", c) for c in nb.get("competiciones") or []] + [("dataset", d) for d in nb.get("datasets") or []]
+    fuentes_codigo = detectar_fuentes_en_codigo(nb)
+
+    todas_fuentes = []
+    vistos = set()
+    for tipo, ref in fuentes_base + fuentes_codigo:
+        clave = (tipo, ref.lower())
+        if clave not in vistos:
+            vistos.add(clave)
+            todas_fuentes.append((tipo, ref))
+
+    resumen_fuentes = []
+    bloques_texto = []
+
+    for tipo, ref in todas_fuentes:
+        slug = _nombre_local(tipo, ref)
+        info_local = local(tipo, ref, workspace)
+        descargado = info_local is not None
+
+        datos_fuente = {
+            "tipo": tipo,
+            "ref": ref,
+            "slug": slug,
+            "descargado": descargado,
+            "tablas": []
+        }
+
+        # 1. Si está descargado localmente, leemos vistas previas reales
+        if descargado and info_local:
+            datos_fuente["carpeta"] = info_local.get("carpeta")
+            archivos_datos = [a for a in info_local.get("archivos") or [] if a["relativa"].lower().endswith((".csv", ".tsv", ".parquet", ".json", ".txt"))]
+            for a in archivos_datos[:6]:
+                try:
+                    prev = vista_previa(a["ruta"], workspace, filas=max_filas)
+                    prev["relativa"] = a["relativa"]
+                    datos_fuente["tablas"].append(prev)
+                except Exception:
+                    continue
+
+        # 2. Si no está descargado o no tiene tablas legibles, intentamos obtener metadatos de Kaggle
+        if not datos_fuente["tablas"]:
+            try:
+                ficha = dataset(ref, workspace) if tipo == "dataset" else competicion(ref, workspace)
+                archivos_api = ficha.get("archivos") or []
+                for a in archivos_api[:6]:
+                    cols = a.get("columnas") or []
+                    datos_fuente["tablas"].append({
+                        "nombre": a.get("nombre"),
+                        "bytes": a.get("bytes"),
+                        "tipo": (a.get("nombre") or "").rsplit(".", 1)[-1].lower() if "." in (a.get("nombre") or "") else "",
+                        "columnas": cols,
+                        "primeras": [],
+                        "total_filas": None,
+                        "metadatos_solo": True
+                    })
+            except Exception:
+                pass
+
+        resumen_fuentes.append(datos_fuente)
+
+        # 3. Construir bloque de texto para el contexto del modelo de IA
+        texto_lineas = [f"### FUENTE DE DATOS: [{tipo.upper()}] «{ref}» ({'Descargado localmente' if descargado else 'Metadatos de Kaggle'})"]
+        if datos_fuente["tablas"]:
+            for tab in datos_fuente["tablas"]:
+                nombre_tab = tab.get("nombre") or "tabla"
+                filas_str = f"{tab.get('total_filas')} filas, " if tab.get("total_filas") is not None else ""
+                cols = tab.get("columnas") or []
+                texto_lineas.append(f"- Archivo `{nombre_tab}` ({filas_str}{len(cols)} columnas):")
+
+                desc_cols = []
+                for c in cols[:35]:
+                    nombre_col = c.get("nombre") or ""
+                    tipo_col = c.get("tipo") or "desconocido"
+                    detalles = []
+                    if c.get("faltan_pct") is not None and c["faltan_pct"] > 0:
+                        detalles.append(f"{c['faltan_pct']}% nulos")
+                    if c.get("distintos") is not None:
+                        detalles.append(f"{c['distintos']} valores distintos")
+                    if c.get("media") is not None:
+                        detalles.append(f"media {c['media']}")
+                    elif c.get("frecuentes"):
+                        vals = [str(f.get("valor")) for f in c["frecuentes"][:3] if f.get("valor") is not None]
+                        if vals:
+                            detalles.append(f"frecuentes: {', '.join(vals)}")
+                    det_str = f" ({', '.join(detalles)})" if detalles else ""
+                    desc_cols.append(f"    · `{nombre_col}` [{tipo_col}]{det_str}")
+                texto_lineas.extend(desc_cols)
+
+                primeras = tab.get("primeras") or []
+                if primeras:
+                    filas_muestras = ["    Muestras de filas:"]
+                    for f in primeras[:3]:
+                        filas_muestras.append("      " + ", ".join(str(val) for val in f[:10]))
+                    texto_lineas.extend(filas_muestras)
+        else:
+            texto_lineas.append("- Archivos en Kaggle (descarga al proyecto para ver muestras exactas).")
+
+        bloques_texto.append("\n".join(texto_lineas))
+
+    return {
+        "fuentes": resumen_fuentes,
+        "contexto_texto": "\n\n".join(bloques_texto) if bloques_texto else "",
+        "descargados_todos": all(f["descargado"] for f in resumen_fuentes) if resumen_fuentes else False,
+        "total_fuentes": len(resumen_fuentes)
+    }
+

@@ -407,6 +407,8 @@ Estructura (encabezados «### »):
 Una o dos frases.
 ### Paso a paso
 Las partes importantes del código explicadas en orden; cita el fragmento entre `comillas de código`.
+### Datos y Columnas (solo si la celda lee, transforma, filtra o grafica datos)
+Si la celda interactúa con columnas o archivos de datos, explica qué columnas concretas del dataset real se están usando, qué significan, cómo se están tratando los tipos o nulos y qué impacto tiene en los datos.
 ### Por qué aquí
 Qué papel cumple en el flujo del notebook (usa el esquema y las celdas anteriores).
 ### Conceptos
@@ -423,11 +425,11 @@ celda es TEXTO del autor. En español y en pocas líneas: resume la idea, explic
 técnicos que use y di qué conviene tener presente para las celdas de código que siguen."""
 
 SISTEMA_GUIA = """Eres un científico de datos senior. Antes de leer un notebook de Kaggle con el alumno, le
-das una guía de lectura en español, basada SOLO en el esquema y en las celdas que te pasan.
+das una guía de lectura en español, basada en el esquema, las celdas y la estructura de los datos disponibles.
 
 Secciones (encabezados «## »):
 ## De qué trata
-Objetivo del notebook y qué datos usa.
+Objetivo del notebook y qué datos usa (menciona los datasets, tablas y columnas principales).
 ## El recorrido
 Las etapas (por ejemplo: carga, exploración, limpieza, variables, modelo, evaluación) con los
 números de celda donde empieza cada una: `celdas 3–7`. Si el notebook entrena modelos, incluye un diagrama de flujo general del pipeline en un bloque ```mermaid ... ```.
@@ -436,16 +438,49 @@ Técnicas y conceptos concretos que aparecen.
 ## Antes de empezar
 Lo que conviene saber para seguirlo, y cómo leerlo (qué celdas son clave y cuáles se pueden hojear)."""
 
+SISTEMA_ESTUDIO_OPTIMO = """Eres un mentor y científico de datos senior especializado en aprendizaje activo de Machine Learning y Ciencia de Datos a través de proyectos reales de Kaggle.
 
-def _contexto(nb: Dict[str, Any], indice: int) -> str:
+Diseña una RUTA ÓPTIMA DE ESTUDIO personalizada para este notebook y sus datasets reales, diseñada para que el estudiante comprenda el flujo de trabajo completo, domine la teoría subyacente y sepa reutilizar el código en sus propios proyectos.
+
+Estructura obligatoria con encabezados («## » y «### »):
+## 1. Mapeo del Problema y los Datos
+- Tipo de problema (clasificación, regresión, series temporales, NLP, visión, etc.) y métrica de evaluación (ROC-AUC, RMSE, F1, LogLoss, etc.).
+- Relación de los datasets reales con el objetivo: qué representa cada fila, cuál es la variable objetivo (target) y qué variables predictoras son clave.
+
+## 2. Flujo de Trabajo y Celdas Clave
+Organiza el estudio en fases lógicas indicando los rangos de celdas a revisar:
+- Fase A: Carga, Inspección y Calidad de Datos (celdas X-Y).
+- Fase B: Análisis Exploratorio (EDA) e Hipótesis (celdas X-Y).
+- Fase C: Ingeniería de Características y Preprocesamiento (celdas X-Y).
+- Fase D: Modelado, Validación Cruzada y Tuning (celdas X-Y).
+- Fase E: Inferencia, Post-procesamiento y Conclusiones (celdas X-Y).
+(Si el notebook entrena modelos, incluye un diagrama de flujo modular en bloque ```mermaid ... ``` resumiendo la arquitectura de datos y modelado).
+
+## 3. Patrones de Código Reutilizables
+Identifica 2 a 4 técnicas o patrones de código excelentes que se usan en este notebook y que el estudiante debería guardar en su caja de herramientas (ej. imputación específica, encoding, optimización de memoria, cross-validation estratificado, pipeline de scikit-learn/PyTorch, etc.), con breve explicación de por qué son buenas prácticas.
+
+## 4. Preguntas Socráticas y Retos de Aprendizaje
+3 retos prácticos ordenados por dificultad:
+- Nivel Básico: Modificar un hiperparámetro o preprocesamiento en una celda específica.
+- Nivel Intermedio: Crear una nueva feature o manejar valores nulos de forma alternativa.
+- Nivel Avanzado: Diseñar una estrategia de validación diferente o mitigar un riesgo de fuga de datos (data leakage).
+
+## 5. Próximos Pasos para Practicar en Prig IDE
+Cómo transferir este código a tu editor local con el botón «Al editor», cómo ejecutarlo con datos en `kaggle_datos/` y qué experimento ejecutar primero."""
+
+
+def _contexto(nb: Dict[str, Any], indice: int, contexto_datos: Optional[str] = None) -> str:
     c = nb["celdas"][indice]
     previas = []
     for p in nb["celdas"][max(0, indice - 3):indice]:
         previas.append(f"--- celda {p['indice']} ({p['tipo']}) ---\n{p['fuente'][:1500]}")
-    return (f"NOTEBOOK: «{nb['titulo']}» de {nb.get('autor')} · datos: {', '.join(nb['competiciones'] + nb['datasets']) or 'sin indicar'}\n\n"
+    base = (f"NOTEBOOK: «{nb['titulo']}» de {nb.get('autor')} · datos: {', '.join(nb['competiciones'] + nb['datasets']) or 'sin indicar'}\n\n"
             f"ESQUEMA:\n{esquema(nb)}\n\nCELDAS ANTERIORES:\n" + ("\n".join(previas) or "(ninguna)")
             + f"\n\nCELDA {indice} A EXPLICAR ({c['tipo']}):\n{c['fuente'][:5000]}"
             + (f"\n\nSALIDA GUARDADA:\n{c['salida']}" if c.get("salida") else ""))
+    if contexto_datos and contexto_datos.strip():
+        base += f"\n\nESTRUCTURA DE LOS DATASETS DISPONIBLES:\n{contexto_datos.strip()}"
+    return base
 
 
 def _ruta_explicaciones(ref: str) -> str:
@@ -468,7 +503,10 @@ def guardar_explicacion(nb: Dict[str, Any], indice: Optional[int], nivel: str, m
     ref = nb["ref"]
     with _cerrojo:
         datos = explicaciones(ref)
-        clave = "guia:" + modelo if indice is None else _clave_explicacion(nb, indice, nivel, modelo)
+        if indice is None:
+            clave = "estudio:" + modelo if nivel == "estudio" else "guia:" + modelo
+        else:
+            clave = _clave_explicacion(nb, indice, nivel, modelo)
         datos[clave] = {"texto": texto, "fecha": datetime.now().isoformat(timespec="seconds"), "indice": indice}
         os.makedirs(os.path.dirname(_ruta_explicaciones(ref)), exist_ok=True)
         with open(_ruta_explicaciones(ref) + ".tmp", "w", encoding="utf-8") as f:
@@ -479,11 +517,15 @@ def guardar_explicacion(nb: Dict[str, Any], indice: Optional[int], nivel: str, m
 
 
 def explicacion_guardada(nb: Dict[str, Any], indice: Optional[int], nivel: str, modelo: str) -> Optional[str]:
-    clave = "guia:" + modelo if indice is None else _clave_explicacion(nb, indice, nivel, modelo)
+    if indice is None:
+        clave = "estudio:" + modelo if nivel == "estudio" else "guia:" + modelo
+    else:
+        clave = _clave_explicacion(nb, indice, nivel, modelo)
     return (explicaciones(nb["ref"]).get(clave) or {}).get("texto")
 
 
-def explicar(ai, modelo: str, nb: Dict[str, Any], indice: int, nivel: str = "intermedio"):
+def explicar(ai, modelo: str, nb: Dict[str, Any], indice: int, nivel: str = "intermedio",
+             contexto_datos: Optional[str] = None):
     from desafios.tutor import flujo
     if not 0 <= indice < len(nb["celdas"]):
         raise ErrorKaggle("Esa celda no existe.")
@@ -491,24 +533,38 @@ def explicar(ai, modelo: str, nb: Dict[str, Any], indice: int, nivel: str = "int
     if not c["fuente"].strip():
         return "Celda vacía."
     sistema = (SISTEMA_MARKDOWN if c["tipo"] == "markdown" else SISTEMA_CELDA) + "\n\n" + NIVELES.get(nivel, NIVELES["intermedio"])
-    return (yield from flujo(ai, modelo, _contexto(nb, indice), sistema, temperatura=0.3))
+    return (yield from flujo(ai, modelo, _contexto(nb, indice, contexto_datos), sistema, temperatura=0.3))
 
 
-def guia(ai, modelo: str, nb: Dict[str, Any]):
+def guia(ai, modelo: str, nb: Dict[str, Any], contexto_datos: Optional[str] = None):
     from desafios.tutor import flujo
     primeras = "\n".join(f"--- celda {c['indice']} ({c['tipo']}) ---\n{c['fuente'][:800]}" for c in nb["celdas"][:6])
     prompt = (f"NOTEBOOK: «{nb['titulo']}» de {nb.get('autor')} · {len(nb['celdas'])} celdas · datos: "
               f"{', '.join(nb['competiciones'] + nb['datasets']) or 'sin indicar'}\n\nESQUEMA:\n{esquema(nb)}\n\nPRIMERAS CELDAS:\n{primeras}")
+    if contexto_datos and contexto_datos.strip():
+        prompt += f"\n\nDATASETS Y ESQUEMAS DISPONIBLES:\n{contexto_datos.strip()}"
     return (yield from flujo(ai, modelo, prompt, SISTEMA_GUIA, temperatura=0.3, pensar=True))
 
 
-def preguntar(ai, modelo: str, nb: Dict[str, Any], indice: Optional[int], mensajes: List[Dict[str, str]]):
+def estudio_optimo(ai, modelo: str, nb: Dict[str, Any], contexto_datos: Optional[str] = None):
+    from desafios.tutor import flujo
+    primeras = "\n".join(f"--- celda {c['indice']} ({c['tipo']}) ---\n{c['fuente'][:600]}" for c in nb["celdas"][:8])
+    prompt = (f"NOTEBOOK: «{nb['titulo']}» de {nb.get('autor')} · {len(nb['celdas'])} celdas · datos: "
+              f"{', '.join(nb['competiciones'] + nb['datasets']) or 'sin indicar'}\n\n"
+              f"ESQUEMA COMPLETO:\n{esquema(nb)}\n\nMUESTRA DE CELDAS:\n{primeras}")
+    if contexto_datos and contexto_datos.strip():
+        prompt += f"\n\nESTRUCTURA Y ESTADÍSTICAS DE LOS DATASETS REALES:\n{contexto_datos.strip()}"
+    return (yield from flujo(ai, modelo, prompt, SISTEMA_ESTUDIO_OPTIMO, temperatura=0.3, pensar=True))
+
+
+def preguntar(ai, modelo: str, nb: Dict[str, Any], indice: Optional[int], mensajes: List[Dict[str, str]],
+              contexto_datos: Optional[str] = None):
     from desafios.tutor import flujo
     sistema = ("Eres un científico de datos senior que lee con el alumno un notebook de Kaggle. Responde en español, claro "
-               "y breve (menos de 200 palabras), apoyándote en el código del notebook. Si la pregunta es sobre algo que no está en "
-               "el notebook, dilo. Puedes mostrar fragmentos cortos de código.")
-    contexto = _contexto(nb, indice) if indice is not None and 0 <= indice < len(nb["celdas"]) else \
-        f"NOTEBOOK: «{nb['titulo']}»\n\nESQUEMA:\n{esquema(nb)}"
+               "y breve (menos de 200 palabras), apoyándote en el código del notebook y en la estructura de los datos reales. "
+               "Si la pregunta es sobre algo que no está en el notebook ni en sus datos, dilo. Puedes mostrar fragmentos cortos de código.")
+    contexto = _contexto(nb, indice, contexto_datos) if indice is not None and 0 <= indice < len(nb["celdas"]) else \
+        f"NOTEBOOK: «{nb['titulo']}»\n\nESQUEMA:\n{esquema(nb)}" + (f"\n\nDATASETS:\n{contexto_datos.strip()}" if contexto_datos and contexto_datos.strip() else "")
     historial = "\n".join(f"{'Alumno' if m.get('rol') == 'usuario' else 'Profesor'}: {str(m.get('texto'))[:1500]}"
                           for m in (mensajes or [])[-10:])
     return (yield from flujo(ai, modelo, f"{contexto}\n\nCONVERSACIÓN:\n{historial}\nProfesor:", sistema, temperatura=0.4))

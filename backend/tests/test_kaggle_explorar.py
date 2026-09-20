@@ -229,6 +229,36 @@ class TestNotebookEjecutable(Base):
         self.assertEqual({(d["ref"], d["descargado"]) for d in r["datos"]},
                          {("titanic", False), ("yasserh/titanic-dataset", True)})
 
+    def test_detectar_fuentes_en_codigo(self):
+        nb = {
+            "celdas": [
+                {"tipo": "code", "fuente": "df = pd.read_csv('/kaggle/input/titanic/train.csv')"},
+                {"tipo": "code", "fuente": "test = pd.read_csv('../input/house-prices-advanced-regression-techniques/test.csv')"},
+                {"tipo": "code", "fuente": "extra = pd.read_csv('../input/user/custom-dataset/data.csv')"},
+                {"tipo": "markdown", "fuente": "No buscar en /kaggle/input/falso"},
+            ]
+        }
+        fuentes = ke.detectar_fuentes_en_codigo(nb)
+        self.assertIn(("competicion", "titanic"), fuentes)
+        self.assertIn(("competicion", "house-prices-advanced-regression-techniques"), fuentes)
+        self.assertIn(("dataset", "user/custom-dataset"), fuentes)
+
+    def test_obtener_contexto_datasets_notebook(self):
+        ke.descargar("dataset", "yasserh/titanic-dataset", self.ws)
+        nb = {
+            "competiciones": ["titanic"],
+            "datasets": ["yasserh/titanic-dataset"],
+            "celdas": [
+                {"tipo": "code", "fuente": "df = pd.read_csv('/kaggle/input/titanic-dataset/Titanic-Dataset.csv')"}
+            ]
+        }
+        resumen = ke.obtener_contexto_datasets_notebook(nb, self.ws)
+        self.assertIn("fuentes", resumen)
+        self.assertIn("contexto_texto", resumen)
+        self.assertTrue(any(f["descargado"] for f in resumen["fuentes"]))
+        self.assertIn("Titanic-Dataset.csv", resumen["contexto_texto"])
+        self.assertIn("Survived", resumen["contexto_texto"])
+
 
 if __name__ == "__main__":
     unittest.main()

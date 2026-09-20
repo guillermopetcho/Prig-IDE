@@ -2039,6 +2039,7 @@ class KaggleRefRequest(BaseModel):
     ref: str
     modelo: Optional[str] = None
     regenerar: bool = False
+    incluir_datos: Optional[bool] = True
 
 
 class KaggleExplicarRequest(KaggleRefRequest):
@@ -2440,6 +2441,11 @@ def kaggle_notebook(ref: str, refrescar: bool = False):
     vista = kaggle_lector.vista(nb)
     vista["explicaciones"] = kaggle_lector.explicaciones(nb["ref"])
     vista["datos"] = kaggle_explorar.datos_del_notebook(nb, file_mgr.base_dir)
+    try:
+        vista["resumen_datos"] = kaggle_explorar.obtener_contexto_datasets_notebook(nb, file_mgr.base_dir)
+    except Exception as e:
+        logger.warning(f"Error obteniendo resumen de datos de {ref}: {e}")
+        vista["resumen_datos"] = {"fuentes": [], "contexto_texto": ""}
     return vista
 
 
@@ -2471,6 +2477,17 @@ def _kaggle_con_cache(nb, indice, nivel, modelo, regenerar, generador):
     return _ndjson_en_hilo(trabajo)
 
 
+def _obtener_contexto_datos(nb, req: KaggleRefRequest) -> Optional[str]:
+    if not getattr(req, "incluir_datos", True):
+        return None
+    try:
+        resumen = kaggle_explorar.obtener_contexto_datasets_notebook(nb, file_mgr.base_dir)
+        return resumen.get("contexto_texto")
+    except Exception as e:
+        logger.warning(f"Error obteniendo contexto de datos: {e}")
+        return None
+
+
 @app.post("/api/kaggle/explicar")
 def kaggle_explicar(req: KaggleExplicarRequest):
     nb = _kaggle(kaggle_lector.abrir, req.ref)
@@ -2479,16 +2496,28 @@ def kaggle_explicar(req: KaggleExplicarRequest):
     nivel = req.nivel if req.nivel in kaggle_lector.NIVELES else "intermedio"
     if not 0 <= req.indice < len(nb["celdas"]):
         raise HTTPException(status_code=400, detail="Esa celda no existe.")
+    ctx_datos = _obtener_contexto_datos(nb, req)
     return _kaggle_con_cache(nb, req.indice, nivel, modelo, req.regenerar,
-                             lambda: kaggle_lector.explicar(motor, nombre, nb, req.indice, nivel))
+                             lambda: kaggle_lector.explicar(motor, nombre, nb, req.indice, nivel, contexto_datos=ctx_datos))
 
 
 @app.post("/api/kaggle/guia")
 def kaggle_guia(req: KaggleRefRequest):
     nb = _kaggle(kaggle_lector.abrir, req.ref)
     motor, nombre = _motor_desafios(req.modelo, "explicar")
+    ctx_datos = _obtener_contexto_datos(nb, req)
     return _kaggle_con_cache(nb, None, "", _modelo_desafios(req.modelo, "explicar"), req.regenerar,
-                             lambda: kaggle_lector.guia(motor, nombre, nb))
+                             lambda: kaggle_lector.guia(motor, nombre, nb, contexto_datos=ctx_datos))
+
+
+@app.post("/api/kaggle/notebook/estudio_optimo")
+def kaggle_estudio_optimo(req: KaggleRefRequest):
+    nb = _kaggle(kaggle_lector.abrir, req.ref)
+    motor, nombre = _motor_desafios(req.modelo, "explicar")
+    modelo = _modelo_desafios(req.modelo, "explicar")
+    ctx_datos = _obtener_contexto_datos(nb, req)
+    return _kaggle_con_cache(nb, None, "estudio", modelo, req.regenerar,
+                             lambda: kaggle_lector.estudio_optimo(motor, nombre, nb, contexto_datos=ctx_datos))
 
 
 @app.post("/api/kaggle/preguntar")
@@ -2497,9 +2526,10 @@ def kaggle_preguntar(req: KagglePreguntarRequest):
         raise HTTPException(status_code=400, detail="Escribe una pregunta.")
     nb = _kaggle(kaggle_lector.abrir, req.ref)
     motor, nombre = _motor_desafios(req.modelo, "explicar")
+    ctx_datos = _obtener_contexto_datos(nb, req)
 
     def trabajo(avisar):
-        return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, req.mensajes), avisar)}
+        return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, req.mensajes, contexto_datos=ctx_datos), avisar)}
     return _ndjson_en_hilo(trabajo)
 
 @app.get("/api/workspace")

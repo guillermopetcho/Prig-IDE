@@ -338,6 +338,32 @@ class TestProfesor(Base):
         self.assertEqual((sig["ref"], sig["celda"]), ("alexisbcook/titanic-tutorial", 0))
         self.assertEqual(r["kaggle"][0]["leidas"], 1)
 
+    def test_explicar_con_contexto_de_datos(self):
+        ai = ModeloFalso("Explicación con datos.")
+        ctx = "### FUENTE DE DATOS: [COMPETICION] «titanic»\n- Archivo `train.csv` (891 filas, 12 columnas):\n  · `Survived`: int64, 0% nulos"
+        texto, _ = consumir(kl.explicar(ai, "qwen", self.nb, 2, "intermedio", contexto_datos=ctx))
+        self.assertIn("Explicación con datos", texto)
+        p = ai.prompts[0]
+        self.assertIn("ESTRUCTURA DE LOS DATASETS DISPONIBLES:", p["prompt"])
+        self.assertIn("train.csv", p["prompt"])
+        self.assertIn("Datos y Columnas", p["sistema"])
+
+    def test_estudio_optimo_y_guardado(self):
+        ai = ModeloFalso("<think>analizando ruta</think>## 1. Mapeo del Problema\nPredicción binaria.")
+        ctx = "### FUENTE DE DATOS: [COMPETICION] «titanic»"
+        texto, _ = consumir(kl.estudio_optimo(ai, "qwen", self.nb, contexto_datos=ctx))
+        self.assertNotIn("analizando", texto)
+        self.assertIn("1. Mapeo del Problema", texto)
+        p = ai.prompts[0]
+        self.assertIn("ESTRUCTURA Y ESTADÍSTICAS", p["prompt"])
+        self.assertIn("RUTA ÓPTIMA DE ESTUDIO", p["sistema"])
+
+        kl.guardar_explicacion(self.nb, None, "estudio", "qwen", texto)
+        recuperado = kl.explicacion_guardada(self.nb, None, "estudio", "qwen")
+        self.assertEqual(recuperado, texto)
+        self.assertIsNone(kl.explicacion_guardada(self.nb, None, "", "qwen"))  # No colisiona con la guía
+
 
 if __name__ == "__main__":
     unittest.main()
+
