@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prig IDE - Editor de Código & Tutor IA</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=8">
+  <link rel="stylesheet" href="/static/css/style.css?v=9">
   <link rel="stylesheet" href="/static/css/rediseno.css?v=16">
 
   <!-- Google Font & FontAwesome Icons -->
@@ -557,7 +557,7 @@
           <div class="modal-title">
             <i class="fa-brands fa-kaggle" style="color:#20beff;"></i> Kaggle · explorar datos y leer notebooks con un profesor
           </div>
-          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="document.getElementById('modal-kaggle-hub').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="if (window.workArea && window.workArea.vistas.some(v => v.modalId === 'modal-kaggle-hub')) window.workArea.cerrar('h:modal-kaggle-hub'); else document.getElementById('modal-kaggle-hub').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
           <div id="kaggle-raiz" style="height:100%;"></div>
@@ -2489,17 +2489,17 @@
   <script src="/static/js/prig_net.js?v=6"></script>
   <script src="/static/js/apariencia.js?v=7"></script>
   <script src="/static/js/shortcuts.js?v=8"></script>
-  <script src="/static/js/commands.js?v=17"></script>
+  <script src="/static/js/commands.js?v=18"></script>
   <script src="/static/js/menubar.js?v=9"></script>
   <script src="/static/js/layout.js?v=8"></script>
-  <script src="/static/js/workarea.js?v=12"></script>
+  <script src="/static/js/workarea.js?v=13"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
   <script src="/static/js/editor.js?v=11"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=8"></script>
   <script src="/static/js/terminal.js?v=6"></script>
   <script src="/static/js/ai_chat.js?v=11"></script>
-  <script src="/static/js/kaggle_lector.js?v=9"></script>
+  <script src="/static/js/kaggle_lector.js?v=10"></script>
   <script src="/static/js/github_lector.js?v=4"></script>
   <script src="/static/js/youtube_hub.js?v=1"></script>
   <script src="/static/js/inicio.js?v=3"></script>

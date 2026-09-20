@@ -306,7 +306,7 @@
 
         // Grupo 2: Kaggle, GitHub, YouTube
         { id: 'herr.kaggle', menu: 'Secciones', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
-          run: () => window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k') },
+          run: () => window.KaggleLector ? window.KaggleLector.abrir() : (window.workArea && window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle')) },
         { id: 'herr.github', menu: 'Secciones', label: 'GitHub', accel: 'Ctrl+Shift+G',
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
         { id: 'herr.youtube', menu: 'Secciones', label: 'YouTube', accel: 'Ctrl+Shift+Y',

@@ -299,7 +299,13 @@
     function montar() {
         estilos();
         const r = $('kaggle-raiz');
-        if (!r || $('kg-nav')) return;
+        if (!r) return;
+        if ($('kg-nav')) {
+            if (!$('kg-hoja') || !$('kg-hoja').children.length) {
+                ir(estado.vista || { tipo: 'datasets' }, false);
+            }
+            return;
+        }
         r.innerHTML = `
           <nav class="kg-nav" id="kg-nav">
             <div class="kg-logo">kaggle</div>
@@ -2023,15 +2029,28 @@
 
     // ================================================================== entrada pública
     async function abrir(opciones = {}) {
-        if (window.workArea) window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k');
+        if (window.workArea) {
+            window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle');
+        } else {
+            const m = $('modal-kaggle-hub');
+            if (m) m.style.display = 'flex';
+        }
         montar();
-        if (opciones.ref) ir({ tipo: opciones.tipo || 'notebook', ref: opciones.ref, celda: opciones.celda });
+        if (opciones.ref) {
+            ir({ tipo: opciones.tipo || 'notebook', ref: opciones.ref, celda: opciones.celda });
+        } else if (estado.vista && (!$('kg-hoja') || !$('kg-hoja').children.length)) {
+            ir(estado.vista, false);
+        }
     }
 
-    // Herramientas → Kaggle (Ctrl+5) abre la pestaña sin pasar por abrir(): se monta y
-    // vuelve a la última vista
+    // Herramientas → Kaggle (Ctrl+5) abre la pestaña: se monta y vuelve a la última vista si está vacía
     document.addEventListener('prig:herramienta-abierta', (e) => {
-        if (e.detail && e.detail.modalId === 'modal-kaggle-hub') montar();
+        if (e.detail && e.detail.modalId === 'modal-kaggle-hub') {
+            montar();
+            if (estado.vista && (!$('kg-hoja') || !$('kg-hoja').children.length)) {
+                ir(estado.vista, false);
+            }
+        }
     });
 
     window.KaggleLector = { abrir, estado, ir };

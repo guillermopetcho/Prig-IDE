@@ -160,16 +160,19 @@ class WorkAreaManager {
             let destinoEl = null;
             if (vista && vista.tipo === 'herramienta') {
                 destinoEl = this._obtenerOcrearContenedorHerramienta(vista);
-                this._montarHerramienta(vista, destinoEl);
-            } else {
-                destinoEl = document.getElementById(`vista-${id}`);
-            }
-
-            if (destinoEl) {
                 if (destinoEl.parentElement !== contenedor) {
                     contenedor.appendChild(destinoEl);
                 }
                 destinoEl.hidden = false;
+                this._montarHerramienta(vista, destinoEl);
+            } else {
+                destinoEl = document.getElementById(`vista-${id}`);
+                if (destinoEl) {
+                    if (destinoEl.parentElement !== contenedor) {
+                        contenedor.appendChild(destinoEl);
+                    }
+                    destinoEl.hidden = false;
+                }
             }
         }
 
@@ -265,7 +268,7 @@ class WorkAreaManager {
                 this.paneles.der.activa = mover;
             } else {
                 // Solo estaba el editor: abrir Kaggle a la derecha como herramienta de apoyo
-                this.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-k', { lado: 'der' });
+                this.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle', { lado: 'der' });
                 return;
             }
         }

@@ -1537,7 +1537,9 @@ select optgroup {
 .vista-herramienta-contenedor .modal-content.incrustado.wf-studio-content,
 .vista-herramienta-contenedor .modal-content[data-modal-origen="modal-agent-workflow"],
 .vista-herramienta-contenedor .modal-content.incrustado[data-modal-origen="modal-desafios"],
-.vista-herramienta-contenedor .modal-content[data-modal-origen="modal-desafios"] {
+.vista-herramienta-contenedor .modal-content[data-modal-origen="modal-desafios"],
+.vista-herramienta-contenedor .modal-content.incrustado[data-modal-origen="modal-kaggle-hub"],
+.vista-herramienta-contenedor .modal-content[data-modal-origen="modal-kaggle-hub"] {
   background: var(--bg-panel, #1e1e2e) !important;
   display: flex !important;
   flex-direction: column !important;
