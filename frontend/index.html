@@ -1531,7 +1531,12 @@
             <span style="font-size: 12px; color: var(--text-muted);">Estadísticas reales acumuladas de tus Recorridos y Seguimientos completados</span>
           </div>
         </div>
-        <button onclick="window.closePerfilModal();" style="background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;" title="Cerrar (Esc)"><i class="fa-solid fa-xmark"></i></button>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button id="btn-abrir-gh-widget-perfil" class="btn btn-sm" onclick="if(window.GitHubWidget) window.GitHubWidget.abrir();" style="background: #24292e; color: #fff; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: background 0.15s;" title="Sincronizar tarjeta visual de estadísticas con tu GitHub Profile">
+            <i class="fa-brands fa-github" style="color: #cba6f7;"></i> Tarjeta GitHub Profile
+          </button>
+          <button onclick="window.closePerfilModal();" style="background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;" title="Cerrar (Esc)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
 
       <!-- Modal Body (Grid 2 columnas) -->
@@ -2508,9 +2513,10 @@
   <script src="/static/js/ai_chat.js?v=12"></script>
   <script src="/static/js/kaggle_lector.js?v=10"></script>
   <script src="/static/js/github_lector.js?v=4"></script>
+  <script src="/static/js/github_widget.js?v=1"></script>
   <script src="/static/js/youtube_hub.js?v=9"></script>
   <script src="/static/js/prig_hub.js?v=3"></script>
-  <script src="/static/js/inicio.js?v=5"></script>
+  <script src="/static/js/inicio.js?v=6"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
   <script src="/static/js/book_library.js?v=7"></script>
@@ -2525,7 +2531,7 @@
   <script src="/static/js/diagramas_ml.js?v=1"></script>
   <script src="/static/js/papers_ml.js?v=1"></script>
   <script src="/static/js/progreso.js?v=2"></script>
-  <script src="/static/js/perfil.js?v=9"></script>
+  <script src="/static/js/perfil.js?v=10"></script>
   <script src="/static/js/note_window.js?v=6"></script>
   <script src="/static/js/global_config.js?v=10"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>

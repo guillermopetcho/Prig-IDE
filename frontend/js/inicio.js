@@ -211,7 +211,8 @@
             <div style="min-width:0;">
               <h1 class="in-saludo">${SALUDO(d.hora)}${p.nombre ? `, ${esc(p.nombre)}` : ''}</h1>
               <div class="in-sub">${p.objetivo ? `<i class="fa-solid fa-flag-checkered"></i> ${esc(p.objetivo)} · ` : ''}nivel ${esc(p.nivel)}
-                · <a href="#" data-editar-perfil style="color:var(--accent-blue);">${p.nombre ? 'editar perfil' : 'cuéntame quién eres'}</a></div>
+                · <a href="#" data-editar-perfil style="color:var(--accent-blue);">${p.nombre ? 'editar perfil' : 'cuéntame quién eres'}</a>
+                · <a href="#" data-abrir-gh-widget style="color:#cba6f7; display:inline-flex; align-items:center; gap:4px;"><i class="fa-brands fa-github"></i> tarjeta GitHub Profile</a></div>
               <div class="in-semana" title="Tu actividad de los últimos 7 días">${d.semana.map((x, i) => `<div class="in-dia ${x.n ? 'activo' : ''} ${i === d.semana.length - 1 ? 'hoy' : ''}" title="${x.fecha}: ${x.n} acciones">
                   <div style="height:${x.n ? 8 + Math.round(30 * x.n / max) : 5}px;"></div>${x.dia}</div>`).join('')}</div>
             </div>
@@ -519,6 +520,7 @@
     // ================================================================== acciones
     function conectar(raiz, d) {
         raiz.querySelectorAll('[data-editar-perfil]').forEach(el => el.onclick = (e) => { e.preventDefault(); estado.editando = true; pintar(); setTimeout(() => { const n = $('in-nombre'); if (n) n.focus(); }, 20); });
+        raiz.querySelectorAll('[data-abrir-gh-widget]').forEach(el => el.onclick = (e) => { e.preventDefault(); if (window.GitHubWidget) window.GitHubWidget.abrir(); });
         const cancelar = raiz.querySelector('[data-cancelar-perfil]');
         if (cancelar) cancelar.onclick = () => { estado.editando = false; pintar(); };
         const guardar = raiz.querySelector('[data-guardar-perfil]');

@@ -424,3 +424,7 @@ window.openPerfilModal = function() {
 window.closePerfilModal = function() {
     if (window.perfilMgr) window.perfilMgr.closeModal();
 };
+
+window.openGitHubWidget = function() {
+    if (window.GitHubWidget) window.GitHubWidget.abrir();
+};

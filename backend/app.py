@@ -69,6 +69,7 @@ import kaggle_colecciones
 import kaggle_pdf
 import inicio
 import github_lector
+import github_stats_widget
 from datetime import datetime
 
 @asynccontextmanager
@@ -2277,6 +2278,20 @@ class GithubTokenRequest(BaseModel):
     texto: str
 
 
+class GithubWidgetConfigRequest(BaseModel):
+    config: Dict[str, Any]
+
+
+class GithubWidgetPreviewRequest(BaseModel):
+    config: Optional[Dict[str, Any]] = None
+    extras: Optional[Dict[str, Any]] = None
+
+
+class GithubWidgetPublicarRequest(BaseModel):
+    config: Optional[Dict[str, Any]] = None
+    extras: Optional[Dict[str, Any]] = None
+
+
 def _github(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -2408,6 +2423,118 @@ def github_exportado(ruta: str, descargar: bool = False):
     tipo = "application/pdf" if real.endswith(".pdf") else "text/markdown; charset=utf-8"
     return FileResponse(real, media_type=tipo, filename=os.path.basename(real),
                         content_disposition_type="attachment" if descargar else "inline")
+
+
+# WIDGET GITHUB PROFILE (github_stats_widget.py)
+@app.get("/api/github/widget/config")
+def github_widget_config():
+    cfg = github_stats_widget.leer_config()
+    token = github_lector.leer_token()
+    user_info = None
+    if token:
+        try:
+            r = requests_lib.get("https://api.github.com/user", headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Prig-IDE"
+            }, timeout=6)
+            if r.status_code == 200:
+                d = r.json()
+                user_info = {
+                    "login": d.get("login"),
+                    "name": d.get("name"),
+                    "avatar_url": d.get("avatar_url"),
+                    "html_url": d.get("html_url")
+                }
+        except Exception:
+            pass
+    return {
+        "config": cfg,
+        "tiene_token": bool(token),
+        "usuario": user_info,
+        "temas": {k: v["nombre"] for k, v in github_stats_widget.TEMAS.items()}
+    }
+
+
+@app.post("/api/github/widget/config")
+def github_widget_guardar_config(req: GithubWidgetConfigRequest):
+    cfg = github_stats_widget.guardar_config(req.config)
+    return {"ok": True, "config": cfg}
+
+
+@app.post("/api/github/widget/preview")
+def github_widget_preview(req: GithubWidgetPreviewRequest):
+    cfg = github_stats_widget.leer_config()
+    if req.config:
+        cfg.update(req.config)
+
+    almacen = globals().get("desafios_almacen")
+    prog = globals().get("progreso")
+
+    stats = github_stats_widget.recolectar_estadisticas(
+        progreso_mgr=prog,
+        almacen_desafios=almacen,
+        extras_cliente=req.extras
+    )
+    svg = github_stats_widget.generar_svg(stats, cfg)
+
+    token = github_lector.leer_token()
+    login = "username"
+    if token:
+        try:
+            r = requests_lib.get("https://api.github.com/user", headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Prig-IDE"
+            }, timeout=5)
+            if r.status_code == 200:
+                login = r.json().get("login") or "username"
+        except Exception:
+            pass
+
+    markdown = (
+        f"<!-- PRIG-STATS:START -->\n"
+        f"[![Prig IDE Stats](https://raw.githubusercontent.com/{login}/{login}/main/prig-stats.svg)]"
+        f"(https://github.com/{login})\n"
+        f"<!-- PRIG-STATS:END -->"
+    )
+
+    return {
+        "svg": svg,
+        "stats": stats,
+        "config": cfg,
+        "login": login,
+        "markdown": markdown
+    }
+
+
+@app.post("/api/github/widget/publicar")
+def github_widget_publicar(req: GithubWidgetPublicarRequest):
+    token = github_lector.leer_token()
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No hay token de GitHub configurado. Conéctalo desde la barra lateral o Ajustes de GitHub."
+        )
+
+    cfg = github_stats_widget.leer_config()
+    if req.config:
+        cfg.update(req.config)
+        github_stats_widget.guardar_config(cfg)
+
+    almacen = globals().get("desafios_almacen")
+    prog = globals().get("progreso")
+
+    stats = github_stats_widget.recolectar_estadisticas(
+        progreso_mgr=prog,
+        almacen_desafios=almacen,
+        extras_cliente=req.extras
+    )
+
+    res = github_stats_widget.sincronizar_con_github(token, stats, cfg)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("mensaje", "Error al sincronizar con GitHub"))
+    return res
 
 
 @app.get("/api/kaggle/estado")
