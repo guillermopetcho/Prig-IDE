@@ -5,9 +5,11 @@
     "canal": "freeCodeCamp / Harvard (David J. Malan)",
     "categoria": "python",
     "duracion": "15:56:00",
-    "nivel": "Principiante / Intermedio",
+    "nivel": "Principiante / Universidad",
     "idioma": "en",
-    "descripcion": "El curso universitario completo de Harvard sobre Python: funciones, variables, bucles, excepciones, librerías, pruebas unitarias con pytest, POO y expresiones regulares."
+    "descripcion": "El curso universitario completo de Harvard sobre Python: funciones, variables, bucles, excepciones, librerías, pruebas unitarias con pytest, POO y expresiones regulares.",
+    "universidad": "Harvard",
+    "playlist": "PLhQjrBD2T3817j24-GogXmWAmO55JDXv7"
   },
   {
     "id": "rfscVS0vtbw",
@@ -157,17 +159,21 @@
     "duracion": "25:00:00",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
-    "descripcion": "Arquitectura de bajo nivel en C: gestión manual de memoria (malloc/free), punteros, segmentación de memoria y estructuras de datos complejas."
+    "descripcion": "Arquitectura de bajo nivel en C: gestión manual de memoria (malloc/free), punteros, segmentación de memoria y estructuras de datos complejas.",
+    "universidad": "Harvard",
+    "playlist": "PLhQjrBD2T380F_inVRXMIHCqLaNUd7bN4"
   },
   {
     "id": "UzxYlbK2c7E",
-    "titulo": "Stanford CS229: Machine Learning Course (Lecture 1)",
-    "canal": "Stanford University (Andrew Ng)",
+    "titulo": "Stanford CS229: Machine Learning Course",
+    "canal": "Stanford University (Prof. Andrew Ng)",
     "categoria": "ml",
-    "duracion": "1:18:00",
+    "duracion": "20 Clases (~25 Horas)",
     "nivel": "Senior / Avanzado",
     "idioma": "en",
-    "descripcion": "El curso universitario de referencia de Stanford: formulación matemática de aprendizaje supervisado, gradiente descendente y ecuaciones normales."
+    "descripcion": "El curso universitario de referencia de Stanford: formulación matemática de aprendizaje supervisado, gradiente descendente, ecuaciones normales, SVM, kernels y teoría de aprendizaje.",
+    "universidad": "Stanford",
+    "playlist": "PLoROMvodv4rMiGQp3WXShtMGgzqpfVfbU"
   },
   {
     "id": "i_LwzRVP7bg",
@@ -231,13 +237,15 @@
   },
   {
     "id": "UZZD9d9YqnQ",
-    "titulo": "MIT 6.S191: Introduction to Deep Learning (Lecture 1)",
-    "canal": "MIT OpenCourseWare (Alexander Amini)",
+    "titulo": "MIT 6.S191: Introduction to Deep Learning",
+    "canal": "MIT OpenCourseWare (Dr. Alexander Amini)",
     "categoria": "dl",
-    "duracion": "54:00",
+    "duracion": "10 Clases (~12 Horas)",
     "nivel": "Avanzado / Senior",
     "idioma": "en",
-    "descripcion": "El curso oficial de Deep Learning del MIT: perceptrones, backpropagation multivariable, optimizadores estocásticos (SGD/Adam) y representaciones latentes."
+    "descripcion": "El curso oficial de Deep Learning del MIT: perceptrones, backpropagation multivariable, optimizadores estocásticos (SGD/Adam) y representaciones latentes.",
+    "universidad": "MIT",
+    "playlist": "PLtBw6njQRU-rwp5__7C0oIVt26ZgjG9NI"
   },
   {
     "id": "mEsle_RQk70",
@@ -312,22 +320,26 @@
   {
     "id": "vT1JzLTH4y4",
     "titulo": "Stanford CS231n: Convolutional Neural Networks for Visual Recognition",
-    "canal": "Stanford (Fei-Fei Li & Andrej Karpathy)",
+    "canal": "Stanford University (Fei-Fei Li & Andrej Karpathy)",
     "categoria": "dl",
-    "duracion": "1:04:00",
+    "duracion": "16 Clases (~20 Horas)",
     "nivel": "Senior / Avanzado",
     "idioma": "en",
-    "descripcion": "El curso clásico de Stanford sobre visión computacional: capas convolucionales, pooling, normalización, AlexNet, VGG y ResNet."
+    "descripcion": "El curso clásico de Stanford sobre visión computacional: capas convolucionales, pooling, normalización, AlexNet, VGG y ResNet.",
+    "universidad": "Stanford",
+    "playlist": "PL3FW7Lu3i5JvHM8ljYj-zLfQRF3EO8sYv"
   },
   {
     "id": "8rXD5-xhemo",
     "titulo": "Stanford CS224N: Natural Language Processing with Deep Learning",
-    "canal": "Stanford (Christopher Manning)",
+    "canal": "Stanford University (Prof. Christopher Manning)",
     "categoria": "dl",
-    "duracion": "1:21:00",
+    "duracion": "18 Clases (~24 Horas)",
     "nivel": "Senior / Avanzado",
     "idioma": "en",
-    "descripcion": "Representación semántica vectorial (Word2Vec, GloVe), redes secuenciales recurrentes, atención y arquitecturas de Transformers para NLP."
+    "descripcion": "Representación semántica vectorial (Word2Vec, GloVe), redes secuenciales recurrentes, atención y arquitecturas de Transformers para NLP.",
+    "universidad": "Stanford",
+    "playlist": "PLoROMvodv4rOSH4v6133s9LFPRHjEmbmJ"
   },
   {
     "id": "8SF_h8NW6dc",
@@ -385,9 +397,11 @@
     "canal": "MIT OpenCourseWare (Erik Demaine)",
     "categoria": "algoritmos",
     "duracion": "50:00",
-    "nivel": "Avanzado",
+    "nivel": "Avanzado / Universidad",
     "idioma": "en",
-    "descripcion": "Fundamentos de análisis asintótico, cotas Big-O y búsqueda de picos en tiempo logarítmico con división y conquista."
+    "descripcion": "Fundamentos de análisis asintótico, cotas Big-O y búsqueda de picos en tiempo logarítmico con división y conquista.",
+    "universidad": "MIT",
+    "playlist": "PLUl4u3cNGP61Oq3tWYp6V_F-5jb5L2iHb"
   },
   {
     "id": "i53Gi_K3o7I",
@@ -398,6 +412,328 @@
     "nivel": "Senior",
     "idioma": "en",
     "descripcion": "Arquitectura escalable: balanceadores de carga, CDN, particionado de bases de datos, colas asíncronas y caché con Redis."
+  },
+  {
+    "id": "k6U-i4gXkLM",
+    "titulo": "MIT 6.0001: Introduction to Computer Science and Programming in Python",
+    "canal": "MIT OpenCourseWare (Dr. Ana Bell & John Guttag)",
+    "universidad": "MIT",
+    "categoria": "python",
+    "playlist": "PLUl4u3cNGP63WbdFxL8giv4yhgdMGaZNA",
+    "duracion": "12 Clases (~12 Horas)",
+    "nivel": "Principiante / Universidad",
+    "idioma": "en",
+    "descripcion": "El curso troncal oficial de ciencias de la computación del MIT: descomposición computacional, abstracción, funciones, tuplas, listas, diccionarios, algoritmos de búsqueda y orientación a objetos."
+  },
+  {
+    "id": "AA213677U_0",
+    "titulo": "MIT 6.0002: Introduction to Computational Thinking and Data Science",
+    "canal": "MIT OpenCourseWare (Prof. John Guttag & Eric Grimson)",
+    "universidad": "MIT",
+    "categoria": "python",
+    "playlist": "PLUl4u3cNGP619EG1wp0kT-7rDE_wKMaW-",
+    "duracion": "15 Clases (~15 Horas)",
+    "nivel": "Intermedio / Universidad",
+    "idioma": "en",
+    "descripcion": "La continuación del MIT en Python orientada a ciencia de datos: optimización de mochilas y grafos, pensamiento estocástico, simulaciones de Monte Carlo, modelado estadístico y clustering de datos."
+  },
+  {
+    "id": "8DvyiNr-78E",
+    "titulo": "Python for Everybody (PY4E) – Full University Course",
+    "canal": "Univ. of Michigan (Dr. Charles Severance / freeCodeCamp)",
+    "universidad": "Univ. of Michigan",
+    "categoria": "python",
+    "playlist": "PLlRFEj9H3Oj7Bp8-DfGpfWx4ahuPBvee",
+    "duracion": "13:40:00",
+    "nivel": "Principiante / Intermedio",
+    "idioma": "en",
+    "descripcion": "La prestigiosa formación universitaria de la Universidad de Michigan: sintaxis moderna de Python 3, estructuras de datos nativas, regex, sockets de red, web scraping y bases de datos relacionales SQL."
+  },
+  {
+    "id": "WbzNRTTrX0g",
+    "titulo": "Harvard CS50AI: Introduction to Artificial Intelligence with Python",
+    "canal": "Harvard University (Brian Yu & David J. Malan)",
+    "universidad": "Harvard",
+    "categoria": "python",
+    "playlist": "PL_mM4cC3R5MXs9J4smEUhKfRrqMNqgQeK",
+    "duracion": "12 Horas",
+    "nivel": "Intermedio / Universidad",
+    "idioma": "en",
+    "descripcion": "El curso de inteligencia artificial con Python de Harvard: algoritmos de búsqueda (Minimax, A*), representación de conocimiento, probabilidad bayesiana, optimización, aprendizaje automático y redes neuronales."
+  },
+  {
+    "id": "kO3w9o5415Y",
+    "titulo": "Stanford CS106B: Programming Abstractions in C++",
+    "canal": "Stanford University (Julie Zelenski)",
+    "universidad": "Stanford",
+    "categoria": "cpp",
+    "playlist": "PLFE6E58F856038C69",
+    "duracion": "28 Clases (~26 Horas)",
+    "nivel": "Intermedio / Universidad",
+    "idioma": "en",
+    "descripcion": "Curso emblemático de Stanford en C++: recursión profunda, backtracking, punteros y gestión dinámica de memoria en el heap, plantillas (templates), algoritmos de ordenamiento y estructuras de datos abstractas."
+  },
+  {
+    "id": "s3G6g_3rR-s",
+    "titulo": "Modern C++ for Computer Vision and Robotics (C++17/C++20)",
+    "canal": "Univ. of Bonn (Prof. Cyrill Stachniss & Ignacio Vizzo)",
+    "universidad": "Univ. of Bonn",
+    "categoria": "cpp",
+    "playlist": "PLgnQpQtFTOGRM59sr3nSL8BmeMZR9GCIA",
+    "duracion": "14 Clases (~16 Horas)",
+    "nivel": "Intermedio / Senior",
+    "idioma": "en",
+    "descripcion": "Formación de vanguardia de la Universidad de Bonn: C++ moderno (C++17/C++20), CMake, gestión de memoria RAII, smart pointers, lambdas, polimorfismo y librerías de alto rendimiento para visión y robótica."
+  },
+  {
+    "id": "kYJ53N9C63w",
+    "titulo": "CMU 15-445/645: Database Systems (Modern C++20 Bustub)",
+    "canal": "Carnegie Mellon University (Prof. Andy Pavlo)",
+    "universidad": "CMU",
+    "categoria": "cpp",
+    "playlist": "PLSE8ODhjZXjaKScG3l0nuOiDTT31UknW1",
+    "duracion": "24 Clases (~30 Horas)",
+    "nivel": "Senior / Universidad",
+    "idioma": "en",
+    "descripcion": "El legendario curso de arquitectura de sistemas de CMU: diseño e implementación en C++20 de un motor de bases de datos relacionales completo (buffer pool, B+ Trees, índices concurrentes y query execution)."
+  },
+  {
+    "id": "kY31ptn9_2k",
+    "titulo": "Stanford CS149: Parallel Computing & Systems (C++, Multicore & GPUs)",
+    "canal": "Stanford University (Prof. Kayvon Fatahalian)",
+    "universidad": "Stanford",
+    "categoria": "cpp",
+    "playlist": "PLo6lM83QnS3S5dE-Qe7V1P7XpB_6tqW8D",
+    "duracion": "20 Clases (~25 Horas)",
+    "nivel": "Senior / Universidad",
+    "idioma": "en",
+    "descripcion": "Arquitectura y optimización de software de alto rendimiento en Stanford: paralelismo a nivel de hilos e instrucciones en C++, coherencia de caché, OpenMP, shaders y programación de GPUs con CUDA."
+  },
+  {
+    "id": "BP6N9P1R3j8",
+    "titulo": "The Essence of C++ & Architecture of Modern Software",
+    "canal": "The University of Edinburgh (Bjarne Stroustrup)",
+    "universidad": "Univ. of Edinburgh",
+    "categoria": "cpp",
+    "duracion": "1:15:00",
+    "nivel": "Senior / Arquitectura",
+    "idioma": "en",
+    "descripcion": "Clase magistral dictada en la Universidad de Edimburgo por Bjarne Stroustrup, el creador de C++: filosofía del lenguaje, diseño de tipos, abstracción de costo cero (zero-overhead) y evolución de los estándares ISO."
+  },
+  {
+    "id": "Cx5Z-OslNWE",
+    "titulo": "MIT 18.065: Matrix Methods in Data Analysis, Signal Processing & ML",
+    "canal": "MIT OpenCourseWare (Prof. Gilbert Strang)",
+    "universidad": "MIT",
+    "categoria": "ml",
+    "playlist": "PLUl4u3cNGP63oMNUHXqIUcrkS2PivhN3k",
+    "duracion": "36 Clases (~30 Horas)",
+    "nivel": "Fundamentos / Universidad",
+    "idioma": "en",
+    "descripcion": "La cumbre pedagógica de Gilbert Strang en el MIT: álgebra lineal aplicada al aprendizaje automático, descomposición en valores singulares (SVD), análisis de componentes principales (PCA) y optimización convexa."
+  },
+  {
+    "id": "kYyE9D0QVB4",
+    "titulo": "Cornell CS4780: Machine Learning for Intelligent Systems",
+    "canal": "Cornell University (Prof. Kilian Weinberger)",
+    "universidad": "Cornell",
+    "categoria": "ml",
+    "playlist": "PLl8OlHZGYOQ7bkVbuS1t8hPXG5N42wgK6",
+    "duracion": "23 Clases (~26 Horas)",
+    "nivel": "Intermedio / Senior",
+    "idioma": "en",
+    "descripcion": "Uno de los cursos universitarios más elogiados del mundo: fundamentos rigurosos de SVM, kernel trick, árboles de decisión, boosting, bagging, deep learning y teoría de generalización estadística."
+  },
+  {
+    "id": "mbyG85GZ0PI",
+    "titulo": "Caltech CS156: Learning From Data",
+    "canal": "Caltech (Prof. Yaser Abu-Mostafa)",
+    "universidad": "Caltech",
+    "categoria": "ml",
+    "playlist": "PLD63A284B76153189",
+    "duracion": "18 Clases (~20 Horas)",
+    "nivel": "Fundamentos / Universidad",
+    "idioma": "en",
+    "descripcion": "El curso universitario canónico de Caltech sobre la teoría matemática del aprendizaje automático: dimensión VC, dilema sesgo-varianza, regularización, teoría de validación y límites de generalización."
+  },
+  {
+    "id": "d_k8O-9z65g",
+    "titulo": "MIT 6.036: Introduction to Machine Learning",
+    "canal": "MIT OpenCourseWare (Prof. Tamara Broderick)",
+    "universidad": "MIT",
+    "categoria": "ml",
+    "playlist": "PLUl4u3cNGP60eZ_1i3f49hC5q9G_o-pS_",
+    "duracion": "24 Clases (~24 Horas)",
+    "nivel": "Intermedio / Universidad",
+    "idioma": "en",
+    "descripcion": "El curso troncal de pregrado en Machine Learning del MIT: clasificadores lineales, funciones de pérdida, descenso de gradiente estocástico, regresión logística, redes neuronales y algoritmos de clustering."
+  },
+  {
+    "id": "JKAieM0877c",
+    "titulo": "Stanford CS224W: Machine Learning with Graphs",
+    "canal": "Stanford University (Prof. Jure Leskovec)",
+    "universidad": "Stanford",
+    "categoria": "ml",
+    "playlist": "PLoROMvodv4rPLKxIpqhZXsQWmThkJYXV9",
+    "duracion": "19 Clases (~22 Horas)",
+    "nivel": "Avanzado / Senior",
+    "idioma": "en",
+    "descripcion": "El curso de vanguardia de Stanford sobre grafos y aprendizaje relacional: embeddings de nodos (Node2Vec, DeepWalk), Graph Neural Networks (GCN, GraphSAGE, GAT) y aplicaciones biomédicas y de redes."
+  },
+  {
+    "id": "TjZBTDzGeGg",
+    "titulo": "MIT 6.034: Artificial Intelligence",
+    "canal": "MIT OpenCourseWare (Prof. Patrick Winston)",
+    "universidad": "MIT",
+    "categoria": "ml",
+    "playlist": "PLUl4u3cNGP63gFHB6xb-kVBiQHYe_4hSi",
+    "duracion": "24 Clases (~23 Horas)",
+    "nivel": "Fundamentos / Universidad",
+    "idioma": "en",
+    "descripcion": "Un clásico atemporal del MIT por Patrick Winston: razonamiento simbólico, búsqueda en árboles, propagación de restricciones, redes semánticas, máquinas de vectores de soporte e inferencia."
+  },
+  {
+    "id": "CS4cs9xVecE",
+    "titulo": "Stanford CS230: Deep Learning",
+    "canal": "Stanford University (Prof. Andrew Ng)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rNRRGdS0rBbXOUGA0wjdh1X",
+    "duracion": "10 Clases (~12 Horas)",
+    "nivel": "Intermedio / Avanzado",
+    "idioma": "en",
+    "descripcion": "La formación aplicada de Deep Learning de Stanford dictada por Andrew Ng: arquitecturas de redes neuronales, hiperparámetros, optimización, visión computacional con CNNs y procesamiento secuencial."
+  },
+  {
+    "id": "JuoVZkPBiKk",
+    "titulo": "Stanford CS336: Language Modeling from Scratch",
+    "canal": "Stanford University (Prof. Percy Liang & Tatsunori Hashimoto)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rMqXOcazWaTUHhq-yembLCV",
+    "duracion": "18 Clases (~22 Horas)",
+    "nivel": "Senior / Cutting-Edge",
+    "idioma": "en",
+    "descripcion": "El curso más moderno y técnico de Stanford para construir Modelos de Lenguaje (LLMs) desde cero: tokenización BPE, implementación de Transformers en PyTorch, paralelismo en GPUs, scaling laws y post-entrenamiento (RLHF)."
+  },
+  {
+    "id": "XfpMkf4rD6E",
+    "titulo": "Stanford CS25: Transformers United",
+    "canal": "Stanford Online (CS25 Seminar)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rNiJRchCzutFw5ItR_Z27CM",
+    "duracion": "10 Semanas",
+    "nivel": "Senior / Estado del Arte",
+    "idioma": "en",
+    "descripcion": "El seminario de posgrado de Stanford con los creadores e investigadores más destacados de la IA generativa: mecanismos de atención, modelos autorregresivos, modelos multimodales, inferencia eficiente y agentes."
+  },
+  {
+    "id": "A2WpS1mX1_k",
+    "titulo": "Stanford CS330: Deep Multi-Task and Meta-Learning",
+    "canal": "Stanford University (Prof. Chelsea Finn)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rNjRoawgt72BBNwL2V7doGI",
+    "duracion": "18 Clases (~22 Horas)",
+    "nivel": "Senior / Investigación",
+    "idioma": "en",
+    "descripcion": "Curso de posgrado de Stanford enfocado en meta-aprendizaje (aprender a aprender): Few-Shot Learning, MAML (Model-Agnostic Meta-Learning), aprendizaje multitarea y adaptación rápida en visión y robótica."
+  },
+  {
+    "id": "k5H52P7330M",
+    "titulo": "Stanford CS234: Reinforcement Learning",
+    "canal": "Stanford University (Prof. Emma Brunskill)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rOSOPzutgyCTapiGlY2Nd8u",
+    "duracion": "16 Clases (~20 Horas)",
+    "nivel": "Avanzado / Senior",
+    "idioma": "en",
+    "descripcion": "El curso avanzado de Stanford sobre aprendizaje por refuerzo: procesos de decisión de Markov (MDP), programación dinámica, Q-learning, aproximación de funciones con deep learning y búsqueda de políticas."
+  },
+  {
+    "id": "4YmD7B32F34",
+    "titulo": "Stanford CS224U: Natural Language Understanding",
+    "canal": "Stanford University (Prof. Christopher Potts)",
+    "universidad": "Stanford",
+    "categoria": "dl",
+    "playlist": "PLoROMvodv4rOwvldxftJTmoR3kRcWkJBp",
+    "duracion": "15 Clases (~18 Horas)",
+    "nivel": "Avanzado / Senior",
+    "idioma": "en",
+    "descripcion": "Semántica computacional y comprensión de lenguaje natural en Stanford: modelos de espacio vectorial, análisis de sentimientos, extracción de relaciones, fine-tuning y evaluación rigurosa de LLMs."
+  },
+  {
+    "id": "2pWv7GOvuf0",
+    "titulo": "Reinforcement Learning Course by David Silver",
+    "canal": "Google DeepMind / UCL (Prof. David Silver)",
+    "universidad": "UCL / DeepMind",
+    "categoria": "dl",
+    "playlist": "PLqYmG7hTraZDM-OYHWgPebj2MfCFzFObQ",
+    "duracion": "10 Clases (~15 Horas)",
+    "nivel": "Senior / Fundamentos de RL",
+    "idioma": "en",
+    "descripcion": "El curso fundamental por excelencia impartido por David Silver (creador de AlphaGo en DeepMind): MDPs, métodos Monte Carlo, Temporal Difference Learning, Policy Gradients y Deep Q-Networks."
+  },
+  {
+    "id": "zGFAnOHiQxw",
+    "titulo": "DeepMind x UCL: Deep Learning Lecture Series",
+    "canal": "Google DeepMind & UCL (DeepMind Research Team)",
+    "universidad": "UCL / DeepMind",
+    "categoria": "dl",
+    "playlist": "PLqYmG7hTX2B-0L1V_mN1bO8D98r94a0S2",
+    "duracion": "12 Clases (~18 Horas)",
+    "nivel": "Intermedio / Senior",
+    "idioma": "en",
+    "descripcion": "Serie conjunta de 12 clases magistrales entre DeepMind y University College London: redes neuronales profundas, optimización de segundo orden, visión computacional avanzada, atención y modelos generativos."
+  },
+  {
+    "id": "kO6u_2w2L_k",
+    "titulo": "UC Berkeley CS285: Deep Reinforcement Learning",
+    "canal": "UC Berkeley RAIL (Prof. Sergey Levine)",
+    "universidad": "UC Berkeley",
+    "categoria": "dl",
+    "playlist": "PL_iWQOsE6TfURIIhCrlt-wj9ByIVpbfGc",
+    "duracion": "22 Clases (~25 Horas)",
+    "nivel": "Senior / Doctorado",
+    "idioma": "en",
+    "descripcion": "El curso de referencia mundial en Deep RL de Berkeley: clonación conductual, policy gradients analíticos, Actor-Critic, model-based RL, meta-RL y algoritmos fuera de política (SAC, TD3)."
+  },
+  {
+    "id": "tFR6Likf4VI",
+    "titulo": "UC Berkeley CS294: Deep Unsupervised Learning",
+    "canal": "UC Berkeley (Prof. Pieter Abbeel)",
+    "universidad": "UC Berkeley",
+    "categoria": "dl",
+    "playlist": "PL_iJu012NOxdq9-y-vRk4O6_z42xZ29Vj",
+    "duracion": "14 Clases (~18 Horas)",
+    "nivel": "Senior / Cutting-Edge",
+    "idioma": "en",
+    "descripcion": "Modelos generativos y aprendizaje no supervisado de vanguardia en Berkeley: modelos autorregresivos (PixelCNN), Variational Autoencoders (VAEs), Normalizing Flows, GANs y Diffusion Models."
+  },
+  {
+    "id": "SGZ6BttHMPw",
+    "titulo": "Neural Networks and Deep Learning Class",
+    "canal": "Université de Sherbrooke (Prof. Hugo Larochelle)",
+    "universidad": "U. de Sherbrooke",
+    "categoria": "dl",
+    "playlist": "PL6Xpj9I5qXYEcOhn7TqghAJ6NAPrNmUBH",
+    "duracion": "10 Módulos",
+    "nivel": "Avanzado / Matemáticas",
+    "idioma": "en",
+    "descripcion": "Formulación matemática rigurosa de redes neuronales: capas densas, funciones de activación, entrenamiento multivariable por retropropagación, RBMs, autoencoders y regularización."
+  },
+  {
+    "id": "1L0IAxwZpZc",
+    "titulo": "MIT 6.S094: Deep Learning for Self-Driving Cars",
+    "canal": "MIT (Dr. Lex Fridman)",
+    "universidad": "MIT",
+    "categoria": "dl",
+    "playlist": "PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+    "duracion": "8 Clases (~10 Horas)",
+    "nivel": "Intermedio / Avanzado",
+    "idioma": "en",
+    "descripcion": "Curso insignia del MIT aplicando Deep Learning a vehículos autónomos: visión por computadora en tiempo real, redes convolucionales, localización y sistemas de percepción con redes neuronales."
   }
 ]
-
