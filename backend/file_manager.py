@@ -22,7 +22,11 @@ class FileManager:
             self.base_dir = self._load_last_workspace()
 
     def allowed_roots(self) -> List[str]:
-        return [self.base_dir] + [os.path.abspath(r) for r in self.EXTRA_ALLOWED_ROOTS]
+        # Tus repositorios de Prig Hub (perfil y packs) se pueden editar a mano en el editor.
+        # Los que sigues NO: son de otros y se actualizan solo revisando sus cambios.
+        from hub.servicio import ruta_base
+        propios = os.path.join(ruta_base(), "propios")
+        return [self.base_dir] + [os.path.abspath(r) for r in self.EXTRA_ALLOWED_ROOTS] + [os.path.abspath(propios)]
 
     def is_path_allowed(self, abs_path: str) -> bool:
         """ True solo si la ruta cae dentro del workspace o de una raíz permitida.

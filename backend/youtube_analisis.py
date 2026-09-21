@@ -241,3 +241,4 @@ def generar_objetivos_didacticos(motor, modelo: str, titulo: str, canal: str,
             "criterio_evaluacion": "Escribir la solución y verificar con pruebas unitarias."
         }
     ]
+

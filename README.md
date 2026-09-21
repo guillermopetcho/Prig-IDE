@@ -10,7 +10,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Linux](https://img.shields.io/badge/plataforma-Linux-FCC624?logo=linux&logoColor=black)
 ![Ollama](https://img.shields.io/badge/modelos-Ollama-000000)
-![Tests](https://img.shields.io/badge/tests-694%20en%20verde-brightgreen)
+![Tests](https://img.shields.io/badge/tests-781-blue)
 
 ![Inicio de Prig](docs/capturas/inicio.png)
 
@@ -70,6 +70,28 @@ corrige ejecutándola, no preguntándole al modelo. Las pistas son graduadas
 |---|---|
 | **Kaggle** (`Ctrl+5`) | Interfaz al estilo de Kaggle con Código, Datasets, Competiciones, Colecciones, Mis lecturas y Mis datos. Lee cualquier notebook celda a celda con un profesor. Descarga datasets y los explora columna a columna (tipos, faltantes, distribución). Adapta las rutas del notebook para **ejecutarlo en Prig**. Exporta el notebook explicado a **PDF**. Tiene filtros por licencia, tamaño, autor y notebook de origen. |
 | **GitHub** (`Ctrl+Shift+G`) | Busca repositorios o pega la URL de uno. Recorre el árbol, pide que el modelo explique **el repositorio entero** o **un archivo**, y guarda la explicación (`.md`), el código explicado (PDF) o el proyecto completo para trabajar en local. |
+
+### Compartir: Prig Hub (`Ctrl+Shift+J`)
+
+Tus cursos, videos, canales, perfiles de Kaggle, repositorios, rutas y desafíos viven en
+**un repositorio git en texto plano**. Puedes leerlo y editarlo sin Prig. Los packs de
+otras personas se siguen por GitHub, sin cuentas nuevas ni servidores.
+
+- **Un solo campo «Agregar»**: pegas cualquier enlace y Prig reconoce la plataforma y el
+  tipo (video, curso, notebook, repositorio…) y busca el título. Si pegas un usuario de
+  GitHub, sigues su perfil.
+- **Todo junto**: tus listas y las de quienes sigues, con filtros por plataforma, tipo,
+  origen y estado. Un mismo video en dos packs aparece una vez, y tu progreso vale para
+  los dos.
+- **Rutas** paso a paso y **desafíos compartidos**. Antes de importar un desafío ves su
+  código, y Prig lo verifica ejecutándolo.
+- **Novedades revisables**: nada de lo que sigues se actualiza solo. Ves qué se agrega,
+  qué se quita y si hay código nuevo, y aplicas si quieres.
+- **Publicar**: tu perfil (`usuario/prig`) y tus packs (`usuario/prig-<tema>`) se
+  publican en GitHub con un clic. Tu progreso **no se publica**, y los commits van
+  firmados con el correo «noreply» de GitHub.
+
+Formato de los archivos: [docs/prig-hub.md](docs/prig-hub.md).
 
 ### Programar
 
@@ -225,6 +247,7 @@ hay conexión en estos casos, y siempre porque tú lo pides:
 | Búsqueda web | Solo con la casilla **Búsqueda web** marcada en el chat | No |
 | Descarga de modelos | Al descargar desde Ollama, Hugging Face o ModelScope | No |
 | Google Gemini | Solo si pegas tu clave y aceptas el aviso | Clave de API propia |
+| Prig Hub | Al seguir o actualizar un pack (git por HTTPS), al buscar títulos de enlaces y al publicar | Token de GitHub solo para publicar |
 
 Sobre **Gemini**: en su nivel gratuito, Google puede usar lo que se le envía para
 mejorar sus productos. Por eso está apagado por defecto y la opción recomendada es
@@ -279,6 +302,7 @@ kaggle_worker/             Extracción de conocimiento de libros en una GPU de K
 | `~/.prig_desafios/` | Desafíos y tu progreso |
 | `~/.prig_kaggle/`, `~/.prig_kaggle.json` | Lecturas, colecciones y datos de Kaggle; credenciales |
 | `~/.prig_github/`, `~/.prig_github.json` | Caché y repositorios guardados; token |
+| `~/.prig_hub/` | Prig Hub: tus repositorios (`propios/`), lo que sigues (`siguiendo/`) y tu progreso (`progreso.jsonl`, nunca se publica) |
 | `~/.prig_gemini.json` | Clave de Gemini, si la configuras |
 | `~/.prig_recursos.json` | Límites térmicos y ajustes del modo suave |
 | `~/.prig_flags.json` | Banderas de funcionalidad |

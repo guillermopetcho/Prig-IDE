@@ -311,6 +311,8 @@
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
         { id: 'herr.youtube', menu: 'Secciones', label: 'YouTube', accel: 'Ctrl+Shift+Y',
           run: () => window.YouTubeHub && window.YouTubeHub.abrir() },
+        { id: 'herr.hub', menu: 'Secciones', label: 'Prig Hub', accel: 'Ctrl+Shift+J',
+          run: () => window.PrigHub && window.PrigHub.abrir() },
 
         // Grupo 3: Modelos, Gestión de modelos, Gestión Ollama, Gestión máquina
         { id: 'herr.modelos', menu: 'Secciones', label: 'Modelos', separadorAntes: true,
@@ -379,6 +381,7 @@
         'sec.kaggle': 'herr.kaggle',
         'sec.github': 'herr.github',
         'sec.youtube': 'herr.youtube',
+        'sec.hub': 'herr.hub',
         'sec.modelos': 'herr.modelos',
         'sec.gestionModelos': 'herr.buscarModelos',
         'sec.gestionOllama': 'herr.modelosServidor',

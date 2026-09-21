@@ -5486,6 +5486,14 @@ def desafios_comprobar(id_: str, req: DesafioPaginasRequest):
     d = _desafio(desafios_almacen.modificar, id_, cambio)
     _registrar_telemetria(d, "submission", passed=resultado["aprobado"], hints_used=d["progreso"].get("pistas", 0),
                           stderr=resultado.get("error") or resultado.get("stderr") or "", elapsed=resultado.get("elapsed", 0))
+    origen = d.get("origen") or {}
+    if resultado["aprobado"] and origen.get("tipo") == "prig-hub" and origen.get("ref"):
+        # Un desafío de Prig Hub resuelto cuenta en tu progreso del Hub (y en sus rutas)
+        try:
+            from hub.servicio import Hub
+            Hub().marcar(f"desafio:{origen['ref']}", "terminado", origen["ref"].split("#")[0], origen.get("version") or "")
+        except Exception as e:
+            print(f"⚠️ No se pudo anotar el progreso en Prig Hub: {e}")
     return {**resultado, "progreso": d["progreso"]}
 
 
@@ -5714,6 +5722,15 @@ def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
     return _ndjson_en_hilo(trabajo)
 
 
+# ============================================================================
+# Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
+# ============================================================================
+from hub.api import crear_router as _hub_router  # noqa: E402
+
+app.include_router(_hub_router(
+    runner=runner, motor=_motor_desafios, consumir=_consumir, ndjson=_ndjson_en_hilo, desafios=desafios_almacen,
+    telemetria=_registrar_telemetria, publico=AlmacenDesafios.publico, validar_desafio=des_ejec.validar_desafio,
+    autor=lambda: inicio.perfil().get("nombre") or ""))
 
 
 # Serve frontend static assets
