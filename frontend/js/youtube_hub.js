@@ -9,6 +9,7 @@
 (function () {
     const $ = (id) => document.getElementById(id);
     const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const md = (t) => (typeof marked !== 'undefined' ? (typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(marked.parse(String(t || ''))) : marked.parse(String(t || ''))) : esc(t));
 
 const VIDEOS_CURADOS = [
         // ==================== PYTHON ====================,
@@ -1284,6 +1285,12 @@ const VIDEOS_CURADOS = [
         ocultarTextoPlayer: localStorage.getItem('prig_yt_ocultar_texto_player') === 'true',
         videoActual: null,
         pestanaLateral: 'notas', // 'notas' | 'objetivos' | 'resumen' | 'tutor'
+        subpestanaNotas: 'fotogramas', // 'fotogramas' | 'marcas' | 'cuaderno'
+        fotogramaFormAbierto: false,
+        fotogramaTemporal: null,
+        lightboxImg: null,
+        explicacionFotogramaCargando: false,
+        explicacionFotogramaError: null,
         chatTutor: [],
         tutorCargando: false,
         analisisCargando: false,
@@ -1354,6 +1361,186 @@ const VIDEOS_CURADOS = [
             return guardarProgreso(videoId, { estado: 'en_progreso', porcentaje: 50 });
         } else {
             return guardarProgreso(videoId, { estado: 'completado', porcentaje: 100 });
+        }
+    }
+
+    // ==================== GESTIÓN DE FOTOGRAMAS Y NOTAS VISUALES ====================
+    function leerFotogramas(videoId) {
+        try {
+            const raw = localStorage.getItem(`prig_yt_fotogramas_${videoId}`);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function sincronizarIndiceFotogramas(videoId, fotogramas) {
+        try {
+            const raw = localStorage.getItem('prig_yt_indice_fotogramas');
+            const indice = raw ? JSON.parse(raw) : {};
+            const video = VIDEOS_CURADOS.find(v => v.id === videoId) || (estado.videoActual && estado.videoActual.id === videoId ? estado.videoActual : { id: videoId, titulo: 'Video de YouTube' });
+            Object.keys(indice).forEach(k => {
+                if (indice[k] && indice[k].videoId === videoId) delete indice[k];
+            });
+            (fotogramas || []).forEach(f => {
+                indice[f.id] = {
+                    id: f.id,
+                    videoId: videoId,
+                    videoTitulo: video.titulo || 'Video de YouTube',
+                    canal: video.canal || 'YouTube',
+                    minuto: f.minuto,
+                    segundos: f.segundos,
+                    titulo: f.titulo || 'Nota visual',
+                    explicacion: f.explicacion || '',
+                    imagenUrl: f.imagenUrl || '',
+                    fecha: f.fecha || Date.now()
+                };
+            });
+            localStorage.setItem('prig_yt_indice_fotogramas', JSON.stringify(indice));
+        } catch (e) {
+            console.error('Error sincronizando índice de fotogramas:', e);
+        }
+    }
+
+    function guardarFotogramas(videoId, fotogramas) {
+        try {
+            localStorage.setItem(`prig_yt_fotogramas_${videoId}`, JSON.stringify(fotogramas));
+            sincronizarIndiceFotogramas(videoId, fotogramas);
+        } catch (e) {
+            console.error('Error guardando fotogramas:', e);
+        }
+    }
+
+    function obtenerKeyframeUrl(videoId, opcion = 'hqdefault') {
+        if (!videoId) return '';
+        return `https://img.youtube.com/vi/${videoId}/${opcion}.jpg`;
+    }
+
+    function obtenerTodasLasNotas() {
+        const resultado = [];
+        try {
+            const rawIdx = localStorage.getItem('prig_yt_indice_fotogramas');
+            if (rawIdx) {
+                const idx = JSON.parse(rawIdx);
+                Object.values(idx).forEach(f => {
+                    resultado.push({
+                        tipo: 'fotograma',
+                        id: f.id,
+                        videoId: f.videoId,
+                        videoTitulo: f.videoTitulo,
+                        canal: f.canal || 'YouTube',
+                        minuto: f.minuto,
+                        segundos: f.segundos,
+                        titulo: f.titulo,
+                        texto: f.explicacion,
+                        imagenUrl: f.imagenUrl,
+                        fecha: f.fecha
+                    });
+                });
+            }
+        } catch (e) { /* continuar */ }
+
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('prig_yt_marcas_')) {
+                    const videoId = key.replace('prig_yt_marcas_', '');
+                    const raw = localStorage.getItem(key);
+                    const marcas = raw ? JSON.parse(raw) : [];
+                    const vid = VIDEOS_CURADOS.find(v => v.id === videoId) || { id: videoId, titulo: 'Video de YouTube', canal: 'YouTube' };
+                    if (Array.isArray(marcas)) {
+                        marcas.forEach(m => {
+                            resultado.push({
+                                tipo: 'marca',
+                                id: m.id || `${videoId}_${m.segundos}`,
+                                videoId: videoId,
+                                videoTitulo: vid.titulo,
+                                canal: vid.canal || 'YouTube',
+                                minuto: m.minuto,
+                                segundos: m.segundos,
+                                titulo: `Marca en ${m.minuto}`,
+                                texto: m.texto,
+                                imagenUrl: obtenerKeyframeUrl(videoId, 'hqdefault'),
+                                fecha: m.fecha || null
+                            });
+                        });
+                    }
+                }
+            }
+        } catch (e) { /* continuar */ }
+
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('prig_yt_nota_')) {
+                    const videoId = key.replace('prig_yt_nota_', '');
+                    const texto = localStorage.getItem(key);
+                    if (texto && texto.trim()) {
+                        const vid = VIDEOS_CURADOS.find(v => v.id === videoId) || { id: videoId, titulo: 'Video de YouTube', canal: 'YouTube' };
+                        resultado.push({
+                            tipo: 'cuaderno',
+                            id: `cuaderno_${videoId}`,
+                            videoId: videoId,
+                            videoTitulo: vid.titulo,
+                            canal: vid.canal || 'YouTube',
+                            minuto: '00:00',
+                            segundos: 0,
+                            titulo: `Apuntes de ${vid.titulo}`,
+                            texto: texto.slice(0, 280),
+                            imagenUrl: obtenerKeyframeUrl(videoId, 'hqdefault'),
+                            fecha: null
+                        });
+                    }
+                }
+            }
+        } catch (e) { /* continuar */ }
+
+        return resultado.sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    }
+
+    async function solicitarExplicacionFotograma(minuto, titulo, notaActual) {
+        const v = estado.videoActual;
+        if (!v) return;
+        estado.explicacionFotogramaCargando = true;
+        estado.explicacionFotogramaError = null;
+        pintar();
+
+        const prompt = `Estoy estudiando la clase de programación/ML: "${v.titulo}" (${v.canal || 'YouTube'}).\n` +
+            `Timestamp del fotograma: ${minuto || '00:00'}.\n` +
+            `Concepto / Diapositiva: "${titulo || 'Tema principal de este momento'}".\n` +
+            (notaActual ? `Notas previas del estudiante: "${notaActual}".\n` : '') +
+            `Por favor, genera una explicación técnica, concisa y didáctica (en español):\n` +
+            `1. Explica los fundamentos teóricos o prácticos que se muestran en este punto.\n` +
+            `2. Si involucra fórmulas o matemáticas, represéntalas en notación clara o LaTeX.\n` +
+            `3. Si involucra código o arquitectura, proporciona un snippet breve y limpio.\n` +
+            `4. Concluye con un tip práctico de optimización o advertencia.`;
+
+        try {
+            const resp = await window.prigFetchJson('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: 'Eres un profesor universitario de ciencias de la computación, arquitectura de sistemas y machine learning. Explicas diapositivas y fotogramas técnicos con máxima claridad.' },
+                        { role: 'user', content: prompt }
+                    ],
+                    tutor: 'modelo_explicar',
+                    stream: false
+                })
+            });
+
+            const textoGen = (resp && (resp.response || resp.texto || resp.message || resp.content)) || '';
+            if (estado.fotogramaTemporal) {
+                const prev = (estado.fotogramaTemporal.explicacion || '').trim();
+                estado.fotogramaTemporal.explicacion = prev ? `${prev}\n\n${textoGen.trim()}` : textoGen.trim();
+            }
+        } catch (e) {
+            console.error('Error generando explicación con IA:', e);
+            estado.explicacionFotogramaError = e.message;
+        } finally {
+            estado.explicacionFotogramaCargando = false;
+            pintar();
         }
     }
 
@@ -1771,6 +1958,48 @@ const VIDEOS_CURADOS = [
             .yt-lateral-tab.activo { color:#fff; border-bottom-color:#ff0000; background:rgba(255,255,255,0.05); }
             .yt-lateral-cuerpo { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
 
+            /* Subpestañas en Notas */
+            .yt-subtabs-notas { display:flex; gap:4px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px; margin-bottom:4px; }
+            .yt-subtab-btn { flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:5px 6px; font-size:10.5px; font-weight:700; color:var(--text-muted, #a6adc8); cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; }
+            .yt-subtab-btn:hover { background:rgba(255,255,255,0.08); color:#fff; }
+            .yt-subtab-btn.activo { background:rgba(137,180,250,0.18); border-color:var(--accent-blue, #89b4fa); color:#89b4fa; }
+
+            /* Barra de acción y formulario de Fotogramas */
+            .yt-fotograma-barra { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+            .yt-fotograma-form { background:rgba(0,0,0,0.28); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px; animation:ytFadeIn 0.2s ease-out; }
+            @keyframes ytFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+            .yt-fotograma-preview-wrap { position:relative; width:100%; border-radius:6px; overflow:hidden; background:rgba(0,0,0,0.4); border:1px dashed rgba(255,255,255,0.2); display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100px; }
+            .yt-fotograma-preview-img { width:100%; max-height:160px; object-fit:contain; display:block; background:#000; }
+            .yt-fotograma-placeholder { padding:12px; text-align:center; color:var(--text-muted, #a6adc8); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+            .yt-fotograma-placeholder i { font-size:20px; color:var(--accent-blue, #89b4fa); opacity:0.7; }
+            .yt-fotograma-thumb-bar { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+            .yt-btn-thumb-opt { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--text-muted, #a6adc8); font-size:9.5px; padding:2px 6px; cursor:pointer; transition:all 0.15s; }
+            .yt-btn-thumb-opt:hover { color:#fff; background:rgba(255,255,255,0.15); border-color:#89b4fa; }
+            .yt-btn-thumb-opt.activo { background:rgba(137,180,250,0.25); color:#89b4fa; border-color:#89b4fa; font-weight:700; }
+
+            /* Lista de Tarjetas de Fotogramas */
+            .yt-fotogramas-lista { display:flex; flex-direction:column; gap:8px; }
+            .yt-fotograma-card { background:rgba(255,255,255,0.035); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; transition:all 0.15s; }
+            .yt-fotograma-card:hover { border-color:rgba(137,180,250,0.3); background:rgba(255,255,255,0.05); }
+            .yt-fotograma-card-header { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:7px 9px; background:rgba(0,0,0,0.18); border-bottom:1px solid rgba(255,255,255,0.04); }
+            .yt-fotograma-card-titulo { font-size:11.5px; font-weight:700; color:#fff; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .yt-fotograma-card-body { padding:8px 9px; display:flex; gap:9px; align-items:flex-start; }
+            .yt-fotograma-thumb-click { position:relative; width:92px; height:58px; flex-shrink:0; border-radius:5px; overflow:hidden; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:#000; }
+            .yt-fotograma-thumb-click img { width:100%; height:100%; object-fit:cover; transition:transform 0.2s; }
+            .yt-fotograma-thumb-click:hover img { transform:scale(1.06); }
+            .yt-fotograma-zoom-badge { position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.7); color:#fff; font-size:9px; padding:1px 4px; border-radius:3px; opacity:0.85; }
+            .yt-fotograma-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; font-size:11px; color:#cdd6f4; line-height:1.4; }
+            .yt-fotograma-explicacion { white-space:pre-wrap; max-height:120px; overflow-y:auto; word-break:break-word; }
+            .yt-fotograma-footer { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 9px; background:rgba(0,0,0,0.12); font-size:10px; color:var(--text-muted, #a6adc8); border-top:1px solid rgba(255,255,255,0.03); }
+
+            /* Lightbox zoom modal */
+            .yt-lightbox-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.88); backdrop-filter:blur(4px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px; animation:ytFadeIn 0.2s ease-out; }
+            .yt-lightbox-box { max-width:92%; max-height:92%; background:var(--bg-panel, #181825); border:1px solid rgba(255,255,255,0.15); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 15px 35px rgba(0,0,0,0.6); }
+            .yt-lightbox-top { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:rgba(0,0,0,0.3); border-bottom:1px solid rgba(255,255,255,0.08); color:#fff; font-size:12px; font-weight:700; gap:8px; }
+            .yt-lightbox-img { max-width:100%; max-height:72vh; object-fit:contain; background:#000; display:block; }
+            .yt-lightbox-bottom { padding:10px 14px; font-size:11.5px; color:#cdd6f4; background:rgba(0,0,0,0.25); max-height:120px; overflow-y:auto; line-height:1.4; white-space:pre-wrap; }
+
             /* Notaciones por minuto */
             .yt-marcas-seccion { display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,0.22); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:8px; padding:10px; }
             .yt-marca-input-fila { display:flex; gap:6px; align-items:center; }
@@ -2053,6 +2282,7 @@ const VIDEOS_CURADOS = [
         const v = estado.videoActual;
         const prog = obtenerProgreso(v.id);
         const marcas = leerMarcasVideo(v.id);
+        const fotogramas = leerFotogramas(v.id);
         const notaClave = `prig_yt_nota_${v.id}`;
         const notaGuardada = localStorage.getItem(notaClave) || '';
         const marcasDetectadas = extraerTimestampsDeTexto(notaGuardada);
@@ -2151,7 +2381,7 @@ const VIDEOS_CURADOS = [
 
                 <div class="yt-lateral">
                   <div class="yt-lateral-tabs">
-                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas (${marcas.length})</div>
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas (${fotogramas.length + marcas.length})</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'objetivos' ? 'activo' : ''}" data-tab="objetivos"><i class="fa-solid fa-bullseye"></i> Objetivos ${objetivos.length > 0 ? `(${superadosObj}/${objetivos.length})` : ''}</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'resumen' ? 'activo' : ''}" data-tab="resumen"><i class="fa-solid fa-file-lines"></i> Resumen IA ${resumen ? '✓' : ''}</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'tutor' ? 'activo' : ''}" data-tab="tutor"><i class="fa-solid fa-robot"></i> Asistente IA</div>
@@ -2171,59 +2401,163 @@ const VIDEOS_CURADOS = [
                         <div id="yt-desafio-mensaje-stream" style="font-size:11px; color:var(--text-muted);">${esc(estado.desafioMensaje)}</div>
                       </div>
                     ` : estado.pestanaLateral === 'notas' ? `
-                      <!-- Sección 1: Notaciones por Minuto -->
-                      <div class="yt-marcas-seccion">
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
-                          <span style="font-weight:700; color:#fff;"><i class="fa-solid fa-stopwatch" style="color:var(--accent-blue, #89b4fa);"></i> Notaciones por minuto (${marcas.length})</span>
-                          <span id="yt-minuto-activo-badge" style="font-size:10px; color:var(--text-muted);">Clic en ▶ para saltar al min</span>
+                      <!-- Barra de Subpestañas de Notas -->
+                      <div class="yt-subtabs-notas">
+                        <button class="yt-subtab-btn ${estado.subpestanaNotas === 'fotogramas' ? 'activo' : ''}" data-subtab="fotogramas" title="Notas visuales con capturas del video y explicaciones"><i class="fa-solid fa-camera"></i> Fotogramas (${fotogramas.length})</button>
+                        <button class="yt-subtab-btn ${estado.subpestanaNotas === 'marcas' ? 'activo' : ''}" data-subtab="marcas" title="Notaciones y saltos por minuto"><i class="fa-solid fa-stopwatch"></i> Marcas (${marcas.length})</button>
+                        <button class="yt-subtab-btn ${estado.subpestanaNotas === 'cuaderno' ? 'activo' : ''}" data-subtab="cuaderno" title="Cuaderno libre en Markdown"><i class="fa-solid fa-book-open"></i> Cuaderno</button>
+                      </div>
+
+                      ${estado.subpestanaNotas === 'fotogramas' ? `
+                        <!-- Subpestaña: Fotogramas con Notas y Explicación -->
+                        <div class="yt-fotograma-barra">
+                          <span style="font-size:11px; font-weight:700; color:#fff;"><i class="fa-solid fa-camera" style="color:var(--accent-blue, #89b4fa);"></i> Notas Visuales (${fotogramas.length})</span>
+                          <button class="yt-btn azul" id="yt-btn-toggle-form-foto" style="padding:3px 9px; font-size:10.5px;">
+                            <i class="fa-solid ${estado.fotogramaFormAbierto ? 'fa-xmark' : 'fa-plus'}"></i> ${estado.fotogramaFormAbierto ? 'Cerrar captura' : 'Añadir Fotograma'}
+                          </button>
                         </div>
 
-                        <div class="yt-marca-input-fila">
-                          <input id="yt-input-marca-min" class="yt-input-min" placeholder="MM:SS" value="${prog.ultimoMinuto !== '00:00' ? prog.ultimoMinuto : '00:00'}" title="Minuto del video (ej. 05:20 o 1:15:30)">
-                          <input id="yt-input-marca-txt" class="yt-input-txt" placeholder="¿Qué ocurre en este minuto?..." title="Nota del minuto">
-                          <button class="yt-btn azul" id="yt-btn-agregar-marca" style="padding:5px 9px;" title="Agregar anotación en este minuto"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-
-                        <div class="yt-marcas-lista" id="yt-marcas-lista">
-                          ${marcas.length === 0 ? `
-                            <div style="text-align:center; padding:12px; color:var(--text-muted); font-size:11px; font-style:italic;">
-                              Sin notaciones por minuto. Escribe un minuto arriba (ej: 04:30) y una nota para saltar a ese punto clave cuando estudies.
+                        ${estado.fotogramaFormAbierto ? `
+                          <div class="yt-fotograma-form">
+                            <div style="font-size:10.5px; font-weight:700; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+                              <span><i class="fa-solid fa-image" style="color:var(--accent-blue);"></i> Captura del momento</span>
+                              <span style="font-size:10px; color:var(--text-muted);">Pega con <b>Ctrl+V</b> en cualquier parte</span>
                             </div>
-                          ` : marcas.map(m => `
-                            <div class="yt-marca-item" data-id="${esc(m.id)}">
-                              <button class="yt-timestamp-btn" data-segundos="${m.segundos}" title="Saltar el reproductor al minuto ${esc(m.minuto)}">
-                                <i class="fa-solid fa-play" style="font-size:9px;"></i> ${esc(m.minuto)}
+
+                            <div class="yt-fotograma-preview-wrap" id="yt-fotograma-dropzone">
+                              ${(estado.fotogramaTemporal && estado.fotogramaTemporal.imagenUrl) ? `
+                                <img src="${esc(estado.fotogramaTemporal.imagenUrl)}" class="yt-fotograma-preview-img" alt="Fotograma a guardar">
+                              ` : `
+                                <div class="yt-fotograma-placeholder">
+                                  <i class="fa-solid fa-camera-retro"></i>
+                                  <span>Pega captura con <b>Ctrl+V</b> o elige un keyframe abajo</span>
+                                </div>
+                              `}
+                            </div>
+
+                            <div class="yt-fotograma-thumb-bar">
+                              <span style="font-size:9.5px; color:var(--text-muted); align-self:center;">Keyframe YT:</span>
+                              <button type="button" class="yt-btn-thumb-opt" data-keyframe="hqdefault">Portada</button>
+                              <button type="button" class="yt-btn-thumb-opt" data-keyframe="1">25%</button>
+                              <button type="button" class="yt-btn-thumb-opt" data-keyframe="2">50%</button>
+                              <button type="button" class="yt-btn-thumb-opt" data-keyframe="3">75%</button>
+                              <button type="button" class="yt-btn-thumb-opt" id="yt-btn-trigger-upload"><i class="fa-solid fa-upload"></i> Subir recorte</button>
+                              <input type="file" id="yt-file-upload-fotograma" accept="image/*" style="display:none;">
+                            </div>
+
+                            <div style="display:flex; gap:6px; margin-top:2px;">
+                              <input id="yt-input-foto-min" class="yt-input-min" placeholder="MM:SS" value="${esc((estado.fotogramaTemporal && estado.fotogramaTemporal.minuto) || (prog.ultimoMinuto !== '00:00' ? prog.ultimoMinuto : '00:00'))}" title="Minuto exacto del video (ej. 05:20)">
+                              <input id="yt-input-foto-titulo" class="yt-input-txt" placeholder="Concepto o tema del fotograma..." value="${esc((estado.fotogramaTemporal && estado.fotogramaTemporal.titulo) || '')}">
+                            </div>
+
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                              <span style="font-size:10px; color:var(--text-muted); font-weight:600;">Explicación y fórmulas del concepto:</span>
+                              <button type="button" class="yt-btn morado" id="yt-btn-ia-explicar-foto" style="padding:2px 7px; font-size:10px;" ${estado.explicacionFotogramaCargando ? 'disabled' : ''}>
+                                <i class="fa-solid ${estado.explicacionFotogramaCargando ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}"></i> ${estado.explicacionFotogramaCargando ? 'Explicando...' : 'Explicar con IA'}
                               </button>
-                              <span class="yt-marca-texto" title="${esc(m.texto)}">${esc(m.texto)}</span>
-                              <div style="display:flex; gap:2px;">
-                                <button class="yt-marca-btn" data-accion="recargar" data-segundos="${m.segundos}" title="Forzar salto / recarga en min ${esc(m.minuto)}"><i class="fa-solid fa-rotate-right"></i></button>
-                                <button class="yt-marca-btn" data-accion="copiar" data-id="${esc(m.id)}" title="Copiar al cuaderno de notas"><i class="fa-regular fa-copy"></i></button>
-                                <button class="yt-marca-btn eliminar" data-accion="eliminar" data-id="${esc(m.id)}" title="Eliminar anotación"><i class="fa-regular fa-trash-can"></i></button>
+                            </div>
+
+                            ${estado.explicacionFotogramaError ? `
+                              <div style="font-size:10px; color:var(--accent-red);">${esc(estado.explicacionFotogramaError)}</div>
+                            ` : ''}
+
+                            <textarea id="yt-textarea-foto-exp" class="yt-input-txt" style="min-height:75px; resize:vertical; font-family:'Fira Code',monospace;" placeholder="Anota la fórmula, concepto teórico o fragmento de código mostrado en la pantalla...">${esc((estado.fotogramaTemporal && estado.fotogramaTemporal.explicacion) || '')}</textarea>
+
+                            <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:2px;">
+                              <button type="button" class="yt-btn" id="yt-btn-cancelar-foto">Cancelar</button>
+                              <button type="button" class="yt-btn verde" id="yt-btn-guardar-foto"><i class="fa-solid fa-check"></i> Guardar Nota Visual</button>
+                            </div>
+                          </div>
+                        ` : ''}
+
+                        <div class="yt-fotogramas-lista">
+                          ${fotogramas.length === 0 && !estado.fotogramaFormAbierto ? `
+                            <div style="text-align:center; padding:18px 10px; color:var(--text-muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                              <i class="fa-solid fa-camera" style="font-size:26px; opacity:0.35; color:var(--accent-blue);"></i>
+                              <p style="margin:0; line-height:1.4;">No hay notas visuales aún. Haz clic en <b>Añadir Fotograma</b> para vincular diapositivas, capturas de código o fórmulas con su explicación técnica.</p>
+                            </div>
+                          ` : fotogramas.map(f => `
+                            <div class="yt-fotograma-card" data-id="${esc(f.id)}">
+                              <div class="yt-fotograma-card-header">
+                                <button class="yt-timestamp-btn" data-segundos="${f.segundos}" title="Saltar el reproductor a ${esc(f.minuto)}">
+                                  <i class="fa-solid fa-play" style="font-size:9px;"></i> ${esc(f.minuto)}
+                                </button>
+                                <span class="yt-fotograma-card-titulo" title="${esc(f.titulo)}">${esc(f.titulo)}</span>
+                                <div style="display:flex; gap:2px;">
+                                  <button class="yt-marca-btn" data-accion="insertar-cuaderno" data-id="${esc(f.id)}" title="Insertar en el cuaderno de notas"><i class="fa-regular fa-copy"></i></button>
+                                  <button class="yt-marca-btn eliminar" data-accion="eliminar-fotograma" data-id="${esc(f.id)}" title="Eliminar fotograma"><i class="fa-regular fa-trash-can"></i></button>
+                                </div>
+                              </div>
+
+                              <div class="yt-fotograma-card-body">
+                                ${f.imagenUrl ? `
+                                  <div class="yt-fotograma-thumb-click" data-accion="ampliar" data-id="${esc(f.id)}" title="Clic para ver captura ampliada">
+                                    <img src="${esc(f.imagenUrl)}" alt="${esc(f.titulo)}">
+                                    <span class="yt-fotograma-zoom-badge"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
+                                  </div>
+                                ` : ''}
+                                <div class="yt-fotograma-info">
+                                  <div class="yt-fotograma-explicacion">${md(f.explicacion || '')}</div>
+                                </div>
                               </div>
                             </div>
                           `).join('')}
                         </div>
-                      </div>
+                      ` : estado.subpestanaNotas === 'marcas' ? `
+                        <!-- Subpestaña: Notaciones por Minuto -->
+                        <div class="yt-marcas-seccion">
+                          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+                            <span style="font-weight:700; color:#fff;"><i class="fa-solid fa-stopwatch" style="color:var(--accent-blue, #89b4fa);"></i> Notaciones por minuto (${marcas.length})</span>
+                            <span id="yt-minuto-activo-badge" style="font-size:10px; color:var(--text-muted);">Clic en ▶ para saltar al min</span>
+                          </div>
 
-                      <!-- Sección 2: Cuaderno de Notas Markdown Libre -->
-                      <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <span style="font-weight:600; color:#fff;"><i class="fa-solid fa-book-open"></i> Cuaderno de Apuntes</span>
-                        <div style="display:flex; gap:4px;">
-                          <button class="yt-btn" id="yt-btn-insertar-timestamp" style="padding:2px 7px; font-size:10px;" title="Insertar marca [MM:SS] en el cursor"><i class="fa-regular fa-clock"></i> + [Minuto]</button>
-                          <button class="yt-btn verde" id="yt-btn-guardar-archivo" style="padding:2px 7px; font-size:10px;" title="Exportar apuntes y timestamps a un archivo .md en el proyecto"><i class="fa-solid fa-file-export"></i> Exportar</button>
+                          <div class="yt-marca-input-fila">
+                            <input id="yt-input-marca-min" class="yt-input-min" placeholder="MM:SS" value="${prog.ultimoMinuto !== '00:00' ? prog.ultimoMinuto : '00:00'}" title="Minuto del video (ej. 05:20 o 1:15:30)">
+                            <input id="yt-input-marca-txt" class="yt-input-txt" placeholder="¿Qué ocurre en este minuto?..." title="Nota del minuto">
+                            <button class="yt-btn azul" id="yt-btn-agregar-marca" style="padding:5px 9px;" title="Agregar anotación en este minuto"><i class="fa-solid fa-plus"></i></button>
+                          </div>
+
+                          <div class="yt-marcas-lista" id="yt-marcas-lista">
+                            ${marcas.length === 0 ? `
+                              <div style="text-align:center; padding:12px; color:var(--text-muted); font-size:11px; font-style:italic;">
+                                Sin notaciones por minuto. Escribe un minuto arriba (ej: 04:30) y una nota para saltar a ese punto clave cuando estudies.
+                              </div>
+                            ` : marcas.map(m => `
+                              <div class="yt-marca-item" data-id="${esc(m.id)}">
+                                <button class="yt-timestamp-btn" data-segundos="${m.segundos}" title="Saltar el reproductor al minuto ${esc(m.minuto)}">
+                                  <i class="fa-solid fa-play" style="font-size:9px;"></i> ${esc(m.minuto)}
+                                </button>
+                                <span class="yt-marca-texto" title="${esc(m.texto)}">${esc(m.texto)}</span>
+                                <div style="display:flex; gap:2px;">
+                                  <button class="yt-marca-btn" data-accion="recargar" data-segundos="${m.segundos}" title="Forzar salto / recarga en min ${esc(m.minuto)}"><i class="fa-solid fa-rotate-right"></i></button>
+                                  <button class="yt-marca-btn" data-accion="copiar" data-id="${esc(m.id)}" title="Copiar al cuaderno de notas"><i class="fa-regular fa-copy"></i></button>
+                                  <button class="yt-marca-btn eliminar" data-accion="eliminar" data-id="${esc(m.id)}" title="Eliminar anotación"><i class="fa-regular fa-trash-can"></i></button>
+                                </div>
+                              </div>
+                            `).join('')}
+                          </div>
                         </div>
-                      </div>
-
-                      ${marcasDetectadas.length > 0 ? `
-                        <div class="yt-chips-detectados">
-                          <span>Saltos en apuntes:</span>
-                          ${marcasDetectadas.map(md => `
-                            <button class="yt-chip-seek" data-segundos="${md.segundos}" title="Saltar al minuto ${md.minuto}">▶ ${md.minuto}</button>
-                          `).join('')}
+                      ` : `
+                        <!-- Subpestaña: Cuaderno de Notas Markdown Libre -->
+                        <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                          <span style="font-weight:600; color:#fff;"><i class="fa-solid fa-book-open"></i> Cuaderno de Apuntes</span>
+                          <div style="display:flex; gap:4px;">
+                            <button class="yt-btn" id="yt-btn-insertar-timestamp" style="padding:2px 7px; font-size:10px;" title="Insertar marca [MM:SS] en el cursor"><i class="fa-regular fa-clock"></i> + [Minuto]</button>
+                            <button class="yt-btn verde" id="yt-btn-guardar-archivo" style="padding:2px 7px; font-size:10px;" title="Exportar apuntes y timestamps a un archivo .md en el proyecto"><i class="fa-solid fa-file-export"></i> Exportar</button>
+                          </div>
                         </div>
-                      ` : ''}
 
-                      <textarea id="yt-nota" class="yt-textarea-nota" placeholder="Escribe aquí tus fórmulas, conceptos clave, código y marcas como [12:34] para saltar directamente...">${esc(notaGuardada)}</textarea>
+                        ${marcasDetectadas.length > 0 ? `
+                          <div class="yt-chips-detectados">
+                            <span>Saltos en apuntes:</span>
+                            ${marcasDetectadas.map(mdItem => `
+                              <button class="yt-chip-seek" data-segundos="${mdItem.segundos}" title="Saltar al minuto ${mdItem.minuto}">▶ ${mdItem.minuto}</button>
+                            `).join('')}
+                          </div>
+                        ` : ''}
+
+                        <textarea id="yt-nota" class="yt-textarea-nota" placeholder="Escribe aquí tus fórmulas, conceptos clave, código y marcas como [12:34] para saltar directamente...">${esc(notaGuardada)}</textarea>
+                      `}
                     ` : estado.pestanaLateral === 'objetivos' ? `
                       <!-- Pestaña de Objetivos Didácticos -->
                       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -2378,6 +2712,22 @@ const VIDEOS_CURADOS = [
                     `}
                   </div>
                 </div>
+              ${estado.lightboxImg ? `
+                <div class="yt-lightbox-overlay" id="yt-lightbox-overlay">
+                  <div class="yt-lightbox-box">
+                    <div class="yt-lightbox-top">
+                      <span><i class="fa-regular fa-clock" style="color:var(--accent-blue);"></i> ${esc(estado.lightboxImg.minuto || '00:00')} — ${esc(estado.lightboxImg.titulo || 'Fotograma')}</span>
+                      <button class="yt-marca-btn" id="yt-btn-cerrar-lightbox" style="font-size:14px;"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <img src="${esc(estado.lightboxImg.imagenUrl)}" class="yt-lightbox-img" alt="Fotograma ampliado">
+                    ${estado.lightboxImg.explicacion ? `
+                      <div class="yt-lightbox-bottom">
+                        ${md(estado.lightboxImg.explicacion)}
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              ` : ''}
               </div>
             </div>
         `;
@@ -2631,6 +2981,165 @@ const VIDEOS_CURADOS = [
             };
         });
 
+        // Subpestañas de Notas
+        raiz.querySelectorAll('.yt-subtab-btn').forEach(sb => {
+            sb.onclick = () => {
+                estado.subpestanaNotas = sb.dataset.subtab;
+                pintar();
+            };
+        });
+
+        // Formulario y acciones de Fotogramas
+        const btnToggleFoto = $('yt-btn-toggle-form-foto');
+        if (btnToggleFoto) {
+            btnToggleFoto.onclick = () => {
+                estado.fotogramaFormAbierto = !estado.fotogramaFormAbierto;
+                if (estado.fotogramaFormAbierto && !estado.fotogramaTemporal) {
+                    const pr = obtenerProgreso(v.id);
+                    estado.fotogramaTemporal = {
+                        minuto: pr.ultimoMinuto || '00:00',
+                        segundos: pr.segundos || 0,
+                        imagenUrl: obtenerKeyframeUrl(v.id, 'hqdefault'),
+                        titulo: '',
+                        explicacion: ''
+                    };
+                }
+                pintar();
+            };
+        }
+
+        raiz.querySelectorAll('.yt-btn-thumb-opt[data-keyframe]').forEach(btn => {
+            btn.onclick = () => {
+                estado.fotogramaTemporal = estado.fotogramaTemporal || {};
+                estado.fotogramaTemporal.imagenUrl = obtenerKeyframeUrl(v.id, btn.dataset.keyframe);
+                pintar();
+            };
+        });
+
+        const btnTriggerUpload = $('yt-btn-trigger-upload');
+        const fileUploadFotograma = $('yt-file-upload-fotograma');
+        if (btnTriggerUpload && fileUploadFotograma) {
+            btnTriggerUpload.onclick = () => fileUploadFotograma.click();
+            fileUploadFotograma.onchange = (e) => {
+                const f = e.target.files && e.target.files[0];
+                if (f) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        estado.fotogramaTemporal = estado.fotogramaTemporal || {};
+                        estado.fotogramaTemporal.imagenUrl = evt.target.result;
+                        pintar();
+                    };
+                    reader.readAsDataURL(f);
+                }
+            };
+        }
+
+        const btnIaExplicarFoto = $('yt-btn-ia-explicar-foto');
+        if (btnIaExplicarFoto) {
+            btnIaExplicarFoto.onclick = () => {
+                const min = $('yt-input-foto-min') ? $('yt-input-foto-min').value.trim() : '00:00';
+                const tit = $('yt-input-foto-titulo') ? $('yt-input-foto-titulo').value.trim() : '';
+                const exp = $('yt-textarea-foto-exp') ? $('yt-textarea-foto-exp').value.trim() : '';
+                estado.fotogramaTemporal = estado.fotogramaTemporal || {};
+                estado.fotogramaTemporal.minuto = min;
+                estado.fotogramaTemporal.titulo = tit;
+                estado.fotogramaTemporal.explicacion = exp;
+                solicitarExplicacionFotograma(min, tit, exp);
+            };
+        }
+
+        const inputFotoMin = $('yt-input-foto-min');
+        if (inputFotoMin) inputFotoMin.oninput = () => { if (estado.fotogramaTemporal) estado.fotogramaTemporal.minuto = inputFotoMin.value; };
+        const inputFotoTit = $('yt-input-foto-titulo');
+        if (inputFotoTit) inputFotoTit.oninput = () => { if (estado.fotogramaTemporal) estado.fotogramaTemporal.titulo = inputFotoTit.value; };
+        const textareaFotoExp = $('yt-textarea-foto-exp');
+        if (textareaFotoExp) textareaFotoExp.oninput = () => { if (estado.fotogramaTemporal) estado.fotogramaTemporal.explicacion = textareaFotoExp.value; };
+
+        const btnCancelFoto = $('yt-btn-cancelar-foto');
+        if (btnCancelFoto) {
+            btnCancelFoto.onclick = () => {
+                estado.fotogramaFormAbierto = false;
+                estado.fotogramaTemporal = null;
+                pintar();
+            };
+        }
+
+        const btnGuardarFoto = $('yt-btn-guardar-foto');
+        if (btnGuardarFoto) {
+            btnGuardarFoto.onclick = () => {
+                const minStr = (inputFotoMin ? inputFotoMin.value.trim() : '') || '00:00';
+                const tit = (inputFotoTit ? inputFotoTit.value.trim() : '') || 'Momento clave';
+                const exp = (textareaFotoExp ? textareaFotoExp.value.trim() : '');
+                const img = (estado.fotogramaTemporal && estado.fotogramaTemporal.imagenUrl) || obtenerKeyframeUrl(v.id, 'hqdefault');
+                const seg = parsearTimestamp(minStr);
+                const lista = leerFotogramas(v.id);
+                lista.push({
+                    id: 'f_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                    minuto: formatearSegundos(seg),
+                    segundos: seg,
+                    titulo: tit,
+                    explicacion: exp,
+                    imagenUrl: img,
+                    fecha: Date.now()
+                });
+                lista.sort((a, b) => a.segundos - b.segundos);
+                guardarFotogramas(v.id, lista);
+                estado.fotogramaFormAbierto = false;
+                estado.fotogramaTemporal = null;
+                pintar();
+            };
+        }
+
+        // Clic en fotogramas para ampliar
+        raiz.querySelectorAll('[data-accion="ampliar"]').forEach(thumb => {
+            thumb.onclick = () => {
+                const item = fotogramas.find(x => x.id === thumb.dataset.id);
+                if (item) {
+                    estado.lightboxImg = item;
+                    pintar();
+                }
+            };
+        });
+
+        // Insertar fotograma en cuaderno
+        raiz.querySelectorAll('[data-accion="insertar-cuaderno"]').forEach(btn => {
+            btn.onclick = () => {
+                const item = fotogramas.find(x => x.id === btn.dataset.id);
+                if (item) {
+                    let mdBloque = `\n\n### 📸 [${item.minuto}] ${item.titulo}\n`;
+                    if (item.imagenUrl) mdBloque += `![${item.titulo}](${item.imagenUrl})\n`;
+                    if (item.explicacion) mdBloque += `\n> ${item.explicacion.replace(/\n/g, '\n> ')}\n`;
+                    const prev = localStorage.getItem(notaClave) || '';
+                    localStorage.setItem(notaClave, (prev + mdBloque).trim());
+                    estado.subpestanaNotas = 'cuaderno';
+                    pintar();
+                    alert('¡Fotograma insertado en tu cuaderno de notas!');
+                }
+            };
+        });
+
+        // Eliminar fotograma
+        raiz.querySelectorAll('[data-accion="eliminar-fotograma"]').forEach(btn => {
+            btn.onclick = () => {
+                const lista = leerFotogramas(v.id).filter(x => x.id !== btn.dataset.id);
+                guardarFotogramas(v.id, lista);
+                pintar();
+            };
+        });
+
+        // Cerrar lightbox
+        const btnCerrarLb = $('yt-btn-cerrar-lightbox');
+        if (btnCerrarLb) btnCerrarLb.onclick = () => { estado.lightboxImg = null; pintar(); };
+        const overlayLb = $('yt-lightbox-overlay');
+        if (overlayLb) {
+            overlayLb.onclick = (e) => {
+                if (e.target === overlayLb) {
+                    estado.lightboxImg = null;
+                    pintar();
+                }
+            };
+        }
+
         raiz.querySelectorAll('.yt-marca-btn').forEach(mb => {
             mb.onclick = () => {
                 const accion = mb.dataset.accion;
@@ -2689,9 +3198,10 @@ const VIDEOS_CURADOS = [
                 const contenido = notaEl.value;
                 const marcasActuales = leerMarcasVideo(v.id);
                 const progActual = obtenerProgreso(v.id);
+                const fotogramasActuales = leerFotogramas(v.id);
 
-                if (!contenido.trim() && marcasActuales.length === 0) {
-                    return alert('Escribe algunos apuntes o añade notas por minuto antes de exportar.');
+                if (!contenido.trim() && marcasActuales.length === 0 && fotogramasActuales.length === 0) {
+                    return alert('Escribe algunos apuntes o añade fotogramas / marcas antes de exportar.');
                 }
 
                 let cuerpoMd = `# Apuntes de Estudio: ${v.titulo}\n\n`;
@@ -2699,6 +3209,15 @@ const VIDEOS_CURADOS = [
                 cuerpoMd += `- **URL**: https://www.youtube.com/watch?v=${v.id}\n`;
                 cuerpoMd += `- **Avance**: ${progActual.porcentaje}% (${progActual.estado === 'completado' ? 'Completado' : 'En progreso'})\n`;
                 cuerpoMd += `- **Última posición**: ${progActual.ultimoMinuto || '00:00'}\n\n`;
+
+                if (fotogramasActuales.length > 0) {
+                    cuerpoMd += `## 📸 Fotogramas y Notas Visuales\n\n`;
+                    fotogramasActuales.forEach(f => {
+                        cuerpoMd += `### [${f.minuto}](https://www.youtube.com/watch?v=${v.id}&t=${f.segundos}s) — ${f.titulo}\n\n`;
+                        if (f.imagenUrl) cuerpoMd += `![${f.titulo}](${f.imagenUrl})\n\n`;
+                        if (f.explicacion) cuerpoMd += `${f.explicacion}\n\n`;
+                    });
+                }
 
                 if (marcasActuales.length > 0) {
                     cuerpoMd += `## ⏱️ Notaciones y Momentos Clave\n\n`;
@@ -2815,13 +3334,25 @@ const VIDEOS_CURADOS = [
             const m = $('modal-youtube');
             if (m) m.style.display = 'flex';
         }
-        if (opciones.videoId || opciones.url) {
-            const id = extraerVideoId(opciones.videoId || opciones.url);
+        if (opciones.videoId || opciones.url || opciones.id) {
+            const id = extraerVideoId(opciones.videoId || opciones.url || opciones.id);
             if (id) {
                 const vid = VIDEOS_CURADOS.find(x => x.id === id) || { id, titulo: 'Video de YouTube', canal: 'YouTube' };
                 reproducir(vid);
+                if (opciones.tab) {
+                    estado.pestanaLateral = opciones.tab;
+                    if (opciones.subtab) estado.subpestanaNotas = opciones.subtab;
+                }
+                if (opciones.segundos != null) {
+                    setTimeout(() => saltarAMinuto(opciones.segundos, false), 450);
+                }
+                pintar();
                 return;
             }
+        }
+        if (opciones.tab) {
+            estado.pestanaLateral = opciones.tab;
+            if (opciones.subtab) estado.subpestanaNotas = opciones.subtab;
         }
         pintar();
         cargarCursosJson();
@@ -2850,6 +3381,39 @@ const VIDEOS_CURADOS = [
         } catch (e) { /* usa lista interna */ }
     }
 
+    function configurarPasteGlobal() {
+        window.addEventListener('paste', (e) => {
+            const modalYt = $('modal-youtube');
+            if (!modalYt || modalYt.style.display === 'none') return;
+            if (estado.vista !== 'reproductor' || estado.pestanaLateral !== 'notas' || estado.subpestanaNotas !== 'fotogramas') return;
+            const items = (e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData) || {}).items;
+            if (!items) return;
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file' && item.type.indexOf('image/') !== -1) {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const v = estado.videoActual;
+                        const prog = v ? obtenerProgreso(v.id) : { ultimoMinuto: '00:00', segundos: 0 };
+                        estado.fotogramaFormAbierto = true;
+                        estado.fotogramaTemporal = estado.fotogramaTemporal || {
+                            minuto: prog.ultimoMinuto || '00:00',
+                            segundos: prog.segundos || 0,
+                            titulo: '',
+                            explicacion: ''
+                        };
+                        estado.fotogramaTemporal.imagenUrl = event.target.result;
+                        pintar();
+                    };
+                    reader.readAsDataURL(blob);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        });
+    }
+
     document.addEventListener('prig:herramienta-abierta', (e) => {
         if (e.detail && e.detail.modalId === 'modal-youtube') {
             pintar();
@@ -2857,10 +3421,16 @@ const VIDEOS_CURADOS = [
         }
     });
 
+    configurarPasteGlobal();
+
     window.YouTubeHub = {
         abrir,
         reproducir,
+        saltarAMinuto,
         pintar,
+        obtenerTodasLasNotas,
+        leerFotogramas,
+        guardarFotogramas,
         estado,
         VIDEOS_CURADOS
     };

@@ -16,7 +16,7 @@
     const json = (url, opciones) => window.prigFetchJson(url, opciones);
     const enviar = (url, cuerpo, metodo = 'POST') => json(url, { method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}) });
 
-    const estado = { datos: null, cargando: false, editando: false, error: null, todasHerramientas: false };
+    const estado = { datos: null, cargando: false, editando: false, error: null, todasHerramientas: false, filtroNotas: 'todas' };
 
     /** Qué se ve de cada sección. Lo que ejecuta y su atajo salen de commands.js */
     const HERRAMIENTAS = [
@@ -172,6 +172,7 @@
             </div>
             <div style="display:flex; flex-direction:column; gap:18px; min-width:0;">
               ${avance(d)}
+              ${notas(d)}
               ${modelos(d)}
               ${proyectos(d)}
               ${kaggle(d)}
@@ -336,6 +337,163 @@
           </div>`;
     }
 
+    // ------------------------------------------------------------------ notas unificadas
+    function obtenerNotasUnificadas(d) {
+        const todas = [];
+
+        // 1. YouTube: fotogramas y marcas
+        try {
+            if (window.YouTubeHub && typeof window.YouTubeHub.obtenerTodasLasNotas === 'function') {
+                const ytNotas = window.YouTubeHub.obtenerTodasLasNotas();
+                ytNotas.forEach(y => {
+                    todas.push({
+                        origen: 'youtube',
+                        id: y.id,
+                        videoId: y.videoId,
+                        videoTitulo: y.videoTitulo || 'Video de YouTube',
+                        titulo: y.titulo || 'Nota visual',
+                        minuto: y.minuto || '00:00',
+                        segundos: y.segundos || 0,
+                        texto: y.texto || '',
+                        imagenUrl: y.imagenUrl || '',
+                        fecha: y.fecha || 0
+                    });
+                });
+            } else {
+                const rawIdx = localStorage.getItem('prig_yt_indice_fotogramas');
+                if (rawIdx) {
+                    const idx = JSON.parse(rawIdx);
+                    Object.values(idx).forEach(f => {
+                        todas.push({
+                            origen: 'youtube',
+                            id: f.id,
+                            videoId: f.videoId,
+                            videoTitulo: f.videoTitulo || 'Video de YouTube',
+                            titulo: f.titulo || 'Nota visual',
+                            minuto: f.minuto || '00:00',
+                            segundos: f.segundos || 0,
+                            texto: f.explicacion || '',
+                            imagenUrl: f.imagenUrl || '',
+                            fecha: f.fecha || 0
+                        });
+                    });
+                }
+            }
+        } catch (e) { /* continuar */ }
+
+        // 2. Kaggle: items con nota en colecciones
+        try {
+            const kRecientes = (d.kaggle && d.kaggle.recientes) || [];
+            kRecientes.forEach(it => {
+                if (it.nota && it.nota.trim()) {
+                    todas.push({
+                        origen: 'kaggle',
+                        id: `kg_${it.tipo}_${it.ref}`,
+                        ref: it.ref,
+                        tipoItem: it.tipo,
+                        coleccion: it.coleccion || 'Kaggle',
+                        titulo: it.titulo || it.ref,
+                        texto: it.nota,
+                        color: it.color || '#20beff',
+                        fecha: it.anadido ? new Date(it.anadido).getTime() : 0
+                    });
+                }
+            });
+        } catch (e) { /* continuar */ }
+
+        // 3. Notas rápidas (Prig Note)
+        try {
+            const rapida = localStorage.getItem('prig_note_saved_content');
+            if (rapida && rapida.trim()) {
+                todas.push({
+                    origen: 'rapidas',
+                    id: 'prig_rapida',
+                    titulo: 'Nota Rápida',
+                    texto: rapida.slice(0, 240),
+                    fecha: 0
+                });
+            }
+        } catch (e) { /* continuar */ }
+
+        return todas.sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    }
+
+    function notas(d) {
+        const todas = obtenerNotasUnificadas(d);
+        const ytCount = todas.filter(n => n.origen === 'youtube').length;
+        const kgCount = todas.filter(n => n.origen === 'kaggle').length;
+        const rapCount = todas.filter(n => n.origen === 'rapidas').length;
+
+        const filtro = estado.filtroNotas || 'todas';
+        const filtradas = filtro === 'todas' ? todas : todas.filter(n => n.origen === filtro);
+        const visibles = filtradas.slice(0, 5);
+
+        return `<div class="in-tarjeta">
+            <h2>
+              <i class="fa-solid fa-note-sticky" style="color:#f5c2e7;"></i> Apuntes y Notas
+              <span class="in-sub" style="margin:0 0 0 6px; font-weight:400;">(${todas.length})</span>
+              <button class="in-btn in-accion" data-cmd="herr.youtube" title="Abrir clases y notas en YouTube"><i class="fa-brands fa-youtube" style="color:#ff5555;"></i> YouTube</button>
+            </h2>
+
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+              <span class="in-chip ${filtro === 'todas' ? 'fuerte' : ''}" data-filtro-nota="todas">Todas (${todas.length})</span>
+              <span class="in-chip ${filtro === 'youtube' ? 'fuerte' : ''}" data-filtro-nota="youtube"><i class="fa-brands fa-youtube" style="color:#ff5555;"></i> YouTube (${ytCount})</span>
+              <span class="in-chip ${filtro === 'kaggle' ? 'fuerte' : ''}" data-filtro-nota="kaggle"><i class="fa-brands fa-kaggle" style="color:#20beff;"></i> Kaggle (${kgCount})</span>
+              ${rapCount > 0 ? `<span class="in-chip ${filtro === 'rapidas' ? 'fuerte' : ''}" data-filtro-nota="rapidas"><i class="fa-solid fa-file-lines" style="color:#f5c2e7;"></i> Rápidas (${rapCount})</span>` : ''}
+            </div>
+
+            ${visibles.length === 0 ? `
+              <div class="in-vacio">
+                No hay notas todavía en esta categoría. Puedes capturar fotogramas con explicaciones mientras miras videos en <a href="#" data-cmd="herr.youtube" style="color:var(--accent-blue);">YouTube</a> o agregar notas a tus notebooks de <a href="#" data-cmd="herr.kaggle" style="color:var(--accent-blue);">Kaggle</a>.
+              </div>
+            ` : `
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                ${visibles.map((n) => {
+                    if (n.origen === 'youtube') {
+                        return `<div class="in-fila clic" data-nota-yt="${esc(JSON.stringify({ videoId: n.videoId, segundos: n.segundos }))}">
+                            ${n.imagenUrl ? `
+                              <div style="width:44px; height:28px; border-radius:5px; overflow:hidden; flex-shrink:0; background:#000; border:1px solid rgba(255,255,255,0.1);">
+                                <img src="${esc(n.imagenUrl)}" style="width:100%; height:100%; object-fit:cover;" alt="Fotograma">
+                              </div>
+                            ` : `
+                              <div class="in-icono" style="width:28px; height:28px; background:rgba(255,0,0,0.12); color:#ff5555;"><i class="fa-brands fa-youtube"></i></div>
+                            `}
+                            <div class="in-texto" style="font-size:12px;">
+                              <div style="display:flex; align-items:center; gap:6px;">
+                                <span class="in-badge azul" style="font-size:9px; padding:1px 5px;"><i class="fa-regular fa-clock"></i> ${esc(n.minuto)}</span>
+                                <b style="color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(n.titulo)}</b>
+                              </div>
+                              <small style="color:var(--text-muted);">${esc(n.videoTitulo)} ${n.texto ? `· ${esc(n.texto)}` : ''}</small>
+                            </div>
+                            <span class="in-cuando"><i class="fa-solid fa-play" style="font-size:9px; color:var(--accent-blue);"></i></span>
+                          </div>`;
+                    } else if (n.origen === 'kaggle') {
+                        return `<div class="in-fila clic" data-kaggle='${esc(JSON.stringify({ tipo: n.tipoItem, ref: n.ref }))}'>
+                            <div class="in-icono" style="width:28px; height:28px; background:color-mix(in srgb, ${n.color || '#20beff'} 16%, transparent); color:${n.color || '#20beff'};">
+                              <i class="fa-brands fa-kaggle"></i>
+                            </div>
+                            <div class="in-texto" style="font-size:12px;">
+                              <b style="color:#fff;">${esc(n.titulo)}</b>
+                              <small><span class="in-badge" style="font-size:9px; background:rgba(255,255,255,0.06); color:var(--text-muted);">${esc(n.coleccion)}</span> ${esc(n.texto)}</small>
+                            </div>
+                          </div>`;
+                    } else {
+                        return `<div class="in-fila clic" data-cmd="herr.note">
+                            <div class="in-icono" style="width:28px; height:28px; background:rgba(245,194,231,0.14); color:#f5c2e7;">
+                              <i class="fa-solid fa-file-lines"></i>
+                            </div>
+                            <div class="in-texto" style="font-size:12px;">
+                              <b style="color:#fff;">${esc(n.titulo)}</b>
+                              <small>${esc(n.texto)}</small>
+                            </div>
+                          </div>`;
+                    }
+                }).join('')}
+              </div>
+            `}
+          </div>`;
+    }
+
     // ------------------------------------------------------------------ herramientas
     function herramientas(d) {
         const favoritas = d.perfil.favoritas || [];
@@ -410,6 +568,29 @@
         });
         raiz.querySelectorAll('[data-kaggle]').forEach(el => el.onclick = () => {
             if (window.KaggleLector) window.KaggleLector.abrir(JSON.parse(el.dataset.kaggle));
+        });
+        raiz.querySelectorAll('[data-filtro-nota]').forEach(chip => {
+            chip.onclick = () => {
+                estado.filtroNotas = chip.dataset.filtroNota;
+                pintar();
+            };
+        });
+        raiz.querySelectorAll('[data-nota-yt]').forEach(el => {
+            el.onclick = () => {
+                try {
+                    const info = JSON.parse(el.dataset.notaYt);
+                    if (window.YouTubeHub) {
+                        window.YouTubeHub.abrir({
+                            id: info.videoId,
+                            segundos: info.segundos,
+                            tab: 'notas',
+                            subtab: 'fotogramas'
+                        });
+                    }
+                } catch (e) {
+                    if (window.YouTubeHub) window.YouTubeHub.abrir({ tab: 'notas' });
+                }
+            };
         });
         raiz.querySelectorAll('[data-practicar]').forEach(el => el.onclick = () => { if (window.Desafios) window.Desafios.abrir({ tema: el.dataset.practicar }); });
         raiz.querySelectorAll('[data-modelo]').forEach(el => el.onclick = () => { if (window.Modelos) window.Modelos.abrir(); });

@@ -158,7 +158,7 @@ def resumen(fuentes: Dict[str, Callable[[], Any]]) -> Dict[str, Any]:
         "proyecto": obtener("proyecto"),
         "recientes": obtener("recientes", []),
         "kaggle": {"lecturas": lecturas[:4], "colecciones": (obtener("colecciones", []) or [])[:6],
-                   "cuenta": obtener("kaggle_cuenta")},
+                   "recientes": guardado, "cuenta": obtener("kaggle_cuenta")},
         "errores": errores,
         "generado": datetime.now().isoformat(timespec="seconds"),
     }
