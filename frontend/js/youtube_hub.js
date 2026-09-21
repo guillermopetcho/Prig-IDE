@@ -1084,12 +1084,188 @@ const VIDEOS_CURADOS = [
             nivel: "Principiante / Intermedio",
             idioma: "EN",
             descripcion: "Fundamentos matemáticos para cálculo y computación: trigonometría, círculo unitario, identidades trigonométricas, funciones inversas, exponenciales y logaritmos."
+        },
+        // ==================== ARQUITECTURA DE COMPUTADORAS & SISTEMAS OPERATIVOS ====================,
+        {
+            id: "L6YqHxYHa7A",
+            titulo: "MIT 6.S081: Operating System Engineering (xv6 RISC-V)",
+            canal: "MIT PDOS (Prof. Frans Kaashoek & Robert Morris)",
+            universidad: "MIT",
+            categoria: "arquitectura_so",
+            playlist: "PL2zRqk16zX5xP9V3eY71Q_sM5Z-mN4o-1",
+            duracion: "24 Clases (~26 Horas)",
+            nivel: "Avanzado / Universidad",
+            idioma: "EN",
+            descripcion: "El curso troncal de ingeniería de sistemas operativos del MIT basado en xv6 sobre arquitectura RISC-V: llamadas al sistema, aislamiento de memoria, tablas de páginas multinivel, traps, interrupciones hardware, bloqueos con semáforos y sistemas de archivos con journaling."
+        },
+        {
+            id: "A8yC-o-o46Y",
+            titulo: "UC Berkeley CS162: Operating Systems and System Programming",
+            canal: "UC Berkeley (Prof. John Kubiatowicz)",
+            universidad: "UC Berkeley",
+            categoria: "arquitectura_so",
+            duracion: "28 Clases (~30 Horas)",
+            nivel: "Avanzado / Universidad",
+            idioma: "EN",
+            descripcion: "Cátedra universitaria de Berkeley sobre sistemas operativos: procesos e hilos, primitivas de sincronización (mutex, semáforos, variables de condición), algoritmos de planificación de CPU, memoria virtual y paginación, entrada/salida y sistemas de archivos."
+        },
+        {
+            id: "BIpPTqHK-Lc",
+            titulo: "Computer Architecture & Digital Design – Masterclass",
+            canal: "ETH Zürich / CMU (Prof. Onur Mutlu)",
+            universidad: "ETH Zürich",
+            categoria: "arquitectura_so",
+            duracion: "35 Clases (~40 Horas)",
+            nivel: "Universidad / Exhaustivo",
+            idioma: "EN",
+            descripcion: "La referencia mundial en arquitectura de computadoras del Prof. Onur Mutlu: diseño de procesadores, ejecución fuera de orden (Out-of-Order Execution), predicción de saltos, jerarquías y coherencia de memoria caché, GPUs y computación en memoria (PIM)."
+        },
+        {
+            id: "9DWlqtsNGV0",
+            titulo: "MIT 6.004: Computation Structures – From Gates to Processors",
+            canal: "MIT OpenCourseWare (Prof. Chris Terman & Steve Ward)",
+            universidad: "MIT",
+            categoria: "arquitectura_so",
+            playlist: "PLUl4u3cNGP62WVs95MNq3dQBqY2vGOtQ2",
+            duracion: "25 Clases (~26 Horas)",
+            nivel: "Universidad",
+            idioma: "EN",
+            descripcion: "El puente de ingeniería del MIT entre circuitos digitales y software: compuertas CMOS, diseño de ALUs, datapath de procesadores RISC-V, pipelining, memoria virtual y diseño del núcleo de sistemas operativos."
+        },
+        {
+            id: "3LVeEjsn8Ts",
+            titulo: "A New Golden Age for Computer Architecture (ACM Turing Lecture)",
+            canal: "ACM (John Hennessy & David Patterson)",
+            universidad: "UC Berkeley",
+            categoria: "arquitectura_so",
+            duracion: "1:45:00",
+            nivel: "Conferencia Magistral",
+            idioma: "EN",
+            descripcion: "La conferencia magistral de los galardonados con el Premio Turing John Hennessy (Stanford) y David Patterson (Berkeley): el fin de la ley de Moore y la escala de Dennard, el auge de RISC-V y las arquitecturas específicas de dominio (DSAs) para aceleración de IA."
+        },
+        {
+            id: "kUfxKq24g9s",
+            titulo: "Building an 8-bit Breadboard Computer from Scratch",
+            canal: "Ben Eater",
+            categoria: "arquitectura_so",
+            playlist: "PLUOaI24LpvQN2Y53vWepO2LMabKPIplar",
+            duracion: "44 Videos (~8 Horas)",
+            nivel: "Principiante / Intermedio",
+            idioma: "EN",
+            descripcion: "Construcción paso a paso de una computadora programable de 8 bits en protoboards: módulo de reloj con 555, registros A/B, bus de datos, ALU con sumadores, memoria RAM, microcódigo EEPROM y decodificador de instrucciones."
+        },
+        {
+            id: "mXw9ruZaxzQ",
+            titulo: "Operating Systems – Full University Course",
+            canal: "Neso Academy",
+            categoria: "arquitectura_so",
+            playlist: "PLBlnK6fEyqRiVpkKlSXDRA-G9x0H_n1gG",
+            duracion: "77 Lecciones (~15 Horas)",
+            nivel: "Principiante / Intermedio",
+            idioma: "EN",
+            descripcion: "Cátedra enciclopédica de sistemas operativos: gestión de procesos, bloque de control de procesos (PCB), planificación de CPU (FCFS, SJF, Round Robin), concurrencia, interbloqueos (Deadlocks), algoritmo del banquero y memoria virtual."
+        },
+        {
+            id: "IaY2NM64S6c",
+            titulo: "Computer Organization and Architecture (COA) – Full Course",
+            canal: "Neso Academy",
+            categoria: "arquitectura_so",
+            playlist: "PLBlnK6fEyqRj8D3G3P71c7xYn4gS1wZlD",
+            duracion: "70+ Lecciones (~14 Horas)",
+            nivel: "Principiante / Intermedio",
+            idioma: "EN",
+            descripcion: "Organización y microarquitectura de computadoras: ciclo de instrucción fetch-decode-execute, modos de direccionamiento, arquitecturas RISC vs CISC, pipelines con resolución de riesgos (hazards) y mapas de memoria caché."
+        },
+        {
+            id: "kYJv8y61Q8k",
+            titulo: "Operating Systems: The 4 Pillars (Three Easy Pieces / OSTEP)",
+            canal: "Prof. Remzi Arpaci-Dusseau (UW-Madison)",
+            universidad: "Univ. of Wisconsin",
+            categoria: "arquitectura_so",
+            duracion: "Cátedra Magistral",
+            nivel: "Intermedio / Universidad",
+            idioma: "EN",
+            descripcion: "Los 4 pilares fundamentales de los sistemas operativos por el autor de OSTEP: virtualización de CPU (procesos y scheduling), virtualización de memoria (páginas y TLBs), concurrencia (locks y semáforos) y persistencia (archivos y discos)."
+        },
+        {
+            id: "QktLoqcFI9c",
+            titulo: "Exploring How Computers Work – From Logic to CPU",
+            canal: "Sebastian Lague",
+            categoria: "arquitectura_so",
+            playlist: "PLFt_AvWsXl0dPhqDfL1CNnOvGYgFP9b3J",
+            duracion: "1:20:00",
+            nivel: "Principiante / Intermedio",
+            idioma: "EN",
+            descripcion: "Construcción visual e intuitiva de una computadora en software: cómo las compuertas lógicas forman sumadores, cómo los biestables (latches) almacenan memoria y cómo una CPU lee instrucciones para ejecutar programas completos."
+        },
+        {
+            id: "JK8i8Wq4T0s",
+            titulo: "The Central Processing Unit (CPU) – Microarchitecture",
+            canal: "CrashCourse (Carrie Anne Philbin)",
+            categoria: "arquitectura_so",
+            playlist: "PL1mtdjDVOoOqJzeaJAV15Tq0tZ1vKj7ZV",
+            duracion: "12:00",
+            nivel: "Principiante",
+            idioma: "EN",
+            descripcion: "Cómo funciona un procesador por dentro: la unidad aritmético-lógica (ALU), registros de control, buses internos de datos y el ciclo de reloj de instrucciones."
+        },
+        {
+            id: "26QPDBe-NB8",
+            titulo: "Operating Systems – Evolution & Architecture",
+            canal: "CrashCourse (Carrie Anne Philbin)",
+            categoria: "arquitectura_so",
+            playlist: "PL1mtdjDVOoOqJzeaJAV15Tq0tZ1vKj7ZV",
+            duracion: "13:00",
+            nivel: "Principiante",
+            idioma: "EN",
+            descripcion: "La arquitectura de los sistemas operativos: el kernel como intermediario entre hardware y software, multiprocesamiento, controladores de dispositivos y sistemas de archivos."
+        },
+        {
+            id: "kC7hQpBhi5s",
+            titulo: "Operating Systems Course for Beginners",
+            canal: "freeCodeCamp.org",
+            categoria: "arquitectura_so",
+            duracion: "2:30:00",
+            nivel: "Principiante",
+            idioma: "EN",
+            descripcion: "Fundamentos de sistemas operativos para programadores: espacio de usuario vs espacio de kernel, llamadas al sistema (syscalls), controladores, memoria compartida y seguridad de procesos."
+        },
+        {
+            id: "S0tNe6AZq90",
+            titulo: "Linux Operating System – Crash Course for Beginners",
+            canal: "freeCodeCamp.org",
+            categoria: "arquitectura_so",
+            duracion: "2:40:00",
+            nivel: "Principiante",
+            idioma: "EN",
+            descripcion: "El sistema operativo Linux a fondo: arquitectura del kernel Linux, jerarquía de archivos FHS, permisos POSIX, gestión de procesos en segundo plano y comandos del sistema."
+        },
+        {
+            id: "gMef1cXnC-4",
+            titulo: "Assembly Language Programming with ARM",
+            canal: "freeCodeCamp.org",
+            categoria: "arquitectura_so",
+            duracion: "2:30:00",
+            nivel: "Intermedio",
+            idioma: "EN",
+            descripcion: "Programación en lenguaje ensamblador de bajo nivel para arquitectura ARM: registros de CPU, instrucciones de carga y almacenamiento (load/store), saltos condicionales y manejo de la pila."
+        },
+        {
+            id: "gS8T-7o_h1o",
+            titulo: "¿Cómo Funciona un Sistema Operativo por Dentro?",
+            canal: "BettaTech",
+            categoria: "arquitectura_so",
+            duracion: "18:00",
+            nivel: "Principiante / Intermedio",
+            idioma: "ES",
+            descripcion: "Explicación técnica y didáctica en español: qué sucede desde que enciendes el ordenador hasta que carga el kernel, cómo interactúan la BIOS/UEFI, los drivers, la CPU y la memoria RAM."
         }
     ];
 
     const CATEGORIAS = [
         { id: 'todas', label: 'Todos los cursos' },
         { id: 'universidades', label: '🎓 Universidades (MIT, Stanford, etc.)' },
+        { id: 'arquitectura_so', label: '💻 Arquitectura & Sistemas Operativos' },
         { id: 'matematicas', label: '📐 Matemáticas (Álgebra, Cálculo, Probabilidad)' },
         { id: 'python', label: 'Python' },
         { id: 'cpp', label: 'C++ Moderno' },
