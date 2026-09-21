@@ -1125,7 +1125,7 @@ class AIChatManager {
                 : 'Analizando con detalle...');
 
         const aiMsgContentEl = this.appendMessage(initialStatus, false);
-        const currentCode = codeContext || window.editorMgr.getAIContext();
+        const currentCode = codeContext || (window.editorMgr && typeof window.editorMgr.getAIContext === 'function' ? window.editorMgr.getAIContext() : '');
 
         // Recolectar archivos enganchados para contexto y edición asistida
         let hookedFilesData = [];
@@ -1415,8 +1415,8 @@ class AIChatManager {
     }
 
     explainCodeFlow() {
-        const selected = window.editorMgr.getSelectedText();
-        const codeToExplain = selected || window.editorMgr.getAIContext();
+        const selected = (window.editorMgr && typeof window.editorMgr.getSelectedText === 'function') ? window.editorMgr.getSelectedText() : '';
+        const codeToExplain = selected || (window.editorMgr && typeof window.editorMgr.getAIContext === 'function' ? window.editorMgr.getAIContext() : '');
         this.sendMessage(
             "Explícame en DETALLE el FLUJO DE EJECUCIÓN paso a paso de este código (muestra orden de ejecución línea por línea, valores de variables y cambios de estado):",
             "explain_flow",
@@ -1425,7 +1425,7 @@ class AIChatManager {
     }
 
     explainSelection() {
-        const selected = window.editorMgr.getSelectedText();
+        const selected = (window.editorMgr && typeof window.editorMgr.getSelectedText === 'function') ? window.editorMgr.getSelectedText() : '';
         if (!selected) {
             alert('Selecciona primero las líneas de código que deseas que explique.');
             return;
@@ -1434,7 +1434,7 @@ class AIChatManager {
     }
 
     explainError(errorText) {
-        const code = window.editorMgr.getAIContext();
+        const code = (window.editorMgr && typeof window.editorMgr.getAIContext === 'function') ? window.editorMgr.getAIContext() : '';
         this.sendMessage(`El programa arrojó el siguiente error al ejecutarse:\n\n${errorText}\n\nAnaliza a fondo el error, explica la causa raíz y muestra la solución completa:`, "fix", code);
     }
 

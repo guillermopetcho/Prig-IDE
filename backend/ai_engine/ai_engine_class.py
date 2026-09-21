@@ -123,7 +123,12 @@ class AIEngine:
     def get_config(self) -> Dict[str, Any]:
         return self.config
 
-    ROLES = {"codigo": "modelo_codigo", "explicar": "modelo_explicar", "autocompletar": "modelo_autocompletar"}
+    ROLES = {
+        "codigo": "modelo_codigo",
+        "explicar": "modelo_explicar",
+        "tutor": "modelo_explicar",
+        "autocompletar": "modelo_autocompletar"
+    }
 
     def modelo_para(self, rol: Optional[str], pedido: Optional[str] = None) -> Optional[str]:
         """ El modelo de una tarea: el que se pide explícitamente, si no el elegido para

@@ -1572,8 +1572,10 @@ const VIDEOS_CURADOS = [
 
         try {
             const notaActual = localStorage.getItem(`prig_yt_nota_${v.id}`) || '';
+            const modeloActivo = (window.aiChatMgr && window.aiChatMgr.modelSelect && window.aiChatMgr.modelSelect.value) ? window.aiChatMgr.modelSelect.value : undefined;
             const r = await window.prigFetchJson('/api/youtube/analizar', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     video_id: v.id,
                     titulo: v.titulo,
@@ -1584,7 +1586,8 @@ const VIDEOS_CURADOS = [
                     nivel: v.nivel ? v.nivel.toLowerCase().split('/')[0].trim() : 'intermedio',
                     texto_usuario: estado.textoExtra || '',
                     notas_usuario: notaActual,
-                    modo: modo
+                    modo: modo,
+                    modelo: modeloActivo
                 })
             });
 
@@ -2365,7 +2368,7 @@ const VIDEOS_CURADOS = [
                             Haz preguntas sobre los conceptos del video, pide ejercicios prácticos o un resumen estructurado.
                           </div>
                         ` : estado.chatTutor.map(m => `
-                          <div class="yt-chat-msg ${m.rol}">${esc(m.texto)}</div>
+                          <div class="yt-chat-msg ${m.rol}">${m.rol === 'tutor' && typeof marked !== 'undefined' ? marked.parse(m.texto) : esc(m.texto)}</div>
                         `).join('')}
                       </div>
                       <div class="yt-chat-form">
@@ -2715,6 +2718,7 @@ const VIDEOS_CURADOS = [
                 try {
                     await window.prigFetchJson('/api/files/write', {
                         method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ path: nombre, content: cuerpoMd })
                     });
                     alert(`Notas guardadas en el proyecto como: ${nombre}`);
@@ -2738,6 +2742,21 @@ const VIDEOS_CURADOS = [
         }
     }
 
+    function actualizarStreamingTutor(texto) {
+        const contenedor = $('yt-chat-mensajes');
+        if (!contenedor) return;
+        const msgs = contenedor.querySelectorAll('.yt-chat-msg.tutor');
+        if (msgs.length > 0) {
+            const ultimo = msgs[msgs.length - 1];
+            if (typeof marked !== 'undefined') {
+                ultimo.innerHTML = marked.parse(texto);
+            } else {
+                ultimo.textContent = texto;
+            }
+            contenedor.scrollTop = contenedor.scrollHeight;
+        }
+    }
+
     async function enviarPreguntaTutor(pregunta) {
         const v = estado.videoActual;
         estado.chatTutor.push({ rol: 'usuario', texto: pregunta });
@@ -2747,16 +2766,42 @@ const VIDEOS_CURADOS = [
         pintar();
 
         try {
-            const r = await window.prigFetchJson('/api/ai/chat', {
+            const modeloActivo = (window.aiChatMgr && window.aiChatMgr.modelSelect && window.aiChatMgr.modelSelect.value) ? window.aiChatMgr.modelSelect.value : undefined;
+            const res = await fetch('/api/ai/chat', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt: `El usuario está viendo el video de YouTube educativo: "${v.titulo}" del canal "${v.canal}".\nConsulta del usuario: ${pregunta}`,
+                    prompt: `El usuario está viendo el video de YouTube educativo: "${v.titulo}" del canal "${v.canal}".\nConsulta del alumno: ${pregunta}`,
+                    model: modeloActivo,
                     mode: 'tutor'
                 })
             });
-            respItem.texto = r && (r.response || r.texto || r.content) ? (r.response || r.texto || r.content) : 'Respuesta procesada correctamente.';
+
+            if (!res.ok) {
+                const errDetail = await window.prigErrorDetail(res);
+                throw new Error(errDetail);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let acumulado = '';
+            respItem.texto = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                acumulado += decoder.decode(value, { stream: true });
+                respItem.texto = acumulado;
+                actualizarStreamingTutor(acumulado);
+            }
+
+            if (!respItem.texto.trim()) {
+                respItem.texto = 'No se recibió respuesta del modelo.';
+                actualizarStreamingTutor(respItem.texto);
+            }
         } catch (e) {
             respItem.texto = `*Error al consultar al tutor: ${e.message}*`;
+            actualizarStreamingTutor(respItem.texto);
         } finally {
             estado.tutorCargando = false;
             pintar();

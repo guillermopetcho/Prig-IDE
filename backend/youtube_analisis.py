@@ -107,11 +107,15 @@ def _extraer_json(texto: str) -> Optional[Any]:
     """ Extrae y deserializa el primer objeto o lista JSON válida encontrada en la respuesta """
     if not texto:
         return None
-    t = texto.strip()
+    t = re.sub(r"<think>[\s\S]*?</think>", "", texto, flags=re.I).strip()
     # Eliminar bloques markdown ```json ... ```
     m_code = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", t, re.I)
     if m_code:
-        t = m_code.group(1).strip()
+        try:
+            return json.loads(m_code.group(1).strip())
+        except Exception:
+            pass
+    # Intentar parseo directo
     try:
         return json.loads(t)
     except Exception:
@@ -122,6 +126,14 @@ def _extraer_json(texto: str) -> Optional[Any]:
     if i != -1 and j > i:
         try:
             return json.loads(t[i:j+1])
+        except Exception:
+            pass
+    # Buscar primer [ y último ]
+    i_arr = t.find("[")
+    j_arr = t.rfind("]")
+    if i_arr != -1 and j_arr > i_arr:
+        try:
+            return json.loads(t[i_arr:j_arr+1])
         except Exception:
             pass
     return None

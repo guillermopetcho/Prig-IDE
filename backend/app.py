@@ -3447,22 +3447,38 @@ def ai_chat(req: AIChatRequest):
     if req.code_context:
         prompt = f"```\n{req.code_context}\n```\n\n{prompt}"
 
+    modelo = req.model or _modelo_desafios(None, "tutor")
+
+    if gemini_motor.es_gemini(modelo):
+        if not gemini_motor.clave_actual()[0]:
+            raise HTTPException(status_code=400, detail="Gemini no está conectado: conéctalo o elige un modelo local.")
+        motor_gem = gemini_motor.MotorGemini(ai_engine._extract_and_parse_json)
+        nombre_gem = modelo[len(gemini_motor.PREFIJO):]
+        if req.eventos:
+            def gemini_eventos():
+                for chunk in motor_gem.generate_response(prompt, nombre_gem, sys_prompt):
+                    yield json.dumps({"t": "texto", "v": chunk}, ensure_ascii=False) + "\n"
+            return StreamingResponse(gemini_eventos(), media_type="application/x-ndjson")
+        else:
+            return StreamingResponse(motor_gem.generate_response(prompt, nombre_gem, sys_prompt), media_type="text/plain")
+
     if req.eventos:
-        return StreamingResponse(_chat_eventos(req, prompt, sys_prompt), media_type="application/x-ndjson")
+        return StreamingResponse(_chat_eventos(req, prompt, sys_prompt, modelo=modelo), media_type="application/x-ndjson")
 
     def event_stream():
         should_web_search = req.use_web or ai_engine.web_search.should_auto_search(req.prompt)
         if should_web_search:
-            for chunk in ai_engine.generate_response_with_web_search(prompt, req.model, sys_prompt):
+            for chunk in ai_engine.generate_response_with_web_search(prompt, modelo, sys_prompt):
                 yield chunk
         else:
-            for chunk in ai_engine.generate_response(prompt, req.model, sys_prompt, uso="tutor"):
+            for chunk in ai_engine.generate_response(prompt, modelo, sys_prompt, uso="tutor"):
                 yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/plain")
 
 
-def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str):
+def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None):
+    mod = modelo or req.model or _modelo_desafios(None, "tutor")
     fuentes = []
     if req.use_web or ai_engine.web_search.should_auto_search(req.prompt):
         try:
@@ -3478,7 +3494,7 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str):
     if req.herramientas:
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
                                     permitir_codigo=req.permitir_codigo, timeout=_exec_timeout())
-    for evento in ai_engine.chat_eventos(mensajes, req.model, "tutor", think=req.think,
+    for evento in ai_engine.chat_eventos(mensajes, mod, "tutor", think=req.think,
                                          logprobs=max(0, min(int(req.logprobs or 0), 5)),
                                          herramientas=herramientas,
                                          gobernador=recursos_termico.gobernador()):
@@ -5030,8 +5046,14 @@ def _desafio(fn, *args, **kwargs):
 
 
 def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
-    """ El pedido; si no, el modelo elegido para ese rol en Configuración; si no, el del tutor """
-    return ai_engine.modelo_para(rol, modelo) or ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
+    """ El pedido; si no, el modelo elegido para ese rol en Configuración; si no, el del tutor / explicación """
+    return (
+        ai_engine.modelo_para(rol, modelo)
+        or ai_engine.config.get("modelo_explicar")
+        or ai_engine.config.get("agent2_model")
+        or ai_engine.config.get("agent1_model")
+        or "qwen2.5-coder:7b"
+    )
 
 
 def _motor_desafios(modelo: Optional[str], rol: Optional[str] = None):

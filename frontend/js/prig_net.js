@@ -38,6 +38,10 @@
 
     /** fetch + comprobación + JSON en un solo paso */
     window.prigFetchJson = async function (url, options) {
+        options = options ? Object.assign({}, options) : {};
+        if (options.body && typeof options.body === 'string') {
+            options.headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+        }
         return window.prigJson(await fetch(url, options));
     };
 })();
