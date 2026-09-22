@@ -1796,27 +1796,58 @@ const VIDEOS_CURADOS = [
         guardarExplicaciones(videoId, lista);
     }
 
-    async function cargarTranscripcion(videoId, idioma = 'es') {
+    async function cargarTranscripcion(videoId, idioma = 'es', forzarRefresco = false) {
         if (!videoId) return;
+
+        const cacheClave = `prig_yt_trans_${videoId}_${idioma}`;
+        let cargadoDesdeCache = false;
+
+        // Si no se fuerza refresco y no tenemos datos ya en memoria para este video, cargar instantáneamente de caché
+        if (!forzarRefresco && (!estado.transcripcion.datos || estado.transcripcion.videoId !== videoId)) {
+            try {
+                const enCache = localStorage.getItem(cacheClave);
+                if (enCache) {
+                    const parsed = JSON.parse(enCache);
+                    if (parsed && parsed.ok && parsed.segmentos && parsed.segmentos.length > 0) {
+                        estado.transcripcion = {
+                            cargando: false,
+                            error: null,
+                            datos: parsed,
+                            videoId: videoId,
+                            idioma: idioma
+                        };
+                        cargadoDesdeCache = true;
+                        pintar();
+                    }
+                }
+            } catch (e) {}
+        }
+
         if (estado.transcripcion.videoId === videoId &&
             estado.transcripcion.idioma === idioma &&
-            estado.transcripcion.datos) {
+            estado.transcripcion.datos &&
+            !forzarRefresco) {
             return;
         }
 
-        estado.transcripcion = {
-            cargando: true,
-            error: null,
-            datos: null,
-            videoId: videoId,
-            idioma: idioma
-        };
-        pintar();
+        if (!cargadoDesdeCache) {
+            estado.transcripcion = {
+                cargando: true,
+                error: null,
+                datos: null,
+                videoId: videoId,
+                idioma: idioma
+            };
+            pintar();
+        }
 
         try {
             const resp = await fetch(`/api/youtube/transcripcion?video_id=${encodeURIComponent(videoId)}&idioma=${encodeURIComponent(idioma)}`);
             const data = await resp.json();
-            if (data.ok && data.segmentos) {
+            if (data.ok && data.segmentos && data.segmentos.length > 0) {
+                try {
+                    localStorage.setItem(cacheClave, JSON.stringify(data));
+                } catch (e) {}
                 estado.transcripcion = {
                     cargando: false,
                     error: null,
@@ -1825,22 +1856,26 @@ const VIDEOS_CURADOS = [
                     idioma: idioma
                 };
             } else {
+                if (!cargadoDesdeCache) {
+                    estado.transcripcion = {
+                        cargando: false,
+                        error: data.error || 'No se pudieron extraer subtítulos para este video.',
+                        datos: null,
+                        videoId: videoId,
+                        idioma: idioma
+                    };
+                }
+            }
+        } catch (e) {
+            if (!cargadoDesdeCache) {
                 estado.transcripcion = {
                     cargando: false,
-                    error: data.error || 'No se pudieron extraer subtítulos para este video.',
+                    error: 'Error conectando con el servicio de transcripción: ' + (e.message || e),
                     datos: null,
                     videoId: videoId,
                     idioma: idioma
                 };
             }
-        } catch (e) {
-            estado.transcripcion = {
-                cargando: false,
-                error: 'Error conectando con el servicio de transcripción: ' + (e.message || e),
-                datos: null,
-                videoId: videoId,
-                idioma: idioma
-            };
         }
         pintar();
     }
@@ -3262,6 +3297,9 @@ const VIDEOS_CURADOS = [
     function reproducir(video) {
         estado.videoActual = video;
         estado.vista = 'reproductor';
+        estado.pestanaLateral = 'traduccion';
+        estado.subpestanaTraduccion = 'transcripcion';
+        estado.filtroTextoTraduccion = '';
         if (video && video.id && !String(video.id).startsWith('pl_')) {
             cargarTranscripcion(video.id, estado.idiomaSubtitulos || 'es');
         }
@@ -3368,8 +3406,10 @@ const VIDEOS_CURADOS = [
                     </button>
                     <span style="color:var(--text-muted); font-size:10.5px; margin-left:6px;"><i class="fa-solid fa-language"></i> Subtítulos:</span>
                     <select id="yt-select-idioma-subtitulos" class="yt-select-idioma" title="Forzar idioma de subtítulos en el reproductor de YouTube y traducción lateral" style="background:#181825; color:#cdd6f4; border:1px solid rgba(255,255,255,0.15); border-radius:4px; font-size:10.5px; padding:2px 4px; outline:none; cursor:pointer;">
-                      <option value="es" ${estado.idiomaSubtitulos === 'es' ? 'selected' : ''}>Español (traducción)</option>
-                      <option value="en" ${estado.idiomaSubtitulos === 'en' ? 'selected' : ''}>English (original)</option>
+                      <option value="es" ${(estado.idiomaSubtitulos === 'es' || !estado.idiomaSubtitulos) ? 'selected' : ''}>Español (traducción / nativo)</option>
+                      ${((transDatos && transDatos.idiomas_disponibles) || []).filter(idm => idm.codigo !== 'es' && idm.codigo !== 'es-419' && idm.codigo !== 'es-ES').map(idm => `
+                        <option value="${esc(idm.codigo)}" ${estado.idiomaSubtitulos === idm.codigo ? 'selected' : ''}>${esc(idm.nombre)} (YouTube)</option>
+                      `).join('')}
                       <option value="none" ${estado.idiomaSubtitulos === 'none' ? 'selected' : ''}>Desactivados</option>
                     </select>
                   </div>
@@ -3545,11 +3585,21 @@ const VIDEOS_CURADOS = [
                         <div class="yt-trad-toolbar">
                           <div class="yt-trad-controles-fila">
                             <div class="yt-trad-modo-btns">
-                              <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'traduccion' ? 'activo' : ''}" data-modo-trad="traduccion" title="Ver solo la traducción en español"><i class="fa-solid fa-language"></i> Español</button>
+                              <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'traduccion' ? 'activo' : ''}" data-modo-trad="traduccion" title="Ver traducción dividida en párrafos por minutos"><i class="fa-solid fa-clock"></i> Por Minutos</button>
+                              <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'lectura' ? 'activo' : ''}" data-modo-trad="lectura" title="Ver toda la traducción continua como una clase completa"><i class="fa-solid fa-book-open"></i> Lectura Completa</button>
                               <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'bilingue' ? 'activo' : ''}" data-modo-trad="bilingue" title="Ver traducción y texto original en inglés"><i class="fa-solid fa-globe"></i> Bilingüe</button>
                             </div>
-                            <button class="yt-btn" id="yt-btn-recargar-transcripcion" style="padding:2px 7px; font-size:10.5px;" title="Volver a cargar subtítulos y traducción"><i class="fa-solid fa-rotate-right"></i> Recargar</button>
+                            <div style="display:flex; align-items:center; gap:4px; margin-left:auto;">
+                              <button class="yt-btn" id="yt-btn-copiar-toda-traduccion" style="padding:2px 7px; font-size:10.5px;" title="Copiar toda la traducción al portapapeles"><i class="fa-regular fa-copy"></i> Copiar todo</button>
+                              <button class="yt-btn" id="yt-btn-recargar-transcripcion" style="padding:2px 7px; font-size:10.5px;" title="Volver a cargar subtítulos y traducción"><i class="fa-solid fa-rotate-right"></i></button>
+                            </div>
                           </div>
+                          ${transDatos ? `
+                            <div style="font-size:10px; color:#a6adc8; display:flex; justify-content:space-between; align-items:center; padding:1px 2px;">
+                              <span><i class="fa-solid fa-check" style="color:var(--accent-green, #a6e3a1);"></i> <b>${esc(transDatos.idioma_nombre || 'Español')}</b> · ${segmentosFiltrados.length} párrafos</span>
+                              <span style="color:var(--text-muted); font-size:9.5px;">${esc(v.canal || 'YouTube')}</span>
+                            </div>
+                          ` : ''}
                           <div>
                             <input type="text" id="yt-input-buscar-transcripcion" class="yt-trad-search-input" placeholder="Buscar concepto o palabra en la explicación..." value="${esc(estado.filtroTextoTraduccion || '')}">
                           </div>
@@ -3587,6 +3637,34 @@ const VIDEOS_CURADOS = [
                             return `
                               <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:11px;">
                                 No se encontraron explicaciones que coincidan con "<b>${esc(estado.filtroTextoTraduccion)}</b>".
+                              </div>
+                            `;
+                          }
+
+                          if (estado.modoVistaTraduccion === 'lectura') {
+                            return `
+                              <div style="font-size:10px; color:var(--text-muted); display:flex; align-items:center; gap:5px; margin:4px 0 2px;">
+                                <i class="fa-solid fa-book-open" style="color:var(--accent-blue);"></i>
+                                <span>Lectura completa de la clase explicada en español. Haz clic en cualquier marca para saltar al video.</span>
+                              </div>
+                              <div class="yt-transcripcion-cuerpo" id="yt-transcripcion-cuerpo" style="padding:4px 6px;">
+                                <div style="font-size:12px; color:#e0def4; line-height:1.75; display:flex; flex-direction:column; gap:10px;">
+                                  ${segmentosFiltrados.map(seg => `
+                                    <div class="yt-bloque-transcripcion yt-bloque-lectura" data-start="${seg.start}" data-end="${seg.end}" data-intervalo="${esc(seg.intervalo)}" style="padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:6px; border-left:3px solid var(--accent-blue);">
+                                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <button class="yt-segmento-timestamp" data-segundos="${seg.start}" style="font-size:9px; padding:1px 5px;" title="Saltar al minuto ${esc(seg.intervalo)}">
+                                          <i class="fa-solid fa-play" style="font-size:7.5px;"></i> ${esc(seg.intervalo)}
+                                        </button>
+                                        <button class="yt-marca-btn" data-accion="guardar-bloque" data-start="${seg.start}" data-end="${seg.end}" data-intervalo="${esc(seg.intervalo)}" title="Resaltar y guardar esta explicación">
+                                          <i class="fa-regular fa-bookmark"></i>
+                                        </button>
+                                      </div>
+                                      <div class="yt-segmento-texto" data-intervalo="${esc(seg.intervalo)}" data-start="${seg.start}" data-end="${seg.end}">
+                                        ${renderTextoConResaltados(seg.texto, explicaciones, seg.start, seg.end)}
+                                      </div>
+                                    </div>
+                                  `).join('')}
+                                </div>
                               </div>
                             `;
                           }
@@ -4048,6 +4126,30 @@ const VIDEOS_CURADOS = [
             };
         }
 
+        // Forzar activación de subtítulos en el reproductor de YouTube mediante postMessage
+        const iframePlayer = $('yt-iframe-player');
+        if (iframePlayer) {
+            iframePlayer.onload = () => {
+                const idm = estado.idiomaSubtitulos || 'es';
+                if (idm !== 'none') {
+                    try {
+                        iframePlayer.contentWindow.postMessage(JSON.stringify({
+                            event: 'command',
+                            func: 'loadModule',
+                            args: ['captions']
+                        }), '*');
+                        iframePlayer.contentWindow.postMessage(JSON.stringify({
+                            event: 'command',
+                            func: 'setOption',
+                            args: ['captions', 'track', { languageCode: idm }]
+                        }), '*');
+                    } catch (e) {
+                        // Ignorar errores de cross-origin postMessage
+                    }
+                }
+            };
+        }
+
         // Subpestañas dentro de Traducción (Transcripción vs Explicaciones Guardadas)
         raiz.querySelectorAll('[data-subtab-trad]').forEach(btn => {
             btn.onclick = () => {
@@ -4056,13 +4158,28 @@ const VIDEOS_CURADOS = [
             };
         });
 
-        // Alternar modo de visualización: Solo traducción vs Bilingüe
+        // Alternar modo de visualización: Solo traducción vs Bilingüe vs Lectura
         raiz.querySelectorAll('[data-modo-trad]').forEach(btn => {
             btn.onclick = () => {
                 estado.modoVistaTraduccion = btn.dataset.modoTrad;
                 pintar();
             };
         });
+
+        // Copiar toda la traducción al portapapeles
+        const btnCopiarTodo = $('yt-btn-copiar-toda-traduccion');
+        if (btnCopiarTodo && transDatos && transDatos.segmentos) {
+            btnCopiarTodo.onclick = () => {
+                const todo = transDatos.segmentos.map(s => `[${s.intervalo}] ${s.texto}`).join('\n\n');
+                navigator.clipboard.writeText(todo).then(() => {
+                    const orig = btnCopiarTodo.innerHTML;
+                    btnCopiarTodo.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+                    setTimeout(() => { btnCopiarTodo.innerHTML = orig; }, 1600);
+                }).catch(() => {
+                    prompt('Copiar transcripción completa:', todo);
+                });
+            };
+        }
 
         // Filtro de búsqueda en la transcripción
         const inputBuscarTrans = $('yt-input-buscar-transcripcion');
@@ -4078,17 +4195,17 @@ const VIDEOS_CURADOS = [
             };
         }
 
-        // Recargar o reintentar transcripción
+        // Recargar o reintentar transcripción (forzando actualización sin caché)
         const btnRecargarTrans = $('yt-btn-recargar-transcripcion');
         if (btnRecargarTrans) {
             btnRecargarTrans.onclick = () => {
-                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es');
+                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es', true);
             };
         }
         const btnReintentarTrans = $('yt-btn-reintentar-transcripcion');
         if (btnReintentarTrans) {
             btnReintentarTrans.onclick = () => {
-                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es');
+                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es', true);
             };
         }
         const btnPegarExtraTrans = $('yt-btn-pegar-extra-trans');

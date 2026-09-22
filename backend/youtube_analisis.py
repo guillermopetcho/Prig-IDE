@@ -11,6 +11,7 @@ Permite:
 import html
 import json
 import re
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
@@ -83,102 +84,267 @@ def formatear_segundos_hms(segundos: float) -> str:
     return f"{m_num:02d}:{s_num:02d}"
 
 
+def _extraer_nombre_track(c: Dict[str, Any]) -> str:
+    """ Extrae el nombre legible del track de subtítulos, compatible con formato simpleText y runs """
+    name_obj = c.get("name") or {}
+    if isinstance(name_obj, dict):
+        if name_obj.get("simpleText"):
+            return name_obj["simpleText"]
+        runs = name_obj.get("runs")
+        if runs and isinstance(runs, list) and len(runs) > 0 and isinstance(runs[0], dict):
+            return runs[0].get("text", "")
+    elif isinstance(name_obj, str):
+        return name_obj
+    return c.get("languageCode", "Desconocido")
+
+
+def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
+    """
+    Obtiene la lista de captionTracks de YouTube.
+    Utiliza el cliente Android de Innertube (que no sufre de restricciones de PoToken en timedtext),
+    con fallback a scraping de HTML y cliente Web.
+    """
+    # 1. Obtener HTML del video para extraer INNERTUBE_API_KEY y usar el cliente Android
+    try:
+        url_watch = f"https://www.youtube.com/watch?v={video_id}"
+        req_w = urllib.request.Request(
+            url_watch,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "es,en;q=0.9"
+            }
+        )
+        with urllib.request.urlopen(req_w, timeout=8) as resp_w:
+            html_watch = resp_w.read().decode("utf-8", errors="ignore")
+
+        m_key = re.search(r'"INNERTUBE_API_KEY":\s*"([a-zA-Z0-9_-]+)"', html_watch)
+        api_key = m_key.group(1) if m_key else ""
+        if api_key:
+            url_it = f"https://www.youtube.com/youtubei/v1/player?key={api_key}"
+            payload = json.dumps({
+                "context": {
+                    "client": {
+                        "clientName": "ANDROID",
+                        "clientVersion": "20.10.38",
+                        "hl": "es",
+                        "gl": "ES"
+                    }
+                },
+                "videoId": video_id
+            }).encode("utf-8")
+            req_it = urllib.request.Request(
+                url_it,
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "com.google.android.youtube/20.10.38"
+                }
+            )
+            with urllib.request.urlopen(req_it, timeout=8) as resp_it:
+                data_it = json.loads(resp_it.read().decode("utf-8", errors="ignore"))
+                tracks = data_it.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+                if tracks:
+                    return tracks
+
+        # Fallback de tracks dentro de ytInitialPlayerResponse en el propio HTML
+        m_resp = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html_watch)
+        if m_resp:
+            data_resp = json.loads(m_resp.group(1))
+            tracks = data_resp.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+            if tracks:
+                return tracks
+    except Exception:
+        pass
+
+    # 2. Fallback a llamada directa Innertube Web
+    try:
+        url_web = "https://www.youtube.com/youtubei/v1/player"
+        payload_web = json.dumps({
+            "context": {
+                "client": {
+                    "hl": "es",
+                    "gl": "ES",
+                    "clientName": "WEB",
+                    "clientVersion": "2.20240101.01.00"
+                }
+            },
+            "videoId": video_id
+        }).encode("utf-8")
+        req_web = urllib.request.Request(
+            url_web,
+            data=payload_web,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        )
+        with urllib.request.urlopen(req_web, timeout=7) as resp_web:
+            data_web = json.loads(resp_web.read().decode("utf-8", errors="ignore"))
+            tracks = data_web.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+            if tracks:
+                return tracks
+    except Exception:
+        pass
+
+    return []
+
+
+def _descargar_xml_timedtext(url: str) -> str:
+    """ Descarga el XML de subtítulos cronometrados de YouTube utilizando User-Agent de Android y fallback """
+    if not url:
+        return ""
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "com.google.android.youtube/20.10.38",
+                "Accept-Language": "es,en;q=0.9"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.read().decode("utf-8", errors="ignore")
+    except Exception:
+        pass
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "es,en;q=0.9"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.read().decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
+def _parsear_fragmentos_subtitulos(xml_str: str) -> List[Dict[str, Any]]:
+    """ Parsea XML de subtítulos soportando formato 1 (<text>) y formato 3 (<p>) """
+    if not xml_str:
+        return []
+    entradas = []
+    # Formato 1: <text start="..." dur="...">texto</text>
+    for s_str, d_str, txt in re.findall(r'<text start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>(.*?)</text>', xml_str, re.DOTALL):
+        try:
+            start = float(s_str)
+            dur = float(d_str) if d_str else 3.0
+            t = re.sub(r'<[^>]+>', '', txt)
+            t = html.unescape(t).replace('\n', ' ').strip()
+            if t:
+                entradas.append({"start": round(start, 2), "dur": round(dur, 2), "end": round(start + dur, 2), "texto": t})
+        except Exception:
+            continue
+
+    if not entradas:
+        # Formato 3: <p t="ms" d="ms">texto</p>
+        for t_str, d_str, txt in re.findall(r'<p t="(\d+)"(?:\s+d="(\d+)")?[^>]*>(.*?)</p>', xml_str, re.DOTALL):
+            try:
+                start = round(int(t_str) / 1000.0, 2)
+                dur = round(int(d_str) / 1000.0, 2) if d_str else 3.0
+                t = re.sub(r'<[^>]+>', '', txt)
+                t = html.unescape(t).replace('\n', ' ').strip()
+                if t:
+                    entradas.append({"start": start, "dur": dur, "end": round(start + dur, 2), "texto": t})
+            except Exception:
+                continue
+
+    return entradas
+
+
+def _traducir_texto_rapido(texto: str, idioma_destino: str = "es") -> str:
+    """ Traduce un texto mediante endpoint rápido con fallback seguro al texto original """
+    if not texto or not texto.strip():
+        return texto
+    try:
+        q = urllib.parse.quote(texto)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={idioma_destino}&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            partes = [item[0] for item in data[0] if item and item[0]]
+            res = "".join(partes).strip()
+            return res if res else texto
+    except Exception:
+        return texto
+
+
 def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es") -> Dict[str, Any]:
     """
     Extrae la transcripción completa de YouTube con marcas de tiempo e intervalos calculados.
-    Obtiene tanto la versión original como la versión traducida al idioma destino (default: 'es').
+    Si el video tiene subtítulos en español o permite traducción automática a español, entrega toda
+    la transcripción traducida al español. Si no, entrega la transcripción en el idioma disponible
+    en YouTube e intenta traducir los párrafos.
     Agrupa los fragmentos en párrafos didácticos y oraciones coherentes.
     """
     if not video_id:
         return {"ok": False, "error": "ID de video vacío", "segmentos": []}
 
     try:
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept-Language": "es,en;q=0.9",
-            },
-        )
-        raw_html = urllib.request.urlopen(req, timeout=8).read().decode("utf-8", errors="ignore")
-        m = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", raw_html)
-        if not m:
-            return {"ok": False, "error": "No se encontraron metadatos del reproductor", "segmentos": []}
-
-        data = json.loads(m.group(1))
-        captions = data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+        captions = _obtener_caption_tracks(video_id)
         if not captions:
-            return {"ok": False, "error": "Este video no tiene subtítulos disponibles en YouTube", "segmentos": []}
+            return {
+                "ok": False,
+                "error": "Este video no tiene subtítulos disponibles en YouTube.",
+                "segmentos": [],
+                "idiomas_disponibles": []
+            }
 
         idiomas_disponibles = [
             {
                 "codigo": c.get("languageCode"),
-                "nombre": c.get("name", {}).get("simpleText", c.get("languageCode")),
+                "nombre": _extraer_nombre_track(c),
                 "es_traducible": c.get("isTranslatable", True)
             }
             for c in captions
         ]
 
-        track_destino = next((c for c in captions if c.get("languageCode") in ("es", "es-419", "es-ES")), None)
-        track_original = next((c for c in captions if c.get("languageCode") in ("en", "en-US", "en-GB")), captions[0])
+        track_es = next((c for c in captions if (c.get("languageCode") or "").startswith("es")), None)
+        track_orig = next((c for c in captions if (c.get("languageCode") or "").startswith("en")), captions[0])
 
-        idioma_origen = track_original.get("languageCode", "en")
-        url_origen = track_original.get("baseUrl")
-
-        # Descargar XML original
         xml_origen = ""
-        if url_origen:
-            try:
-                cap_req = urllib.request.Request(url_origen, headers={"User-Agent": "Mozilla/5.0"})
-                xml_origen = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
-            except Exception:
-                pass
-
-        # Descargar XML traducido
         xml_traducido = ""
-        if idioma_destino in ("es", "es-419", "es-ES") and track_destino:
-            url_destino = track_destino.get("baseUrl")
-            try:
-                cap_req = urllib.request.Request(url_destino, headers={"User-Agent": "Mozilla/5.0"})
-                xml_traducido = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
-            except Exception:
-                pass
-        elif url_origen:
-            url_trad = url_origen + f"&tlang={idioma_destino}"
-            try:
-                cap_req = urllib.request.Request(url_trad, headers={"User-Agent": "Mozilla/5.0"})
-                xml_traducido = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
-            except Exception:
-                pass
+        idioma_usado = "es"
+        idioma_nombre = "Español"
+        idioma_origen = track_orig.get("languageCode", "en")
+        nombre_origen = _extraer_nombre_track(track_orig)
 
-        if not xml_traducido:
+        if idioma_destino in ("es", "es-419", "es-ES"):
+            if track_es:
+                # El video ya dispone de subtítulos oficiales en español
+                xml_traducido = _descargar_xml_timedtext(track_es.get("baseUrl"))
+                xml_origen = xml_traducido
+                idioma_usado = "es"
+                nombre_es = _extraer_nombre_track(track_es)
+                idioma_nombre = f"Español ({nombre_es})" if nombre_es != "Español" else "Español (oficial de YouTube)"
+                idioma_origen = track_es.get("languageCode", "es")
+            else:
+                # Descargar original para agrupar y traducir párrafos
+                url_orig = track_orig.get("baseUrl", "")
+                xml_origen = _descargar_xml_timedtext(url_orig)
+                xml_traducido = xml_origen
+                idioma_usado = idioma_origen
+                idioma_nombre = f"{nombre_origen} (disponible en YouTube)"
+        else:
+            # El usuario eligió un idioma específico de los disponibles
+            track_sel = next((c for c in captions if c.get("languageCode") == idioma_destino), captions[0])
+            url_sel = track_sel.get("baseUrl", "")
+            xml_traducido = _descargar_xml_timedtext(url_sel)
+            xml_origen = xml_traducido
+            idioma_usado = track_sel.get("languageCode", idioma_destino)
+            idioma_nombre = _extraer_nombre_track(track_sel)
+            idioma_origen = idioma_usado
+
+        if not xml_traducido and xml_origen:
             xml_traducido = xml_origen
 
-        entradas_orig = []
-        if xml_origen:
-            for s_str, d_str, txt in re.findall(r'<text start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>(.*?)</text>', xml_origen):
-                start = float(s_str)
-                dur = float(d_str) if d_str else 3.0
-                t = html.unescape(txt).replace("\n", " ").strip()
-                if t:
-                    entradas_orig.append({"start": start, "dur": dur, "end": start + dur, "texto": t})
-
-        entradas_trad = []
-        if xml_traducido:
-            for s_str, d_str, txt in re.findall(r'<text start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>(.*?)</text>', xml_traducido):
-                start = float(s_str)
-                dur = float(d_str) if d_str else 3.0
-                t = html.unescape(txt).replace("\n", " ").strip()
-                if t:
-                    entradas_trad.append({"start": start, "dur": dur, "end": start + dur, "texto": t})
+        entradas_orig = _parsear_fragmentos_subtitulos(xml_origen)
+        entradas_trad = _parsear_fragmentos_subtitulos(xml_traducido)
 
         base_entradas = entradas_trad if entradas_trad else entradas_orig
         if not base_entradas:
-            return {"ok": False, "error": "No se pudieron decodificar subtítulos para este video", "segmentos": []}
+            return {"ok": False, "error": "No se pudieron decodificar subtítulos para este video.", "segmentos": []}
 
         # Agrupar entradas en párrafos didácticos coherentes
         segmentos_agrupados = []
@@ -245,11 +411,36 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
                 "texto_original": texto_orig_final
             })
 
+        # Si el usuario solicitó español pero YouTube solo entregó texto en inglés/otro idioma:
+        # traducir los párrafos directamente al español con el traductor rápido en paralelo
+        if idioma_destino in ("es", "es-419", "es-ES") and idioma_usado != "es":
+            try:
+                import concurrent.futures
+
+                def _traducir_un_segmento(seg):
+                    txt = seg.get("texto")
+                    if txt:
+                        trad = _traducir_texto_rapido(txt, "es")
+                        if trad and trad != txt:
+                            seg["texto"] = trad
+                            return True
+                    return False
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                    resultados = list(executor.map(_traducir_un_segmento, segmentos_agrupados))
+
+                if any(resultados):
+                    idioma_usado = "es"
+                    idioma_nombre = f"Español (traducido desde {nombre_origen})"
+            except Exception:
+                pass
+
         return {
             "ok": True,
             "video_id": video_id,
             "idioma_destino": idioma_destino,
-            "idioma_origen": idioma_origen,
+            "idioma_usado": idioma_usado,
+            "idioma_nombre": idioma_nombre,
             "idiomas_disponibles": idiomas_disponibles,
             "total_segmentos": len(segmentos_agrupados),
             "segmentos": segmentos_agrupados
