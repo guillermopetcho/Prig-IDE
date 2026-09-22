@@ -1011,7 +1011,7 @@ class GlobalConfigManager {
                 { id: 'Edición', label: 'Edición' },
                 { id: 'Vista', label: 'Vista' },
                 { id: 'Ejecutar', label: 'Ejecutar' },
-                { id: 'Herramientas', label: 'Herramientas' },
+                { id: 'Secciones', label: 'Secciones' },
                 { id: 'Navegación', label: 'Navegación' },
                 { id: 'Configuración', label: 'Configuración' },
                 { id: 'Ayuda', label: 'Ayuda' }
@@ -1037,7 +1037,7 @@ class GlobalConfigManager {
         const comandosConCat = todosComandos.map(c => {
             let cat = c.menu;
             if (!cat) {
-                if (c.id.startsWith('herr.')) cat = 'Herramientas';
+                if (c.id.startsWith('herr.')) cat = 'Secciones';
                 else if (c.id.startsWith('ir.')) cat = 'Navegación';
                 else if (c.id.startsWith('seleccion.')) cat = 'Edición';
                 else cat = 'General';

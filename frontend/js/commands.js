@@ -289,41 +289,41 @@
         { id: 'ejecutar.limpiarConsola', menu: 'Ejecutar', label: 'Limpiar consola', accel: 'Ctrl+K Ctrl+L', separadorAntes: true,
           run: () => window.terminalMgr.clear() },
 
-        // ---------------- Secciones (accesibles vía botones, atajos y paleta) ----------------
+        // ---------------- Secciones ----------------
         // Grupo 1: Inicio, Perfil, Biblioteca, Desafíos, Diagramas, Papers, Agenticos
-        { id: 'herr.inicio', menu: null, label: 'Inicio', accel: 'Alt+Home',
+        { id: 'herr.inicio', menu: 'Secciones', label: 'Inicio', accel: 'Alt+Home',
           run: () => window.Inicio && window.Inicio.abrir() },
-        { id: 'herr.perfil', menu: null, label: 'Perfil', accel: 'Ctrl+4',
+        { id: 'herr.perfil', menu: 'Secciones', label: 'Perfil', accel: 'Ctrl+4',
           run: () => window.workArea.abrirHerramienta('modal-perfil', 'Perfil', 'fa-chart-pie') },
-        { id: 'herr.biblioteca', menu: null, label: 'Biblioteca', accel: 'Ctrl+1',
+        { id: 'herr.biblioteca', menu: 'Secciones', label: 'Biblioteca', accel: 'Ctrl+1',
           run: () => window.workArea.abrirHerramienta('modal-book-library', 'Biblioteca', 'fa-book-bookmark') },
-        { id: 'herr.practica', menu: null, label: 'Desafíos', accel: 'Ctrl+3',
+        { id: 'herr.practica', menu: 'Secciones', label: 'Desafíos', accel: 'Ctrl+3',
           run: () => window.Desafios && window.Desafios.abrir() },
-        { id: 'herr.diagramas', menu: null, label: 'Diagramas', accel: 'Ctrl+Alt+D',
+        { id: 'herr.diagramas', menu: 'Secciones', label: 'Diagramas', accel: 'Ctrl+Alt+D',
           run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('diagramas'); } },
-        { id: 'herr.papers', menu: null, label: 'Papers', accel: 'Ctrl+Alt+P',
+        { id: 'herr.papers', menu: 'Secciones', label: 'Papers', accel: 'Ctrl+Alt+P',
           run: () => { window.workArea.abrirHerramienta('modal-seguimiento', 'Aprendizaje Guiado', 'fa-route'); if (window.cambiarPestanaAprendizaje) window.cambiarPestanaAprendizaje('papers'); } },
-        { id: 'herr.agentes', menu: null, label: 'Agenticos', accel: 'Ctrl+6',
+        { id: 'herr.agentes', menu: 'Secciones', label: 'Agenticos', accel: 'Ctrl+6',
           run: () => window.workArea.abrirHerramienta('modal-agent-workflow', 'Agenticos', 'fa-diagram-project') },
 
         // Grupo 2: Kaggle, GitHub, YouTube
-        { id: 'herr.kaggle', menu: null, label: 'Kaggle', accel: 'Ctrl+5',
+        { id: 'herr.kaggle', menu: 'Secciones', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
           run: () => window.KaggleLector ? window.KaggleLector.abrir() : (window.workArea && window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle')) },
-        { id: 'herr.github', menu: null, label: 'GitHub', accel: 'Ctrl+Shift+G',
+        { id: 'herr.github', menu: 'Secciones', label: 'GitHub', accel: 'Ctrl+Shift+G',
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
-        { id: 'herr.youtube', menu: null, label: 'YouTube', accel: 'Ctrl+Shift+Y',
+        { id: 'herr.youtube', menu: 'Secciones', label: 'YouTube', accel: 'Ctrl+Shift+Y',
           run: () => window.YouTubeHub && window.YouTubeHub.abrir() },
-        { id: 'herr.hub', menu: null, label: 'Prig Hub', accel: 'Ctrl+Shift+J',
+        { id: 'herr.hub', menu: 'Secciones', label: 'Prig Hub', accel: 'Ctrl+Shift+J',
           run: () => window.PrigHub && window.PrigHub.abrir() },
 
         // Grupo 3: Modelos, Gestión de modelos, Gestión Ollama, Gestión máquina
-        { id: 'herr.modelos', menu: null, label: 'Modelos',
+        { id: 'herr.modelos', menu: 'Secciones', label: 'Modelos', separadorAntes: true,
           run: () => window.Modelos && window.Modelos.abrir() },
-        { id: 'herr.buscarModelos', menu: null, label: 'Gestión de modelos', accel: 'Ctrl+K Ctrl+M',
+        { id: 'herr.buscarModelos', menu: 'Secciones', label: 'Gestión de modelos', accel: 'Ctrl+K Ctrl+M',
           run: () => window.Modelos && window.Modelos.abrir('buscar') },
-        { id: 'herr.modelosServidor', menu: null, label: 'Gestión Ollama',
+        { id: 'herr.modelosServidor', menu: 'Secciones', label: 'Gestión Ollama',
           run: () => window.Modelos && window.Modelos.abrir('servidor') },
-        { id: 'herr.temperaturas', menu: null, label: 'Gestión máquina',
+        { id: 'herr.temperaturas', menu: 'Secciones', label: 'Gestión máquina',
           run: () => window.Temperaturas && window.Temperaturas.abrir() },
 
         // Comandos auxiliares disponibles por atajo y paleta
@@ -395,7 +395,7 @@
     });
 
     window.PrigCommands = {
-        MENUS: ['Archivos', 'Edición', 'Vista', 'Ejecutar', 'Configuración', 'Ayuda'],
+        MENUS: ['Archivos', 'Edición', 'Vista', 'Ejecutar', 'Secciones', 'Configuración', 'Ayuda'],
         todos: () => COMANDOS,
         porMenu: (menu) => COMANDOS.filter(c => c.menu === menu),
         get: (id) => porId[id],
