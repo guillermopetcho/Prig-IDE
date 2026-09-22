@@ -1409,7 +1409,8 @@ const VIDEOS_CURADOS = [
         filtroDuracionYt: 'todas', // 'todas' | 'cortos' | 'clases' | 'cursos' | 'playlists'
         ordenYt: 'educativo', // 'educativo' | 'duracion' | 'vistas'
         sugerenciasActivas: [],
-        sugerenciasAbiertas: false
+        sugerenciasAbiertas: false,
+        servidorEmbed: localStorage.getItem('prig_yt_embed_server') || 'www.youtube.com' // 'www.youtube.com' | 'www.youtube-nocookie.com'
     };
 
     // ==================== GESTIÓN DE PROGRESO Y PERSISTENCIA ====================
@@ -1785,6 +1786,45 @@ const VIDEOS_CURADOS = [
         })).sort((a, b) => a.segundos - b.segundos);
     }
 
+    function obtenerServidorEmbed() {
+        return estado.servidorEmbed || localStorage.getItem('prig_yt_embed_server') || 'www.youtube.com';
+    }
+
+    function construirEmbedUrl(video, startSegundos = 0) {
+        if (!video) return '';
+        const servidor = obtenerServidorEmbed();
+        const esSoloPlaylist = String(video.id || '').startsWith('pl_') || (!video.id && video.playlist);
+        const originParam = window.location && window.location.origin ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
+
+        if (esSoloPlaylist) {
+            return `https://${servidor}/embed/videoseries?list=${encodeURIComponent(video.playlist)}&autoplay=1${originParam}`;
+        }
+
+        const startParam = Number(startSegundos) > 0 ? `&start=${Math.floor(startSegundos)}` : '';
+        return `https://${servidor}/embed/${encodeURIComponent(video.id)}?enablejsapi=1&autoplay=1&rel=0${startParam}${originParam}`;
+    }
+
+    async function abrirEnNavegadorExterno(url) {
+        if (!url) return;
+        try {
+            const resp = await fetch('/api/youtube/abrir_externo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.ok) {
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.warn('[YouTubeHub] Falló apertura por backend:', e);
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return true;
+    }
+
     function saltarAMinuto(segundos, forzarRecarga = false) {
         const v = estado.videoActual;
         if (!v) return;
@@ -1801,8 +1841,9 @@ const VIDEOS_CURADOS = [
 
         const iframe = $('yt-iframe-player');
         if (iframe) {
+            const nuevaSrc = construirEmbedUrl(v, segundos);
             if (forzarRecarga) {
-                iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&autoplay=1&start=${segundos}&rel=0`;
+                iframe.src = nuevaSrc;
             } else {
                 try {
                     iframe.contentWindow.postMessage(JSON.stringify({
@@ -1816,7 +1857,7 @@ const VIDEOS_CURADOS = [
                         args: []
                     }), '*');
                 } catch (e) {
-                    iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?enablejsapi=1&autoplay=1&start=${segundos}&rel=0`;
+                    iframe.src = nuevaSrc;
                 }
             }
         }
@@ -2190,6 +2231,13 @@ const VIDEOS_CURADOS = [
             .yt-player-layout { display:grid; grid-template-columns:1fr 390px; height:100%; min-height:0; overflow:hidden; }
             @media (max-width: 950px) { .yt-player-layout { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
             .yt-player-main { display:flex; flex-direction:column; height:100%; min-height:0; overflow-y:auto; padding:16px; gap:12px; }
+            .yt-player-aux-bar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-radius:8px; flex-shrink:0; font-size:11px; flex-wrap:wrap; }
+            .yt-player-aux-left { display:flex; align-items:center; gap:8px; }
+            .yt-player-aux-right { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+            .yt-aviso-embed { display:flex; align-items:flex-start; gap:8px; padding:8px 12px; background:rgba(137,180,250,0.08); border:1px solid rgba(137,180,250,0.22); border-radius:8px; font-size:11px; color:#cdd6f4; line-height:1.45; }
+            .yt-aviso-embed i { color:#89b4fa; font-size:13px; margin-top:2px; flex-shrink:0; }
+            .yt-btn-link { background:transparent; border:none; color:#89b4fa; text-decoration:underline; cursor:pointer; padding:0; font-size:inherit; font-weight:600; }
+            .yt-btn-link:hover { color:#b4befe; }
             .yt-iframe-wrap { width:100%; aspect-ratio:16/9; background:#000; border-radius:10px; overflow:hidden; border:1px solid var(--border-color, rgba(255,255,255,0.1)); flex-shrink:0; }
             .yt-iframe-wrap iframe { width:100%; height:100%; border:none; display:block; }
             
@@ -3131,9 +3179,8 @@ const VIDEOS_CURADOS = [
         const enlaceExterno = esSoloPlaylist
             ? `https://www.youtube.com/playlist?list=${esc(v.playlist)}`
             : `https://www.youtube.com/watch?v=${esc(v.id)}${v.playlist ? `&list=${esc(v.playlist)}` : ''}`;
-        const iframeSrc = esSoloPlaylist
-            ? `https://www.youtube-nocookie.com/embed?listType=playlist&list=${esc(v.playlist)}&autoplay=1`
-            : `https://www.youtube-nocookie.com/embed/${esc(v.id)}?enablejsapi=1&autoplay=1&rel=0${v.playlist ? `&list=${esc(v.playlist)}` : ''}${prog.segundos > 0 ? `&start=${prog.segundos}` : ''}`;
+        const servidorActual = obtenerServidorEmbed();
+        const iframeSrc = construirEmbedUrl(v, prog.segundos);
 
         raiz.innerHTML = `
           <div class="yt-raiz">
@@ -3146,14 +3193,39 @@ const VIDEOS_CURADOS = [
               </div>
               <div class="yt-header-right">
                 <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video (Modo Cine)"><i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Modo Cine'}</button>
-                <a class="yt-btn" href="${enlaceExterno}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en YouTube</a>
+                <button class="yt-btn rojo" id="yt-btn-abrir-externo-header" title="Abrir video en el navegador web del sistema (Chrome, Firefox, etc.)"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en Navegador</button>
+                <a class="yt-btn" href="${enlaceExterno}" target="_blank" rel="noopener noreferrer" title="Enlace directo a YouTube"><i class="fa-brands fa-youtube"></i> Ver en YouTube</a>
               </div>
             </div>
 
             <div class="yt-player-layout">
               <div class="yt-player-main">
+                <div class="yt-player-aux-bar">
+                  <div class="yt-player-aux-left">
+                    <span style="color:var(--text-muted); font-size:10.5px;"><i class="fa-solid fa-server"></i> Servidor:</span>
+                    <button class="yt-btn" id="yt-btn-cambiar-servidor" style="padding:2px 7px; font-size:10.5px;" title="Alternar entre servidor estándar de YouTube y youtube-nocookie">
+                      ${servidorActual === 'www.youtube.com' ? 'youtube.com (Estándar)' : 'youtube-nocookie.com (Privado)'}
+                    </button>
+                  </div>
+                  <div class="yt-player-aux-right">
+                    <button class="yt-btn azul" id="yt-btn-copiar-enlace" style="padding:2px 8px; font-size:10.5px;" title="Copiar enlace del video al portapapeles">
+                      <i class="fa-regular fa-copy"></i> Copiar enlace
+                    </button>
+                    <button class="yt-btn rojo" id="yt-btn-abrir-externo" style="padding:2px 8px; font-size:10.5px;" title="Abrir directamente en tu navegador predeterminado del sistema (Chrome, Firefox, etc.)">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en Navegador
+                    </button>
+                  </div>
+                </div>
+
                 <div class="yt-iframe-wrap">
-                  <iframe id="yt-iframe-player" src="${iframeSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                  <iframe id="yt-iframe-player" src="${iframeSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                </div>
+
+                <div class="yt-aviso-embed">
+                  <i class="fa-solid fa-circle-info"></i>
+                  <div style="flex:1;">
+                    ¿El reproductor integrado muestra "No disponible" o faltan códecs en tu entorno? Puedes <button class="yt-btn-link" id="yt-btn-abrir-externo-link">abrirlo en tu navegador predeterminado</button> o alternar el servidor. Tus notas, progreso e IA seguirán activos aquí en Prig.
+                  </div>
                 </div>
 
                   <!-- Control de Avance del Curso -->
@@ -3596,6 +3668,52 @@ const VIDEOS_CURADOS = [
                 pintar();
             };
         }
+
+        // Abrir en navegador externo (Chrome/Firefox del SO)
+        const abrirExternoHandler = (e) => {
+            if (e) e.preventDefault();
+            abrirEnNavegadorExterno(enlaceExterno);
+        };
+        const btnAbrirExtHeader = $('yt-btn-abrir-externo-header');
+        if (btnAbrirExtHeader) btnAbrirExtHeader.onclick = abrirExternoHandler;
+        const btnAbrirExt = $('yt-btn-abrir-externo');
+        if (btnAbrirExt) btnAbrirExt.onclick = abrirExternoHandler;
+        const btnAbrirExtLink = $('yt-btn-abrir-externo-link');
+        if (btnAbrirExtLink) btnAbrirExtLink.onclick = abrirExternoHandler;
+
+        // Alternar servidor de embed (youtube.com vs youtube-nocookie.com)
+        const btnCambiarServidor = $('yt-btn-cambiar-servidor');
+        if (btnCambiarServidor) {
+            btnCambiarServidor.onclick = () => {
+                estado.servidorEmbed = (estado.servidorEmbed === 'www.youtube.com')
+                    ? 'www.youtube-nocookie.com'
+                    : 'www.youtube.com';
+                localStorage.setItem('prig_yt_embed_server', estado.servidorEmbed);
+                pintar();
+            };
+        }
+
+        // Copiar enlace al portapapeles
+        const btnCopiarEnlace = $('yt-btn-copiar-enlace');
+        if (btnCopiarEnlace) {
+            btnCopiarEnlace.onclick = () => {
+                navigator.clipboard.writeText(enlaceExterno).then(() => {
+                    const original = btnCopiarEnlace.innerHTML;
+                    btnCopiarEnlace.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+                    setTimeout(() => { btnCopiarEnlace.innerHTML = original; }, 1500);
+                }).catch(() => {
+                    prompt('Copia este enlace:', enlaceExterno);
+                });
+            };
+        }
+
+        // Interceptar enlaces directos a YouTube dentro del reproductor para abrirlos externamente si es necesario
+        raiz.querySelectorAll('a[href^="https://www.youtube.com"], a[href^="https://youtu.be"]').forEach(a => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                abrirEnNavegadorExterno(a.href);
+            });
+        });
 
         raiz.querySelectorAll('.yt-lateral-tab').forEach(tb => {
             tb.onclick = () => {

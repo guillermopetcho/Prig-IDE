@@ -5926,6 +5926,28 @@ def youtube_buscar(
     return resultados
 
 
+@app.post("/api/youtube/abrir_externo")
+async def youtube_abrir_externo(request: Request):
+    """Abre un enlace de YouTube en el navegador web predeterminado del sistema (Chrome, Firefox, etc.)."""
+    import webbrowser
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Falta el parámetro 'url'")
+    if not (url.startswith("https://www.youtube.com/") or url.startswith("https://youtube.com/") or url.startswith("https://youtu.be/") or url.startswith("https://www.youtube-nocookie.com/")):
+        raise HTTPException(status_code=400, detail="Solo se permite abrir enlaces oficiales de YouTube.")
+    try:
+        exito = webbrowser.open(url)
+        return {"ok": True, "abierto": exito, "url": url}
+    except Exception as e:
+        logger.error(f"Error abriendo navegador externo para {url}: {e}")
+        return {"ok": False, "error": str(e), "url": url}
+
+
+
 # ============================================================================
 # Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
 

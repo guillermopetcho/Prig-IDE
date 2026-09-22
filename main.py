@@ -205,6 +205,22 @@ def _blindar_qt() -> None:
             traceback.print_exc()
 
     webview_qt.BrowserView.on_download_requested = descargar
+
+    def accept_nav(self, url, nav_type, is_main_frame):
+        try:
+            url_str = url.toString() if hasattr(url, "toString") else str(url)
+            if is_main_frame:
+                if url_str.startswith("http://") or url_str.startswith("https://"):
+                    if not (url_str.startswith("http://127.0.0.1") or url_str.startswith("http://localhost")):
+                        import webbrowser
+                        webbrowser.open(url_str)
+                        return False
+        except Exception:
+            pass
+        return True
+
+    webview_qt.BrowserView.WebPage.acceptNavigationRequest = accept_nav
+
     try:
         import webview
         webview.settings["ALLOW_DOWNLOADS"] = True
