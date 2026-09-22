@@ -452,13 +452,9 @@
                 ${visibles.map((n) => {
                     if (n.origen === 'youtube') {
                         return `<div class="in-fila clic" data-nota-yt="${esc(JSON.stringify({ videoId: n.videoId, segundos: n.segundos }))}">
-                            ${n.imagenUrl ? `
-                              <div style="width:44px; height:28px; border-radius:5px; overflow:hidden; flex-shrink:0; background:#000; border:1px solid rgba(255,255,255,0.1);">
-                                <img src="${esc(n.imagenUrl)}" style="width:100%; height:100%; object-fit:cover;" alt="Fotograma">
-                              </div>
-                            ` : `
-                              <div class="in-icono" style="width:28px; height:28px; background:rgba(255,0,0,0.12); color:#ff5555;"><i class="fa-brands fa-youtube"></i></div>
-                            `}
+                            <div style="width:48px; height:30px; border-radius:5px; overflow:hidden; flex-shrink:0; background:#11111b; border:1px solid rgba(255,255,255,0.12); position:relative; display:flex; align-items:center; justify-content:center;">
+                              <img src="${esc(n.imagenUrl || (n.videoId ? `https://i.ytimg.com/vi/${n.videoId}/0.jpg` : ''))}" style="width:100%; height:100%; object-fit:cover;" alt="Fotograma" onerror="if(window.prigYtImgFallback){window.prigYtImgFallback(this, '${esc(n.videoId)}', '', '${esc(n.titulo)}');}else{this.src='https://i.ytimg.com/vi/${esc(n.videoId)}/0.jpg';}">
+                            </div>
                             <div class="in-texto" style="font-size:12px;">
                               <div style="display:flex; align-items:center; gap:6px;">
                                 <span class="in-badge azul" style="font-size:9px; padding:1px 5px;"><i class="fa-regular fa-clock"></i> ${esc(n.minuto)}</span>

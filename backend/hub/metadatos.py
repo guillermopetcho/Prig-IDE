@@ -48,7 +48,10 @@ def _youtube(url: str) -> Optional[Dict[str, str]]:
     if r.status_code != 200:
         return None
     d = r.json()
-    return {"titulo": str(d.get("title") or "")[:200], "autor": str(d.get("author_name") or "")[:100]}
+    res = {"titulo": str(d.get("title") or "")[:200], "autor": str(d.get("author_name") or "")[:100]}
+    if d.get("thumbnail_url"):
+        res["miniatura"] = str(d["thumbnail_url"])[:500]
+    return res
 
 
 def _pagina(url: str) -> Optional[Dict[str, str]]:
@@ -61,6 +64,7 @@ def _pagina(url: str) -> Optional[Dict[str, str]]:
             if len(trozo) >= MAX_BYTES or b"</head>" in trozo.lower():
                 break
     texto = trozo.decode(r.encoding or "utf-8", "replace")
+    res: Dict[str, str] = {}
     for patron in (r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)',
                    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title',
                    r"<title[^>]*>(.*?)</title>"):
@@ -69,8 +73,17 @@ def _pagina(url: str) -> Optional[Dict[str, str]]:
             t = re.sub(r"\s+", " ", html.unescape(m.group(1))).strip()
             t = re.sub(r"\s*[|·–-]\s*(YouTube|Kaggle|GitHub|Coursera|Udemy|Hugging Face)\s*$", "", t)
             if t:
-                return {"titulo": t[:200]}
-    return None
+                res["titulo"] = t[:200]
+                break
+    for patron in (r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+                   r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image'):
+        m = re.search(patron, texto, re.I | re.S)
+        if m:
+            img = html.unescape(m.group(1)).strip()
+            if img.startswith("http"):
+                res["miniatura"] = img[:500]
+                break
+    return res or None
 
 
 def titulo(base: str, info: Dict[str, Any]) -> Dict[str, str]:

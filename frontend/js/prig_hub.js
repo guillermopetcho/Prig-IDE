@@ -124,6 +124,16 @@
           .ph-tarjeta { border:1px solid var(--border-color); background:var(--bg-panel); border-radius:10px; padding:11px 12px; display:flex; flex-direction:column; gap:6px; min-width:0; }
           .ph-tarjeta:hover { border-color:rgba(203,166,247,.45); }
           .ph-tarjeta.terminado { opacity:.72; }
+          .ph-tarjeta-portada { position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:#11111b; border:1px solid rgba(255,255,255,.06); margin-bottom:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+          .ph-tarjeta-portada img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .2s ease; }
+          .ph-tarjeta:hover .ph-tarjeta-portada img { transform:scale(1.03); }
+          .ph-portada-badge { position:absolute; bottom:6px; right:6px; background:rgba(17,17,27,.85); color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; display:inline-flex; align-items:center; gap:4px; backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.12); z-index:2; }
+          .ph-portada-badge.playlist { background:rgba(203,166,247,.92); color:#111; border-color:transparent; }
+          .ph-portada-badge.tiempo { background:rgba(0,0,0,.82); color:#fff; }
+          .ph-portada-badge.gh { background:rgba(36,41,47,.9); color:#fff; }
+          .ph-portada-badge.kg { background:rgba(32,190,255,.92); color:#111; }
+          .ph-portada-play { position:absolute; width:38px; height:38px; border-radius:50%; background:rgba(0,0,0,.65); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; border:1.5px solid rgba(255,255,255,.3); transition:all .2s ease; pointer-events:none; z-index:2; }
+          .ph-tarjeta:hover .ph-portada-play { transform:scale(1.15); background:#ff0000; color:#fff; border-color:#ff0000; box-shadow:0 4px 14px rgba(255,0,0,.5); }
           .ph-t-cab { display:flex; gap:9px; align-items:flex-start; }
           .ph-t-icono { width:30px; height:30px; border-radius:8px; background:rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; flex:none; font-size:14px; }
           .ph-t-titulo { font-weight:600; font-size:12.8px; color:#fff; line-height:1.35; word-break:break-word; cursor:pointer; }
@@ -344,7 +354,7 @@
             window.GitHubLector.abrir({ ref: e.ref });
             return;
         }
-        if (e.plataforma === 'youtube' && e.tipo === 'video' && window.YouTubeHub) {
+        if (e.plataforma === 'youtube' && ['video', 'curso', 'lista'].includes(e.tipo) && window.YouTubeHub) {
             window.YouTubeHub.abrir({ url });
             return;
         }
@@ -380,11 +390,235 @@
             && (!q || `${e.titulo} ${e.url} ${e.nota} ${(e.etiquetas || []).join(' ')}`.toLowerCase().includes(q)));
     }
 
+    function extraerIdYouTube(url) {
+        if (!url) return null;
+        const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([a-zA-Z0-9_-]{11})/i);
+        return m ? m[1] : null;
+    }
+
+    function extraerPlaylistYouTube(url) {
+        if (!url) return null;
+        const m = url.match(/[?&]list=([a-zA-Z0-9_-]+)/i);
+        return m ? m[1] : null;
+    }
+
+    function generarSvgPosterYt(videoId, playlistId, titulo) {
+        const esPlaylist = Boolean(playlistId && (!videoId || String(videoId).startsWith('pl_')));
+        const cleanTitle = (titulo || (esPlaylist ? 'Playlist de YouTube' : 'Video de YouTube'))
+            .replace(/[<>&"']/g, '')
+            .slice(0, 48);
+        const sub = esPlaylist ? 'Lista de reproducción' : 'Clase Magistral Prig';
+        const color1 = esPlaylist ? '#cba6f7' : '#ff4444';
+        const color2 = esPlaylist ? '#89b4fa' : '#b31b1b';
+        const icono = esPlaylist
+            ? '<path d="M4 6h16M4 12h16M4 18h10" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
+            : '<polygon points="8,5 19,12 8,19" fill="white"/>';
+
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgyt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14141e"/>
+      <stop offset="100%" stop-color="#1e1e2e"/>
+    </linearGradient>
+    <linearGradient id="acct" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${color1}"/>
+      <stop offset="100%" stop-color="${color2}"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#bgyt)"/>
+  <circle cx="430" cy="50" r="90" fill="url(#acct)" opacity="0.08"/>
+  <circle cx="50" cy="220" r="110" fill="url(#acct)" opacity="0.06"/>
+  <g transform="translate(240, 105)">
+    <rect x="-36" y="-26" width="72" height="52" rx="14" fill="url(#acct)"/>
+    <g transform="translate(-12, -12)">${icono}</g>
+  </g>
+  <text x="240" y="172" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14" font-weight="700" text-anchor="middle">${cleanTitle}</text>
+  <text x="240" y="196" fill="#a6adc8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11.5" text-anchor="middle">${sub}</text>
+</svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function generarSvgPosterGh(owner, repo, lenguaje) {
+        const cleanRepo = `${owner}/${repo}`.replace(/[<>&"']/g, '').slice(0, 40);
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bggh" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#bggh)"/>
+  <rect x="1" y="1" width="478" height="268" rx="8" fill="none" stroke="rgba(255,255,255,0.08)"/>
+  <g transform="translate(40, 60)">
+    <circle cx="28" cy="28" r="28" fill="#21262d"/>
+    <path d="M28 14C20.27 14 14 20.27 14 28c0 6.19 4.01 11.43 9.58 13.28.7.13.96-.3.96-.67v-2.35c-3.9.85-4.72-1.88-4.72-1.88-.64-1.62-1.56-2.05-1.56-2.05-1.27-.87.1-.85.1-.85 1.41.1 2.15 1.45 2.15 1.45 1.25 2.14 3.28 1.52 4.08 1.16.13-.91.49-1.52.89-1.87-3.11-.35-6.38-1.56-6.38-6.93 0-1.53.55-2.78 1.44-3.76-.14-.35-.63-1.78.14-3.71 0 0 1.18-.38 3.85 1.44 1.12-.31 2.32-.47 3.51-.47 1.19 0 2.39.16 3.51.47 2.67-1.82 3.85-1.44 3.85-1.44.77 1.93.28 3.36.14 3.71.9.98 1.44 2.23 1.44 3.76 0 5.38-3.28 6.57-6.4 6.92.5.43.95 1.29.95 2.6v3.86c0 .38.25.81.96.67C37.99 39.43 42 34.19 42 28c0-7.73-6.27-14-14-14z" fill="#f0f6fc"/>
+  </g>
+  <text x="115" y="80" fill="#8b949e" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="13" font-weight="500">${esc(owner)}</text>
+  <text x="115" y="104" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="17" font-weight="700">${esc(repo)}</text>
+  <g transform="translate(40, 160)">
+    <rect width="400" height="60" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>
+    <circle cx="24" cy="30" r="5" fill="#cba6f7"/>
+    <text x="38" y="34" fill="#cdd6f4" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="600">${esc(lenguaje || 'Código')}</text>
+    <text x="370" y="34" fill="#89b4fa" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11.5" text-anchor="end">GitHub Repository</text>
+  </g>
+</svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function generarSvgPosterKg(tipo, titulo) {
+        const cleanTitle = (titulo || 'Kaggle Notebook').replace(/[<>&"']/g, '').slice(0, 48);
+        const tipoLabel = tipo === 'dataset' ? 'Dataset de la Comunidad' : (tipo === 'competicion' ? 'Competición Oficial' : 'Notebook Guiado');
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgkg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1a2e"/>
+      <stop offset="100%" stop-color="#112d4e"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#bgkg)"/>
+  <circle cx="430" cy="50" r="100" fill="#20beff" opacity="0.08"/>
+  <g transform="translate(40, 65)">
+    <rect width="52" height="52" rx="12" fill="rgba(32,190,255,0.15)" stroke="rgba(32,190,255,0.4)"/>
+    <text x="26" y="37" fill="#20beff" font-family="Arial,sans-serif" font-size="28" font-weight="900" text-anchor="middle">k</text>
+  </g>
+  <text x="108" y="85" fill="#20beff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11" font-weight="700" letter-spacing="0.5">KAGGLE · ${tipoLabel.toUpperCase()}</text>
+  <text x="108" y="108" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="15" font-weight="700">${cleanTitle}</text>
+  <g transform="translate(40, 160)">
+    <rect width="400" height="60" rx="8" fill="rgba(32,190,255,0.06)" stroke="rgba(32,190,255,0.18)"/>
+    <text x="20" y="35" fill="#cdd6f4" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12">Estudio interactivo con el profesor Prig</text>
+    <text x="380" y="35" fill="#20beff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="700" text-anchor="end">Kaggle</text>
+  </g>
+</svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function generarSvgPosterWeb(plat, tipo, titulo, url) {
+        const cleanTitle = (titulo || url || 'Recurso Web').replace(/[<>&"']/g, '').slice(0, 48);
+        const host = (url || '').replace(/^https?:\/\//i, '').split('/')[0] || plat || 'web';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgwb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#181825"/>
+      <stop offset="100%" stop-color="#1e1e2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#bgwb)"/>
+  <rect x="1" y="1" width="478" height="268" rx="8" fill="none" stroke="rgba(255,255,255,0.06)"/>
+  <circle cx="240" cy="95" r="32" fill="rgba(203,166,247,0.12)" stroke="rgba(203,166,247,0.3)"/>
+  <path d="M240 79a16 16 0 100 32 16 16 0 000-32zm0 0c-3 4-5 10-5 16s2 12 5 16m0-32c3 4 5 10 5 16s-2 12-5 16m-15-16h30" stroke="#cba6f7" stroke-width="1.8" fill="none"/>
+  <text x="240" y="160" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14.5" font-weight="700" text-anchor="middle">${cleanTitle}</text>
+  <text x="240" y="184" fill="#a6adc8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11.5" text-anchor="middle">${esc(host)}</text>
+</svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    if (!window.prigYtImgFallback) {
+        window.prigYtImgFallback = function (img, videoId, playlistId, titulo) {
+            if (!img) return;
+            const src = img.src || '';
+            if (videoId && src.includes('hqdefault.jpg')) {
+                img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+            } else if (videoId && (src.includes('mqdefault.jpg') || src.includes('maxresdefault.jpg'))) {
+                img.src = `https://i.ytimg.com/vi/${videoId}/0.jpg`;
+            } else {
+                img.onerror = null;
+                img.src = generarSvgPosterYt(videoId, playlistId, titulo || img.alt || '');
+            }
+        };
+    }
+
+    window.prigGhImgFallback = function (img, owner, repo, lenguaje) {
+        if (!img) return;
+        img.onerror = null;
+        img.src = generarSvgPosterGh(owner, repo, lenguaje);
+    };
+
+    window.prigKgImgFallback = function (img, tipo, titulo) {
+        if (!img) return;
+        img.onerror = null;
+        img.src = generarSvgPosterKg(tipo, titulo);
+    };
+
+    function generarPortadaElemento(e) {
+        if (!e) return '';
+        const plat = e.plataforma || '';
+        const tipo = e.tipo || '';
+        const url = e.url || '';
+        const tit = esc(e.titulo || e.url || '');
+
+        // 1. YouTube (video, curso o lista)
+        if (plat === 'youtube' || tipo === 'video' || tipo === 'curso' || tipo === 'lista' || url.includes('youtube.com') || url.includes('youtu.be')) {
+            const vidId = extraerIdYouTube(url) || (e.clave && e.clave.startsWith('youtube:video:') ? e.clave.split(':')[2] : '');
+            const plId = extraerPlaylistYouTube(url) || (e.clave && e.clave.startsWith('youtube:playlist:') ? e.clave.split(':')[2] : (e.playlist || ''));
+            const esPlaylist = Boolean(plId || tipo === 'lista' || tipo === 'curso');
+
+            let src = e.miniatura || (vidId ? `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg` : '');
+            if (!src) {
+                src = generarSvgPosterYt(vidId, plId, e.titulo);
+            }
+
+            return `<div class="ph-tarjeta-portada" data-abrir title="Reproducir en Prig IDE">
+                <img src="${esc(src)}" alt="${tit}" loading="lazy" onerror="window.prigYtImgFallback(this, '${esc(vidId)}', '${esc(plId)}', '${tit}')">
+                <div class="ph-portada-play"><i class="fa-solid fa-play"></i></div>
+                ${esPlaylist ? `<span class="ph-portada-badge playlist"><i class="fa-solid fa-layer-group"></i> Playlist</span>` : ''}
+                ${e.minutos ? `<span class="ph-portada-badge tiempo"><i class="fa-regular fa-clock"></i> ${e.minutos} min</span>` : ''}
+            </div>`;
+        }
+
+        // 2. GitHub (repositorio o persona)
+        if (plat === 'github' || tipo === 'repositorio' || url.includes('github.com')) {
+            let ref = e.ref || '';
+            if (!ref) {
+                const m = url.match(/github\.com\/([^\/]+\/[^\/\?#]+)/i);
+                ref = m ? m[1].replace(/\.git$/, '') : '';
+            }
+            const partes = (ref || '').split('/');
+            const owner = partes[0] || 'github';
+            const repo = partes[1] || 'repo';
+            const src = `https://opengraph.githubassets.com/1/${owner}/${repo}`;
+
+            return `<div class="ph-tarjeta-portada" data-abrir title="Ver repositorio en Prig IDE">
+                <img src="${src}" alt="${tit}" loading="lazy" onerror="window.prigGhImgFallback(this, '${esc(owner)}', '${esc(repo)}', '${esc(e.lenguaje || '')}')">
+                <span class="ph-portada-badge gh"><i class="fa-brands fa-github"></i> GitHub</span>
+            </div>`;
+        }
+
+        // 3. Kaggle (notebook, dataset, competición)
+        if (plat === 'kaggle' || ['notebook', 'dataset', 'competicion'].includes(tipo) || url.includes('kaggle.com')) {
+            if (e.miniatura) {
+                return `<div class="ph-tarjeta-portada" data-abrir title="Abrir en Kaggle Lector">
+                    <img src="${esc(e.miniatura)}" alt="${tit}" loading="lazy" onerror="window.prigKgImgFallback(this, '${esc(tipo)}', '${tit}')">
+                    <span class="ph-portada-badge kg"><i class="fa-brands fa-kaggle"></i> Kaggle</span>
+                </div>`;
+            }
+            const svgSrc = generarSvgPosterKg(tipo, e.titulo);
+            return `<div class="ph-tarjeta-portada" data-abrir title="Abrir en Kaggle Lector">
+                <img src="${svgSrc}" alt="${tit}" loading="lazy">
+                <span class="ph-portada-badge kg"><i class="fa-brands fa-kaggle"></i> Kaggle</span>
+            </div>`;
+        }
+
+        // 4. Otros enlaces web o artículos
+        if (e.miniatura) {
+            return `<div class="ph-tarjeta-portada" data-abrir title="Abrir enlace">
+                <img src="${esc(e.miniatura)}" alt="${tit}" loading="lazy" onerror="this.remove()">
+                <span class="ph-portada-badge"><i class="${PLAT_ICONO[plat] || 'fa-solid fa-link'}"></i> ${esc(plat || 'Web')}</span>
+            </div>`;
+        }
+
+        const svgWeb = generarSvgPosterWeb(plat, e.tipo, e.titulo, url);
+        return `<div class="ph-tarjeta-portada" data-abrir title="Abrir enlace">
+            <img src="${svgWeb}" alt="${tit}" loading="lazy">
+            <span class="ph-portada-badge"><i class="${PLAT_ICONO[plat] || 'fa-solid fa-link'}"></i> ${esc(plat || 'Web')}</span>
+        </div>`;
+    }
+
     function tarjeta(e) {
         const icono = PLAT_ICONO[e.plataforma] || `fa-solid ${ICONOS[e.tipo] || 'fa-link'}`;
         const propio = e.origenes.find(o => o.propio);
         const origen0 = e.origenes[0];
         return `<div class="ph-tarjeta ${e.progreso === 'terminado' ? 'terminado' : ''}" data-clave="${esc(e.clave)}">
+            ${generarPortadaElemento(e)}
             <div class="ph-t-cab">
               <div class="ph-t-icono" style="color:${PLAT_COLOR[e.plataforma] || 'var(--text-main)'};"><i class="${icono}"></i></div>
               <div style="min-width:0; flex:1;">
@@ -804,7 +1038,12 @@
           <div id="ph-d-res">${b.cargando ? '<div class="ph-vacio"><i class="fa-solid fa-spinner fa-spin"></i> Buscando repositorios en GitHub...</div>'
             : b.error ? `<div class="ph-error">${esc(b.error)}</div>`
             : b.datos ? (b.datos.repos.length ? `<div class="ph-ayuda">${b.datos.total} repositorios encontrados</div><div class="ph-lista">${b.datos.repos.map((r, i) => `
-                <div class="ph-tarjeta"><div class="ph-t-cab">${r.avatar ? `<img src="${esc(r.avatar)}" style="width:30px; height:30px; border-radius:50%;" alt="">` : ''}
+                <div class="ph-tarjeta">
+                  <div class="ph-tarjeta-portada" style="margin-bottom:8px;">
+                    <img src="https://opengraph.githubassets.com/1/${esc(r.ref)}" alt="${esc(r.ref)}" loading="lazy" onerror="window.prigGhImgFallback(this, '${esc(r.ref.split('/')[0])}', '${esc(r.ref.split('/')[1])}', '')">
+                    <span class="ph-portada-badge gh"><i class="fa-brands fa-github"></i> ${(r.ref.split('/')[1] || '').toLowerCase().startsWith('prig-') ? 'Pack Prig' : 'Perfil Prig'}</span>
+                  </div>
+                  <div class="ph-t-cab">${r.avatar ? `<img src="${esc(r.avatar)}" style="width:28px; height:28px; border-radius:50%;" alt="" onerror="this.remove()">` : ''}
                   <div style="flex:1; min-width:0;"><div class="ph-t-titulo">${esc(r.ref)}</div>
                   <div class="ph-t-meta">
                     <span class="ph-etq morado" style="font-weight:600;"><i class="fa-brands fa-github"></i> ${(r.ref.split('/')[1] || '').toLowerCase().startsWith('prig-') ? 'Pack Prig' : 'Perfil Prig'}</span>

@@ -353,7 +353,10 @@
         if (!r) { c.innerHTML = '<div class="gh-ayuda" style="padding:30px 10px; text-align:center;">Elige un repositorio para ver su ficha.</div>'; return; }
         const guardado = estado.guardados.some(g => g.ref === r.ref);
         c.innerHTML = `<div class="gh-tarjeta">
-            <div class="gh-fila" style="flex-wrap:nowrap;"><img class="gh-avatar" style="width:44px; height:44px;" src="${esc(r.avatar || '')}&s=88" alt="" onerror="this.style.visibility='hidden'">
+            <div style="width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden; margin-bottom:12px; background:#0d1117; border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center;">
+              <img src="https://opengraph.githubassets.com/1/${esc(r.ref)}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="${esc(r.ref)}" onerror="if(window.prigGhImgFallback){window.prigGhImgFallback(this, '${esc(r.dueno)}', '${esc(r.nombre)}', '${esc(r.lenguaje || '')}');}else{this.style.display='none';}">
+            </div>
+            <div class="gh-fila" style="flex-wrap:nowrap;"><img class="gh-avatar" style="width:40px; height:40px; border-radius:50%;" src="${esc(r.avatar || '')}&s=80" alt="" onerror="this.style.visibility='hidden'">
               <div style="min-width:0;"><div class="gh-ayuda">${esc(r.dueno)}</div><div style="color:#fff; font-size:17px; font-weight:700; word-break:break-word;">${esc(r.nombre)}</div></div></div>
             <div style="font-size:13px; margin-top:10px; line-height:1.5;">${esc(r.descripcion || 'Sin descripción.')}</div>
             ${r.temas && r.temas.length ? `<div class="gh-fila" style="margin-top:8px;">${r.temas.map(t => `<span class="gh-tema">${esc(t)}</span>`).join('')}</div>` : ''}

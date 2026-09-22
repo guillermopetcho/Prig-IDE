@@ -920,13 +920,16 @@ class Hub:
                     duracion = c.get("duracion") or ""
                     nota = f"{canal} · {duracion}".strip(" ·") if (canal or duracion) else ""
 
+                    vid = c.get("id") or ""
                     entrada = {
                         "url": url,
                         "titulo": c.get("titulo") or "Curso Prig",
                         "tipo": tipo,
                         "etiquetas": [e for e in etqs if e],
                         "nivel": nivel,
-                        "nota": nota
+                        "nota": nota,
+                        "miniatura": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else "",
+                        "playlist": c.get("playlist") or ""
                     }
                     try:
                         formato.agregar_entrada(carpeta, "recursos.yaml", entrada)

@@ -212,6 +212,8 @@ def leer_lista(carpeta: str, nombre: str, avisos, solo_personas: Optional[bool] 
             "titulo": _texto(e.get("titulo"), 200), "etiquetas": _etiquetas(e.get("etiquetas")),
             "nivel": _nivel(e.get("nivel")), "nota": _texto(e.get("nota"), 1000),
             "minutos": int(minutos) if isinstance(minutos, (int, float)) and 0 < minutos < 100000 else None,
+            "miniatura": _texto(e.get("miniatura") or e.get("imagen"), 500),
+            "playlist": _texto(e.get("playlist"), 100),
         })
     return salida
 

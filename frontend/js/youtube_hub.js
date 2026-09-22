@@ -1393,7 +1393,7 @@ const VIDEOS_CURADOS = [
                     segundos: f.segundos,
                     titulo: f.titulo || 'Nota visual',
                     explicacion: f.explicacion || '',
-                    imagenUrl: f.imagenUrl || '',
+                    imagenUrl: f.imagenUrl || (videoId && !String(videoId).startsWith('pl_') ? `https://i.ytimg.com/vi/${videoId}/0.jpg` : ''),
                     fecha: f.fecha || Date.now()
                 };
             });
@@ -1412,8 +1412,79 @@ const VIDEOS_CURADOS = [
         }
     }
 
+    function generarSvgPoster(videoId, playlistId, titulo = '') {
+        const esPlaylist = Boolean(playlistId && (!videoId || String(videoId).startsWith('pl_')));
+        const cleanTitle = (titulo || (esPlaylist ? 'Playlist de YouTube' : 'Video de YouTube'))
+            .replace(/[<>&"']/g, '')
+            .slice(0, 48);
+        const sub = esPlaylist ? 'Lista de reproducción' : 'Clase Magistral Prig';
+        const color1 = esPlaylist ? '#cba6f7' : '#ff4444';
+        const color2 = esPlaylist ? '#89b4fa' : '#b31b1b';
+        const icono = esPlaylist
+            ? '<path d="M4 6h16M4 12h16M4 18h10" stroke="white" stroke-width="2.2" stroke-linecap="round"/>'
+            : '<polygon points="8,5 19,12 8,19" fill="white"/>';
+
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14141e"/>
+      <stop offset="100%" stop-color="#1e1e2e"/>
+    </linearGradient>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${color1}"/>
+      <stop offset="100%" stop-color="${color2}"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#bg)"/>
+  <circle cx="430" cy="50" r="90" fill="url(#acc)" opacity="0.08"/>
+  <circle cx="50" cy="220" r="110" fill="url(#acc)" opacity="0.06"/>
+  <g transform="translate(240, 105)">
+    <rect x="-36" y="-26" width="72" height="52" rx="14" fill="url(#acc)"/>
+    <g transform="translate(-12, -12)">${icono}</g>
+  </g>
+  <text x="240" y="172" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14.5" font-weight="700" text-anchor="middle">${cleanTitle}</text>
+  <text x="240" y="196" fill="#a6adc8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11.5" text-anchor="middle">${sub}</text>
+</svg>`;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function resolverVideoIdDePlaylist(playlistId) {
+        if (!playlistId) return null;
+        const encontrado = VIDEOS_CURADOS.find(c => c.playlist === playlistId && c.id && !c.id.startsWith('pl_'));
+        return encontrado ? encontrado.id : null;
+    }
+
+    function generarUrlMiniatura(videoId, playlistId) {
+        if (videoId && !String(videoId).startsWith('pl_')) {
+            return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        }
+        if (playlistId) {
+            const vid = resolverVideoIdDePlaylist(playlistId);
+            if (vid) return `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+            return generarSvgPoster(videoId, playlistId, 'Playlist');
+        }
+        return generarSvgPoster(videoId, playlistId, 'Video');
+    }
+
+    window.prigYtImgFallback = function (img, videoId, playlistId, titulo) {
+        if (!img) return;
+        const src = img.src || '';
+        const vid = (videoId && !String(videoId).startsWith('pl_')) ? videoId : resolverVideoIdDePlaylist(playlistId);
+
+        if (vid && src.includes('hqdefault.jpg')) {
+            img.src = `https://i.ytimg.com/vi/${vid}/mqdefault.jpg`;
+        } else if (vid && (src.includes('mqdefault.jpg') || src.includes('maxresdefault.jpg'))) {
+            // El fotograma inicial (0.jpg) de YouTube
+            img.src = `https://i.ytimg.com/vi/${vid}/0.jpg`;
+        } else {
+            img.onerror = null;
+            img.src = generarSvgPoster(videoId, playlistId, titulo || img.alt || '');
+        }
+    };
+
     function obtenerKeyframeUrl(videoId, opcion = 'hqdefault') {
         if (!videoId) return '';
+        if (String(videoId).startsWith('pl_')) return generarSvgPoster(videoId, '', 'Playlist');
         return `https://img.youtube.com/vi/${videoId}/${opcion}.jpg`;
     }
 
@@ -1652,6 +1723,14 @@ const VIDEOS_CURADOS = [
         if (/^[a-zA-Z0-9_-]{11}$/.test(texto)) return texto;
         const m1 = texto.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
         return m1 ? m1[1] : null;
+    }
+
+    function extraerPlaylistId(cadena) {
+        if (!cadena) return null;
+        const texto = cadena.trim();
+        if (/^PL[a-zA-Z0-9_-]{16,40}$/.test(texto)) return texto;
+        const m = texto.match(/[?&]list=([a-zA-Z0-9_-]+)/i);
+        return m ? m[1] : null;
     }
 
     // ==================== GESTIÓN DE OBJETIVOS DIDÁCTICOS Y RESÚMENES ====================
@@ -1899,11 +1978,16 @@ const VIDEOS_CURADOS = [
             .yt-modo-compacto .yt-grid { grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:12px; }
             .yt-tarjeta { background:var(--bg-panel, #181825); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform 0.15s, border-color 0.15s, box-shadow 0.15s; position:relative; }
             .yt-tarjeta:hover { transform:translateY(-2px); border-color:rgba(255,0,0,0.45); box-shadow:0 6px 18px rgba(0,0,0,0.4); }
-            .yt-miniatura { position:relative; width:100%; aspect-ratio:16/9; background:#000; overflow:hidden; }
+            .yt-miniatura { position:relative; width:100%; aspect-ratio:16/9; background:#11111b; overflow:hidden; display:flex; align-items:center; justify-content:center; }
             .yt-miniatura img { width:100%; height:100%; object-fit:cover; display:block; }
+            .yt-miniatura-playlist-badge { position:absolute; top:6px; left:6px; background:rgba(203,166,247,0.95); color:#111; font-size:9.5px; padding:2px 6px; border-radius:4px; font-weight:700; z-index:2; display:flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+            .yt-playlist-stack { position:absolute; top:0; right:0; bottom:0; width:34px; background:rgba(0,0,0,0.65); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-left:1px solid rgba(255,255,255,0.15); z-index:2; color:#fff; font-size:10px; font-weight:700; }
+            .yt-playlist-stack i { font-size:12px; color:var(--accent-purple, #cba6f7); }
             .yt-duracion { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.82); color:#fff; font-size:10px; padding:2px 5px; border-radius:4px; font-weight:600; z-index:2; }
+            .yt-tarjeta.es-playlist .yt-duracion { right:38px; }
             .yt-nivel { position:absolute; top:6px; left:6px; background:rgba(203,166,247,0.9); color:#111; font-size:9.5px; padding:2px 6px; border-radius:4px; font-weight:700; z-index:2; }
             .yt-idioma { position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.75); color:#fff; font-size:9.5px; padding:2px 5px; border-radius:4px; font-weight:700; text-transform:uppercase; border:1px solid rgba(255,255,255,0.15); z-index:2; }
+            .yt-tarjeta.es-playlist .yt-idioma { right:38px; }
             
             /* Progreso en tarjeta */
             .yt-tarjeta-progreso-barra { width:100%; height:4px; background:rgba(255,255,255,0.08); position:relative; }
@@ -2158,11 +2242,15 @@ const VIDEOS_CURADOS = [
                         const esProg = !esComp && (prog.estado === 'en_progreso' || prog.porcentaje > 0);
 
                         return `
-                          <div class="yt-tarjeta" data-video-id="${esc(v.id)}">
+                          <div class="yt-tarjeta ${v.playlist ? 'es-playlist' : ''}" data-video-id="${esc(v.id)}">
                             <div class="yt-miniatura">
-                              <img src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="${esc(v.titulo)}" loading="lazy">
+                              <img src="${generarUrlMiniatura(v.id, v.playlist)}" alt="${esc(v.titulo)}" loading="lazy" onerror="window.prigYtImgFallback(this, '${esc(v.id)}', '${esc(v.playlist || '')}', '${esc(v.titulo)}')">
+                              ${v.playlist ? `
+                                <span class="yt-miniatura-playlist-badge"><i class="fa-solid fa-layer-group"></i> Playlist</span>
+                                <div class="yt-playlist-stack" title="Lista de reproducción"><i class="fa-solid fa-list-ol"></i></div>
+                              ` : ''}
                               <span class="yt-duracion">${esc(v.duracion)}</span>
-                              <span class="yt-nivel">${esc(v.nivel)}</span>
+                              ${!v.playlist ? `<span class="yt-nivel">${esc(v.nivel)}</span>` : ''}
                               <span class="yt-idioma">${esc(v.idioma || 'EN')}</span>
                               
                               <button class="yt-btn-quick-check ${esComp ? 'activo' : ''}" title="${esComp ? 'Completado (clic para desmarcar)' : 'Marcar como completado'}" data-video-id="${esc(v.id)}">
@@ -2259,17 +2347,37 @@ const VIDEOS_CURADOS = [
         if (!texto || !texto.trim()) return;
         const vidId = extraerVideoId(texto);
         if (vidId) {
+            const plId = extraerPlaylistId(texto);
             const existente = VIDEOS_CURADOS.find(v => v.id === vidId);
             reproducir(existente || {
                 id: vidId,
+                playlist: plId || '',
                 titulo: `Video de YouTube (${vidId})`,
                 canal: 'YouTube',
                 descripcion: 'Video cargado mediante enlace directo.'
             });
-        } else {
-            estado.busqueda = texto.trim();
-            pintar();
+            return;
         }
+        const plId = extraerPlaylistId(texto);
+        if (plId) {
+            const existente = VIDEOS_CURADOS.find(v => v.playlist === plId);
+            if (existente) {
+                reproducir(existente);
+                return;
+            }
+            reproducir({
+                id: 'pl_' + plId,
+                playlist: plId,
+                titulo: `Playlist de YouTube (${plId})`,
+                canal: 'YouTube Playlist',
+                duracion: 'Lista de reproducción',
+                nivel: 'Curso / Playlist',
+                descripcion: 'Lista de reproducción de YouTube cargada directamente.'
+            });
+            return;
+        }
+        estado.busqueda = texto.trim();
+        pintar();
     }
 
     function reproducir(video) {
@@ -2290,29 +2398,33 @@ const VIDEOS_CURADOS = [
         const resumen = leerResumen(v.id);
         const superadosObj = objetivos.filter(o => o.superado).length;
 
-        raiz.innerHTML = `
-            <div class="yt-raiz">
-              <div class="yt-barra">
-                <button class="yt-btn" id="yt-btn-volver"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
-                <div class="yt-logo" style="margin-left:6px;"><i class="fa-brands fa-youtube"></i> ${esc(v.titulo)}</div>
-                <div style="margin-left:auto; display:flex; gap:8px;">
-                  ${v.playlist ? `
-                    <a class="yt-btn azul" href="https://www.youtube.com/playlist?list=${esc(v.playlist)}" target="_blank" rel="noopener noreferrer" title="Ver playlist completa oficial en YouTube">
-                      <i class="fa-solid fa-list-ol"></i> Ver Playlist Completa
-                    </a>
-                  ` : ''}
-                  <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video">
-                    <i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Quitar texto (Modo Cine)'}
-                  </button>
-                  <a class="yt-btn" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en YouTube</a>
-                </div>
-              </div>
+        const esSoloPlaylist = String(v.id || '').startsWith('pl_') || (!v.id && v.playlist);
+        const enlaceExterno = esSoloPlaylist
+            ? `https://www.youtube.com/playlist?list=${esc(v.playlist)}`
+            : `https://www.youtube.com/watch?v=${esc(v.id)}${v.playlist ? `&list=${esc(v.playlist)}` : ''}`;
+        const iframeSrc = esSoloPlaylist
+            ? `https://www.youtube-nocookie.com/embed?listType=playlist&list=${esc(v.playlist)}&autoplay=1`
+            : `https://www.youtube-nocookie.com/embed/${esc(v.id)}?enablejsapi=1&autoplay=1&rel=0${v.playlist ? `&list=${esc(v.playlist)}` : ''}${prog.segundos > 0 ? `&start=${prog.segundos}` : ''}`;
 
-              <div class="yt-player-layout">
-                <div class="yt-player-main">
-                  <div class="yt-iframe-wrap">
-                    <iframe id="yt-iframe-player" src="https://www.youtube-nocookie.com/embed/${esc(v.id)}?enablejsapi=1&autoplay=1&rel=0${prog.segundos > 0 ? `&start=${prog.segundos}` : ''}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                  </div>
+        raiz.innerHTML = `
+          <div class="yt-raiz">
+            <div class="yt-header">
+              <div class="yt-header-left">
+                <button class="yt-btn" id="yt-btn-volver-catalogo" title="Volver al catálogo de cursos"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
+                <div class="yt-logo-badge" style="font-size:13px; font-weight:700;"><i class="fa-brands fa-youtube"></i> ${esc(v.titulo)}</div>
+                ${v.universidad ? `<span class="yt-tag-uni"><i class="fa-solid fa-graduation-cap"></i> ${esc(v.universidad)}</span>` : ''}
+                ${v.playlist ? `<span class="yt-tag-playlist"><i class="fa-solid fa-list-ol"></i> Playlist</span>` : ''}
+              </div>
+              <div class="yt-header-right">
+                <a class="yt-btn" href="${enlaceExterno}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en YouTube</a>
+              </div>
+            </div>
+
+            <div class="yt-player-layout">
+              <div class="yt-player-main">
+                <div class="yt-iframe-wrap">
+                  <iframe id="yt-iframe-player" src="${iframeSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
 
                   <!-- Control de Avance del Curso -->
                   <div class="yt-progreso-caja">
