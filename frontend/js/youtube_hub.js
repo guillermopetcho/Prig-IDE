@@ -1346,6 +1346,33 @@ const VIDEOS_CURADOS = [
         });
     }
 
+    // Historial de Búsquedas Recientes
+    function leerHistorialBusquedas() {
+        try {
+            const raw = localStorage.getItem('prig_yt_historial_busquedas');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function agregarAHistorial(termino) {
+        if (!termino || !termino.trim()) return;
+        const q = termino.trim();
+        let lista = leerHistorialBusquedas().filter(item => item.toLowerCase() !== q.toLowerCase());
+        lista.unshift(q);
+        lista = lista.slice(0, 6);
+        try {
+            localStorage.setItem('prig_yt_historial_busquedas', JSON.stringify(lista));
+        } catch (e) { }
+    }
+
+    function limpiarHistorialBusquedas() {
+        try {
+            localStorage.removeItem('prig_yt_historial_busquedas');
+        } catch (e) { }
+    }
+
     const estado = {
         vista: 'catalogo', // 'catalogo' | 'reproductor'
         modoCatalogo: 'catalogo', // 'catalogo' | 'busqueda_yt'
@@ -1371,13 +1398,18 @@ const VIDEOS_CURADOS = [
         mostrarInputTextoExtra: false,
         textoExtra: '',
 
-        // Motor de búsqueda YouTube en tiempo real
+        // Motor de búsqueda YouTube en tiempo real & Facetas
         palabraRegistradaActiva: null, // 'deep_learning' | 'machine_learning' | 'python' | 'cpp' | null
         resultadosBusquedaYt: [],
         infoPalabraRegistrada: null,
         busquedaYtCargando: false,
         busquedaYtError: null,
-        filtroTipoYt: 'todos' // 'todos' | 'video' | 'playlist'
+        filtroTipoYt: 'todos', // 'todos' | 'video' | 'playlist'
+        filtroIdiomaYt: 'todos', // 'todos' | 'es' | 'en'
+        filtroDuracionYt: 'todas', // 'todas' | 'cortos' | 'clases' | 'cursos' | 'playlists'
+        ordenYt: 'educativo', // 'educativo' | 'duracion' | 'vistas'
+        sugerenciasActivas: [],
+        sugerenciasAbiertas: false
     };
 
     // ==================== GESTIÓN DE PROGRESO Y PERSISTENCIA ====================
@@ -2081,6 +2113,33 @@ const VIDEOS_CURADOS = [
             .yt-search-select { background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.14)); border-radius:7px; padding:5px 8px; color:#fff; font-size:11.5px; outline:none; }
             .yt-search-select:focus { border-color:#ff0000; }
 
+            /* Contenedor con Autocompletado Flotante */
+            .yt-search-container { position:relative; flex:1; min-width:220px; max-width:540px; display:flex; align-items:center; }
+            .yt-search-container .yt-campo-buscar { width:100%; max-width:100%; }
+            .yt-sugerencias-dropdown { position:absolute; top:calc(100% + 5px); left:0; right:0; background:var(--bg-panel, #181825); border:1px solid var(--border-color, rgba(255,255,255,0.18)); border-radius:8px; box-shadow:0 10px 28px rgba(0,0,0,0.65); z-index:99999; max-height:260px; overflow-y:auto; display:flex; flex-direction:column; padding:4px 0; backdrop-filter:blur(6px); }
+            .yt-sug-item { display:flex; align-items:center; gap:9px; padding:8px 12px; font-size:11.5px; color:#cdd6f4; cursor:pointer; transition:background 0.12s; }
+            .yt-sug-item:hover, .yt-sug-item.activo { background:rgba(255,255,255,0.09); color:#fff; }
+            .yt-sug-item i { color:var(--text-muted, #a6adc8); font-size:10px; }
+
+            /* Barra de Facetas y Filtros Avanzados */
+            .yt-facetas-barra { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 16px; background:rgba(0,0,0,0.18); border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap; font-size:11px; flex-shrink:0; }
+            .yt-facetas-grupo { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+            .yt-faceta-label { font-size:10.5px; font-weight:700; color:var(--text-muted, #a6adc8); display:inline-flex; align-items:center; gap:4px; }
+            .yt-faceta-select { background:var(--bg-dark, #11111b); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:6px; padding:4px 8px; color:#cdd6f4; font-size:11px; outline:none; }
+            .yt-faceta-select:focus { border-color:#ff0000; }
+            
+            /* Historial de búsquedas recientes */
+            .yt-historial-barra { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+            .yt-chip-historial { display:inline-flex; align-items:center; gap:4px; font-size:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:2px 8px; color:var(--text-muted, #a6adc8); cursor:pointer; transition:all 0.15s; }
+            .yt-chip-historial:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+            /* Badge de Canal de Autoridad Educativa */
+            .yt-badge-canal-top { display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; color:#a6e3a1; background:rgba(166,227,161,0.14); border:1px solid rgba(166,227,161,0.3); border-radius:4px; padding:1px 5px; }
+
+            /* Sección de Búsqueda Federada Híbrida */
+            .yt-seccion-separador { display:flex; align-items:center; justify-content:space-between; margin:16px 0 10px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08); flex-wrap:wrap; gap:8px; }
+            .yt-seccion-titulo { font-size:12.5px; font-weight:700; color:#fff; display:flex; align-items:center; gap:6px; margin:0; }
+
             .yt-cuerpo { flex:1; overflow-y:auto; padding:16px 20px; }
             
             /* Resumen de avance en catálogo */
@@ -2282,19 +2341,81 @@ const VIDEOS_CURADOS = [
         }
     }
 
-    async function ejecutarBusquedaYt(termino, tipo = 'todos', palabraSlug = null) {
+    let timeoutSugerencias = null;
+
+    function solicitarSugerencias(texto) {
+        clearTimeout(timeoutSugerencias);
+        if (!texto || texto.trim().length < 2) {
+            estado.sugerenciasActivas = [];
+            estado.sugerenciasAbiertas = false;
+            pintarSugerenciasDropdown();
+            return;
+        }
+        timeoutSugerencias = setTimeout(async () => {
+            try {
+                const r = await fetch(`/api/youtube/sugerencias?q=${encodeURIComponent(texto.trim())}&limite=7`);
+                if (r.ok) {
+                    const d = await r.json();
+                    estado.sugerenciasActivas = d.sugerencias || [];
+                    estado.sugerenciasAbiertas = estado.sugerenciasActivas.length > 0;
+                    pintarSugerenciasDropdown();
+                }
+            } catch (e) { }
+        }, 200);
+    }
+
+    function pintarSugerenciasDropdown() {
+        const box = $('yt-sugerencias-box');
+        if (!box) return;
+        if (!estado.sugerenciasAbiertas || !estado.sugerenciasActivas.length) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            return;
+        }
+        box.innerHTML = estado.sugerenciasActivas.map((sug, idx) => `
+            <div class="yt-sug-item" data-sug="${esc(sug)}" data-idx="${idx}">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <span>${esc(sug)}</span>
+            </div>
+        `).join('');
+        box.style.display = 'flex';
+
+        box.querySelectorAll('.yt-sug-item').forEach(it => {
+            it.onclick = () => {
+                const sug = it.dataset.sug;
+                const inp = $('yt-input-buscar');
+                if (inp) inp.value = sug;
+                estado.busqueda = sug;
+                estado.sugerenciasAbiertas = false;
+                box.style.display = 'none';
+                ejecutarBusquedaYt(sug);
+            };
+        });
+    }
+
+    async function ejecutarBusquedaYt(termino, tipo = null, palabraSlug = null) {
         if (!termino || !termino.trim()) return;
         const q = termino.trim();
         estado.busqueda = q;
         estado.modoCatalogo = 'busqueda_yt';
         estado.palabraRegistradaActiva = palabraSlug;
-        estado.filtroTipoYt = tipo || 'todos';
+        if (tipo) estado.filtroTipoYt = tipo;
         estado.busquedaYtCargando = true;
         estado.busquedaYtError = null;
+        estado.sugerenciasAbiertas = false;
+        agregarAHistorial(q);
         pintar();
 
         try {
-            const url = `/api/youtube/buscar?q=${encodeURIComponent(q)}&tipo=${encodeURIComponent(estado.filtroTipoYt)}&filtro_educativo=true`;
+            const params = new URLSearchParams({
+                q: q,
+                tipo: estado.filtroTipoYt || 'todos',
+                idioma: estado.filtroIdiomaYt || 'todos',
+                duracion_filtro: estado.filtroDuracionYt || 'todas',
+                orden: estado.ordenYt || 'educativo',
+                filtro_educativo: 'true'
+            });
+            const url = `/api/youtube/buscar?${params.toString()}`;
             const resp = await fetch(url);
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
@@ -2319,6 +2440,7 @@ const VIDEOS_CURADOS = [
     function pintarCatalogo(raiz) {
         const busq = estado.busqueda.toLowerCase().trim();
         const todosProgreso = leerProgresoTodos();
+        const historial = leerHistorialBusquedas();
 
         // Conteo global de avances
         let totalCompletados = 0;
@@ -2332,6 +2454,7 @@ const VIDEOS_CURADOS = [
             else totalSinIniciar++;
         });
 
+        // Filtrado del catálogo local
         const filtrados = VIDEOS_CURADOS.filter(v => {
             const p = todosProgreso[v.id] || {};
             const esComp = p.estado === 'completado' || p.porcentaje >= 100;
@@ -2347,7 +2470,14 @@ const VIDEOS_CURADOS = [
             return coincideCat && coincideTexto;
         });
 
-        // Buscar metadata de palabra registrada activa si existe
+        // Coincidencias de búsqueda híbrida federada (catálogo curado que coincida con la consulta actual)
+        const tokensBusq = busq.split(/\s+/).filter(Boolean);
+        const coincidenciasCuradas = (estado.modoCatalogo === 'busqueda_yt' && tokensBusq.length > 0) ? VIDEOS_CURADOS.filter(c => {
+            const target = `${c.titulo || ''} ${c.canal || ''} ${c.descripcion || ''} ${c.universidad || ''} ${c.categoria || ''}`.toLowerCase();
+            return tokensBusq.every(tok => target.includes(tok));
+        }) : [];
+
+        // Metadata de palabra registrada activa si existe
         const metaPalabra = estado.palabraRegistradaActiva ? (PALABRAS_REGISTRADAS_DEF.find(p => p.slug === estado.palabraRegistradaActiva) || estado.infoPalabraRegistrada) : null;
 
         raiz.innerHTML = `
@@ -2366,15 +2496,13 @@ const VIDEOS_CURADOS = [
                   </button>
                 </div>
 
-                <!-- Input de Búsqueda -->
-                <input id="yt-input-buscar" class="yt-campo-buscar" placeholder="${estado.modoCatalogo === 'busqueda_yt' ? 'Buscar cursos, especializaciones o temas en YouTube...' : 'Pega un enlace de YouTube (https://...) o busca por tema...'}" value="${esc(estado.busqueda)}">
+                <!-- Input de Búsqueda con Autocompletado Flotante -->
+                <div class="yt-search-container">
+                  <input id="yt-input-buscar" class="yt-campo-buscar" placeholder="${estado.modoCatalogo === 'busqueda_yt' ? 'Buscar cursos, temas o playlists en YouTube...' : 'Pega un enlace de YouTube (https://...) o busca por tema...'}" value="${esc(estado.busqueda)}" autocomplete="off">
+                  <div id="yt-sugerencias-box" class="yt-sugerencias-dropdown" style="display:none;"></div>
+                </div>
 
                 ${estado.modoCatalogo === 'busqueda_yt' ? `
-                  <select id="yt-filtro-tipo" class="yt-search-select" title="Filtrar tipo de resultado en YouTube">
-                    <option value="todos" ${estado.filtroTipoYt === 'todos' ? 'selected' : ''}>Todos (Videos y Listas)</option>
-                    <option value="video" ${estado.filtroTipoYt === 'video' ? 'selected' : ''}>Solo Cursos / Videos</option>
-                    <option value="playlist" ${estado.filtroTipoYt === 'playlist' ? 'selected' : ''}>Solo Playlists</option>
-                  </select>
                   <button class="yt-btn rojo" id="yt-btn-buscar-yt"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
                 ` : `
                   <button class="yt-btn rojo" id="yt-btn-cargar"><i class="fa-solid fa-play"></i> Reproducir</button>
@@ -2397,14 +2525,57 @@ const VIDEOS_CURADOS = [
                 </div>
               </div>
 
-              ${estado.modoCatalogo === 'catalogo' ? `
+              ${estado.modoCatalogo === 'busqueda_yt' ? `
+                <!-- Barra de Facetas, Filtros Avanzados e Historial -->
+                <div class="yt-facetas-barra">
+                  <div class="yt-facetas-grupo">
+                    <span class="yt-faceta-label"><i class="fa-solid fa-sliders"></i> Filtros:</span>
+                    
+                    <select id="yt-filtro-tipo" class="yt-faceta-select" title="Tipo de resultado">
+                      <option value="todos" ${estado.filtroTipoYt === 'todos' ? 'selected' : ''}>Todos (Videos y Listas)</option>
+                      <option value="video" ${estado.filtroTipoYt === 'video' ? 'selected' : ''}>Solo Cursos / Videos</option>
+                      <option value="playlist" ${estado.filtroTipoYt === 'playlist' ? 'selected' : ''}>Solo Playlists</option>
+                    </select>
+
+                    <select id="yt-filtro-duracion" class="yt-faceta-select" title="Duración del contenido">
+                      <option value="todas" ${estado.filtroDuracionYt === 'todas' ? 'selected' : ''}>⏱ Cualquier duración</option>
+                      <option value="cortos" ${estado.filtroDuracionYt === 'cortos' ? 'selected' : ''}>⚡ Cortos (&lt; 30 min)</option>
+                      <option value="clases" ${estado.filtroDuracionYt === 'clases' ? 'selected' : ''}>📖 Clases (30m - 2h)</option>
+                      <option value="cursos" ${estado.filtroDuracionYt === 'cursos' ? 'selected' : ''}>🎓 Cursos (+ 2h)</option>
+                      <option value="playlists" ${estado.filtroDuracionYt === 'playlists' ? 'selected' : ''}>📚 Listas / Playlists</option>
+                    </select>
+
+                    <select id="yt-filtro-idioma" class="yt-faceta-select" title="Idioma preferido">
+                      <option value="todos" ${estado.filtroIdiomaYt === 'todos' ? 'selected' : ''}>🌐 Idioma: Todos</option>
+                      <option value="es" ${estado.filtroIdiomaYt === 'es' ? 'selected' : ''}>🇪🇸 Español</option>
+                      <option value="en" ${estado.filtroIdiomaYt === 'en' ? 'selected' : ''}>🇬🇧 Inglés</option>
+                    </select>
+
+                    <select id="yt-orden" class="yt-faceta-select" title="Criterio de ordenamiento">
+                      <option value="educativo" ${estado.ordenYt === 'educativo' ? 'selected' : ''}>⭐ Más didáctico (Score IA)</option>
+                      <option value="duracion" ${estado.ordenYt === 'duracion' ? 'selected' : ''}>⏳ Mayor duración</option>
+                      <option value="vistas" ${estado.ordenYt === 'vistas' ? 'selected' : ''}>🔥 Más vistos</option>
+                    </select>
+                  </div>
+
+                  ${historial.length ? `
+                    <div class="yt-historial-barra">
+                      <span class="yt-faceta-label" style="opacity:0.75;"><i class="fa-solid fa-clock-rotate-left"></i> Recientes:</span>
+                      ${historial.map(h => `
+                        <span class="yt-chip-historial" data-hist="${esc(h)}">${esc(h)}</span>
+                      `).join('')}
+                      <button id="yt-btn-limpiar-historial" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:10px; padding:2px 4px;" title="Limpiar historial"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : `
                 <!-- Barra de Categorías del Catálogo Curado -->
                 <div class="yt-chips">
                   ${CATEGORIAS.map(c => `
                     <button class="yt-chip ${estado.filtroCategoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${esc(c.label)}</button>
                   `).join('')}
                 </div>
-              ` : ''}
+              `}
 
               <!-- Cuerpo Principal -->
               <div class="yt-cuerpo">
@@ -2482,7 +2653,7 @@ const VIDEOS_CURADOS = [
                     </div>
                   `}
                 ` : `
-                  <!-- Modo Buscador YouTube en Tiempo Real -->
+                  <!-- Modo Buscador YouTube en Tiempo Real & Federado -->
                   ${metaPalabra ? `
                     <div class="yt-banner-palabra" style="border-left: 4px solid ${metaPalabra.color || '#ff0000'};">
                       <div class="yt-banner-palabra-info">
@@ -2503,8 +2674,8 @@ const VIDEOS_CURADOS = [
                   ${estado.busquedaYtCargando ? `
                     <div class="yt-loading-box">
                       <i class="fa-solid fa-circle-notch yt-loading-spinner"></i>
-                      <p style="margin:0; font-weight:600; color:#fff;">Buscando cursos y playlists didácticas en YouTube para "${esc(estado.busqueda)}"...</p>
-                      <span style="font-size:11.5px; color:var(--text-muted);">Filtrando contenido educativo de alta duración y listas estructuradas</span>
+                      <p style="margin:0; font-weight:600; color:#fff;">Explorando cursos con YouTube InnerTube para "${esc(estado.busqueda)}"...</p>
+                      <span style="font-size:11.5px; color:var(--text-muted);">Aplicando ranking pedagógico, canales de élite y filtros de duración</span>
                     </div>
                   ` : estado.busquedaYtError ? `
                     <div style="text-align:center; padding:30px; background:rgba(255,0,0,0.06); border:1px solid rgba(255,0,0,0.25); border-radius:10px; margin:20px 0;">
@@ -2513,104 +2684,228 @@ const VIDEOS_CURADOS = [
                       <button class="yt-btn rojo" id="yt-btn-reintentar-busqueda" style="margin-top:8px;"><i class="fa-solid fa-rotate-right"></i> Reintentar</button>
                       <button class="yt-btn" id="yt-btn-volver-catalogo" style="margin-top:8px; margin-left:8px;"><i class="fa-solid fa-book"></i> Ver Catálogo Curado</button>
                     </div>
-                  ` : estado.resultadosBusquedaYt.length === 0 ? `
+                  ` : (estado.resultadosBusquedaYt.length === 0 && coincidenciasCuradas.length === 0) ? `
                     <div style="text-align:center; padding:40px; color:var(--text-muted);">
                       <i class="fa-brands fa-youtube" style="font-size:44px; opacity:0.3; margin-bottom:12px; display:block;"></i>
                       <p style="margin:0; font-size:13.5px; color:#fff; font-weight:600;">No se encontraron resultados para "${esc(estado.busqueda)}".</p>
-                      <p style="margin:6px 0 16px; font-size:11.5px;">Prueba seleccionando una de las palabras clave registradas o ajustando los términos.</p>
+                      <p style="margin:6px 0 16px; font-size:11.5px;">Prueba seleccionando una de las palabras clave registradas o cambiando los filtros.</p>
                       <button class="yt-btn" id="yt-btn-volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver al Catálogo Curado</button>
                     </div>
                   ` : `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-                      <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-weight:700; color:#fff; font-size:13px;"><i class="fa-brands fa-youtube" style="color:#ff0000;"></i> Cursos y Playlists encontrados:</span>
-                        <span class="yt-badge-search-count">${estado.resultadosBusquedaYt.length} resultados</span>
+                    <!-- 1. Sección Superior: Búsqueda Federada - Cursos Curados Verificados en Prig -->
+                    ${coincidenciasCuradas.length > 0 ? `
+                      <div class="yt-seccion-separador">
+                        <h4 class="yt-seccion-titulo"><i class="fa-solid fa-graduation-cap" style="color:var(--accent-green, #a6e3a1);"></i> Cursos Oficiales Verificados en Prig (${coincidenciasCuradas.length})</h4>
+                        <span style="font-size:11px; color:var(--text-muted);">Cursos universitarios con seguimiento y desafíos didácticos</span>
                       </div>
-                      <button class="yt-btn" id="yt-btn-volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver a Catálogo Curado (${VIDEOS_CURADOS.length})</button>
-                    </div>
+                      <div class="yt-grid" style="margin-bottom:24px;">
+                        ${coincidenciasCuradas.map(v => {
+                            const prog = todosProgreso[v.id] || { estado: 'sin_iniciar', porcentaje: 0, ultimoMinuto: '00:00' };
+                            const esComp = prog.estado === 'completado' || prog.porcentaje >= 100;
+                            const esProg = !esComp && (prog.estado === 'en_progreso' || prog.porcentaje > 0);
 
-                    <div class="yt-grid">
-                      ${estado.resultadosBusquedaYt.map(v => {
-                          const yaGuardado = VIDEOS_CURADOS.some(c => c.id === v.id);
-                          return `
-                            <div class="yt-tarjeta es-busqueda-live ${v.es_playlist ? 'es-playlist' : ''}" data-video-id="${esc(v.id)}" data-es-playlist="${v.es_playlist ? '1' : '0'}">
-                              <div class="yt-miniatura">
-                                <img src="${esc(v.miniatura || generarUrlMiniatura(v.id, v.es_playlist ? v.id : ''))}" alt="${esc(v.titulo)}" loading="lazy" onerror="window.prigYtImgFallback(this, '${esc(v.id)}', '${esc(v.es_playlist ? v.id : '')}', '${esc(v.titulo)}')">
-                                ${v.es_playlist ? `
-                                  <span class="yt-miniatura-playlist-badge"><i class="fa-solid fa-layer-group"></i> Playlist</span>
-                                  <div class="yt-playlist-stack" title="Lista de reproducción"><i class="fa-solid fa-list-ol"></i></div>
-                                ` : ''}
-                                <span class="yt-duracion">${esc(v.duracion)}</span>
-                                <span class="yt-nivel" style="background:#ff0000; color:#fff;"><i class="fa-brands fa-youtube"></i> En Vivo</span>
-                              </div>
+                            return `
+                              <div class="yt-tarjeta ${v.playlist ? 'es-playlist' : ''}" data-video-id="${esc(v.id)}">
+                                <div class="yt-miniatura">
+                                  <img src="${generarUrlMiniatura(v.id, v.playlist)}" alt="${esc(v.titulo)}" loading="lazy" onerror="window.prigYtImgFallback(this, '${esc(v.id)}', '${esc(v.playlist || '')}', '${esc(v.titulo)}')">
+                                  ${v.playlist ? `
+                                    <span class="yt-miniatura-playlist-badge"><i class="fa-solid fa-layer-group"></i> Playlist</span>
+                                    <div class="yt-playlist-stack" title="Lista de reproducción"><i class="fa-solid fa-list-ol"></i></div>
+                                  ` : ''}
+                                  <span class="yt-duracion">${esc(v.duracion)}</span>
+                                  <span class="yt-nivel" style="background:#10b981; color:#fff;"><i class="fa-solid fa-circle-check"></i> Verificado</span>
+                                  <span class="yt-idioma">${esc(v.idioma || 'EN')}</span>
+                                  
+                                  <button class="yt-btn-quick-check ${esComp ? 'activo' : ''}" title="${esComp ? 'Completado (clic para desmarcar)' : 'Marcar como completado'}" data-video-id="${esc(v.id)}">
+                                    <i class="fa-solid fa-check"></i>
+                                  </button>
 
-                              <div class="yt-tarjeta-info">
-                                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
-                                  <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
-                                  ${v.vistas ? `<span style="font-size:10px; color:var(--text-muted);">${esc(v.vistas)}</span>` : ''}
+                                  ${esComp ? `
+                                    <span class="yt-badge-estado completado"><i class="fa-solid fa-circle-check"></i> Completado</span>
+                                  ` : esProg ? `
+                                    <span class="yt-badge-estado en-progreso"><i class="fa-solid fa-clock-rotate-left"></i> ${prog.porcentaje}% (${prog.ultimoMinuto || '00:00'})</span>
+                                  ` : ''}
                                 </div>
-                                <h3 class="yt-tarjeta-titulo" title="${esc(v.titulo)}">${esc(v.titulo)}</h3>
-                                <p class="yt-tarjeta-desc">${esc(v.descripcion || '')}</p>
                                 
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06); gap:6px;">
-                                  <button class="yt-btn rojo btn-reproducir-card" style="font-size:10.5px; padding:3px 9px;" data-video-id="${esc(v.id)}">
-                                    <i class="fa-solid fa-play"></i> Reproducir
-                                  </button>
-                                  <button class="yt-btn-guardar-catalogo ${yaGuardado ? 'guardado' : ''}" data-video-id="${esc(v.id)}" title="${yaGuardado ? 'Ya en tu catálogo' : 'Guardar en mi catálogo permanente'}">
-                                    <i class="fa-solid ${yaGuardado ? 'fa-check' : 'fa-bookmark'}"></i> ${yaGuardado ? 'Guardado' : 'Guardar'}
-                                  </button>
+                                <div class="yt-tarjeta-progreso-barra">
+                                  <div class="yt-tarjeta-progreso-fill ${esComp ? 'completado' : ''}" style="width:${prog.porcentaje || 0}%;"></div>
+                                </div>
+
+                                <div class="yt-tarjeta-info">
+                                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:2px;">
+                                    ${v.universidad ? `<span class="yt-tag-uni" title="${esc(v.universidad)}"><i class="fa-solid fa-graduation-cap"></i> ${esc(v.universidad)}</span>` : ''}
+                                    ${v.playlist ? `<a class="yt-tag-playlist" href="https://www.youtube.com/playlist?list=${esc(v.playlist)}" target="_blank" rel="noopener noreferrer" title="Ver playlist oficial en YouTube" onclick="event.stopPropagation();"><i class="fa-solid fa-list-ol"></i> Playlist</a>` : ''}
+                                  </div>
+                                  <h3 class="yt-tarjeta-titulo">${esc(v.titulo)}</h3>
+                                  <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
+                                  <p class="yt-tarjeta-desc">${esc(v.descripcion || '')}</p>
                                 </div>
                               </div>
-                            </div>
-                          `;
-                      }).join('')}
-                    </div>
+                            `;
+                        }).join('')}
+                      </div>
+                    ` : ''}
+
+                    <!-- 2. Sección Inferior: Descubrimientos en Vivo desde YouTube -->
+                    ${estado.resultadosBusquedaYt.length > 0 ? `
+                      <div class="yt-seccion-separador">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <h4 class="yt-seccion-titulo"><i class="fa-brands fa-youtube" style="color:#ff0000;"></i> Resultados en Vivo de YouTube (${estado.resultadosBusquedaYt.length})</h4>
+                          <span class="yt-badge-search-count">${estado.resultadosBusquedaYt.length} cursos</span>
+                        </div>
+                        <button class="yt-btn" id="yt-btn-volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver a Catálogo Curado (${VIDEOS_CURADOS.length})</button>
+                      </div>
+
+                      <div class="yt-grid">
+                        ${estado.resultadosBusquedaYt.map(v => {
+                            const yaGuardado = VIDEOS_CURADOS.some(c => c.id === v.id);
+                            return `
+                              <div class="yt-tarjeta es-busqueda-live ${v.es_playlist ? 'es-playlist' : ''}" data-video-id="${esc(v.id)}" data-es-playlist="${v.es_playlist ? '1' : '0'}">
+                                <div class="yt-miniatura">
+                                  <img src="${esc(v.miniatura || generarUrlMiniatura(v.id, v.es_playlist ? v.id : ''))}" alt="${esc(v.titulo)}" loading="lazy" onerror="window.prigYtImgFallback(this, '${esc(v.id)}', '${esc(v.es_playlist ? v.id : '')}', '${esc(v.titulo)}')">
+                                  ${v.es_playlist ? `
+                                    <span class="yt-miniatura-playlist-badge"><i class="fa-solid fa-layer-group"></i> Playlist</span>
+                                    <div class="yt-playlist-stack" title="Lista de reproducción"><i class="fa-solid fa-list-ol"></i></div>
+                                  ` : ''}
+                                  <span class="yt-duracion">${esc(v.duracion)}</span>
+                                  <span class="yt-nivel" style="background:#ff0000; color:#fff;"><i class="fa-brands fa-youtube"></i> En Vivo</span>
+                                  ${v.idioma ? `<span class="yt-idioma">${esc(v.idioma)}</span>` : ''}
+                                </div>
+
+                                <div class="yt-tarjeta-info">
+                                  <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px; flex-wrap:wrap;">
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                      <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
+                                      ${v.es_canal_verificado ? `<span class="yt-badge-canal-top" title="Canal de alta autoridad pedagógica"><i class="fa-solid fa-shield-halved"></i> Top</span>` : ''}
+                                    </div>
+                                    ${v.vistas ? `<span style="font-size:10px; color:var(--text-muted);">${esc(v.vistas)}</span>` : ''}
+                                  </div>
+                                  <h3 class="yt-tarjeta-titulo" title="${esc(v.titulo)}">${esc(v.titulo)}</h3>
+                                  <p class="yt-tarjeta-desc">${esc(v.descripcion || '')}</p>
+                                  
+                                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06); gap:6px;">
+                                    <button class="yt-btn rojo btn-reproducir-card" style="font-size:10.5px; padding:3px 9px;" data-video-id="${esc(v.id)}">
+                                      <i class="fa-solid fa-play"></i> Reproducir
+                                    </button>
+                                    <button class="yt-btn-guardar-catalogo ${yaGuardado ? 'guardado' : ''}" data-video-id="${esc(v.id)}" title="${yaGuardado ? 'Ya en tu catálogo' : 'Guardar en mi catálogo permanente'}">
+                                      <i class="fa-solid ${yaGuardado ? 'fa-check' : 'fa-bookmark'}"></i> ${yaGuardado ? 'Guardado' : 'Guardar'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            `;
+                        }).join('')}
+                      </div>
+                    ` : ''}
                   `}
                 `}
               </div>
             </div>
         `;
 
-        // Eventos de Input y Búsqueda
+        // Eventos de Input, Autocompletado y Búsqueda
         const inp = $('yt-input-buscar');
         if (inp) {
-            inp.oninput = () => { estado.busqueda = inp.value; };
+            inp.oninput = () => {
+                estado.busqueda = inp.value;
+                solicitarSugerencias(inp.value);
+            };
+            inp.onfocus = () => {
+                if (estado.busqueda && estado.busqueda.trim().length >= 2) {
+                    solicitarSugerencias(estado.busqueda);
+                }
+            };
             inp.onkeydown = (e) => {
                 if (e.key === 'Enter') {
+                    estado.sugerenciasAbiertas = false;
+                    const box = $('yt-sugerencias-box');
+                    if (box) box.style.display = 'none';
                     if (estado.modoCatalogo === 'busqueda_yt') {
-                        ejecutarBusquedaYt(inp.value, estado.filtroTipoYt || 'todos');
+                        ejecutarBusquedaYt(inp.value);
                     } else {
                         procesarEntradaOUrl(inp.value);
                     }
+                } else if (e.key === 'Escape') {
+                    estado.sugerenciasAbiertas = false;
+                    const box = $('yt-sugerencias-box');
+                    if (box) box.style.display = 'none';
                 }
             };
         }
 
-        // Selector de tipo (videos vs playlists)
+        // Cerrar sugerencias al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.yt-search-container')) {
+                estado.sugerenciasAbiertas = false;
+                const box = $('yt-sugerencias-box');
+                if (box) box.style.display = 'none';
+            }
+        }, { once: true });
+
+        // Selectores de Facetas
         const selectTipo = $('yt-filtro-tipo');
         if (selectTipo) {
             selectTipo.onchange = () => {
                 estado.filtroTipoYt = selectTipo.value;
-                if (estado.busqueda) {
-                    ejecutarBusquedaYt(estado.busqueda, estado.filtroTipoYt, estado.palabraRegistradaActiva);
-                }
+                if (estado.busqueda) ejecutarBusquedaYt(estado.busqueda, estado.filtroTipoYt, estado.palabraRegistradaActiva);
+            };
+        }
+
+        const selectDuracion = $('yt-filtro-duracion');
+        if (selectDuracion) {
+            selectDuracion.onchange = () => {
+                estado.filtroDuracionYt = selectDuracion.value;
+                if (estado.busqueda) ejecutarBusquedaYt(estado.busqueda, estado.filtroTipoYt, estado.palabraRegistradaActiva);
+            };
+        }
+
+        const selectIdioma = $('yt-filtro-idioma');
+        if (selectIdioma) {
+            selectIdioma.onchange = () => {
+                estado.filtroIdiomaYt = selectIdioma.value;
+                if (estado.busqueda) ejecutarBusquedaYt(estado.busqueda, estado.filtroTipoYt, estado.palabraRegistradaActiva);
+            };
+        }
+
+        const selectOrden = $('yt-orden');
+        if (selectOrden) {
+            selectOrden.onchange = () => {
+                estado.ordenYt = selectOrden.value;
+                if (estado.busqueda) ejecutarBusquedaYt(estado.busqueda, estado.filtroTipoYt, estado.palabraRegistradaActiva);
+            };
+        }
+
+        // Historial Reciente Chips
+        raiz.querySelectorAll('.yt-chip-historial').forEach(ch => {
+            ch.onclick = () => {
+                const h = ch.dataset.hist;
+                if (inp) inp.value = h;
+                ejecutarBusquedaYt(h);
+            };
+        });
+
+        const btnLimpiarHist = $('yt-btn-limpiar-historial');
+        if (btnLimpiarHist) {
+            btnLimpiarHist.onclick = () => {
+                limpiarHistorialBusquedas();
+                pintar();
             };
         }
 
         // Botón Buscar en Vivo
         const btnBuscarYt = $('yt-btn-buscar-yt');
         if (btnBuscarYt && inp) {
-            btnBuscarYt.onclick = () => ejecutarBusquedaYt(inp.value, estado.filtroTipoYt || 'todos');
+            btnBuscarYt.onclick = () => ejecutarBusquedaYt(inp.value);
         }
 
         const btnBuscarEnYt = $('yt-btn-buscar-en-yt');
         if (btnBuscarEnYt && inp) {
-            btnBuscarEnYt.onclick = () => ejecutarBusquedaYt(inp.value || 'Machine Learning', 'todos');
+            btnBuscarEnYt.onclick = () => ejecutarBusquedaYt(inp.value || 'Machine Learning');
         }
 
         const btnBuscarVacio = $('yt-btn-buscar-en-vivo-vacio');
         if (btnBuscarVacio) {
-            btnBuscarVacio.onclick = () => ejecutarBusquedaYt(estado.busqueda || 'Python', 'todos');
+            btnBuscarVacio.onclick = () => ejecutarBusquedaYt(estado.busqueda || 'Python');
         }
 
         const btnReintentar = $('yt-btn-reintentar-busqueda');

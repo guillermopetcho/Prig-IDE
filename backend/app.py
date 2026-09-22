@@ -5884,15 +5884,31 @@ def youtube_palabras_registradas():
     }
 
 
+@app.get("/api/youtube/sugerencias")
+def youtube_sugerencias(
+    q: str = Query(..., description="Término o prefijo a autocompletar"),
+    limite: Optional[int] = Query(8, description="Cantidad máxima de sugerencias")
+):
+    """Devuelve sugerencias de autocompletado en tiempo real desde YouTube."""
+    import youtube_buscador
+    if not q or not q.strip():
+        return {"query": "", "sugerencias": []}
+    sugerencias = youtube_buscador.obtener_sugerencias_youtube(q.strip(), max_sugerencias=limite or 8)
+    return {"query": q.strip(), "sugerencias": sugerencias}
+
+
 @app.get("/api/youtube/buscar")
 def youtube_buscar(
     q: str = Query(..., description="Término o palabra a buscar"),
     tipo: Optional[str] = Query("todos", description="Tipo: todos, video, playlist"),
     max_resultados: Optional[int] = Query(16, description="Límite de resultados"),
     filtro_educativo: Optional[bool] = Query(True, description="Priorizar cursos y tutoriales completos"),
+    idioma: Optional[str] = Query("todos", description="Idioma: todos, es, en"),
+    duracion_filtro: Optional[str] = Query("todas", description="Duración: todas, cortos, clases, cursos, playlists"),
+    orden: Optional[str] = Query("educativo", description="Orden: educativo, duracion, vistas, recientes"),
     forzar: Optional[bool] = Query(False, description="Forzar refresco sin caché")
 ):
-    """Busca cursos, tutoriales y listas de reproducción didácticas en YouTube en tiempo real."""
+    """Busca cursos, tutoriales y listas de reproducción didácticas en YouTube en tiempo real con ranking multivariable."""
     import youtube_buscador
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="El parámetro de búsqueda 'q' no puede estar vacío.")
@@ -5902,6 +5918,9 @@ def youtube_buscar(
         tipo=tipo or "todos",
         max_resultados=max_resultados or 16,
         filtro_educativo=filtro_educativo if filtro_educativo is not None else True,
+        idioma=idioma or "todos",
+        duracion_filtro=duracion_filtro or "todas",
+        orden=orden or "educativo",
         forzar_refresco=bool(forzar)
     )
     return resultados

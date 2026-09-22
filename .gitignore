@@ -82,6 +82,8 @@ downloads/
 .prig_web_cache/
 **/.prig_web_cache/
 .prig_*
+backend/data/*.json
+backend/data/youtube_cache.json
 
 # Cuadernos generados por el plan de estudio y descargados de Kaggle
 notebooks_plan/*
