@@ -12,7 +12,10 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-import github_lector as gl
+try:
+    import github_lector as gl
+except ImportError:
+    from backend import github_lector as gl
 
 from . import enlaces
 
@@ -103,16 +106,63 @@ def es_hub(url: str) -> bool:
 
 
 def descubrir(consulta: str = "", tipo: str = "pack", pagina: int = 1) -> Dict[str, Any]:
+    c_limpia = (consulta or "").strip()
+    
+    # 1. Búsqueda directa si es un owner/repo específico (ej. "usuario/Prig-Python" o URL completa)
+    m_directo = re.search(r"github\.com[/:]([A-Za-z0-9_.\-]+)/([A-Za-z0-9_.\-]+)", c_limpia)
+    if not m_directo and re.match(r"^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$", c_limpia):
+        partes = c_limpia.split("/", 1)
+        m_directo = partes if len(partes) == 2 else None
+
+    if m_directo:
+        owner = m_directo.group(1) if hasattr(m_directo, "group") else m_directo[0]
+        repo_name = m_directo.group(2) if hasattr(m_directo, "group") else m_directo[1]
+        repo_name = repo_name.removesuffix(".git")
+        try:
+            r = gl._api(f"repos/{owner}/{repo_name}")
+            if r and "name" in r:
+                return {
+                    "total": 1,
+                    "repos": [{
+                        "ref": r["full_name"], "url": r["html_url"], "titulo": r["name"],
+                        "descripcion": r.get("description") or "", "estrellas": r.get("stargazers_count", 0),
+                        "actualizado": r.get("pushed_at"), "temas": r.get("topics") or [],
+                        "dueno": (r.get("owner") or {}).get("login"), "avatar": (r.get("owner") or {}).get("avatar_url")
+                    }]
+                }
+        except Exception:
+            pass
+
+    # 2. Búsqueda por patrón Prig- o por topics
     tema = "prig-perfil" if tipo == "perfil" else "prig-pack"
-    q = f"topic:{tema} {(consulta or '').strip()}".strip()
+    if c_limpia.lower().startswith("prig-") or c_limpia.lower() == "prig":
+        # Búsqueda por nombre de repositorio que contenga la sigla Prig-
+        q = f"{c_limpia} in:name fork:true"
+    elif c_limpia:
+        q = f"topic:{tema} {c_limpia}"
+    else:
+        q = f"topic:{tema}"
+
     try:
         d = gl._api("search/repositories", {"q": q, "sort": "stars", "per_page": 30, "page": max(1, int(pagina))})
+        # Si no hubo resultados con topic, intentar por nombre Prig-<consulta>
+        if (d.get("total_count", 0) == 0 or not d.get("items")) and c_limpia and not c_limpia.lower().startswith("prig-"):
+            q_fallback = f"prig-{c_limpia} in:name fork:true"
+            try:
+                d_fb = gl._api("search/repositories", {"q": q_fallback, "sort": "stars", "per_page": 30, "page": 1})
+                if d_fb.get("total_count", 0) > 0:
+                    d = d_fb
+            except Exception:
+                pass
     except gl.ErrorGitHub as e:
         raise ErrorGitHubHub(str(e))
+
     salida = []
     for r in d.get("items", []):
-        salida.append({"ref": r["full_name"], "url": r["html_url"], "titulo": r["name"],
-                       "descripcion": r.get("description") or "", "estrellas": r.get("stargazers_count", 0),
-                       "actualizado": r.get("pushed_at"), "temas": r.get("topics") or [],
-                       "dueno": (r.get("owner") or {}).get("login"), "avatar": (r.get("owner") or {}).get("avatar_url")})
+        salida.append({
+            "ref": r["full_name"], "url": r["html_url"], "titulo": r["name"],
+            "descripcion": r.get("description") or "", "estrellas": r.get("stargazers_count", 0),
+            "actualizado": r.get("pushed_at"), "temas": r.get("topics") or [],
+            "dueno": (r.get("owner") or {}).get("login"), "avatar": (r.get("owner") or {}).get("avatar_url")
+        })
     return {"total": d.get("total_count", 0), "repos": salida}

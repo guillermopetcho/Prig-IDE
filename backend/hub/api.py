@@ -11,11 +11,23 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import github_lector as gl
+try:
+    import github_lector as gl
+except ImportError:
+    from backend import github_lector as gl
 
 from . import github as gh
 from . import git
 from .servicio import ErrorHub, Hub
+
+
+class SincronizarLocal(BaseModel):
+    destino: str = "prig"
+    categorias_youtube: Optional[List[str]] = None
+    incluir_todas_youtube: bool = False
+    incluir_desafios: bool = True
+    desafios_ids: Optional[List[str]] = None
+    crear_ruta_estudio: bool = True
 
 
 class Texto(BaseModel):
@@ -208,12 +220,32 @@ def crear_router(runner, motor: Callable, consumir: Callable, ndjson: Callable, 
         h(servicio().borrar_ruta, propio(req.destino), req.id)
         return {"ok": True}
 
+    @r.get("/recursos_locales")
+    def recursos_locales():
+        s = servicio()
+        return h(s.obtener_recursos_locales_catalogo, desafios)
+
+    @r.post("/sincronizar_local")
+    def sincronizar_local(req: SincronizarLocal):
+        s = servicio()
+        return h(s.sincronizar_desde_prig, propio(req.destino), req.model_dump(), autor(), desafios)
+
     @r.post("/seguir")
     def seguir(req: Url):
         texto = req.url.strip()
         s = servicio()
-        if "/" not in texto and "." not in texto:                  # un usuario suelto: su perfil
-            texto = f"https://github.com/{texto.lstrip('@')}/prig"
+        if "/" not in texto and "." not in texto:                  # un usuario suelto: su perfil o nombre pack
+            if texto.lower().startswith("prig-"):
+                t = gl.token()
+                login = (t or {}).get("usuario") or (t or {}).get("login")
+                if login:
+                    texto = f"https://github.com/{login}/{texto}"
+                else:
+                    texto = f"https://github.com/{texto}"
+            else:
+                texto = f"https://github.com/{texto.lstrip('@')}/prig"
+        elif "/" in texto and not texto.startswith(("http://", "https://", "git@")):
+            texto = f"https://github.com/{texto.lstrip('@')}"
         return h(s.seguir, texto, autor())
 
     @r.post("/dejar")

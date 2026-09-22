@@ -644,7 +644,7 @@
           <details><summary class="ph-sec" style="cursor:pointer;">Solución de referencia (spoiler)</summary>${bloque('solucion', x.solucion)}</details>
           <div class="ph-fila" style="margin-top:14px;">
             ${ajeno ? '<label class="ph-ayuda"><input type="checkbox" id="ph-d-confirmo"> Revisé el código y quiero ejecutarlo</label>' : ''}
-            <button class="ph-btn verde" id="ph-d-importar" ${x.verificable && !ajeno ? '' : 'disabled'}><i class="fa-solid fa-download"></i> Importar y verificar</button>
+            <button class="ph-btn verde" id="ph-d-importar" ${x.verificable && !ajeno ? '' : 'disabled'}><i class="fa-solid fa-play"></i> Resolver y Ejecutar en Prig IDE</button>
             <span id="ph-d-estado"></span></div>`;
         md($('ph-d-enunciado'), x.enunciado || '');
         $('ph-volver').onclick = () => { estado.desafio = null; pintar(); };
@@ -653,10 +653,10 @@
         $('ph-d-importar').onclick = async () => {
             const b = $('ph-d-importar');
             b.disabled = true;
-            $('ph-d-estado').innerHTML = '<span class="ph-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Verificando: ejecutando la solución y las pruebas…</span>';
+            $('ph-d-estado').innerHTML = '<span class="ph-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Verificando: ejecutando la solución y las pruebas en local…</span>';
             try {
                 const d = await enviar('/api/hub/desafio/importar', { origen, id, confirmado: true });
-                $('ph-d-estado').innerHTML = `<span class="ph-ok"><i class="fa-solid fa-check"></i> Verificado (${d.comprobacion && d.comprobacion.pruebas || 0} pruebas) e importado en Desafíos</span>`;
+                $('ph-d-estado').innerHTML = `<span class="ph-ok"><i class="fa-solid fa-check"></i> Verificado con éxito (${d.comprobacion && d.comprobacion.pruebas || 0} pruebas locales) e importado en la sección Desafíos</span>`;
                 // Refrescar sin repintar esta vista, para no borrar el mensaje
                 json('/api/hub/todo').then(datos => { estado.datos = datos; pintarNav(); }).catch(() => {});
                 if (window.Desafios) window.Desafios.abrir({ id: d.id });
@@ -793,24 +793,30 @@
     function vistaDescubrir(h) {
         const b = estado.descubrir;
         h.innerHTML = `
-          <div class="ph-h1">Descubrir</div>
-          <div class="ph-ayuda">Perfiles y packs publicados en GitHub con Prig (los que llevan el topic <code>prig-pack</code> o <code>prig-perfil</code>).</div>
+          <div class="ph-h1">Descubrir Repositorios Prig</div>
+          <div class="ph-ayuda">Red descentralizada de aprendizaje: busca por sigla <code>Prig-NOMBRE</code> (ej. <code>Prig-Python</code>, <code>Prig-DeepLearning</code>), por tema o escribe directamente <code>usuario/Prig-NOMBRE</code>.</div>
           <div class="ph-agregar"><div class="ph-fila">
-            <input type="text" class="ph-campo" id="ph-d-q" placeholder="Tema: machine learning, pandas, c++…" value="${esc(b.q)}" style="flex:1; min-width:200px;">
+            <input type="text" class="ph-campo" id="ph-d-q" placeholder="Buscar por sigla Prig-NOMBRE, tema (machine learning, c++…) o usuario/repo..." value="${esc(b.q)}" style="flex:1; min-width:240px;">
             <select class="ph-campo" id="ph-d-tipo"><option value="pack" ${b.tipo === 'pack' ? 'selected' : ''}>Packs</option><option value="perfil" ${b.tipo === 'perfil' ? 'selected' : ''}>Perfiles</option></select>
-            <button class="ph-btn morado" id="ph-d-buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button></div></div>
-          <div id="ph-d-res">${b.cargando ? '<div class="ph-vacio"><i class="fa-solid fa-spinner fa-spin"></i></div>'
+            <button class="ph-btn morado" id="ph-d-buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+            <button class="ph-btn verde" id="ph-d-cargar-directo" title="Seguir o cargar directamente este repositorio"><i class="fa-solid fa-cloud-arrow-down"></i> Cargar Directo</button>
+          </div></div>
+          <div id="ph-d-res">${b.cargando ? '<div class="ph-vacio"><i class="fa-solid fa-spinner fa-spin"></i> Buscando repositorios en GitHub...</div>'
             : b.error ? `<div class="ph-error">${esc(b.error)}</div>`
-            : b.datos ? (b.datos.repos.length ? `<div class="ph-ayuda">${b.datos.total} encontrados</div><div class="ph-lista">${b.datos.repos.map((r, i) => `
+            : b.datos ? (b.datos.repos.length ? `<div class="ph-ayuda">${b.datos.total} repositorios encontrados</div><div class="ph-lista">${b.datos.repos.map((r, i) => `
                 <div class="ph-tarjeta"><div class="ph-t-cab">${r.avatar ? `<img src="${esc(r.avatar)}" style="width:30px; height:30px; border-radius:50%;" alt="">` : ''}
                   <div style="flex:1; min-width:0;"><div class="ph-t-titulo">${esc(r.ref)}</div>
-                  <div class="ph-t-meta"><span><i class="fa-regular fa-star"></i> ${r.estrellas}</span><span>${esc(hace(r.actualizado))}</span></div></div></div>
+                  <div class="ph-t-meta">
+                    <span class="ph-etq morado" style="font-weight:600;"><i class="fa-brands fa-github"></i> ${(r.ref.split('/')[1] || '').toLowerCase().startsWith('prig-') ? 'Pack Prig' : 'Perfil Prig'}</span>
+                    <span><i class="fa-regular fa-star"></i> ${r.estrellas}</span>
+                    <span>${esc(hace(r.actualizado))}</span>
+                  </div></div></div>
                   ${r.descripcion ? `<div class="ph-t-nota">${esc(r.descripcion)}</div>` : ''}
                   <div class="ph-fila" style="gap:4px;">${r.temas.filter(t => !t.startsWith('prig')).slice(0, 6).map(t => `<span class="ph-etq">${esc(t)}</span>`).join('')}</div>
-                  <div class="ph-t-acc"><button class="ph-btn verde chico" data-seguir="${i}"><i class="fa-solid fa-user-plus"></i> Seguir</button>
+                  <div class="ph-t-acc"><button class="ph-btn verde chico" data-seguir="${i}"><i class="fa-solid fa-cloud-arrow-down"></i> Seguir y Cargar</button>
                     <a class="ph-btn chico" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> Ver</a><span data-estado></span></div></div>`).join('')}</div>`
-              : '<div class="ph-vacio">Nada con ese tema todavía. ¡Publica el primero desde Mis repos!</div>')
-            : '<div class="ph-vacio"><i class="fa-solid fa-compass grande"></i>Busca un tema o deja el campo vacío para ver todo.</div>'}</div>`;
+              : '<div class="ph-vacio">No se encontraron repositorios con ese nombre o tema. ¡Puedes ser el primero en publicar desde <b>Mis repos</b>!</div>')
+            : '<div class="ph-vacio"><i class="fa-solid fa-compass grande"></i>Busca por sigla <code>Prig-NOMBRE</code> o tema para explorar repositorios de otros estudiantes.</div>'}</div>`;
         const buscar = async () => {
             b.q = $('ph-d-q').value;
             b.tipo = $('ph-d-tipo').value;
@@ -823,6 +829,17 @@
         };
         $('ph-d-buscar').onclick = buscar;
         $('ph-d-q').onkeydown = (e) => { if (e.key === 'Enter') buscar(); };
+        const btnDirecto = $('ph-d-cargar-directo');
+        if (btnDirecto) {
+            btnDirecto.onclick = () => {
+                const val = $('ph-d-q').value.trim();
+                if (!val) {
+                    alert('Escribe el nombre del repositorio (ej. usuario/Prig-Python o Prig-Python).');
+                    return;
+                }
+                seguir(val, $('ph-d-res'));
+            };
+        }
         h.querySelectorAll('[data-seguir]').forEach(btn => btn.onclick = () => seguir(b.datos.repos[+btn.dataset.seguir].url, btn.parentElement.querySelector('[data-estado]')));
     }
 
@@ -832,9 +849,14 @@
         const lista = propios();
         const avisos = estado.datos.avisos;
         h.innerHTML = `
-          <div class="ph-fila" style="justify-content:space-between;"><div><div class="ph-h1">Mis repos</div>
+          <div class="ph-fila" style="justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <div><div class="ph-h1">Mis repos</div>
             <div class="ph-ayuda">Tu perfil y tus packs son carpetas git con texto plano en <code>${esc(info.carpeta || '~/.prig_hub')}/propios</code>. Puedes editarlos aquí o a mano.</div></div>
-            <button class="ph-btn morado" id="ph-nuevo-pack"><i class="fa-solid fa-plus"></i> Nuevo pack</button></div>
+            <div class="ph-fila" style="gap:8px;">
+              <button class="ph-btn morado" id="ph-btn-sync-general"><i class="fa-solid fa-arrows-rotate"></i> Cargar Cursos & Desafíos desde Prig</button>
+              <button class="ph-btn" id="ph-nuevo-pack"><i class="fa-solid fa-plus"></i> Nuevo pack</button>
+            </div>
+          </div>
           ${info.git === false ? '<div class="ph-error">git no está instalado: sudo apt install git</div>' : ''}
           <div id="ph-pack-form"></div>
           ${lista.map(r => `<div class="ph-tarjeta" style="margin:10px 0;" data-nombre="${esc(r.nombre)}">
@@ -846,6 +868,7 @@
               ${r.descripcion ? `<div class="ph-t-nota">${esc(r.descripcion)}</div>` : ''}
               ${r.avisos ? `<div class="ph-aviso">${avisos.filter(a => a.origen === r.origen).map(a => `<div><code>${esc(a.archivo || '')}</code> ${esc(a.mensaje)}</div>`).join('')}</div>` : ''}
               <div class="ph-t-acc">
+                <button class="ph-btn chico morado" data-sync-repo title="Cargar cursos de YouTube y desafíos a este repositorio"><i class="fa-solid fa-arrows-rotate"></i> Cargar desde Prig</button>
                 <button class="ph-btn chico" data-ficha><i class="fa-solid fa-id-card"></i> Ficha</button>
                 <button class="ph-btn chico" data-desafio><i class="fa-solid fa-chess-knight"></i> Agregar desafío</button>
                 <button class="ph-btn chico" data-archivos title="Abrir prig.yaml en el editor"><i class="fa-solid fa-file-pen"></i> Editar a mano</button>
@@ -856,6 +879,9 @@
             Publicar en mi perfil un <b>resumen</b> de mi progreso (solo recuentos: recursos terminados, rutas completas, desafíos resueltos). Tu progreso detallado nunca se publica.</label>`;
         $('ph-resumen').onchange = (e) => enviar('/api/hub/ajustes', { publicar_resumen: e.target.checked }).catch(() => {});
         $('ph-nuevo-pack').onclick = () => formularioPack();
+        const btnSyncG = $('ph-btn-sync-general');
+        if (btnSyncG) btnSyncG.onclick = () => formularioSincronizarPrig($('ph-pack-form'), lista[0] ? lista[0].nombre : 'prig');
+
         h.querySelectorAll('.ph-tarjeta[data-nombre]').forEach(t => {
             const nombre = t.dataset.nombre;
             const r = lista.find(x => x.nombre === nombre);
@@ -863,6 +889,8 @@
             t.querySelector('[data-ficha]').onclick = () => formularioFicha(zona, nombre);
             t.querySelector('[data-desafio]').onclick = () => formularioDesafio(zona, nombre);
             t.querySelector('[data-publicar]').onclick = () => formularioPublicar(zona, r);
+            const btnSync = t.querySelector('[data-sync-repo]');
+            if (btnSync) btnSync.onclick = () => formularioSincronizarPrig(zona, nombre);
             t.querySelector('[data-archivos]').onclick = () => {
                 const ruta = `${info.carpeta}/propios/${nombre}/prig.yaml`;
                 if (window.editorMgr) window.editorMgr.openFileByPath(ruta);
@@ -870,15 +898,171 @@
         });
     }
 
+    async function formularioSincronizarPrig(zona, nombre_inicial) {
+        zona.innerHTML = '<div class="ph-agregar"><div class="ph-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Consultando cursos y desafíos disponibles en Prig IDE…</div></div>';
+        let catalogo = { total_cursos_youtube: 0, categorias_youtube: {}, total_desafios: 0, desafios: [] };
+        try {
+            catalogo = await json('/api/hub/recursos_locales');
+        } catch (e) {
+            zona.innerHTML = `<div class="ph-error">Error al consultar recursos: ${esc(e.message)}</div>`;
+            return;
+        }
+
+        const cats = [
+            { id: 'python', label: '🐍 Python', desc: 'Harvard CS50P, programación modular, POO' },
+            { id: 'cpp', label: '⚡ C++ Moderno', desc: 'Templates, punteros inteligentes, algoritmos' },
+            { id: 'ml', label: '🤖 Machine Learning', desc: 'Stanford CS229, MIT 6.036, Caltech' },
+            { id: 'dl', label: '🧠 Deep Learning & Redes', desc: 'PyTorch, transformers, redes neuronales' },
+            { id: 'matematicas', label: '📐 Matemáticas para IA', desc: 'Álgebra lineal, cálculo, probabilidad' },
+            { id: 'arquitectura_so', label: '💻 Arquitectura & SO', desc: 'Kernels, CPU, memoria, ensamblador' },
+            { id: 'algoritmos', label: '🧩 Algoritmos & ED', desc: 'Grafos, árboles, complejidad algorítmica' }
+        ];
+
+        const reposDisponibles = propios();
+        const selRepoHtml = `
+          <div class="ph-fila" style="margin-bottom:10px;">
+            <label class="ph-ayuda" style="font-weight:600;">Repositorio destino:</label>
+            <select class="ph-campo" id="ph-sync-destino" style="min-width:200px;">
+              ${reposDisponibles.map(r => `<option value="${esc(r.nombre)}" ${r.nombre === nombre_inicial ? 'selected' : ''}>${r.nombre === 'prig' ? 'Mi perfil (prig)' : esc(r.titulo) + ' (' + esc(r.nombre) + ')'}</option>`).join('')}
+              <option value="__nuevo__">+ Crear nuevo pack Prig-&lt;tema&gt;</option>
+            </select>
+            <input class="ph-campo" id="ph-sync-nuevo-nombre" placeholder="Nombre: Prig-Python, Prig-ML..." style="display:none; min-width:220px;">
+          </div>
+        `;
+
+        zona.innerHTML = `
+          <div class="ph-agregar">
+            <div class="ph-sec" style="margin-top:0;"><i class="fa-solid fa-arrows-rotate"></i> Cargar y Sincronizar Recursos desde Prig IDE</div>
+            <div class="ph-ayuda">Vuelca tus cursos de YouTube y desafíos locales de Prig en el repositorio en texto plano (<code>recursos.yaml</code>, <code>desafios/</code> y <code>rutas/</code>), listo para publicar en GitHub con la sigla <b>Prig-NOMBRE</b>.</div>
+            
+            ${selRepoHtml}
+
+            <div style="font-size:11.5px; font-weight:700; color:#cdd6f4; margin:10px 0 6px;">1. Cursos y Listas de YouTube (${catalogo.total_cursos_youtube} disponibles):</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:6px;">
+              ${cats.map(c => {
+                  const cant = catalogo.categorias_youtube[c.id] || 0;
+                  return `
+                    <label class="ph-ayuda" style="display:flex; gap:8px; align-items:flex-start; background:rgba(255,255,255,0.03); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color); cursor:pointer;">
+                      <input type="checkbox" class="ph-sync-cat" value="${c.id}" checked style="margin-top:2px;">
+                      <div>
+                        <div style="font-weight:600; color:#fff;">${c.label} <span style="font-size:10px; color:#89b4fa;">(${cant})</span></div>
+                        <div style="font-size:10px; color:var(--text-muted);">${c.desc}</div>
+                      </div>
+                    </label>
+                  `;
+              }).join('')}
+            </div>
+
+            <div style="font-size:11.5px; font-weight:700; color:#cdd6f4; margin:12px 0 6px;">2. Desafíos Locales de Programación:</div>
+            <label class="ph-ayuda" style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+              <input type="checkbox" id="ph-sync-desafios" checked>
+              <span>Exportar los desafíos locales de la sección Desafíos (${catalogo.total_desafios} disponibles en tu almacén)</span>
+            </label>
+
+            <div style="font-size:11.5px; font-weight:700; color:#cdd6f4; margin:12px 0 6px;">3. Rutas de Aprendizaje:</div>
+            <label class="ph-ayuda" style="display:flex; gap:8px; align-items:center; cursor:pointer;">
+              <input type="checkbox" id="ph-sync-ruta" checked>
+              <span>Generar ruta de estudio estructurada automática (<code>rutas/ruta-principal.md</code>) vinculando clases y desafíos</span>
+            </label>
+
+            <div class="ph-fila" style="margin-top:14px; gap:10px;">
+              <button class="ph-btn verde" id="ph-sync-ejecutar"><i class="fa-solid fa-arrows-rotate"></i> Sincronizar Repositorio</button>
+              <button class="ph-btn" id="ph-sync-cancelar">Cancelar</button>
+              <span id="ph-sync-status"></span>
+            </div>
+          </div>
+        `;
+
+        const selDest = zona.querySelector('#ph-sync-destino');
+        const inpNuevo = zona.querySelector('#ph-sync-nuevo-nombre');
+        selDest.onchange = () => {
+            if (selDest.value === '__nuevo__') {
+                inpNuevo.style.display = 'inline-block';
+                inpNuevo.focus();
+            } else {
+                inpNuevo.style.display = 'none';
+            }
+        };
+
+        zona.querySelector('#ph-sync-cancelar').onclick = () => { zona.innerHTML = ''; };
+
+        zona.querySelector('#ph-sync-ejecutar').onclick = async () => {
+            const btn = zona.querySelector('#ph-sync-ejecutar');
+            const status = zona.querySelector('#ph-sync-status');
+            btn.disabled = true;
+            status.innerHTML = '<span class="ph-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Sincronizando recursos y generando README...</span>';
+
+            let destino = selDest.value;
+            if (destino === '__nuevo__') {
+                const nombreNuevo = inpNuevo.value.trim();
+                if (!nombreNuevo) {
+                    status.innerHTML = '<span class="ph-error">Escribe el nombre del nuevo pack (ej. Prig-Python).</span>';
+                    btn.disabled = false;
+                    return;
+                }
+                try {
+                    const rPack = await enviar('/api/hub/packs', {
+                        titulo: nombreNuevo,
+                        descripcion: `Pack ${nombreNuevo} de cursos y desafíos de programación`,
+                        etiquetas: ['programacion', 'prig', 'cursos']
+                    });
+                    destino = rPack.nombre;
+                } catch (e) {
+                    status.innerHTML = `<span class="ph-error">Error al crear pack: ${esc(e.message)}</span>`;
+                    btn.disabled = false;
+                    return;
+                }
+            }
+
+            const catsSeleccionadas = Array.from(zona.querySelectorAll('.ph-sync-cat:checked')).map(el => el.value);
+            const incDes = zona.querySelector('#ph-sync-desafios').checked;
+            const incRuta = zona.querySelector('#ph-sync-ruta').checked;
+
+            try {
+                const res = await enviar('/api/hub/sincronizar_local', {
+                    destino: destino,
+                    categorias_youtube: catsSeleccionadas,
+                    incluir_desafios: incDes,
+                    crear_ruta_estudio: incRuta
+                });
+
+                status.innerHTML = `
+                  <span class="ph-ok"><i class="fa-solid fa-check"></i> ¡Sincronizado! Se agregaron ${res.cursos_agregados} cursos y ${res.desafios_exportados} desafíos.</span>
+                  <button class="ph-btn verde chico" id="ph-sync-publicar-ahora" style="margin-left:8px;"><i class="fa-brands fa-github"></i> Publicar en GitHub ahora</button>
+                `;
+
+                const btnPub = zona.querySelector('#ph-sync-publicar-ahora');
+                if (btnPub) {
+                    btnPub.onclick = async () => {
+                        btnPub.disabled = true;
+                        btnPub.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publicando...';
+                        try {
+                            const resPub = await enviar('/api/hub/publicar', { destino: destino });
+                            status.innerHTML = `<span class="ph-ok"><i class="fa-solid fa-check"></i> Publicado en GitHub:</span> <a href="${esc(resPub.url)}" target="_blank">${esc(resPub.url)}</a>`;
+                            await cargar();
+                        } catch (errPub) {
+                            status.innerHTML = `<span class="ph-error">Error al publicar: ${esc(errPub.message)}</span>`;
+                        }
+                    };
+                }
+
+                await cargar();
+            } catch (err) {
+                status.innerHTML = `<span class="ph-error">Error: ${esc(err.message)}</span>`;
+                btn.disabled = false;
+            }
+        };
+    }
+
     function formularioPack() {
         const z = $('ph-pack-form');
         z.innerHTML = `<div class="ph-agregar"><div class="ph-rejilla2">
-            <input class="ph-campo" id="ph-p-titulo" placeholder="Título: Machine Learning desde cero">
+            <input class="ph-campo" id="ph-p-titulo" placeholder="Título: Prig-Python, Prig-ML...">
             <select class="ph-campo" id="ph-p-nivel"><option value="">Nivel</option><option>principiante</option><option>intermedio</option><option>avanzado</option></select>
             <input class="ph-campo" id="ph-p-desc" placeholder="Descripción breve">
             <input class="ph-campo" id="ph-p-etq" placeholder="Etiquetas: ml, python…"></div>
           <div class="ph-fila" style="margin-top:8px;"><button class="ph-btn verde" id="ph-p-crear">Crear pack</button><button class="ph-btn" id="ph-p-cancelar">Cancelar</button>
-            <span class="ph-ayuda">Se crea como <code>prig-&lt;tema&gt;</code> con licencia CC BY 4.0 (contenido) y MIT (código).</span></div><div id="ph-p-estado"></div></div>`;
+            <span class="ph-ayuda">Se crea como <code>Prig-&lt;tema&gt;</code> con licencia CC BY 4.0 (contenido) y MIT (código).</span></div><div id="ph-p-estado"></div></div>`;
         $('ph-p-titulo').focus();
         $('ph-p-cancelar').onclick = () => { z.innerHTML = ''; };
         $('ph-p-crear').onclick = async () => {

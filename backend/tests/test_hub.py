@@ -188,6 +188,36 @@ class TestPropios(Base):
         with self.assertRaises(ErrorHub):
             self.hub.dir_de("sigo:../../etc")
 
+    def test_sincronizar_desde_prig_y_nombre_pack(self):
+        nombre = self.hub.crear_pack("Prig-Python", nombre_sugerido="Prig-Python")
+        self.assertEqual(nombre, "Prig-Python")
+        desafio_mock = {
+            "titulo": "Doble", "enunciado": "Devuelve el doble.", "nivel": "principiante", "conceptos": ["funciones"],
+            "paginas": [{"nombre": "doble.py", "contenido": "def doble(x):\n    pass\n"}],
+            "privado": {"comprobacion": {"tipo": "asserts", "asserts": ["from doble import doble\nassert doble(3) == 6"]},
+                        "referencia": [{"nombre": "doble.py", "contenido": "def doble(x):\n    return 2 * x\n"}]}
+        }
+        almacen = mock.Mock()
+        almacen.lista.return_value = [{"id": "doble", "titulo": "Doble"}]
+        almacen.obtener.return_value = desafio_mock
+
+        res = self.hub.sincronizar_desde_prig(
+            nombre,
+            {"categorias_youtube": ["python"], "desafios_ids": ["doble"], "crear_ruta": True},
+            autor="Ada",
+            almacen_desafios=almacen
+        )
+        self.assertTrue(res["ok"])
+        self.assertGreater(res["cursos_agregados"], 0)
+        self.assertEqual(res["desafios_exportados"], 1)
+        self.assertEqual(res["rutas_creadas"], 1)
+
+        datos = self.hub.leer(f"propio:{nombre}")
+        self.assertGreater(len(datos["recursos"]), 0)
+        self.assertEqual(len(datos["desafios"]), 1)
+        self.assertEqual(len(datos["rutas"]), 1)
+
+
 
 class TestDesafios(Base):
     def desafio_prig(self, tipo="unittest"):

@@ -29,7 +29,7 @@ from typing import Any, Callable, Dict, List, Optional
 from . import enlaces, formato, git, metadatos
 
 ESTADOS = ("pendiente", "en_curso", "terminado")
-NOMBRE_PACK = re.compile(r"^prig-[a-z0-9][a-z0-9\-]{0,48}$")
+NOMBRE_PACK = re.compile(r"^[Pp]rig-[a-zA-Z0-9][a-zA-Z0-9\-]{0,48}$")
 
 
 class ErrorHub(Exception):
@@ -38,6 +38,16 @@ class ErrorHub(Exception):
 
 def ruta_base() -> str:
     return os.environ.get("PRIG_HUB_DIR") or os.path.expanduser("~/.prig_hub")
+
+
+def ruta_cursos_youtube() -> str:
+    posible = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "data", "cursos_youtube.json"))
+    if os.path.isfile(posible):
+        return posible
+    posible2 = os.path.join(os.getcwd(), "frontend", "data", "cursos_youtube.json")
+    if os.path.isfile(posible2):
+        return posible2
+    return ""
 
 
 def ahora() -> str:
@@ -66,8 +76,12 @@ class Hub:
         return os.path.join(self.base, "siguiendo")
 
     def _dir_propio(self, nombre: str) -> str:
-        if nombre != "prig" and not NOMBRE_PACK.match(nombre or ""):
-            raise ErrorHub("Nombre de repositorio no válido.")
+        if (nombre or "").lower() != "prig" and not NOMBRE_PACK.match(nombre or ""):
+            raise ErrorHub("Nombre de repositorio no válido (debe llamarse prig o empezar por Prig-).")
+        if os.path.isdir(self.propios_dir):
+            for d in os.listdir(self.propios_dir):
+                if d.lower() == (nombre or "").lower():
+                    return os.path.join(self.propios_dir, d)
         return os.path.join(self.propios_dir, nombre)
 
     def _dir_sigo(self, clave: str) -> str:
@@ -155,13 +169,18 @@ class Hub:
             return "prig"
 
     def crear_pack(self, titulo: str, descripcion: str = "", etiquetas: Optional[List[str]] = None,
-                   nivel: str = "", autor: str = "") -> str:
+                   nivel: str = "", autor: str = "", nombre_sugerido: str = "") -> str:
         titulo = (titulo or "").strip()
         if not titulo:
             raise ErrorHub("Ponle un título al pack.")
         with self._cerrojo:
             self.asegurar_perfil(autor)
-            base = "prig-" + formato.slug(titulo, 40)
+            if nombre_sugerido and NOMBRE_PACK.match(nombre_sugerido):
+                base = nombre_sugerido
+            elif titulo.startswith("Prig-"):
+                base = "Prig-" + formato.slug(titulo[5:], 40)
+            else:
+                base = "prig-" + formato.slug(titulo, 40)
             nombre, n = base, 2
             while os.path.exists(self._dir_propio(nombre)):
                 nombre, n = f"{base}-{n}", n + 1
@@ -794,3 +813,199 @@ class Hub:
         # Las marcas no pueden aparecer dentro de los datos: así no se pueden «cerrar» desde el contenido
         texto = texto.replace("<<<", "‹‹‹").replace(">>>", "›››")
         return f"<<<DATOS>>>\n{texto[:presupuesto]}\n<<<FIN_DATOS>>>"
+
+    # ------------------------------------------------------------------ sincronización desde Prig
+    def obtener_recursos_locales_catalogo(self, almacen_desafios=None) -> Dict[str, Any]:
+        """ Retorna el inventario de cursos de YouTube, desafíos locales y colecciones para el asistente de sincronización """
+        ruta_yt = ruta_cursos_youtube()
+        cursos = []
+        categorias_yt: Dict[str, int] = {}
+        if os.path.isfile(ruta_yt):
+            try:
+                with open(ruta_yt, "r", encoding="utf-8") as fp:
+                    cursos = json.load(fp)
+            except Exception:
+                cursos = []
+
+        for c in cursos:
+            cat = c.get("categoria", "otros")
+            categorias_yt[cat] = categorias_yt.get(cat, 0) + 1
+
+        desafios_locales = []
+        if almacen_desafios:
+            try:
+                for d in almacen_desafios.lista():
+                    desafios_locales.append({
+                        "id": d.get("id"),
+                        "titulo": d.get("titulo") or d.get("id"),
+                        "nivel": d.get("nivel") or "intermedio",
+                        "conceptos": d.get("conceptos") or [],
+                        "estado": (d.get("progreso") or {}).get("estado") or "nuevo"
+                    })
+            except Exception:
+                pass
+
+        return {
+            "total_cursos_youtube": len(cursos),
+            "categorias_youtube": categorias_yt,
+            "total_desafios": len(desafios_locales),
+            "desafios": desafios_locales
+        }
+
+    def sincronizar_desde_prig(self, nombre: str, opciones: Optional[Dict[str, Any]] = None,
+                               autor: str = "", almacen_desafios=None) -> Dict[str, Any]:
+        """ Sincroniza cursos de YouTube, desafíos y rutas estructuradas en el repositorio indicado """
+        opciones = opciones or {}
+        carpeta = self._dir_propio(nombre)
+        if not os.path.exists(os.path.join(carpeta, formato.MANIFIESTO)):
+            raise ErrorHub(f"El repositorio «{nombre}» no existe.")
+
+        cats = [c.lower() for c in opciones.get("categorias_youtube") or []]
+        todas_yt = opciones.get("incluir_todas_youtube", False) or ("todas" in cats)
+        incluir_des = opciones.get("incluir_desafios", True)
+        des_ids = set(opciones.get("desafios_ids") or [])
+        crear_ruta = opciones.get("crear_ruta_estudio", True)
+
+        cursos_agregados = 0
+        desafios_exportados = 0
+        rutas_creadas = 0
+
+        with self._cerrojo:
+            # 1. Cursos de YouTube
+            ruta_yt = ruta_cursos_youtube()
+            if os.path.isfile(ruta_yt) and (cats or todas_yt):
+                try:
+                    with open(ruta_yt, "r", encoding="utf-8") as fp:
+                        todos_cursos = json.load(fp)
+                except Exception:
+                    todos_cursos = []
+
+                cursos_filtrados = []
+                for c in todos_cursos:
+                    cat = (c.get("categoria") or "").lower()
+                    if todas_yt or cat in cats or (cat == "dl" and "deep_learning" in cats) or (cat == "deep_learning" and "dl" in cats):
+                        cursos_filtrados.append(c)
+
+                existentes = {r["clave"]: r for r in formato.leer_lista(carpeta, "recursos.yaml", [])}
+
+                for c in cursos_filtrados:
+                    if c.get("playlist"):
+                        url = f"https://www.youtube.com/playlist?list={c['playlist']}"
+                        tipo = "curso"
+                    else:
+                        url = f"https://www.youtube.com/watch?v={c['id']}"
+                        tipo = "video"
+
+                    try:
+                        info = enlaces.reconocer(url)
+                    except Exception:
+                        continue
+
+                    clave = info["clave"]
+                    if clave in existentes:
+                        continue
+
+                    etqs = []
+                    if c.get("categoria"):
+                        etqs.append(formato.slug(c.get("categoria"), 20))
+                    if c.get("universidad"):
+                        etqs.append(formato.slug(c.get("universidad"), 20))
+                    if c.get("idioma"):
+                        etqs.append(c.get("idioma"))
+
+                    nivel_crudo = (c.get("nivel") or "").lower()
+                    nivel = "principiante" if "principiante" in nivel_crudo else ("avanzado" if "avanzado" in nivel_crudo else "intermedio")
+
+                    canal = c.get("canal") or ""
+                    duracion = c.get("duracion") or ""
+                    nota = f"{canal} · {duracion}".strip(" ·") if (canal or duracion) else ""
+
+                    entrada = {
+                        "url": url,
+                        "titulo": c.get("titulo") or "Curso Prig",
+                        "tipo": tipo,
+                        "etiquetas": [e for e in etqs if e],
+                        "nivel": nivel,
+                        "nota": nota
+                    }
+                    try:
+                        formato.agregar_entrada(carpeta, "recursos.yaml", entrada)
+                        existentes[clave] = entrada
+                        cursos_agregados += 1
+                    except Exception:
+                        pass
+
+            # 2. Desafíos de programación
+            if incluir_des and almacen_desafios:
+                try:
+                    todos_des = almacen_desafios.lista()
+                    if not isinstance(todos_des, (list, tuple)):
+                        todos_des = []
+                except Exception:
+                    todos_des = []
+
+                for d in todos_des:
+                    did = d.get("id")
+                    if des_ids and did not in des_ids:
+                        continue
+                    try:
+                        base_id = formato.slug(d.get("titulo") or "desafio", 50)
+                        if os.path.exists(os.path.join(carpeta, "desafios", base_id)):
+                            continue
+                        d_completo = d
+                        if did and hasattr(almacen_desafios, "obtener") and ("paginas" not in d or "privado" not in d):
+                            try:
+                                d_completo = almacen_desafios.obtener(did)
+                            except Exception:
+                                pass
+                        self.exportar_desafio(nombre, d_completo)
+                        desafios_exportados += 1
+                    except Exception:
+                        pass
+
+            # 3. Ruta de estudio estructurada
+            if crear_ruta and cursos_agregados > 0:
+                ruta_id = "ruta-principal"
+                ruta_path = os.path.join(carpeta, "rutas", f"{ruta_id}.md")
+                if not os.path.exists(ruta_path):
+                    recursos_actuales = formato.leer_lista(carpeta, "recursos.yaml", [])
+                    try:
+                        desafios_actuales = formato.leer_repo(carpeta).get("desafios", [])
+                    except Exception:
+                        desafios_actuales = []
+
+                    pasos = []
+                    for i, r in enumerate(recursos_actuales[:12], 1):
+                        pasos.append(f"{i}. [{r.get('titulo')}]({r.get('url')})\n   {r.get('nota') or 'Material de estudio oficial.'}")
+
+                    if desafios_actuales:
+                        idx = len(pasos) + 1
+                        for d in desafios_actuales[:6]:
+                            pasos.append(f"{idx}. [Desafío: {d.get('titulo')}](desafio:{d.get('id')})\n   Pon a prueba tu código resolviendo el ejercicio en local.")
+                            idx += 1
+
+                    contenido_ruta = f"""---
+titulo: Ruta de Estudio Prig
+nivel: intermedio
+etiquetas: [estudio, programacion, practica]
+---
+
+Ruta estructurada para dominar los conceptos paso a paso. Sigue cada hito en orden:
+
+{chr(10).join(pasos)}
+"""
+                    formato._escribir(ruta_path, contenido_ruta)
+                    rutas_creadas += 1
+
+            # 4. Guardar commit
+            msg = f"Sincroniza {cursos_agregados} cursos de YouTube y {desafios_exportados} desafíos desde Prig"
+            commit = self._guardar(nombre, msg)
+
+        return {
+            "ok": True,
+            "nombre": nombre,
+            "cursos_agregados": cursos_agregados,
+            "desafios_exportados": desafios_exportados,
+            "rutas_creadas": rutas_creadas,
+            "commit": commit
+        }
