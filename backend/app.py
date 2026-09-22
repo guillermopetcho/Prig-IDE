@@ -5304,6 +5304,13 @@ class YouTubeCrearDesafioRequest(BaseModel):
     modelo: Optional[str] = None
 
 
+class YouTubeTraducirRequest(BaseModel):
+    texto: str
+    de: Optional[str] = "auto"
+    a: Optional[str] = "es"
+    modelo: Optional[str] = None
+
+
 def _contexto_bloque(ruta_id: Optional[str], bloque_id: Optional[str]) -> Dict[str, Any]:
 
     if not ruta_id:
@@ -5945,6 +5952,44 @@ async def youtube_abrir_externo(request: Request):
     except Exception as e:
         logger.error(f"Error abriendo navegador externo para {url}: {e}")
         return {"ok": False, "error": str(e), "url": url}
+
+
+@app.get("/api/youtube/transcripcion")
+def youtube_transcripcion(video_id: str, idioma: str = "es"):
+    """ Extrae la transcripción estructurada y traducida con intervalos de tiempo """
+    if not video_id:
+        raise HTTPException(status_code=400, detail="Falta el parámetro 'video_id'")
+    import youtube_analisis
+    return youtube_analisis.extraer_transcripcion_estructurada(video_id, idioma_destino=idioma)
+
+
+@app.post("/api/youtube/traducir_texto")
+def youtube_traducir_texto(req: YouTubeTraducirRequest):
+    """ Traduce o explica un fragmento de texto del video con el modelo pedagógico """
+    if not req.texto or not req.texto.strip():
+        raise HTTPException(status_code=400, detail="El texto a traducir está vacío")
+
+    modelo = _modelo_desafios(req.modelo, "tutor")
+    motor, nombre_modelo = _motor_desafios(modelo)
+
+    prompt = (
+        f"Traduce y explica de forma clara, didáctica y rigurosa el siguiente fragmento técnico "
+        f"de una clase de programación al español. Mantén intactos nombres de funciones, librerías, "
+        f"términos en código y palabras reservadas.\n\n"
+        f"TEXTO ORIGINAL:\n«{req.texto.strip()}»\n\n"
+        f"Responde directamente con la traducción explicada, fluida y precisa:"
+    )
+
+    try:
+        respuesta = motor.completar(nombre_modelo, [{"role": "user", "content": prompt}])
+        traduccion = respuesta.get("texto", "").strip() if isinstance(respuesta, dict) else str(respuesta).strip()
+        # Limpiar tags <think> si el modelo es razonador
+        traduccion = re.sub(r"<think>[\s\S]*?</think>", "", traduccion, flags=re.I).strip()
+        return {"ok": True, "traduccion": traduccion, "original": req.texto}
+    except Exception as e:
+        logger.error(f"Error traduciendo fragmento de YouTube: {e}")
+        return {"ok": False, "error": str(e), "original": req.texto}
+
 
 
 

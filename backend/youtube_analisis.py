@@ -73,6 +73,191 @@ def extraer_subtitulos_youtube(video_id: str) -> Optional[str]:
     return None
 
 
+def formatear_segundos_hms(segundos: float) -> str:
+    """ Convierte segundos a formato MM:SS o HH:MM:SS """
+    s_tot = max(0, int(segundos))
+    m_num, s_num = divmod(s_tot, 60)
+    h_num, m_num = divmod(m_num, 60)
+    if h_num > 0:
+        return f"{h_num}:{m_num:02d}:{s_num:02d}"
+    return f"{m_num:02d}:{s_num:02d}"
+
+
+def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es") -> Dict[str, Any]:
+    """
+    Extrae la transcripción completa de YouTube con marcas de tiempo e intervalos calculados.
+    Obtiene tanto la versión original como la versión traducida al idioma destino (default: 'es').
+    Agrupa los fragmentos en párrafos didácticos y oraciones coherentes.
+    """
+    if not video_id:
+        return {"ok": False, "error": "ID de video vacío", "segmentos": []}
+
+    try:
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "es,en;q=0.9",
+            },
+        )
+        raw_html = urllib.request.urlopen(req, timeout=8).read().decode("utf-8", errors="ignore")
+        m = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", raw_html)
+        if not m:
+            return {"ok": False, "error": "No se encontraron metadatos del reproductor", "segmentos": []}
+
+        data = json.loads(m.group(1))
+        captions = data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+        if not captions:
+            return {"ok": False, "error": "Este video no tiene subtítulos disponibles en YouTube", "segmentos": []}
+
+        idiomas_disponibles = [
+            {
+                "codigo": c.get("languageCode"),
+                "nombre": c.get("name", {}).get("simpleText", c.get("languageCode")),
+                "es_traducible": c.get("isTranslatable", True)
+            }
+            for c in captions
+        ]
+
+        track_destino = next((c for c in captions if c.get("languageCode") in ("es", "es-419", "es-ES")), None)
+        track_original = next((c for c in captions if c.get("languageCode") in ("en", "en-US", "en-GB")), captions[0])
+
+        idioma_origen = track_original.get("languageCode", "en")
+        url_origen = track_original.get("baseUrl")
+
+        # Descargar XML original
+        xml_origen = ""
+        if url_origen:
+            try:
+                cap_req = urllib.request.Request(url_origen, headers={"User-Agent": "Mozilla/5.0"})
+                xml_origen = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+
+        # Descargar XML traducido
+        xml_traducido = ""
+        if idioma_destino in ("es", "es-419", "es-ES") and track_destino:
+            url_destino = track_destino.get("baseUrl")
+            try:
+                cap_req = urllib.request.Request(url_destino, headers={"User-Agent": "Mozilla/5.0"})
+                xml_traducido = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+        elif url_origen:
+            url_trad = url_origen + f"&tlang={idioma_destino}"
+            try:
+                cap_req = urllib.request.Request(url_trad, headers={"User-Agent": "Mozilla/5.0"})
+                xml_traducido = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+
+        if not xml_traducido:
+            xml_traducido = xml_origen
+
+        entradas_orig = []
+        if xml_origen:
+            for s_str, d_str, txt in re.findall(r'<text start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>(.*?)</text>', xml_origen):
+                start = float(s_str)
+                dur = float(d_str) if d_str else 3.0
+                t = html.unescape(txt).replace("\n", " ").strip()
+                if t:
+                    entradas_orig.append({"start": start, "dur": dur, "end": start + dur, "texto": t})
+
+        entradas_trad = []
+        if xml_traducido:
+            for s_str, d_str, txt in re.findall(r'<text start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>(.*?)</text>', xml_traducido):
+                start = float(s_str)
+                dur = float(d_str) if d_str else 3.0
+                t = html.unescape(txt).replace("\n", " ").strip()
+                if t:
+                    entradas_trad.append({"start": start, "dur": dur, "end": start + dur, "texto": t})
+
+        base_entradas = entradas_trad if entradas_trad else entradas_orig
+        if not base_entradas:
+            return {"ok": False, "error": "No se pudieron decodificar subtítulos para este video", "segmentos": []}
+
+        # Agrupar entradas en párrafos didácticos coherentes
+        segmentos_agrupados = []
+        actual_chunk = None
+
+        for ent in base_entradas:
+            orig_match = None
+            if entradas_orig:
+                orig_match = min(entradas_orig, key=lambda x: abs(x["start"] - ent["start"]))
+
+            texto_orig_val = orig_match["texto"] if orig_match else ent["texto"]
+            texto_trad_val = ent["texto"]
+
+            if actual_chunk is None:
+                actual_chunk = {
+                    "start": ent["start"],
+                    "end": ent["end"],
+                    "textos_trad": [texto_trad_val],
+                    "textos_orig": [texto_orig_val]
+                }
+            else:
+                dur_actual = ent["end"] - actual_chunk["start"]
+                long_actual = sum(len(x) for x in actual_chunk["textos_trad"])
+                termina_oracion = actual_chunk["textos_trad"][-1].rstrip().endswith((".", "!", "?"))
+                debe_cortar = (dur_actual >= 25.0) or (dur_actual >= 12.0 and termina_oracion) or (long_actual >= 220)
+
+                if debe_cortar:
+                    texto_final = " ".join(actual_chunk["textos_trad"]).strip()
+                    texto_orig_final = " ".join(actual_chunk["textos_orig"]).strip()
+                    s_str = formatear_segundos_hms(actual_chunk["start"])
+                    e_str = formatear_segundos_hms(actual_chunk["end"])
+                    segmentos_agrupados.append({
+                        "id": f"seg_{len(segmentos_agrupados)}",
+                        "start": round(actual_chunk["start"], 2),
+                        "end": round(actual_chunk["end"], 2),
+                        "dur": round(actual_chunk["end"] - actual_chunk["start"], 2),
+                        "intervalo": f"{s_str} - {e_str}",
+                        "texto": texto_final,
+                        "texto_original": texto_orig_final
+                    })
+                    actual_chunk = {
+                        "start": ent["start"],
+                        "end": ent["end"],
+                        "textos_trad": [texto_trad_val],
+                        "textos_orig": [texto_orig_val]
+                    }
+                else:
+                    actual_chunk["end"] = ent["end"]
+                    actual_chunk["textos_trad"].append(texto_trad_val)
+                    actual_chunk["textos_orig"].append(texto_orig_val)
+
+        if actual_chunk:
+            texto_final = " ".join(actual_chunk["textos_trad"]).strip()
+            texto_orig_final = " ".join(actual_chunk["textos_orig"]).strip()
+            s_str = formatear_segundos_hms(actual_chunk["start"])
+            e_str = formatear_segundos_hms(actual_chunk["end"])
+            segmentos_agrupados.append({
+                "id": f"seg_{len(segmentos_agrupados)}",
+                "start": round(actual_chunk["start"], 2),
+                "end": round(actual_chunk["end"], 2),
+                "dur": round(actual_chunk["end"] - actual_chunk["start"], 2),
+                "intervalo": f"{s_str} - {e_str}",
+                "texto": texto_final,
+                "texto_original": texto_orig_final
+            })
+
+        return {
+            "ok": True,
+            "video_id": video_id,
+            "idioma_destino": idioma_destino,
+            "idioma_origen": idioma_origen,
+            "idiomas_disponibles": idiomas_disponibles,
+            "total_segmentos": len(segmentos_agrupados),
+            "segmentos": segmentos_agrupados
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e), "segmentos": []}
+
+
 def preparar_contexto_video(video_id: str, titulo: str, canal: str, duracion: str,
                             descripcion: str = "", texto_usuario: str = "",
                             notas_usuario: str = "") -> str:

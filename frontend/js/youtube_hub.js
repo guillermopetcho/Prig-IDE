@@ -1382,8 +1382,13 @@ const VIDEOS_CURADOS = [
         ocultarTexto: localStorage.getItem('prig_yt_ocultar_texto') === 'true',
         ocultarTextoPlayer: localStorage.getItem('prig_yt_ocultar_texto_player') === 'true',
         videoActual: null,
-        pestanaLateral: 'notas', // 'notas' | 'objetivos' | 'resumen' | 'tutor'
+        pestanaLateral: 'traduccion', // 'traduccion' | 'notas' | 'objetivos' | 'resumen' | 'tutor'
         subpestanaNotas: 'fotogramas', // 'fotogramas' | 'marcas' | 'cuaderno'
+        subpestanaTraduccion: 'transcripcion', // 'transcripcion' | 'guardadas'
+        idiomaSubtitulos: localStorage.getItem('prig_yt_sub_lang') || 'es', // 'es' | 'en' | 'none'
+        modoVistaTraduccion: 'traduccion', // 'traduccion' | 'bilingue'
+        filtroTextoTraduccion: '',
+        transcripcion: { cargando: false, error: null, datos: null, videoId: null, idioma: 'es' },
         fotogramaFormAbierto: false,
         fotogramaTemporal: null,
         lightboxImg: null,
@@ -1746,6 +1751,100 @@ const VIDEOS_CURADOS = [
         }
     }
 
+    // ==================== GESTIÓN DE EXPLICACIONES GUARDADAS Y TRANSCRIPCIÓN ====================
+    function leerExplicaciones(videoId) {
+        if (!videoId) return [];
+        try {
+            const raw = localStorage.getItem(`prig_yt_explicaciones_${videoId}`);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarExplicaciones(videoId, lista) {
+        if (!videoId) return;
+        try {
+            localStorage.setItem(`prig_yt_explicaciones_${videoId}`, JSON.stringify(lista || []));
+        } catch (e) {
+            console.error('Error guardando explicaciones:', e);
+        }
+    }
+
+    function agregarExplicacionGuardada(videoId, explicacion) {
+        if (!videoId || !explicacion || !explicacion.texto) return null;
+        const lista = leerExplicaciones(videoId);
+        const nueva = {
+            id: 'exp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            videoId: videoId,
+            texto: explicacion.texto.trim(),
+            intervalo: explicacion.intervalo || '00:00',
+            startSegundos: Math.max(0, Math.floor(Number(explicacion.startSegundos) || 0)),
+            endSegundos: Math.max(0, Math.floor(Number(explicacion.endSegundos) || 0)),
+            fecha: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            color: 'amarillo'
+        };
+        lista.unshift(nueva);
+        guardarExplicaciones(videoId, lista);
+        return nueva;
+    }
+
+    function eliminarExplicacionGuardada(videoId, id) {
+        if (!videoId || !id) return;
+        let lista = leerExplicaciones(videoId).filter(item => item.id !== id);
+        guardarExplicaciones(videoId, lista);
+    }
+
+    async function cargarTranscripcion(videoId, idioma = 'es') {
+        if (!videoId) return;
+        if (estado.transcripcion.videoId === videoId &&
+            estado.transcripcion.idioma === idioma &&
+            estado.transcripcion.datos) {
+            return;
+        }
+
+        estado.transcripcion = {
+            cargando: true,
+            error: null,
+            datos: null,
+            videoId: videoId,
+            idioma: idioma
+        };
+        pintar();
+
+        try {
+            const resp = await fetch(`/api/youtube/transcripcion?video_id=${encodeURIComponent(videoId)}&idioma=${encodeURIComponent(idioma)}`);
+            const data = await resp.json();
+            if (data.ok && data.segmentos) {
+                estado.transcripcion = {
+                    cargando: false,
+                    error: null,
+                    datos: data,
+                    videoId: videoId,
+                    idioma: idioma
+                };
+            } else {
+                estado.transcripcion = {
+                    cargando: false,
+                    error: data.error || 'No se pudieron extraer subtítulos para este video.',
+                    datos: null,
+                    videoId: videoId,
+                    idioma: idioma
+                };
+            }
+        } catch (e) {
+            estado.transcripcion = {
+                cargando: false,
+                error: 'Error conectando con el servicio de transcripción: ' + (e.message || e),
+                datos: null,
+                videoId: videoId,
+                idioma: idioma
+            };
+        }
+        pintar();
+    }
+
     function formatearSegundos(s) {
         s = Math.max(0, Math.floor(Number(s) || 0));
         const h = Math.floor(s / 3600);
@@ -1790,18 +1889,21 @@ const VIDEOS_CURADOS = [
         return estado.servidorEmbed || localStorage.getItem('prig_yt_embed_server') || 'www.youtube.com';
     }
 
-    function construirEmbedUrl(video, startSegundos = 0) {
+    function construirEmbedUrl(video, startSegundos = 0, idiomaSub = null) {
         if (!video) return '';
         const servidor = obtenerServidorEmbed();
         const esSoloPlaylist = String(video.id || '').startsWith('pl_') || (!video.id && video.playlist);
         const originParam = window.location && window.location.origin ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
 
+        const idioma = idiomaSub !== null ? idiomaSub : (estado.idiomaSubtitulos || 'es');
+        const ccParam = (idioma && idioma !== 'none') ? `&cc_load_policy=1&cc_lang_pref=${idioma}&hl=${idioma}` : '';
+
         if (esSoloPlaylist) {
-            return `https://${servidor}/embed/videoseries?list=${encodeURIComponent(video.playlist)}&autoplay=1${originParam}`;
+            return `https://${servidor}/embed/videoseries?list=${encodeURIComponent(video.playlist)}&autoplay=1${ccParam}${originParam}`;
         }
 
         const startParam = Number(startSegundos) > 0 ? `&start=${Math.floor(startSegundos)}` : '';
-        return `https://${servidor}/embed/${encodeURIComponent(video.id)}?enablejsapi=1&autoplay=1&rel=0${startParam}${originParam}`;
+        return `https://${servidor}/embed/${encodeURIComponent(video.id)}?enablejsapi=1&autoplay=1&rel=0${ccParam}${startParam}${originParam}`;
     }
 
     async function abrirEnNavegadorExterno(url) {
@@ -3160,7 +3262,54 @@ const VIDEOS_CURADOS = [
     function reproducir(video) {
         estado.videoActual = video;
         estado.vista = 'reproductor';
+        if (video && video.id && !String(video.id).startsWith('pl_')) {
+            cargarTranscripcion(video.id, estado.idiomaSubtitulos || 'es');
+        }
         pintar();
+    }
+
+    function renderTextoConResaltados(texto, explicaciones, startSeg, endSeg) {
+        if (!texto) return '';
+        if (!explicaciones || !explicaciones.length) return esc(texto);
+
+        // Buscar explicaciones que coincidan con este intervalo o texto
+        const relevantes = explicaciones.filter(exp => {
+            if (!exp || !exp.texto) return false;
+            const t = exp.texto.trim();
+            if (t.length >= 2 && texto.includes(t)) return true;
+            if (exp.startSegundos !== undefined && exp.endSegundos !== undefined) {
+                const traslape = Math.max(0, Math.min(endSeg, exp.endSegundos) - Math.max(startSeg, exp.startSegundos));
+                return traslape > 0;
+            }
+            return false;
+        });
+
+        if (relevantes.length === 0) {
+            return esc(texto);
+        }
+
+        // Si hay una coincidencia completa de todo el párrafo
+        const totalMatch = relevantes.find(exp => exp.texto.trim() === texto.trim());
+        if (totalMatch) {
+            return `<mark class="yt-resaltado-amarillo" data-exp-id="${esc(totalMatch.id)}" title="Explicación guardada [${esc(totalMatch.intervalo)}]">${esc(texto)}</mark>`;
+        }
+
+        // Reemplazar subcadenas específicas ordenadas por longitud descendente
+        let htmlSalida = esc(texto);
+        const subcadenas = relevantes
+            .map(e => ({ exp: e, txt: e.texto.trim() }))
+            .filter(item => item.txt.length >= 2)
+            .sort((a, b) => b.txt.length - a.txt.length);
+
+        for (const item of subcadenas) {
+            const textoBuscar = esc(item.txt);
+            if (htmlSalida.includes(textoBuscar)) {
+                const reemplazo = `<mark class="yt-resaltado-amarillo" data-exp-id="${esc(item.exp.id)}" title="Explicación guardada [${esc(item.exp.intervalo)}]">${textoBuscar}</mark>`;
+                htmlSalida = htmlSalida.split(textoBuscar).join(reemplazo);
+            }
+        }
+
+        return htmlSalida;
     }
 
     function pintarReproductor(raiz) {
@@ -3168,12 +3317,23 @@ const VIDEOS_CURADOS = [
         const prog = obtenerProgreso(v.id);
         const marcas = leerMarcasVideo(v.id);
         const fotogramas = leerFotogramas(v.id);
+        const explicaciones = leerExplicaciones(v.id);
         const notaClave = `prig_yt_nota_${v.id}`;
         const notaGuardada = localStorage.getItem(notaClave) || '';
         const marcasDetectadas = extraerTimestampsDeTexto(notaGuardada);
         const objetivos = leerObjetivos(v.id);
         const resumen = leerResumen(v.id);
         const superadosObj = objetivos.filter(o => o.superado).length;
+        const transDatos = (estado.transcripcion && estado.transcripcion.datos) || null;
+        const segmentosTranscripcion = (transDatos && transDatos.segmentos) ? transDatos.segmentos : [];
+
+        if (v && v.id && !String(v.id).startsWith('pl_')) {
+            if (estado.transcripcion.videoId !== v.id && !estado.transcripcion.cargando) {
+                setTimeout(() => {
+                    cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es');
+                }, 20);
+            }
+        }
 
         const esSoloPlaylist = String(v.id || '').startsWith('pl_') || (!v.id && v.playlist);
         const enlaceExterno = esSoloPlaylist
@@ -3206,6 +3366,12 @@ const VIDEOS_CURADOS = [
                     <button class="yt-btn" id="yt-btn-cambiar-servidor" style="padding:2px 7px; font-size:10.5px;" title="Alternar entre servidor estándar de YouTube y youtube-nocookie">
                       ${servidorActual === 'www.youtube.com' ? 'youtube.com (Estándar)' : 'youtube-nocookie.com (Privado)'}
                     </button>
+                    <span style="color:var(--text-muted); font-size:10.5px; margin-left:6px;"><i class="fa-solid fa-language"></i> Subtítulos:</span>
+                    <select id="yt-select-idioma-subtitulos" class="yt-select-idioma" title="Forzar idioma de subtítulos en el reproductor de YouTube y traducción lateral" style="background:#181825; color:#cdd6f4; border:1px solid rgba(255,255,255,0.15); border-radius:4px; font-size:10.5px; padding:2px 4px; outline:none; cursor:pointer;">
+                      <option value="es" ${estado.idiomaSubtitulos === 'es' ? 'selected' : ''}>Español (traducción)</option>
+                      <option value="en" ${estado.idiomaSubtitulos === 'en' ? 'selected' : ''}>English (original)</option>
+                      <option value="none" ${estado.idiomaSubtitulos === 'none' ? 'selected' : ''}>Desactivados</option>
+                    </select>
                   </div>
                   <div class="yt-player-aux-right">
                     <button class="yt-btn azul" id="yt-btn-copiar-enlace" style="padding:2px 8px; font-size:10.5px;" title="Copiar enlace del video al portapapeles">
@@ -3295,6 +3461,10 @@ const VIDEOS_CURADOS = [
 
                 <div class="yt-lateral">
                   <div class="yt-lateral-tabs">
+                    <div class="yt-lateral-tab ${estado.pestanaLateral === 'traduccion' ? 'activo' : ''}" data-tab="traduccion" title="Traducción y explicación del video">
+                      <i class="fa-solid fa-language"></i> Traducción
+                      ${explicaciones.length > 0 ? `<span class="yt-badge-guardadas-tab" title="${explicaciones.length} explicaciones guardadas">${explicaciones.length}</span>` : ''}
+                    </div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'notas' ? 'activo' : ''}" data-tab="notas"><i class="fa-solid fa-pencil"></i> Notas (${fotogramas.length + marcas.length})</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'objetivos' ? 'activo' : ''}" data-tab="objetivos"><i class="fa-solid fa-bullseye"></i> Objetivos ${objetivos.length > 0 ? `(${superadosObj}/${objetivos.length})` : ''}</div>
                     <div class="yt-lateral-tab ${estado.pestanaLateral === 'resumen' ? 'activo' : ''}" data-tab="resumen"><i class="fa-solid fa-file-lines"></i> Resumen IA ${resumen ? '✓' : ''}</div>
@@ -3314,6 +3484,142 @@ const VIDEOS_CURADOS = [
                         <div style="font-weight:700; color:#fff;">Creando desafío interactivo...</div>
                         <div id="yt-desafio-mensaje-stream" style="font-size:11px; color:var(--text-muted);">${esc(estado.desafioMensaje)}</div>
                       </div>
+                    ` : estado.pestanaLateral === 'traduccion' ? `
+                      <!-- Pestaña: Traducción y Explicación del Video -->
+                      <div class="yt-subtabs-notas">
+                        <button class="yt-subtab-btn ${estado.subpestanaTraduccion === 'transcripcion' ? 'activo' : ''}" data-subtab-trad="transcripcion" title="Transcripción del video explicada y traducida">
+                          <i class="fa-solid fa-align-left"></i> Transcripción (${segmentosTranscripcion.length})
+                        </button>
+                        <button class="yt-subtab-btn ${estado.subpestanaTraduccion === 'guardadas' ? 'activo' : ''}" data-subtab-trad="guardadas" title="Explicaciones guardadas con intervalos de minutos">
+                          <i class="fa-solid fa-bookmark" style="color:#f9e2af;"></i> Guardadas (${explicaciones.length})
+                        </button>
+                      </div>
+
+                      ${estado.subpestanaTraduccion === 'guardadas' ? `
+                        <!-- Vista: Explicaciones Guardadas e Intervalos de Minutos -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin:6px 0 8px;">
+                          <span style="font-weight:700; font-size:11.5px; color:#fff;">
+                            <i class="fa-solid fa-highlighter" style="color:#f9e2af;"></i> Explicaciones Destacadas (${explicaciones.length})
+                          </span>
+                          ${explicaciones.length > 0 ? `
+                            <button class="yt-btn" id="yt-btn-exportar-explicaciones" style="padding:2px 7px; font-size:10px;" title="Copiar todas las explicaciones al cuaderno de notas">
+                              <i class="fa-solid fa-file-import"></i> Al Cuaderno
+                            </button>
+                          ` : ''}
+                        </div>
+
+                        ${explicaciones.length === 0 ? `
+                          <div style="text-align:center; padding:25px 12px; color:var(--text-muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <i class="fa-regular fa-bookmark" style="font-size:30px; opacity:0.35; color:#f9e2af;"></i>
+                            <p style="margin:0; line-height:1.45;">No tienes explicaciones guardadas todavía.<br>En la pestaña <b>Transcripción</b>, selecciona cualquier texto con el ratón y haz <b>clic derecho</b> para <b>resaltarlo en amarillo</b> y guardar el intervalo exacto de minutos para verlo después.</p>
+                          </div>
+                        ` : `
+                          <div class="yt-explicaciones-lista">
+                            ${explicaciones.map(exp => `
+                              <div class="yt-exp-guardada-card" data-exp-id="${esc(exp.id)}">
+                                <div class="yt-exp-cabecera">
+                                  <button class="yt-exp-intervalo yt-btn-reproducir-intervalo" data-segundos="${exp.startSegundos}" data-end="${exp.endSegundos}" title="Saltar al minuto ${esc(exp.intervalo)} y ver en video">
+                                    <i class="fa-solid fa-play" style="font-size:8px;"></i> ${esc(exp.intervalo)}
+                                  </button>
+                                  <span style="font-size:9.5px; color:var(--text-muted);">${esc(exp.fecha || '')}</span>
+                                  <div style="display:flex; gap:3px;">
+                                    <button class="yt-marca-btn" data-accion="copiar-exp" data-id="${esc(exp.id)}" title="Copiar texto de la explicación"><i class="fa-regular fa-copy"></i></button>
+                                    <button class="yt-marca-btn" data-accion="cuaderno-exp" data-id="${esc(exp.id)}" title="Insertar en el cuaderno de notas"><i class="fa-solid fa-book-bookmark"></i></button>
+                                    <button class="yt-marca-btn eliminar" data-accion="eliminar-exp" data-id="${esc(exp.id)}" title="Eliminar explicación guardada"><i class="fa-regular fa-trash-can"></i></button>
+                                  </div>
+                                </div>
+                                <div class="yt-exp-texto">
+                                  "${esc(exp.texto)}"
+                                </div>
+                                <div class="yt-exp-acciones">
+                                  <button class="yt-btn azul yt-btn-reproducir-intervalo" data-segundos="${exp.startSegundos}" data-end="${exp.endSegundos}" style="padding:2px 8px; font-size:10px;">
+                                    <i class="fa-solid fa-play"></i> Reproducir intervalo (${esc(exp.intervalo)})
+                                  </button>
+                                </div>
+                              </div>
+                            `).join('')}
+                          </div>
+                        `}
+                      ` : `
+                        <!-- Vista: Transcripción / Explicación Traducida con Resaltador -->
+                        <div class="yt-trad-toolbar">
+                          <div class="yt-trad-controles-fila">
+                            <div class="yt-trad-modo-btns">
+                              <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'traduccion' ? 'activo' : ''}" data-modo-trad="traduccion" title="Ver solo la traducción en español"><i class="fa-solid fa-language"></i> Español</button>
+                              <button class="yt-trad-modo-btn ${estado.modoVistaTraduccion === 'bilingue' ? 'activo' : ''}" data-modo-trad="bilingue" title="Ver traducción y texto original en inglés"><i class="fa-solid fa-globe"></i> Bilingüe</button>
+                            </div>
+                            <button class="yt-btn" id="yt-btn-recargar-transcripcion" style="padding:2px 7px; font-size:10.5px;" title="Volver a cargar subtítulos y traducción"><i class="fa-solid fa-rotate-right"></i> Recargar</button>
+                          </div>
+                          <div>
+                            <input type="text" id="yt-input-buscar-transcripcion" class="yt-trad-search-input" placeholder="Buscar concepto o palabra en la explicación..." value="${esc(estado.filtroTextoTraduccion || '')}">
+                          </div>
+                        </div>
+
+                        ${estado.transcripcion.cargando ? `
+                          <div class="yt-loading-box" style="margin-top:10px;">
+                            <i class="fa-solid fa-circle-notch yt-loading-spinner" style="color:var(--accent-blue, #89b4fa);"></i>
+                            <div style="font-weight:700; color:#fff;">Cargando explicación y traducción...</div>
+                            <div style="font-size:11px; color:var(--text-muted);">Extrayendo subtítulos oficiales y generando traducción en español...</div>
+                          </div>
+                        ` : estado.transcripcion.error ? `
+                          <div style="text-align:center; padding:20px 10px; color:var(--text-muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-circle-exclamation" style="font-size:26px; opacity:0.4; color:var(--accent-peach, #fab387);"></i>
+                            <div style="color:#fff; font-weight:600;">No se pudo extraer la transcripción automática</div>
+                            <p style="margin:0; line-height:1.4;">${esc(estado.transcripcion.error)}</p>
+                            <div style="display:flex; gap:6px; margin-top:4px;">
+                              <button class="yt-btn azul" id="yt-btn-reintentar-transcripcion"><i class="fa-solid fa-rotate-right"></i> Reintentar</button>
+                              <button class="yt-btn" id="yt-btn-pegar-extra-trans"><i class="fa-solid fa-file-pen"></i> Pegar texto manual</button>
+                            </div>
+                          </div>
+                        ` : segmentosTranscripcion.length === 0 ? `
+                          <div style="text-align:center; padding:25px 12px; color:var(--text-muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-align-left" style="font-size:28px; opacity:0.35; color:var(--accent-blue);"></i>
+                            <p style="margin:0; line-height:1.4;">No hay subtítulos disponibles en este momento para este video.</p>
+                            <button class="yt-btn azul" id="yt-btn-reintentar-transcripcion"><i class="fa-solid fa-rotate-right"></i> Cargar transcripción</button>
+                          </div>
+                        ` : (() => {
+                          const filtro = (estado.filtroTextoTraduccion || '').toLowerCase().trim();
+                          const segmentosFiltrados = filtro
+                            ? segmentosTranscripcion.filter(s => (s.texto && s.texto.toLowerCase().includes(filtro)) || (s.texto_original && s.texto_original.toLowerCase().includes(filtro)))
+                            : segmentosTranscripcion;
+
+                          if (segmentosFiltrados.length === 0) {
+                            return `
+                              <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:11px;">
+                                No se encontraron explicaciones que coincidan con "<b>${esc(estado.filtroTextoTraduccion)}</b>".
+                              </div>
+                            `;
+                          }
+
+                          return `
+                            <div style="font-size:10px; color:var(--text-muted); display:flex; align-items:center; gap:5px; margin:4px 0 2px;">
+                              <i class="fa-solid fa-highlighter" style="color:#f9e2af;"></i>
+                              <span>Selecciona texto y haz <b>clic derecho</b> para <b>resaltar en amarillo</b> y guardar el intervalo.</span>
+                            </div>
+
+                            <div class="yt-transcripcion-cuerpo" id="yt-transcripcion-cuerpo">
+                              ${segmentosFiltrados.map(seg => `
+                                <div class="yt-bloque-transcripcion" data-start="${seg.start}" data-end="${seg.end}" data-intervalo="${esc(seg.intervalo)}">
+                                  <div class="yt-bloque-transcripcion-header">
+                                    <button class="yt-segmento-timestamp" data-segundos="${seg.start}" title="Saltar al inicio de esta explicación (${esc(seg.intervalo)})">
+                                      <i class="fa-solid fa-play" style="font-size:8px;"></i> ${esc(seg.intervalo)}
+                                    </button>
+                                    <button class="yt-marca-btn" data-accion="guardar-bloque" data-start="${seg.start}" data-end="${seg.end}" data-intervalo="${esc(seg.intervalo)}" title="Resaltar y guardar todo este párrafo de explicación">
+                                      <i class="fa-regular fa-bookmark"></i>
+                                    </button>
+                                  </div>
+                                  <div class="yt-segmento-texto" data-intervalo="${esc(seg.intervalo)}" data-start="${seg.start}" data-end="${seg.end}">
+                                    ${renderTextoConResaltados(seg.texto, explicaciones, seg.start, seg.end)}
+                                  </div>
+                                  ${estado.modoVistaTraduccion === 'bilingue' && seg.texto_original ? `
+                                    <div class="yt-segmento-original" title="Texto original">${esc(seg.texto_original)}</div>
+                                  ` : ''}
+                                </div>
+                              `).join('')}
+                            </div>
+                          `;
+                        })()}
+                      `}
                     ` : estado.pestanaLateral === 'notas' ? `
                       <!-- Barra de Subpestañas de Notas -->
                       <div class="yt-subtabs-notas">
@@ -3719,6 +4025,309 @@ const VIDEOS_CURADOS = [
             tb.onclick = () => {
                 estado.pestanaLateral = tb.dataset.tab;
                 pintar();
+            };
+        });
+
+        // Selector de idioma de subtítulos en el reproductor integrado
+        const selectIdiomaSub = $('yt-select-idioma-subtitulos');
+        if (selectIdiomaSub) {
+            selectIdiomaSub.onchange = () => {
+                const nuevoIdioma = selectIdiomaSub.value;
+                estado.idiomaSubtitulos = nuevoIdioma;
+                localStorage.setItem('prig_yt_idioma_subtitulos', nuevoIdioma);
+                const iframe = $('yt-iframe-player');
+                const pr = obtenerProgreso(v.id);
+                if (iframe) {
+                    iframe.src = construirEmbedUrl(v, pr.segundos, nuevoIdioma);
+                }
+                if (nuevoIdioma !== 'none') {
+                    cargarTranscripcion(v.id, nuevoIdioma);
+                } else {
+                    pintar();
+                }
+            };
+        }
+
+        // Subpestañas dentro de Traducción (Transcripción vs Explicaciones Guardadas)
+        raiz.querySelectorAll('[data-subtab-trad]').forEach(btn => {
+            btn.onclick = () => {
+                estado.subpestanaTraduccion = btn.dataset.subtabTrad;
+                pintar();
+            };
+        });
+
+        // Alternar modo de visualización: Solo traducción vs Bilingüe
+        raiz.querySelectorAll('[data-modo-trad]').forEach(btn => {
+            btn.onclick = () => {
+                estado.modoVistaTraduccion = btn.dataset.modoTrad;
+                pintar();
+            };
+        });
+
+        // Filtro de búsqueda en la transcripción
+        const inputBuscarTrans = $('yt-input-buscar-transcripcion');
+        if (inputBuscarTrans) {
+            inputBuscarTrans.oninput = () => {
+                estado.filtroTextoTraduccion = inputBuscarTrans.value;
+                const f = (inputBuscarTrans.value || '').toLowerCase().trim();
+                const bloques = raiz.querySelectorAll('.yt-bloque-transcripcion');
+                bloques.forEach(b => {
+                    const txt = b.textContent.toLowerCase();
+                    b.style.display = (!f || txt.includes(f)) ? '' : 'none';
+                });
+            };
+        }
+
+        // Recargar o reintentar transcripción
+        const btnRecargarTrans = $('yt-btn-recargar-transcripcion');
+        if (btnRecargarTrans) {
+            btnRecargarTrans.onclick = () => {
+                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es');
+            };
+        }
+        const btnReintentarTrans = $('yt-btn-reintentar-transcripcion');
+        if (btnReintentarTrans) {
+            btnReintentarTrans.onclick = () => {
+                cargarTranscripcion(v.id, estado.idiomaSubtitulos || 'es');
+            };
+        }
+        const btnPegarExtraTrans = $('yt-btn-pegar-extra-trans');
+        if (btnPegarExtraTrans) {
+            btnPegarExtraTrans.onclick = () => {
+                estado.mostrarInputTextoExtra = true;
+                pintar();
+                const ta = $('yt-textarea-extra');
+                if (ta) ta.focus();
+            };
+        }
+
+        // Guardar bloque completo de transcripción como explicación
+        raiz.querySelectorAll('[data-accion="guardar-bloque"]').forEach(btn => {
+            btn.onclick = () => {
+                const start = Number(btn.dataset.start) || 0;
+                const end = Number(btn.dataset.end) || 0;
+                const intervalo = btn.dataset.intervalo || `${formatearSegundos(start)} - ${formatearSegundos(end)}`;
+                const bloque = btn.closest('.yt-bloque-transcripcion');
+                const textoEl = bloque ? bloque.querySelector('.yt-segmento-texto') : null;
+                const texto = textoEl ? textoEl.textContent.trim() : '';
+                if (texto) {
+                    agregarExplicacionGuardada(v.id, {
+                        texto,
+                        intervalo,
+                        startSegundos: start,
+                        endSegundos: end
+                    });
+                    pintar();
+                }
+            };
+        });
+
+        // Menú contextual con clic derecho y selección flotante para resaltar en amarillo
+        const cuerpoTrans = $('yt-transcripcion-cuerpo');
+        if (cuerpoTrans) {
+            const limpiarMenusFlotantes = () => {
+                document.querySelectorAll('.yt-context-menu-flotante, .yt-seleccion-flotante').forEach(el => el.remove());
+            };
+            document.removeEventListener('click', limpiarMenusFlotantes);
+            document.addEventListener('click', limpiarMenusFlotantes);
+
+            cuerpoTrans.oncontextmenu = (e) => {
+                e.preventDefault();
+                limpiarMenusFlotantes();
+
+                const sel = window.getSelection();
+                let txtSel = sel ? sel.toString().trim() : '';
+                const bloque = e.target.closest('.yt-bloque-transcripcion');
+                const start = bloque ? Number(bloque.dataset.start || 0) : 0;
+                const end = bloque ? Number(bloque.dataset.end || 0) : 0;
+                const intervalo = bloque ? (bloque.dataset.intervalo || `${formatearSegundos(start)} - ${formatearSegundos(end)}`) : '00:00';
+
+                if (!txtSel && bloque) {
+                    const textoEl = bloque.querySelector('.yt-segmento-texto');
+                    txtSel = textoEl ? textoEl.textContent.trim() : '';
+                }
+
+                if (!txtSel) return;
+
+                const menu = document.createElement('div');
+                menu.className = 'yt-context-menu-flotante';
+                menu.style.left = `${Math.min(e.clientX, window.innerWidth - 260)}px`;
+                menu.style.top = `${Math.min(e.clientY, window.innerHeight - 160)}px`;
+
+                menu.innerHTML = `
+                  <button class="yt-context-item resaltar" id="yt-ctx-guardar-amarillo">
+                    <i class="fa-solid fa-highlighter"></i> Resaltar en amarillo y guardar [${esc(intervalo)}]
+                  </button>
+                  <button class="yt-context-item" id="yt-ctx-saltar-min">
+                    <i class="fa-solid fa-play"></i> Saltar a este minuto (${esc(intervalo.split('-')[0].trim())})
+                  </button>
+                  <button class="yt-context-item" id="yt-ctx-copiar-txt">
+                    <i class="fa-regular fa-copy"></i> Copiar texto
+                  </button>
+                `;
+                document.body.appendChild(menu);
+
+                const btnGuardarCtx = menu.querySelector('#yt-ctx-guardar-amarillo');
+                if (btnGuardarCtx) {
+                    btnGuardarCtx.onclick = (evt) => {
+                        evt.stopPropagation();
+                        agregarExplicacionGuardada(v.id, {
+                            texto: txtSel,
+                            intervalo: intervalo,
+                            startSegundos: start,
+                            endSegundos: end
+                        });
+                        limpiarMenusFlotantes();
+                        pintar();
+                    };
+                }
+
+                const btnSaltarCtx = menu.querySelector('#yt-ctx-saltar-min');
+                if (btnSaltarCtx) {
+                    btnSaltarCtx.onclick = (evt) => {
+                        evt.stopPropagation();
+                        saltarAMinuto(start, false);
+                        limpiarMenusFlotantes();
+                    };
+                }
+
+                const btnCopiarCtx = menu.querySelector('#yt-ctx-copiar-txt');
+                if (btnCopiarCtx) {
+                    btnCopiarCtx.onclick = (evt) => {
+                        evt.stopPropagation();
+                        navigator.clipboard.writeText(txtSel);
+                        limpiarMenusFlotantes();
+                    };
+                }
+            };
+
+            cuerpoTrans.onmouseup = () => {
+                setTimeout(() => {
+                    const sel = window.getSelection();
+                    if (!sel || sel.isCollapsed) return;
+                    const txt = sel.toString().trim();
+                    if (txt.length < 2) return;
+
+                    limpiarMenusFlotantes();
+
+                    const range = sel.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    const bloque = (range.commonAncestorContainer.nodeType === 3
+                        ? range.commonAncestorContainer.parentElement
+                        : range.commonAncestorContainer).closest('.yt-bloque-transcripcion');
+
+                    const start = bloque ? Number(bloque.dataset.start || 0) : 0;
+                    const end = bloque ? Number(bloque.dataset.end || 0) : 0;
+                    const intervalo = bloque ? (bloque.dataset.intervalo || `${formatearSegundos(start)} - ${formatearSegundos(end)}`) : '00:00';
+
+                    const pildora = document.createElement('div');
+                    pildora.className = 'yt-seleccion-flotante';
+                    pildora.style.left = `${Math.max(10, Math.min(rect.left + (rect.width / 2) - 80, window.innerWidth - 180))}px`;
+                    pildora.style.top = `${Math.max(10, rect.top - 36)}px`;
+                    pildora.innerHTML = `<i class="fa-solid fa-highlighter"></i> Resaltar y Guardar`;
+
+                    pildora.onclick = (evt) => {
+                        evt.stopPropagation();
+                        agregarExplicacionGuardada(v.id, {
+                            texto: txt,
+                            intervalo: intervalo,
+                            startSegundos: start,
+                            endSegundos: end
+                        });
+                        limpiarMenusFlotantes();
+                        sel.removeAllRanges();
+                        pintar();
+                    };
+
+                    document.body.appendChild(pildora);
+                }, 15);
+            };
+        }
+
+        // Acciones en tarjetas de explicaciones guardadas
+        raiz.querySelectorAll('[data-accion="copiar-exp"]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const exp = explicaciones.find(x => x.id === btn.dataset.id);
+                if (exp) {
+                    navigator.clipboard.writeText(`[${exp.intervalo}] ${exp.texto}`);
+                    const orig = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                    setTimeout(() => { btn.innerHTML = orig; }, 1200);
+                }
+            };
+        });
+
+        raiz.querySelectorAll('[data-accion="cuaderno-exp"]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const exp = explicaciones.find(x => x.id === btn.dataset.id);
+                if (exp) {
+                    const mdIns = `\n\n> **[${exp.intervalo}]** ${exp.texto}\n`;
+                    const prev = localStorage.getItem(notaClave) || '';
+                    localStorage.setItem(notaClave, (prev + mdIns).trim());
+                    estado.pestanaLateral = 'notas';
+                    estado.subpestanaNotas = 'cuaderno';
+                    pintar();
+                    alert('¡Explicación insertada en tu cuaderno de notas!');
+                }
+            };
+        });
+
+        raiz.querySelectorAll('[data-accion="eliminar-exp"]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                eliminarExplicacionGuardada(v.id, btn.dataset.id);
+                pintar();
+            };
+        });
+
+        const btnExpCuadernoAll = $('yt-btn-exportar-explicaciones');
+        if (btnExpCuadernoAll && explicaciones.length > 0) {
+            btnExpCuadernoAll.onclick = () => {
+                let mdBloque = `\n\n## ⭐️ Explicaciones Destacadas (${v.titulo})\n`;
+                explicaciones.forEach(exp => {
+                    mdBloque += `\n- **[${exp.intervalo}]**: "${exp.texto}"\n`;
+                });
+                const prev = localStorage.getItem(notaClave) || '';
+                localStorage.setItem(notaClave, (prev + mdBloque).trim());
+                estado.pestanaLateral = 'notas';
+                estado.subpestanaNotas = 'cuaderno';
+                pintar();
+                alert('¡Todas las explicaciones guardadas se transfirieron a tu cuaderno de notas!');
+            };
+        }
+
+        // Clic en botones de reproducir intervalo (en tarjetas o header)
+        raiz.querySelectorAll('.yt-btn-reproducir-intervalo').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const seg = Number(btn.dataset.segundos) || 0;
+                saltarAMinuto(seg, false);
+                estado.subpestanaTraduccion = 'transcripcion';
+                pintar();
+                setTimeout(() => {
+                    const bloque = document.querySelector(`.yt-bloque-transcripcion[data-start="${seg}"]`);
+                    if (bloque) {
+                        bloque.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        bloque.classList.add('activo');
+                        setTimeout(() => bloque.classList.remove('activo'), 2500);
+                    }
+                }, 50);
+            };
+        });
+
+        // Clic en marcas amarillas ya existentes dentro de la transcripción
+        raiz.querySelectorAll('.yt-resaltado-amarillo').forEach(mark => {
+            mark.onclick = (e) => {
+                e.stopPropagation();
+                const expId = mark.dataset.expId;
+                const exp = explicaciones.find(x => x.id === expId);
+                if (exp && exp.startSegundos !== undefined) {
+                    saltarAMinuto(exp.startSegundos, false);
+                    mark.classList.add('pulsar');
+                    setTimeout(() => mark.classList.remove('pulsar'), 2000);
+                }
             };
         });
 
