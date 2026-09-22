@@ -2682,14 +2682,14 @@ const VIDEOS_CURADOS = [
                       <i class="fa-solid fa-triangle-exclamation" style="font-size:32px; color:#ff5555; margin-bottom:10px; display:block;"></i>
                       <p style="color:#ff8888; font-weight:600; margin:0 0 6px;">${esc(estado.busquedaYtError)}</p>
                       <button class="yt-btn rojo" id="yt-btn-reintentar-busqueda" style="margin-top:8px;"><i class="fa-solid fa-rotate-right"></i> Reintentar</button>
-                      <button class="yt-btn" id="yt-btn-volver-catalogo" style="margin-top:8px; margin-left:8px;"><i class="fa-solid fa-book"></i> Ver Catálogo Curado</button>
+                      <button class="yt-btn yt-btn-volver-catalogo" data-action="volver-catalogo" style="margin-top:8px; margin-left:8px;"><i class="fa-solid fa-book"></i> Ver Catálogo Curado</button>
                     </div>
                   ` : (estado.resultadosBusquedaYt.length === 0 && coincidenciasCuradas.length === 0) ? `
                     <div style="text-align:center; padding:40px; color:var(--text-muted);">
                       <i class="fa-brands fa-youtube" style="font-size:44px; opacity:0.3; margin-bottom:12px; display:block;"></i>
                       <p style="margin:0; font-size:13.5px; color:#fff; font-weight:600;">No se encontraron resultados para "${esc(estado.busqueda)}".</p>
                       <p style="margin:6px 0 16px; font-size:11.5px;">Prueba seleccionando una de las palabras clave registradas o cambiando los filtros.</p>
-                      <button class="yt-btn" id="yt-btn-volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver al Catálogo Curado</button>
+                      <button class="yt-btn yt-btn-volver-catalogo" data-action="volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver al Catálogo Curado</button>
                     </div>
                   ` : `
                     <!-- 1. Sección Superior: Búsqueda Federada - Cursos Curados Verificados en Prig -->
@@ -2739,6 +2739,15 @@ const VIDEOS_CURADOS = [
                                   <h3 class="yt-tarjeta-titulo">${esc(v.titulo)}</h3>
                                   <div class="yt-tarjeta-canal"><i class="fa-solid fa-circle-check" style="color:#ff0000; font-size:10px;"></i> ${esc(v.canal)}</div>
                                   <p class="yt-tarjeta-desc">${esc(v.descripcion || '')}</p>
+
+                                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06); gap:6px;">
+                                    <button class="yt-btn rojo btn-reproducir-card" style="font-size:10.5px; padding:3px 9px;" data-video-id="${esc(v.id)}">
+                                      <i class="fa-solid fa-play"></i> Reproducir
+                                    </button>
+                                    <button class="yt-btn-guardar-catalogo guardado" data-video-id="${esc(v.id)}" title="En tu catálogo permanente">
+                                      <i class="fa-solid fa-check"></i> En Catálogo
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             `;
@@ -2753,7 +2762,7 @@ const VIDEOS_CURADOS = [
                           <h4 class="yt-seccion-titulo"><i class="fa-brands fa-youtube" style="color:#ff0000;"></i> Resultados en Vivo de YouTube (${estado.resultadosBusquedaYt.length})</h4>
                           <span class="yt-badge-search-count">${estado.resultadosBusquedaYt.length} cursos</span>
                         </div>
-                        <button class="yt-btn" id="yt-btn-volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver a Catálogo Curado (${VIDEOS_CURADOS.length})</button>
+                        <button class="yt-btn yt-btn-volver-catalogo" data-action="volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver a Catálogo Curado (${VIDEOS_CURADOS.length})</button>
                       </div>
 
                       <div class="yt-grid">
@@ -2833,15 +2842,6 @@ const VIDEOS_CURADOS = [
             };
         }
 
-        // Cerrar sugerencias al hacer clic fuera
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.yt-search-container')) {
-                estado.sugerenciasAbiertas = false;
-                const box = $('yt-sugerencias-box');
-                if (box) box.style.display = 'none';
-            }
-        }, { once: true });
-
         // Selectores de Facetas
         const selectTipo = $('yt-filtro-tipo');
         if (selectTipo) {
@@ -2914,7 +2914,7 @@ const VIDEOS_CURADOS = [
         }
 
         // Botones Volver a Catálogo
-        raiz.querySelectorAll('#yt-btn-volver-catalogo').forEach(btn => {
+        raiz.querySelectorAll('.yt-btn-volver-catalogo, [data-action="volver-catalogo"], #yt-btn-volver-catalogo').forEach(btn => {
             btn.onclick = () => {
                 estado.modoCatalogo = 'catalogo';
                 estado.palabraRegistradaActiva = null;
@@ -2955,7 +2955,21 @@ const VIDEOS_CURADOS = [
 
         const btnCargar = $('yt-btn-cargar');
         if (btnCargar && inp) {
-            btnCargar.onclick = () => procesarEntradaOUrl(inp.value);
+            btnCargar.onclick = () => {
+                const val = (inp.value || '').trim();
+                if (!val) {
+                    if (filtrados && filtrados.length > 0) {
+                        reproducir(filtrados[0]);
+                        return;
+                    }
+                    inp.focus();
+                    if (window.layoutMgr && window.layoutMgr.mensajeEstado) {
+                        window.layoutMgr.mensajeEstado('Escribe un tema o pega un enlace de YouTube', 2000);
+                    }
+                    return;
+                }
+                procesarEntradaOUrl(val);
+            };
         }
 
         const btnToggleTexto = $('yt-btn-toggle-texto');
@@ -3025,6 +3039,26 @@ const VIDEOS_CURADOS = [
                     reproducir({
                         id: item.id,
                         playlist: item.es_playlist ? item.id : '',
+                        titulo: item.titulo,
+                        canal: item.canal,
+                        duracion: item.duracion,
+                        descripcion: item.descripcion,
+                        miniatura: item.miniatura
+                    });
+                }
+            };
+        });
+
+        // Click directo en botones "Reproducir" de tarjetas
+        raiz.querySelectorAll('.btn-reproducir-card').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const vidId = btn.dataset.videoId;
+                const item = (estado.resultadosBusquedaYt || []).find(x => x.id === vidId) || VIDEOS_CURADOS.find(x => x.id === vidId);
+                if (item) {
+                    reproducir({
+                        id: item.id,
+                        playlist: item.playlist || (item.es_playlist ? item.id : ''),
                         titulo: item.titulo,
                         canal: item.canal,
                         duracion: item.duracion,
@@ -3105,12 +3139,13 @@ const VIDEOS_CURADOS = [
           <div class="yt-raiz">
             <div class="yt-header">
               <div class="yt-header-left">
-                <button class="yt-btn" id="yt-btn-volver-catalogo" title="Volver al catálogo de cursos"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
+                <button class="yt-btn yt-btn-volver-catalogo" id="yt-btn-volver" title="Volver al catálogo de cursos"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
                 <div class="yt-logo-badge" style="font-size:13px; font-weight:700;"><i class="fa-brands fa-youtube"></i> ${esc(v.titulo)}</div>
                 ${v.universidad ? `<span class="yt-tag-uni"><i class="fa-solid fa-graduation-cap"></i> ${esc(v.universidad)}</span>` : ''}
                 ${v.playlist ? `<span class="yt-tag-playlist"><i class="fa-solid fa-list-ol"></i> Playlist</span>` : ''}
               </div>
               <div class="yt-header-right">
+                <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video (Modo Cine)"><i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Modo Cine'}</button>
                 <a class="yt-btn" href="${enlaceExterno}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en YouTube</a>
               </div>
             </div>
@@ -3539,10 +3574,19 @@ const VIDEOS_CURADOS = [
             </div>
         `;
 
-        $('yt-btn-volver').onclick = () => {
-            estado.vista = 'catalogo';
-            pintar();
-        };
+        const btnVolver = $('yt-btn-volver') || $('yt-btn-volver-catalogo');
+        if (btnVolver) {
+            btnVolver.onclick = () => {
+                estado.vista = 'catalogo';
+                pintar();
+            };
+        }
+        raiz.querySelectorAll('#yt-btn-volver, #yt-btn-volver-catalogo, .yt-btn-volver-catalogo').forEach(b => {
+            b.onclick = () => {
+                estado.vista = 'catalogo';
+                pintar();
+            };
+        });
 
         const btnToggleDetalles = $('yt-btn-toggle-detalles');
         if (btnToggleDetalles) {
@@ -4234,7 +4278,20 @@ const VIDEOS_CURADOS = [
         }
     });
 
+    function configurarClickFueraSugerencias() {
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.yt-search-container')) {
+                if (estado.sugerenciasAbiertas) {
+                    estado.sugerenciasAbiertas = false;
+                    const box = $('yt-sugerencias-box');
+                    if (box) box.style.display = 'none';
+                }
+            }
+        });
+    }
+
     configurarPasteGlobal();
+    configurarClickFueraSugerencias();
     inicializarCursosPersonalizados();
 
     window.YouTubeHub = {
