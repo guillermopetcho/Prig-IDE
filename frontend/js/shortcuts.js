@@ -14,13 +14,17 @@ class ShortcutManager {
     }
 
     _cargar() {
-        try { return JSON.parse(localStorage.getItem(this.CLAVE) || '{}'); }
-        catch (e) { return {}; }
+        try {
+            const s = (typeof window !== 'undefined' && window.localStorage) ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+            return s ? JSON.parse(s.getItem(this.CLAVE) || '{}') : {};
+        } catch (e) { return {}; }
     }
 
     _guardar() {
-        try { localStorage.setItem(this.CLAVE, JSON.stringify(this.personalizados)); }
-        catch (e) { console.error('No se pudieron guardar los atajos:', e); }
+        try {
+            const s = (typeof window !== 'undefined' && window.localStorage) ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+            if (s) s.setItem(this.CLAVE, JSON.stringify(this.personalizados));
+        } catch (e) { console.error('No se pudieron guardar los atajos:', e); }
     }
 
     /** Atajo vigente de un comando: el del usuario si lo cambió, si no el de fábrica */
@@ -32,11 +36,28 @@ class ShortcutManager {
         return c ? (c.accel || '') : '';
     }
 
-    asignar(id, accel) {
+    asignar(id, accel, estricto = false) {
+        if (!accel) {
+            this.personalizados[id] = '';
+            this._guardar();
+            return { ok: true };
+        }
         const conflicto = this.buscarConflicto(accel, id);
+        if (conflicto && estricto) {
+            return { ok: false, conflicto };
+        }
         this.personalizados[id] = accel;
         this._guardar();
-        return conflicto;
+        return { ok: true, conflicto };
+    }
+
+    eliminar(id) {
+        this.personalizados[id] = '';
+        this._guardar();
+    }
+
+    esPersonalizado(id) {
+        return Object.prototype.hasOwnProperty.call(this.personalizados, id);
     }
 
     restablecer(id) {

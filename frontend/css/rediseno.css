@@ -297,49 +297,236 @@ body.modo-zen .trabajo-tabs { display: none; }
 .paleta-accel { font-family: 'Fira Code', monospace; font-size: 10.5px; color: var(--text-muted); }
 .paleta-vacio { padding: 18px; text-align: center; color: var(--text-muted); font-size: 12px; }
 
-/* --------------------------- Editor de atajos -------------------------- */
+/* --------------------------- Editor de atajos y Accesibilidad -------------------------- */
+
+.atajos-alerta-conflicto {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(243, 139, 168, 0.16);
+    border: 1px solid var(--accent-red, #f38ba8);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 11.5px;
+    animation: atajoFadeIn 0.2s ease-out;
+}
+.atajos-alerta-conflicto.visible { display: flex; }
+.atajos-alerta-conflicto i.fa-triangle-exclamation { color: var(--accent-red, #f38ba8); font-size: 14px; flex-shrink: 0; }
+@keyframes atajoFadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+
+.atajos-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.atajos-categorias-bar {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+.atajos-categoria-pill {
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+}
+.atajos-categoria-pill:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+.atajos-categoria-pill.activa {
+    background: rgba(137, 180, 250, 0.2);
+    border-color: var(--accent-blue, #89b4fa);
+    color: var(--accent-blue, #89b4fa);
+}
 
 .atajo-fila {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 5px 0;
+    padding: 6px 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.15s;
+    border-radius: 4px;
 }
-.atajo-menu {
+.atajo-fila:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+.atajo-menu-badge {
     font-size: 9.5px;
     text-transform: uppercase;
     color: var(--text-muted);
-    min-width: 88px;
+    min-width: 82px;
     letter-spacing: 0.04em;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.atajo-label { flex: 1; font-size: 12px; color: var(--text-main); }
+.atajo-label-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.atajo-label {
+    font-size: 11.5px;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.atajo-contexto-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+}
+.atajo-acciones-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
 .atajo-tecla {
     font-family: 'Fira Code', monospace;
-    font-size: 10.5px;
-    padding: 3px 8px;
-    min-width: 116px;
+    font-size: 11px;
+    padding: 4px 10px;
+    min-width: 120px;
     text-align: center;
     background: rgba(0, 0, 0, 0.35);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--acento-usuario);
+    border-radius: 6px;
+    color: var(--acento-usuario, #89b4fa);
     cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+}
+.atajo-tecla:hover:not(:disabled) {
+    border-color: var(--accent-blue, #89b4fa);
+    background: rgba(137, 180, 250, 0.1);
+}
+.atajo-tecla.vacio {
+    color: var(--text-muted);
+    font-style: italic;
+    border-style: dashed;
+    background: transparent;
+}
+.atajo-tecla.vacio:hover {
+    color: var(--accent-green, #a6e3a1);
+    border-color: var(--accent-green, #a6e3a1);
 }
 .atajo-tecla.capturando {
-    border-color: var(--accent-yellow);
-    color: var(--accent-yellow);
-    background: rgba(249, 226, 175, 0.12);
+    border-color: var(--accent-yellow) !important;
+    color: var(--accent-yellow) !important;
+    background: rgba(249, 226, 175, 0.14) !important;
+    animation: atajoPulse 1s infinite alternate;
 }
-.atajo-reset {
+@keyframes atajoPulse {
+    from { box-shadow: 0 0 2px rgba(249, 226, 175, 0.3); }
+    to { box-shadow: 0 0 8px rgba(249, 226, 175, 0.7); }
+}
+.atajo-btn-accion {
     background: none;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
     font-size: 11px;
-    padding: 2px 5px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
 }
-.atajo-reset:hover { color: var(--accent-red); }
+.atajo-btn-accion:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.atajo-btn-accion.eliminar:hover { color: var(--accent-red, #f38ba8); background: rgba(243, 139, 168, 0.15); }
+.atajo-btn-accion.reset:hover { color: var(--accent-blue, #89b4fa); }
+
+/* Secciones de Accesibilidad Visual y Funcional */
+.acc-panel-seccion {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.acc-seccion-titulo {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+.acc-grid-opciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+@media (max-width: 600px) { .acc-grid-opciones { grid-template-columns: 1fr; } }
+.acc-card-opcion {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.acc-toggle-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+.acc-toggle-fila label {
+    font-size: 11.5px;
+    color: #cdd6f4;
+    font-weight: 600;
+    cursor: pointer;
+}
+.acc-toggle-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+/* Modos de accesibilidad globales en body */
+body.ac-alto-contraste {
+    --border-color: rgba(255, 255, 255, 0.35) !important;
+}
+body.ac-alto-contraste * {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+body.ac-alto-contraste .menu-panel, 
+body.ac-alto-contraste .modal-content {
+    box-shadow: 0 0 0 2px #fff !important;
+}
+body.ac-foco-visible :focus-visible {
+    outline: 3px solid var(--accent-yellow, #f9e2af) !important;
+    outline-offset: 2px !important;
+}
+body.ac-reducir-movimiento * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+}
+body.ac-escala-110 { font-size: 110% !important; }
+body.ac-escala-125 { font-size: 125% !important; }
+body.ac-escala-140 { font-size: 140% !important; }
 
 @media (max-width: 900px) {
     #seccion-modelo { width: 300px; min-width: 200px; }

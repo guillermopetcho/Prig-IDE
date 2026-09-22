@@ -78,6 +78,7 @@ class GlobalConfigManager {
 
     init() {
         this.loadSettingsIntoUI();
+        this.aplicarAccesibilidadGuardada();
     }
 
     openModal(tabName = 'ai') {
@@ -90,8 +91,8 @@ class GlobalConfigManager {
             this.loadDetailedModels();
         } else if (tabName === 'apariencia') {
             this.initApariencia();
-        } else if (tabName === 'atajos') {
-            this.renderAtajos();
+        } else if (tabName === 'accesibilidad' || tabName === 'atajos') {
+            this.renderAccesibilidad();
         }
     }
 
@@ -101,6 +102,7 @@ class GlobalConfigManager {
     }
 
     switchTab(tabName) {
+        if (tabName === 'atajos') tabName = 'accesibilidad';
         this.activeTab = tabName;
         const tabs = document.querySelectorAll('.config-tab-btn');
         const contents = document.querySelectorAll('.config-tab-content');
@@ -109,7 +111,7 @@ class GlobalConfigManager {
             // Los botones declaran su pestaña con data-tab o dentro del onclick
             const suyo = btn.dataset.tab ||
                 (btn.getAttribute('onclick') || '').match(/switchTab\('([^']+)'\)/)?.[1];
-            if (suyo === tabName) {
+            if (suyo === tabName || (tabName === 'accesibilidad' && suyo === 'atajos')) {
                 btn.classList.add('active');
                 btn.style.borderColor = 'var(--accent-blue)';
                 btn.style.color = 'var(--accent-blue)';
@@ -132,6 +134,8 @@ class GlobalConfigManager {
 
         if (tabName === 'ai') {
             this.loadDetailedModels();
+        } else if (tabName === 'accesibilidad') {
+            this.renderAccesibilidad();
         }
     }
 
@@ -863,72 +867,273 @@ class GlobalConfigManager {
     }
 
     // ==========================================
-    // ATAJOS DE TECLADO
+    // ACCESIBILIDAD Y ATAJOS DE TECLADO
     // ==========================================
 
-    renderAtajos(filtro = '') {
+    aplicarAccesibilidadGuardada() {
+        try {
+            const raw = localStorage.getItem('prig_accesibilidad');
+            if (!raw) return;
+            const cfg = JSON.parse(raw);
+            const b = document.body;
+            if (!b) return;
+
+            // Escala de tipografía / interfaz
+            b.classList.remove('ac-escala-110', 'ac-escala-125', 'ac-escala-140');
+            if (cfg.escala && cfg.escala !== '100') {
+                b.classList.add(`ac-escala-${cfg.escala}`);
+            }
+
+            // Modos de accesibilidad
+            b.classList.toggle('ac-alto-contraste', !!cfg.altoContraste);
+            b.classList.toggle('ac-foco-visible', !!cfg.focoVisible);
+            b.classList.toggle('ac-reducir-movimiento', !!cfg.reducirMovimiento);
+        } catch (e) {
+            console.warn('Error aplicando accesibilidad guardada:', e);
+        }
+    }
+
+    initOpcionesAccesibilidad() {
+        let cfg = { escala: '100', altoContraste: false, focoVisible: false, reducirMovimiento: false };
+        try {
+            const raw = localStorage.getItem('prig_accesibilidad');
+            if (raw) cfg = Object.assign(cfg, JSON.parse(raw));
+        } catch (e) {}
+
+        const guardar = () => {
+            try {
+                localStorage.setItem('prig_accesibilidad', JSON.stringify(cfg));
+            } catch (e) {}
+            this.aplicarAccesibilidadGuardada();
+        };
+
+        const selEscala = document.getElementById('acc-escala-fuente');
+        if (selEscala && !selEscala.dataset.listo) {
+            selEscala.dataset.listo = '1';
+            selEscala.value = cfg.escala || '100';
+            selEscala.onchange = () => {
+                cfg.escala = selEscala.value;
+                guardar();
+            };
+        }
+
+        const chkContraste = document.getElementById('acc-alto-contraste');
+        if (chkContraste && !chkContraste.dataset.listo) {
+            chkContraste.dataset.listo = '1';
+            chkContraste.checked = !!cfg.altoContraste;
+            chkContraste.onchange = () => {
+                cfg.altoContraste = chkContraste.checked;
+                guardar();
+            };
+        }
+
+        const chkFoco = document.getElementById('acc-foco-visible');
+        if (chkFoco && !chkFoco.dataset.listo) {
+            chkFoco.dataset.listo = '1';
+            chkFoco.checked = !!cfg.focoVisible;
+            chkFoco.onchange = () => {
+                cfg.focoVisible = chkFoco.checked;
+                guardar();
+            };
+        }
+
+        const chkMovimiento = document.getElementById('acc-reducir-movimiento');
+        if (chkMovimiento && !chkMovimiento.dataset.listo) {
+            chkMovimiento.dataset.listo = '1';
+            chkMovimiento.checked = !!cfg.reducirMovimiento;
+            chkMovimiento.onchange = () => {
+                cfg.reducirMovimiento = chkMovimiento.checked;
+                guardar();
+            };
+        }
+    }
+
+    renderAccesibilidad() {
+        this.initOpcionesAccesibilidad();
+        this.renderAtajos(this._atajosFiltro || '', this._atajosCategoria || 'todas');
+    }
+
+    mostrarAlertaConflicto(htmlMsg) {
+        const alerta = document.getElementById('atajos-alerta-conflicto');
+        const txt = document.getElementById('atajos-alerta-texto');
+        if (alerta && txt) {
+            txt.innerHTML = htmlMsg;
+            alerta.style.display = 'flex';
+            alerta.classList.add('visible');
+            const btnCerrar = document.getElementById('atajos-alerta-cerrar');
+            if (btnCerrar) btnCerrar.onclick = () => this.ocultarAlertaConflicto();
+        }
+    }
+
+    ocultarAlertaConflicto() {
+        const alerta = document.getElementById('atajos-alerta-conflicto');
+        if (alerta) {
+            alerta.style.display = 'none';
+            alerta.classList.remove('visible');
+        }
+    }
+
+    renderAtajos(filtro = '', categoria = 'todas') {
+        this._atajosFiltro = filtro;
+        this._atajosCategoria = categoria;
+
         const lista = document.getElementById('atajos-lista');
         if (!lista) return;
 
         const buscar = document.getElementById('atajos-buscar');
         if (buscar && !buscar.dataset.listo) {
             buscar.dataset.listo = '1';
-            buscar.oninput = () => this.renderAtajos(buscar.value);
+            buscar.oninput = () => {
+                this.renderAtajos(buscar.value, this._atajosCategoria);
+            };
         }
+
         const btnReset = document.getElementById('atajos-restablecer');
         if (btnReset && !btnReset.dataset.listo) {
             btnReset.dataset.listo = '1';
             btnReset.onclick = () => {
                 if (!confirm('¿Devolver todos los atajos a sus valores de fábrica?')) return;
+                this.ocultarAlertaConflicto();
                 window.shortcutMgr.restablecerTodos();
-                window.menuBar.refrescarAtajos();
-                this.renderAtajos(buscar ? buscar.value : '');
+                if (window.menuBar && typeof window.menuBar.refrescarAtajos === 'function') {
+                    window.menuBar.refrescarAtajos();
+                }
+                this.renderAtajos(buscar ? buscar.value : '', this._atajosCategoria);
             };
         }
 
+        // Renderizar barra interactiva de categorías
+        const catBar = document.getElementById('atajos-categorias-bar');
+        if (catBar) {
+            const categorias = [
+                { id: 'todas', label: 'Todas' },
+                { id: 'Archivos', label: 'Archivos' },
+                { id: 'Edición', label: 'Edición' },
+                { id: 'Vista', label: 'Vista' },
+                { id: 'Ejecutar', label: 'Ejecutar' },
+                { id: 'Herramientas', label: 'Herramientas' },
+                { id: 'Navegación', label: 'Navegación' },
+                { id: 'Configuración', label: 'Configuración' },
+                { id: 'Ayuda', label: 'Ayuda' }
+            ];
+
+            catBar.innerHTML = '';
+            categorias.forEach(cat => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = `atajos-categoria-pill ${categoria.toLowerCase() === cat.id.toLowerCase() ? 'activa' : ''}`;
+                pill.textContent = cat.label;
+                pill.onclick = () => {
+                    this.renderAtajos(this._atajosFiltro, cat.id);
+                };
+                catBar.appendChild(pill);
+            });
+        }
+
         const q = filtro.trim().toLowerCase();
-        const comandos = window.PrigCommands.todos().filter(
-            c => !q || c.label.toLowerCase().includes(q) || c.menu.toLowerCase().includes(q));
+        const todosComandos = window.PrigCommands.todos();
+
+        // Categorizar cada comando
+        const comandosConCat = todosComandos.map(c => {
+            let cat = c.menu;
+            if (!cat) {
+                if (c.id.startsWith('herr.')) cat = 'Herramientas';
+                else if (c.id.startsWith('ir.')) cat = 'Navegación';
+                else if (c.id.startsWith('seleccion.')) cat = 'Edición';
+                else cat = 'General';
+            }
+            const actual = window.shortcutMgr.accel(c.id);
+            const actualBonito = window.shortcutMgr.bonito(actual);
+            return { ...c, categoria: cat, actual, actualBonito };
+        });
+
+        // Filtrar por categoría y texto
+        const comandos = comandosConCat.filter(c => {
+            const coincideCat = (categoria === 'todas' || c.categoria.toLowerCase() === categoria.toLowerCase());
+            if (!coincideCat) return false;
+            if (!q) return true;
+
+            const coincideLabel = c.label.toLowerCase().includes(q);
+            const coincideMenu = c.categoria.toLowerCase().includes(q);
+            const coincideTecla = (c.actualBonito || '').toLowerCase().includes(q) ||
+                                  (c.actual || '').toLowerCase().includes(q);
+            return coincideLabel || coincideMenu || coincideTecla;
+        });
 
         lista.innerHTML = '';
+
+        if (comandos.length === 0) {
+            lista.innerHTML = `
+                <div style="text-align: center; padding: 25px 10px; color: var(--text-muted); font-size: 12px;">
+                    <i class="fa-solid fa-magnifying-glass" style="font-size: 20px; margin-bottom: 8px; opacity: 0.6; display: block;"></i>
+                    No se encontraron acciones ni atajos que coincidan con la búsqueda.
+                </div>`;
+            return;
+        }
+
         comandos.forEach(c => {
             const fila = document.createElement('div');
             fila.className = 'atajo-fila';
+
+            const esPersonalizado = window.shortcutMgr.esPersonalizado(c.id);
+            const tieneAtajo = !!c.actual;
+
             fila.innerHTML = `
-                <span class="atajo-menu"></span>
-                <span class="atajo-label"></span>
-                <button class="atajo-tecla"></button>
-                <button class="atajo-reset" title="Volver al atajo de fábrica"><i class="fa-solid fa-rotate-left"></i></button>`;
-            fila.querySelector('.atajo-menu').textContent = c.menu;
-            fila.querySelector('.atajo-label').textContent = c.label;
+                <span class="atajo-menu-badge" title="Categoría: ${c.categoria}">${c.categoria}</span>
+                <div class="atajo-label-wrap">
+                    <span class="atajo-label" title="${c.label}">${c.label}</span>
+                    ${c.cuando === 'editor' ? '<span class="atajo-contexto-tag">editor</span>' : ''}
+                </div>
+                <div class="atajo-acciones-wrap">
+                    <button type="button" class="atajo-tecla ${!tieneAtajo ? 'vacio' : ''}" title="${c.nativo ? 'Atajo protegido del editor/sistema' : (tieneAtajo ? 'Clic para cambiar combinación' : 'Clic para asignar combinación')}"></button>
+                    ${(tieneAtajo && !c.nativo) ? '<button type="button" class="atajo-btn-accion eliminar" title="Quitar combinación de teclas"><i class="fa-solid fa-xmark"></i></button>' : ''}
+                    ${(!c.nativo && esPersonalizado) ? '<button type="button" class="atajo-btn-accion reset" title="Restablecer combinación inicial"><i class="fa-solid fa-rotate-left"></i></button>' : ''}
+                </div>`;
 
             const tecla = fila.querySelector('.atajo-tecla');
-            const actual = window.shortcutMgr.accel(c.id);
-            tecla.textContent = window.shortcutMgr.bonito(actual) || 'sin asignar';
+            tecla.textContent = c.actualBonito || '+ Asignar';
 
-            // Ctrl+C, Ctrl+V o Tab los resuelve el propio editor: no se reasignan
             if (c.nativo) {
                 tecla.disabled = true;
-                tecla.title = 'Atajo del editor o del sistema: no se puede reasignar';
-                fila.querySelector('.atajo-reset').hidden = true;
                 lista.appendChild(fila);
                 return;
             }
-            if (c.cuando === 'editor') fila.title = 'Solo actúa con el cursor en el editor de código';
 
-            tecla.onclick = () => this._capturarAtajo(c, tecla, filtro);
-            fila.querySelector('.atajo-reset').onclick = () => {
-                window.shortcutMgr.restablecer(c.id);
-                window.menuBar.refrescarAtajos();
-                this.renderAtajos(filtro);
-            };
+            tecla.onclick = () => this._capturarAtajo(c, tecla, filtro, categoria);
+
+            const btnEliminar = fila.querySelector('.atajo-btn-accion.eliminar');
+            if (btnEliminar) {
+                btnEliminar.onclick = (e) => {
+                    e.stopPropagation();
+                    this.ocultarAlertaConflicto();
+                    window.shortcutMgr.eliminar(c.id);
+                    if (window.menuBar && typeof window.menuBar.refrescarAtajos === 'function') {
+                        window.menuBar.refrescarAtajos();
+                    }
+                    this.renderAtajos(filtro, categoria);
+                };
+            }
+
+            const btnResetFila = fila.querySelector('.atajo-btn-accion.reset');
+            if (btnResetFila) {
+                btnResetFila.onclick = (e) => {
+                    e.stopPropagation();
+                    this.ocultarAlertaConflicto();
+                    window.shortcutMgr.restablecer(c.id);
+                    if (window.menuBar && typeof window.menuBar.refrescarAtajos === 'function') {
+                        window.menuBar.refrescarAtajos();
+                    }
+                    this.renderAtajos(filtro, categoria);
+                };
+            }
+
             lista.appendChild(fila);
         });
     }
 
-    _capturarAtajo(cmd, boton, filtro) {
+    _capturarAtajo(cmd, boton, filtro, categoria) {
         boton.classList.add('capturando');
-        boton.textContent = 'pulsa las teclas…';
+        boton.textContent = 'Pulsa las teclas…';
 
         const terminar = () => {
             window.shortcutMgr.capturando = null;
@@ -937,20 +1142,34 @@ class GlobalConfigManager {
 
         window.shortcutMgr.capturando = (combo) => {
             terminar();
-            if (combo === 'escape') { this.renderAtajos(filtro); return; }
-
-            const conflicto = window.shortcutMgr.buscarConflicto(combo, cmd.id);
-            if (conflicto) {
-                const seguir = confirm(
-                    `${window.shortcutMgr.bonito(combo)} ya está en uso por "${conflicto.label}".\n\n` +
-                    `¿Asignarlo de todos modos? Esa acción se quedará sin atajo.`);
-                if (!seguir) { this.renderAtajos(filtro); return; }
-                window.shortcutMgr.asignar(conflicto.id, '');
+            if (combo === 'escape') {
+                this.renderAtajos(filtro, categoria);
+                return;
             }
 
-            window.shortcutMgr.asignar(cmd.id, combo);
-            window.menuBar.refrescarAtajos();
-            this.renderAtajos(filtro);
+            // CONTROL ESTRICTO: Las combinaciones de teclas NO pueden coincidir
+            const conflicto = window.shortcutMgr.buscarConflicto(combo, cmd.id);
+            if (conflicto) {
+                this.mostrarAlertaConflicto(
+                    `<strong>No permitido (control de colisiones):</strong> La combinación <kbd style="background:rgba(255,255,255,0.15); padding:2px 6px; border-radius:4px; font-family:monospace;">${window.shortcutMgr.bonito(combo)}</kbd> ` +
+                    `ya coincide con la acción "<strong>${conflicto.label}</strong>" (${conflicto.menu || 'Comando existente'}). ` +
+                    `Para garantizar la accesibilidad y evitar colisiones, dos acciones no pueden tener el mismo atajo. Elige otra combinación de teclas.`
+                );
+                this.renderAtajos(filtro, categoria);
+                return;
+            }
+
+            // Sin conflicto: asignar limpiamente
+            this.ocultarAlertaConflicto();
+            const res = window.shortcutMgr.asignar(cmd.id, combo, true);
+            if (!res.ok) {
+                this.mostrarAlertaConflicto(`No se pudo asignar el atajo debido a un conflicto.`);
+            }
+
+            if (window.menuBar && typeof window.menuBar.refrescarAtajos === 'function') {
+                window.menuBar.refrescarAtajos();
+            }
+            this.renderAtajos(filtro, categoria);
         };
     }
 

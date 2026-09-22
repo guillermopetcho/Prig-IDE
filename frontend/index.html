@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prig IDE - Editor de Código & Tutor IA</title>
   <link rel="stylesheet" href="/static/css/style.css?v=9">
-  <link rel="stylesheet" href="/static/css/rediseno.css?v=16">
+  <link rel="stylesheet" href="/static/css/rediseno.css?v=17">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1796,11 +1796,11 @@
         <button class="config-tab-btn active" data-tab="ai" onclick="window.globalConfigMgr.switchTab('ai');" style="padding: 8px 14px; background: rgba(137, 180, 250, 0.15); border: 1px solid var(--accent-blue); border-bottom: none; border-radius: 6px 6px 0 0; color: var(--accent-blue); font-size: 12px; font-weight: 600; cursor: pointer;">
           <i class="fa-solid fa-robot"></i> Modelos IA
         </button>
-          <button class="config-tab-btn" onclick="window.globalConfigMgr.switchTab('apariencia')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+          <button class="config-tab-btn" data-tab="apariencia" onclick="window.globalConfigMgr.switchTab('apariencia')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
             <i class="fa-solid fa-palette"></i> Apariencia
           </button>
-          <button class="config-tab-btn" onclick="window.globalConfigMgr.switchTab('atajos')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
-            <i class="fa-solid fa-keyboard"></i> Atajos
+          <button class="config-tab-btn" data-tab="accesibilidad" onclick="window.globalConfigMgr.switchTab('accesibilidad')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+            <i class="fa-solid fa-universal-access"></i> Accesibilidad
           </button>
         <button class="config-tab-btn" data-tab="note" onclick="window.globalConfigMgr.switchTab('note');" style="padding: 8px 14px; background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer;">
           <i class="fa-solid fa-note-sticky"></i> Note
@@ -1867,19 +1867,100 @@
           </button>
         </div>
 
-        <!-- Atajos de teclado, reasignables -->
-        <div id="config-tab-atajos" class="config-tab-content" style="display: none; flex-direction: column; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <input type="text" id="atajos-buscar" placeholder="🔍 Buscar acción…"
-              style="flex: 1; padding: 7px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
-            <button id="atajos-restablecer" class="tool-btn" style="background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px; white-space: nowrap;">
-              <i class="fa-solid fa-rotate-left"></i> Restablecer todos
-            </button>
+        <!-- Accesibilidad: Opciones visuales y Atajos de teclado reasignables con control estricto de colisiones -->
+        <div id="config-tab-accesibilidad" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+          
+          <!-- Panel de Ajustes Visuales de Accesibilidad -->
+          <div class="acc-panel-seccion">
+            <h4 class="acc-seccion-titulo">
+              <i class="fa-solid fa-eye" style="color: var(--accent-blue);"></i> Opciones de Visualización y Accesibilidad
+            </h4>
+            <div class="acc-grid-opciones">
+              <div class="acc-card-opcion">
+                <label style="font-weight: 600; color: #eee; font-size: 11.5px; margin-bottom: 4px;">Escala de la Interfaz</label>
+                <select id="acc-escala-fuente" style="width: 100%; padding: 7px 10px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 11.5px;">
+                  <option value="100">Predeterminada (100%)</option>
+                  <option value="110">Mediana (110%)</option>
+                  <option value="125">Grande (125%)</option>
+                  <option value="140">Muy grande (140%)</option>
+                </select>
+                <span class="acc-toggle-desc">Aumenta el tamaño general de tipografía e iconos para facilitar la lectura.</span>
+              </div>
+              <div class="acc-card-opcion">
+                <div class="acc-toggle-fila">
+                  <div>
+                    <label for="acc-alto-contraste">Alto Contraste</label>
+                    <div class="acc-toggle-desc">Realza bordes y contraste en paneles oscuros.</div>
+                  </div>
+                  <input type="checkbox" id="acc-alto-contraste" style="accent-color: var(--accent-blue); width: 16px; height: 16px; cursor: pointer;">
+                </div>
+              </div>
+              <div class="acc-card-opcion">
+                <div class="acc-toggle-fila">
+                  <div>
+                    <label for="acc-foco-visible">Resaltar Foco Activo</label>
+                    <div class="acc-toggle-desc">Destaca claramente el elemento con foco de teclado.</div>
+                  </div>
+                  <input type="checkbox" id="acc-foco-visible" style="accent-color: var(--accent-blue); width: 16px; height: 16px; cursor: pointer;">
+                </div>
+              </div>
+              <div class="acc-card-opcion">
+                <div class="acc-toggle-fila">
+                  <div>
+                    <label for="acc-reducir-movimiento">Reducir Animaciones</label>
+                    <div class="acc-toggle-desc">Minimiza transiciones y efectos de movimiento.</div>
+                  </div>
+                  <input type="checkbox" id="acc-reducir-movimiento" style="accent-color: var(--accent-blue); width: 16px; height: 16px; cursor: pointer;">
+                </div>
+              </div>
+            </div>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted);">
-            Haz clic en una combinación y pulsa las teclas nuevas. <b>Esc</b> cancela.
+
+          <!-- Sección Atajos de Teclado con Control de Colisiones -->
+          <div class="acc-panel-seccion" style="flex: 1; min-height: 380px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <h4 class="acc-seccion-titulo">
+                  <i class="fa-solid fa-keyboard" style="color: var(--accent-purple);"></i> Atajos de Teclado del Programa
+                </h4>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                  Personaliza cualquier atajo. El sistema garantiza que las combinaciones <b>no coincidan</b> entre sí.
+                </div>
+              </div>
+              <button id="atajos-restablecer" class="tool-btn" style="background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px; white-space: nowrap; padding: 4px 10px; border-radius: 6px; cursor: pointer;">
+                <i class="fa-solid fa-rotate-left"></i> Restablecer atajos
+              </button>
+            </div>
+
+            <!-- Banner Alerta de Conflicto / Colisión -->
+            <div id="atajos-alerta-conflicto" class="atajos-alerta-conflicto">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="atajos-alerta-texto">Conflicto de teclas detectado.</span>
+              </div>
+              <button id="atajos-alerta-cerrar" type="button" style="background:none; border:none; color:#fff; cursor:pointer; font-size:12px;" title="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Barra de búsqueda y categorías -->
+            <div class="atajos-toolbar">
+              <div style="position: relative; width: 100%;">
+                <input type="text" id="atajos-buscar" placeholder="🔍 Buscar por nombre de acción, menú o tecla (ej: Guardar, Ctrl+S)..."
+                  style="width: 100%; box-sizing: border-box; padding: 7px 12px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+              </div>
+              <div id="atajos-categorias-bar" class="atajos-categorias-bar">
+                <!-- Se llena dinámicamente -->
+              </div>
+            </div>
+
+            <div style="font-size: 10.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i>
+              <span>Haz clic en la tecla de cualquier acción para reasignarla o pulsa <kbd style="background: rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 3px;">Esc</kbd> para cancelar.</span>
+            </div>
+
+            <!-- Contenedor scrollable de atajos -->
+            <div id="atajos-lista" style="flex: 1; overflow-y: auto; max-height: 48vh; padding-right: 4px;"></div>
           </div>
-          <div id="atajos-lista" style="flex: 1; overflow-y: auto; max-height: 52vh;"></div>
+
         </div>
 
         <div id="config-tab-ai" class="config-tab-content" style="display: flex; flex-direction: column; gap: 16px;">
@@ -2500,9 +2581,9 @@
 
   <script src="/static/js/prig_net.js?v=7"></script>
   <script src="/static/js/apariencia.js?v=7"></script>
-  <script src="/static/js/shortcuts.js?v=8"></script>
-  <script src="/static/js/commands.js?v=19"></script>
-  <script src="/static/js/menubar.js?v=9"></script>
+  <script src="/static/js/shortcuts.js?v=9"></script>
+  <script src="/static/js/commands.js?v=20"></script>
+  <script src="/static/js/menubar.js?v=10"></script>
   <script src="/static/js/layout.js?v=8"></script>
   <script src="/static/js/workarea.js?v=13"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
@@ -2533,7 +2614,7 @@
   <script src="/static/js/progreso.js?v=2"></script>
   <script src="/static/js/perfil.js?v=10"></script>
   <script src="/static/js/note_window.js?v=6"></script>
-  <script src="/static/js/global_config.js?v=10"></script>
+  <script src="/static/js/global_config.js?v=11"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>
   <script src="/static/js/desafios.js?v=7"></script>
   <script src="/static/js/ide.js?v=3"></script>
