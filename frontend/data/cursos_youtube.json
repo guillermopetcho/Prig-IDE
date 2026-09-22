@@ -22,11 +22,11 @@
     "descripcion": "Fundamentos exhaustivos de Python 3 en español: tipos de datos, listas, tuplas, diccionarios, bucles for/while, funciones y proyectos prácticos paso a paso."
   },
   {
-    "id": "_uDW4ayzTQg",
+    "id": "_uQrJ0TkZlc",
     "titulo": "Python Full Course for Beginners",
     "canal": "Programming with Mosh",
     "categoria": "python",
-    "duracion": "6:14:00",
+    "duracion": "6:14:07",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Formación práctica en Python: control de flujo, estructuras de datos nativas, programación orientada a objetos, manejo de excepciones y automatización."
@@ -42,11 +42,11 @@
     "descripcion": "Guía enciclopédica de 12 horas: sintaxis, POO, multithreading, decoradores, generadores, interfaces gráficas con Tkinter y sockets de red."
   },
   {
-    "id": "eWRuo9TUUTY",
+    "id": "nKPbfIU442g",
     "titulo": "Curso de PYTHON desde CERO (Completo)",
     "canal": "Soy Dalto",
     "categoria": "python",
-    "duracion": "8:05:00",
+    "duracion": "8:06:30",
     "nivel": "Principiante / Intermedio",
     "idioma": "es",
     "descripcion": "Curso intensivo de 8 horas desde nivel cero hasta conceptos avanzados: lambdas, modularización, archivos y programación orientada a objetos en español."
@@ -72,11 +72,11 @@
     "descripcion": "Explicación magistral sobre programación orientada a objetos: métodos de clase, estáticos, herencia, métodos mágicos dunder y property decorators."
   },
   {
-    "id": "4Z8pP4Xj_Yk",
+    "id": "am_hzAG0dWI",
     "titulo": "Python Data Structures and Algorithms Masterclass",
     "canal": "freeCodeCamp / Jovian",
     "categoria": "python",
-    "duracion": "4:15:00",
+    "duracion": "1:33",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Implementación de algoritmos y estructuras de datos en Python: árboles binarios de búsqueda, grafos, Dijkstra y programación dinámica."
@@ -132,11 +132,11 @@
     "descripcion": "El modelo de memoria en C++: direcciones de memoria, desreferenciación, punteros void*, punteros inteligentes y ciclo de vida en el heap."
   },
   {
-    "id": "W9gT9F-vSS8",
+    "id": "18c3MTX0PK0",
     "titulo": "Welcome to C++ Series / C++ Philosophy and Architecture",
     "canal": "The Cherno",
     "categoria": "cpp",
-    "duracion": "15:00",
+    "duracion": "7:05",
     "nivel": "Fundamentos",
     "idioma": "en",
     "descripcion": "Por qué C++ es el estándar en motores gráficos, sistemas operativos y motores de inferencia de Inteligencia Artificial."
@@ -152,11 +152,11 @@
     "descripcion": "Fundamentos de C++ en español: algoritmos, memoria, estructuras de control, funciones y programación orientada a objetos con ejercicios."
   },
   {
-    "id": "8jOULp9E5-0",
+    "id": "8mAITcNt710",
     "titulo": "Harvard CS50 – Full Computer Science Course (C & Algoritmos)",
     "canal": "freeCodeCamp / Harvard (David J. Malan)",
     "categoria": "cpp",
-    "duracion": "25:00:00",
+    "duracion": "24:51:37",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Arquitectura de bajo nivel en C: gestión manual de memoria (malloc/free), punteros, segmentación de memoria y estructuras de datos complejas.",
@@ -196,21 +196,21 @@
     "descripcion": "Curso integral de 10 horas: álgebra matricial, feature engineering, Decision Trees, Random Forest, Gradient Boosting y reducción con PCA."
   },
   {
-    "id": "QezIU-8U-D0",
+    "id": "vVg7WrelMeA",
     "titulo": "Machine Learning From Scratch in Python with NumPy",
     "canal": "Patrick Loeber",
     "categoria": "ml",
-    "duracion": "5:10:00",
+    "duracion": "8:12",
     "nivel": "Senior",
     "idioma": "en",
     "descripcion": "Construcción pura de algoritmos desde cero en Python y NumPy sin Scikit-Learn: Linear/Logistic Regression, KNN, Naive Bayes, SVM, Árboles y PCA."
   },
   {
-    "id": "ukzFI9xg-M9",
+    "id": "GwIo3gDZCVQ",
     "titulo": "Machine Learning Full Course (10 Horas)",
     "canal": "Edureka",
     "categoria": "ml",
-    "duracion": "10:15:00",
+    "duracion": "9:38:32",
     "nivel": "Intermedio",
     "idioma": "en",
     "descripcion": "Guía práctica de algoritmos de clasificación, clustering K-Means, aprendizaje supervisado y pipelines de datos con Python."
@@ -227,11 +227,11 @@
     "playlist": "PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab"
   },
   {
-    "id": "5hP30Tqjtt4",
+    "id": "nLmhmB6NzcM",
     "titulo": "0/1 Knapsack Problem – Dynamic Programming Formulation",
     "canal": "Abdul Bari",
     "categoria": "algoritmos",
-    "duracion": "33:00",
+    "duracion": "28:24",
     "nivel": "Avanzado",
     "idioma": "en",
     "descripcion": "Optimización algorítmica clásica: programación dinámica matricial bottom-up y resolución analítica paso a paso."
@@ -249,11 +249,11 @@
     "playlist": "PLtBw6njQRU-rwp5__7C0oIVt26ZgjG9NI"
   },
   {
-    "id": "mEsle_RQk70",
+    "id": "kCc8FmEb1nY",
     "titulo": "Let's build GPT: from scratch, in code, spelled out",
     "canal": "Andrej Karpathy",
     "categoria": "dl",
-    "duracion": "1:56:00",
+    "duracion": "1:56:20",
     "nivel": "Senior",
     "idioma": "en",
     "descripcion": "Construcción completa de un Transformer autorregresivo (estilo GPT-2) en PyTorch desde cero, explicando self-attention multi-head y skip connections."
@@ -279,11 +279,11 @@
     "descripcion": "Modelado de lenguaje desde bigramas estadísticos hasta redes neuronales densas (Bengio et al. 2003) con embeddings y función Negative Log-Likelihood."
   },
   {
-    "id": "pAU216bjVQ4",
+    "id": "zduSFxRajkE",
     "titulo": "Let's build the GPT Tokenizer (BPE)",
     "canal": "Andrej Karpathy",
     "categoria": "dl",
-    "duracion": "2:13:00",
+    "duracion": "2:13:35",
     "nivel": "Senior",
     "idioma": "en",
     "descripcion": "Implementación del algoritmo Byte Pair Encoding (BPE) a nivel de bytes UTF-8 para tokenización en modelos de lenguaje como GPT-2 y GPT-4."
@@ -299,11 +299,11 @@
     "descripcion": "La formación de PyTorch más completa: tensores, visión computacional con CNNs, Transfer Learning, model deployment y tracking experimental."
   },
   {
-    "id": "c36lUUrRlzs",
+    "id": "c36lUUr864M",
     "titulo": "Deep Learning With PyTorch – Full Course",
     "canal": "Patrick Loeber",
     "categoria": "dl",
-    "duracion": "4:36:00",
+    "duracion": "4:35:42",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Flujo de trabajo profesional en PyTorch: cálculo de gradientes con autograd, DataLoader/Dataset personalizados, CNNs y redes recurrentes."
@@ -319,11 +319,11 @@
     "descripcion": "Ecosistema TensorFlow 2 y Keras: construcción de modelos convolucionales (Conv2D), procesamiento de lenguaje natural y redes recurrentes."
   },
   {
-    "id": "vT1JzLTH4y4",
+    "id": "vT1JzLTH4G4",
     "titulo": "Stanford CS231n: Convolutional Neural Networks for Visual Recognition",
     "canal": "Stanford University (Fei-Fei Li & Andrej Karpathy)",
     "categoria": "dl",
-    "duracion": "16 Clases (~20 Horas)",
+    "duracion": "57:57",
     "nivel": "Senior / Avanzado",
     "idioma": "en",
     "descripcion": "El curso clásico de Stanford sobre visión computacional: capas convolucionales, pooling, normalización, AlexNet, VGG y ResNet.",
@@ -331,11 +331,11 @@
     "playlist": "PL3FW7Lu3i5JvHM8ljYj-zLfQRF3EO8sYv"
   },
   {
-    "id": "8rXD5-xhemo",
+    "id": "fVYxOy505_4",
     "titulo": "Stanford CS224N: Natural Language Processing with Deep Learning",
     "canal": "Stanford University (Prof. Christopher Manning)",
     "categoria": "dl",
-    "duracion": "18 Clases (~24 Horas)",
+    "duracion": "2:30",
     "nivel": "Senior / Avanzado",
     "idioma": "en",
     "descripcion": "Representación semántica vectorial (Word2Vec, GloVe), redes secuenciales recurrentes, atención y arquitecturas de Transformers para NLP.",
@@ -343,11 +343,11 @@
     "playlist": "PLoROMvodv4rOSH4v6133s9LFPRHjEmbmJ"
   },
   {
-    "id": "8SF_h8NW6dc",
+    "id": "8SF_h3xF3cE",
     "titulo": "Practical Deep Learning for Coders (Lesson 1)",
     "canal": "fast.ai (Jeremy Howard)",
     "categoria": "dl",
-    "duracion": "1:25:00",
+    "duracion": "1:22:56",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Metodología top-down de fast.ai: entrenar modelos de visión y NLP con estado del arte en pocas líneas de código antes de descender a las matemáticas."
@@ -364,11 +364,11 @@
     "playlist": "PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi"
   },
   {
-    "id": "kYJjZ35p3Yg",
+    "id": "iX_on3VxZzk",
     "titulo": "Tu primera red neuronal en Python y Tensorflow",
     "canal": "Ringa Tech",
     "categoria": "dl",
-    "duracion": "21:00",
+    "duracion": "16:25",
     "nivel": "Principiante",
     "idioma": "es",
     "descripcion": "Tutorial práctico en español creando y entrenando una red neuronal en Python usando TensorFlow/Keras para conversión de grados Celsius a Fahrenheit."
@@ -428,25 +428,25 @@
     "descripcion": "El curso troncal oficial de ciencias de la computación del MIT: descomposición computacional, abstracción, funciones, tuplas, listas, diccionarios, algoritmos de búsqueda y orientación a objetos."
   },
   {
-    "id": "AA213677U_0",
+    "id": "C1lhuz6pZC0",
     "titulo": "MIT 6.0002: Introduction to Computational Thinking and Data Science",
     "canal": "MIT OpenCourseWare (Prof. John Guttag & Eric Grimson)",
     "universidad": "MIT",
     "categoria": "python",
     "playlist": "PLUl4u3cNGP619EG1wp0kT-7rDE_wKMaW-",
-    "duracion": "15 Clases (~15 Horas)",
+    "duracion": "40:57",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "La continuación del MIT en Python orientada a ciencia de datos: optimización de mochilas y grafos, pensamiento estocástico, simulaciones de Monte Carlo, modelado estadístico y clustering de datos."
   },
   {
-    "id": "8DvyiNr-78E",
+    "id": "8DvywoWv6fI",
     "titulo": "Python for Everybody (PY4E) – Full University Course",
     "canal": "Univ. of Michigan (Dr. Charles Severance / freeCodeCamp)",
     "universidad": "Univ. of Michigan",
     "categoria": "python",
     "playlist": "PLlRFEj9H3Oj7Bp8-DfGpfWx4ahuPBvee",
-    "duracion": "13:40:00",
+    "duracion": "13:40:10",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "La prestigiosa formación universitaria de la Universidad de Michigan: sintaxis moderna de Python 3, estructuras de datos nativas, regex, sockets de red, web scraping y bases de datos relacionales SQL."
@@ -464,60 +464,60 @@
     "descripcion": "El curso de inteligencia artificial con Python de Harvard: algoritmos de búsqueda (Minimax, A*), representación de conocimiento, probabilidad bayesiana, optimización, aprendizaje automático y redes neuronales."
   },
   {
-    "id": "kO3w9o5415Y",
+    "id": "kMzH3tfP6f8",
     "titulo": "Stanford CS106B: Programming Abstractions in C++",
     "canal": "Stanford University (Julie Zelenski)",
     "universidad": "Stanford",
     "categoria": "cpp",
     "playlist": "PLFE6E58F856038C69",
-    "duracion": "28 Clases (~26 Horas)",
+    "duracion": "43:03",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "Curso emblemático de Stanford en C++: recursión profunda, backtracking, punteros y gestión dinámica de memoria en el heap, plantillas (templates), algoritmos de ordenamiento y estructuras de datos abstractas."
   },
   {
-    "id": "s3G6g_3rR-s",
+    "id": "9mZw6Rwz1vg",
     "titulo": "Modern C++ for Computer Vision and Robotics (C++17/C++20)",
     "canal": "Univ. of Bonn (Prof. Cyrill Stachniss & Ignacio Vizzo)",
     "universidad": "Univ. of Bonn",
     "categoria": "cpp",
     "playlist": "PLgnQpQtFTOGRM59sr3nSL8BmeMZR9GCIA",
-    "duracion": "14 Clases (~16 Horas)",
+    "duracion": "1:02:55",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Formación de vanguardia de la Universidad de Bonn: C++ moderno (C++17/C++20), CMake, gestión de memoria RAII, smart pointers, lambdas, polimorfismo y librerías de alto rendimiento para visión y robótica."
   },
   {
-    "id": "kYJ53N9C63w",
+    "id": "PjST2n7abAY",
     "titulo": "CMU 15-445/645: Database Systems (Modern C++20 Bustub)",
     "canal": "Carnegie Mellon University (Prof. Andy Pavlo)",
     "universidad": "CMU",
     "categoria": "cpp",
     "playlist": "PLSE8ODhjZXjaKScG3l0nuOiDTT31UknW1",
-    "duracion": "24 Clases (~30 Horas)",
+    "duracion": "1:23:29",
     "nivel": "Senior / Universidad",
     "idioma": "en",
     "descripcion": "El legendario curso de arquitectura de sistemas de CMU: diseño e implementación en C++20 de un motor de bases de datos relacionales completo (buffer pool, B+ Trees, índices concurrentes y query execution)."
   },
   {
-    "id": "kY31ptn9_2k",
+    "id": "V1tINV2-9p4",
     "titulo": "Stanford CS149: Parallel Computing & Systems (C++, Multicore & GPUs)",
     "canal": "Stanford University (Prof. Kayvon Fatahalian)",
     "universidad": "Stanford",
     "categoria": "cpp",
     "playlist": "PLo6lM83QnS3S5dE-Qe7V1P7XpB_6tqW8D",
-    "duracion": "20 Clases (~25 Horas)",
+    "duracion": "1:12:22",
     "nivel": "Senior / Universidad",
     "idioma": "en",
     "descripcion": "Arquitectura y optimización de software de alto rendimiento en Stanford: paralelismo a nivel de hilos e instrucciones en C++, coherencia de caché, OpenMP, shaders y programación de GPUs con CUDA."
   },
   {
-    "id": "BP6N9P1R3j8",
+    "id": "86xWVb4XIyE",
     "titulo": "The Essence of C++ & Architecture of Modern Software",
     "canal": "The University of Edinburgh (Bjarne Stroustrup)",
     "universidad": "Univ. of Edinburgh",
     "categoria": "cpp",
-    "duracion": "1:15:00",
+    "duracion": "1:39:11",
     "nivel": "Senior / Arquitectura",
     "idioma": "en",
     "descripcion": "Clase magistral dictada en la Universidad de Edimburgo por Bjarne Stroustrup, el creador de C++: filosofía del lenguaje, diseño de tipos, abstracción de costo cero (zero-overhead) y evolución de los estándares ISO."
@@ -535,13 +535,13 @@
     "descripcion": "La cumbre pedagógica de Gilbert Strang en el MIT: álgebra lineal aplicada al aprendizaje automático, descomposición en valores singulares (SVD), análisis de componentes principales (PCA) y optimización convexa."
   },
   {
-    "id": "kYyE9D0QVB4",
+    "id": "wqpIohLjsAY",
     "titulo": "Cornell CS4780: Machine Learning for Intelligent Systems",
     "canal": "Cornell University (Prof. Kilian Weinberger)",
     "universidad": "Cornell",
     "categoria": "ml",
     "playlist": "PLl8OlHZGYOQ7bkVbuS1t8hPXG5N42wgK6",
-    "duracion": "23 Clases (~26 Horas)",
+    "duracion": "51:00",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Uno de los cursos universitarios más elogiados del mundo: fundamentos rigurosos de SVM, kernel trick, árboles de decisión, boosting, bagging, deep learning y teoría de generalización estadística."
@@ -559,25 +559,25 @@
     "descripcion": "El curso universitario canónico de Caltech sobre la teoría matemática del aprendizaje automático: dimensión VC, dilema sesgo-varianza, regularización, teoría de validación y límites de generalización."
   },
   {
-    "id": "d_k8O-9z65g",
+    "id": "0xaLT4Svzgo",
     "titulo": "MIT 6.036: Introduction to Machine Learning",
     "canal": "MIT OpenCourseWare (Prof. Tamara Broderick)",
     "universidad": "MIT",
     "categoria": "ml",
     "playlist": "PLUl4u3cNGP60eZ_1i3f49hC5q9G_o-pS_",
-    "duracion": "24 Clases (~24 Horas)",
+    "duracion": "1:20:57",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "El curso troncal de pregrado en Machine Learning del MIT: clasificadores lineales, funciones de pérdida, descenso de gradiente estocástico, regresión logística, redes neuronales y algoritmos de clustering."
   },
   {
-    "id": "JKAieM0877c",
+    "id": "JAB_plj2rbA",
     "titulo": "Stanford CS224W: Machine Learning with Graphs",
     "canal": "Stanford University (Prof. Jure Leskovec)",
     "universidad": "Stanford",
     "categoria": "ml",
     "playlist": "PLoROMvodv4rPLKxIpqhZXsQWmThkJYXV9",
-    "duracion": "19 Clases (~22 Horas)",
+    "duracion": "11:55",
     "nivel": "Avanzado / Senior",
     "idioma": "en",
     "descripcion": "El curso de vanguardia de Stanford sobre grafos y aprendizaje relacional: embeddings de nodos (Node2Vec, DeepWalk), Graph Neural Networks (GCN, GraphSAGE, GAT) y aplicaciones biomédicas y de redes."
@@ -595,73 +595,73 @@
     "descripcion": "Un clásico atemporal del MIT por Patrick Winston: razonamiento simbólico, búsqueda en árboles, propagación de restricciones, redes semánticas, máquinas de vectores de soporte e inferencia."
   },
   {
-    "id": "CS4cs9xVecE",
+    "id": "_NLHFoVNlbg",
     "titulo": "Stanford CS230: Deep Learning",
     "canal": "Stanford University (Prof. Andrew Ng)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rNRRGdS0rBbXOUGA0wjdh1X",
-    "duracion": "10 Clases (~12 Horas)",
+    "duracion": "1:00:17",
     "nivel": "Intermedio / Avanzado",
     "idioma": "en",
     "descripcion": "La formación aplicada de Deep Learning de Stanford dictada por Andrew Ng: arquitecturas de redes neuronales, hiperparámetros, optimización, visión computacional con CNNs y procesamiento secuencial."
   },
   {
-    "id": "JuoVZkPBiKk",
+    "id": "SQ3fZ1sAqXI",
     "titulo": "Stanford CS336: Language Modeling from Scratch",
     "canal": "Stanford University (Prof. Percy Liang & Tatsunori Hashimoto)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rMqXOcazWaTUHhq-yembLCV",
-    "duracion": "18 Clases (~22 Horas)",
+    "duracion": "1:18:59",
     "nivel": "Senior / Cutting-Edge",
     "idioma": "en",
     "descripcion": "El curso más moderno y técnico de Stanford para construir Modelos de Lenguaje (LLMs) desde cero: tokenización BPE, implementación de Transformers en PyTorch, paralelismo en GPUs, scaling laws y post-entrenamiento (RLHF)."
   },
   {
-    "id": "XfpMkf4rD6E",
+    "id": "bHSDPgZYie0",
     "titulo": "Stanford CS25: Transformers United",
     "canal": "Stanford Online (CS25 Seminar)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rNiJRchCzutFw5ItR_Z27CM",
-    "duracion": "10 Semanas",
+    "duracion": "1:16:46",
     "nivel": "Senior / Estado del Arte",
     "idioma": "en",
     "descripcion": "El seminario de posgrado de Stanford con los creadores e investigadores más destacados de la IA generativa: mecanismos de atención, modelos autorregresivos, modelos multimodales, inferencia eficiente y agentes."
   },
   {
-    "id": "A2WpS1mX1_k",
+    "id": "bkVCAk9Nsss",
     "titulo": "Stanford CS330: Deep Multi-Task and Meta-Learning",
     "canal": "Stanford University (Prof. Chelsea Finn)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rNjRoawgt72BBNwL2V7doGI",
-    "duracion": "18 Clases (~22 Horas)",
+    "duracion": "1:11:58",
     "nivel": "Senior / Investigación",
     "idioma": "en",
     "descripcion": "Curso de posgrado de Stanford enfocado en meta-aprendizaje (aprender a aprender): Few-Shot Learning, MAML (Model-Agnostic Meta-Learning), aprendizaje multitarea y adaptación rápida en visión y robótica."
   },
   {
-    "id": "k5H52P7330M",
+    "id": "WsvFL-LjA6U",
     "titulo": "Stanford CS234: Reinforcement Learning",
     "canal": "Stanford University (Prof. Emma Brunskill)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rOSOPzutgyCTapiGlY2Nd8u",
-    "duracion": "16 Clases (~20 Horas)",
+    "duracion": "1:19:08",
     "nivel": "Avanzado / Senior",
     "idioma": "en",
     "descripcion": "El curso avanzado de Stanford sobre aprendizaje por refuerzo: procesos de decisión de Markov (MDP), programación dinámica, Q-learning, aproximación de funciones con deep learning y búsqueda de políticas."
   },
   {
-    "id": "4YmD7B32F34",
+    "id": "K_Dh0Sxujuc",
     "titulo": "Stanford CS224U: Natural Language Understanding",
     "canal": "Stanford University (Prof. Christopher Potts)",
     "universidad": "Stanford",
     "categoria": "dl",
     "playlist": "PLoROMvodv4rOwvldxftJTmoR3kRcWkJBp",
-    "duracion": "15 Clases (~18 Horas)",
+    "duracion": "1:13:52",
     "nivel": "Avanzado / Senior",
     "idioma": "en",
     "descripcion": "Semántica computacional y comprensión de lenguaje natural en Stanford: modelos de espacio vectorial, análisis de sentimientos, extracción de relaciones, fine-tuning y evaluación rigurosa de LLMs."
@@ -679,25 +679,25 @@
     "descripcion": "El curso fundamental por excelencia impartido por David Silver (creador de AlphaGo en DeepMind): MDPs, métodos Monte Carlo, Temporal Difference Learning, Policy Gradients y Deep Q-Networks."
   },
   {
-    "id": "zGFAnOHiQxw",
+    "id": "7R52wiUgxZI",
     "titulo": "DeepMind x UCL: Deep Learning Lecture Series",
     "canal": "Google DeepMind & UCL (DeepMind Research Team)",
     "universidad": "UCL / DeepMind",
     "categoria": "dl",
     "playlist": "PLqYmG7hTX2B-0L1V_mN1bO8D98r94a0S2",
-    "duracion": "12 Clases (~18 Horas)",
+    "duracion": "1:25:18",
     "nivel": "Intermedio / Senior",
     "idioma": "en",
     "descripcion": "Serie conjunta de 12 clases magistrales entre DeepMind y University College London: redes neuronales profundas, optimización de segundo orden, visión computacional avanzada, atención y modelos generativos."
   },
   {
-    "id": "kO6u_2w2L_k",
+    "id": "JHrlF10v2Og",
     "titulo": "UC Berkeley CS285: Deep Reinforcement Learning",
     "canal": "UC Berkeley RAIL (Prof. Sergey Levine)",
     "universidad": "UC Berkeley",
     "categoria": "dl",
     "playlist": "PL_iWQOsE6TfURIIhCrlt-wj9ByIVpbfGc",
-    "duracion": "22 Clases (~25 Horas)",
+    "duracion": "10:16",
     "nivel": "Senior / Doctorado",
     "idioma": "en",
     "descripcion": "El curso de referencia mundial en Deep RL de Berkeley: clonación conductual, policy gradients analíticos, Actor-Critic, model-based RL, meta-RL y algoritmos fuera de política (SAC, TD3)."
@@ -727,25 +727,25 @@
     "descripcion": "Formulación matemática rigurosa de redes neuronales: capas densas, funciones de activación, entrenamiento multivariable por retropropagación, RBMs, autoencoders y regularización."
   },
   {
-    "id": "1L0IAxwZpZc",
+    "id": "1L0TKZQcUtA",
     "titulo": "MIT 6.S094: Deep Learning for Self-Driving Cars",
     "canal": "MIT (Dr. Lex Fridman)",
     "universidad": "MIT",
     "categoria": "dl",
     "playlist": "PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
-    "duracion": "8 Clases (~10 Horas)",
+    "duracion": "1:31:29",
     "nivel": "Intermedio / Avanzado",
     "idioma": "en",
     "descripcion": "Curso insignia del MIT aplicando Deep Learning a vehículos autónomos: visión por computadora en tiempo real, redes convolucionales, localización y sistemas de percepción con redes neuronales."
   },
   {
-    "id": "J7dzPju5wCw",
+    "id": "J7DzL2_Na80",
     "titulo": "MIT 18.06: Linear Algebra – Full University Course",
     "canal": "MIT OpenCourseWare (Prof. Gilbert Strang)",
     "universidad": "MIT",
     "categoria": "matematicas",
     "playlist": "PLE7DDD91010BC51F8",
-    "duracion": "35 Clases (~35 Horas)",
+    "duracion": "39:49",
     "nivel": "Universidad",
     "idioma": "en",
     "descripcion": "La legendaria cátedra universitaria de álgebra lineal del MIT impartida por Gilbert Strang: geometría de ecuaciones lineales, eliminación gaussiana, espacios vectoriales, ortogonalidad, determinantes, autovalores, autovectores y descomposición en valores singulares (SVD)."
@@ -774,25 +774,25 @@
     "descripcion": "El prestigioso curso de probabilidad de la Universidad de Harvard: espacios muestrales, probabilidad condicional, regla de Bayes, variables aleatorias discretas y continuas, esperanza matemática, varianza, distribuciones conjuntas, cadenas de Markov y Teorema del Límite Central."
   },
   {
-    "id": "L3x244199oA",
+    "id": "L3LMbpZIKhQ",
     "titulo": "MIT 6.042J: Mathematics for Computer Science",
     "canal": "MIT OpenCourseWare (Prof. Tom Leighton & Marten van Dijk)",
     "universidad": "MIT",
     "categoria": "matematicas",
     "playlist": "PLB7540DEDD482705B",
-    "duracion": "24 Clases (~25 Horas)",
+    "duracion": "44:09",
     "nivel": "Universidad",
     "idioma": "en",
     "descripcion": "Fundamentos matemáticos indispensables para ciencias de la computación del MIT: métodos de demostración, lógica proposicional y de predicados, teoría de grafos, relaciones de recurrencia, aritmética modular y teoría de conteo para análisis de algoritmos."
   },
   {
-    "id": "jbU2CTevEmY",
+    "id": "7K1sB05pE0A",
     "titulo": "MIT 18.01: Single Variable Calculus",
     "canal": "MIT OpenCourseWare (Prof. David Jerison)",
     "universidad": "MIT",
     "categoria": "matematicas",
     "playlist": "PL590CCC2BC5AF3EF8",
-    "duracion": "39 Clases (~38 Horas)",
+    "duracion": "51:33",
     "nivel": "Universidad",
     "idioma": "en",
     "descripcion": "Cálculo diferencial e integral de una variable del MIT: límites y continuidad, diferenciación analítica y geométrica, aproximaciones lineales, optimización, teorema del valor medio, integración de Riemann y cálculo fundamental."
@@ -822,13 +822,13 @@
     "descripcion": "Ecuaciones diferenciales ordinarias (EDO) del MIT: campos de direcciones, ecuaciones de primer orden separables y lineales, osciladores armónicos de segundo orden, transformada de Laplace, convolución y sistemas lineales con matrices."
   },
   {
-    "id": "q6r1905_d7c",
+    "id": "0oBJN8F616U",
     "titulo": "MIT 18.085: Computational Science and Engineering I",
     "canal": "MIT OpenCourseWare (Prof. Gilbert Strang)",
     "universidad": "MIT",
     "categoria": "matematicas",
     "playlist": "PLE7DDD91010BC53F8",
-    "duracion": "30 Clases (~30 Horas)",
+    "duracion": "49:32",
     "nivel": "Avanzado / Universidad",
     "idioma": "en",
     "descripcion": "Matemáticas aplicadas e ingeniería computacional de Strang: diferencias finitas, matrices simétricas definidas positivas, métodos de elementos finitos, transformada rápida de Fourier (FFT) y algoritmos numéricos de álgebra matricial."
@@ -857,12 +857,12 @@
     "descripcion": "Probabilidad diseñada especialmente para programadores y científicos de la computación: axiomas de probabilidad, conteo combinatorio, variables aleatorias discretas y continuas, inferencia bayesiana, estimación de parámetros para algoritmos y Machine Learning."
   },
   {
-    "id": "McLq1hucw8c",
+    "id": "kV1ru-Inzl4",
     "titulo": "Stanford EE364A: Convex Optimization I",
     "canal": "Stanford Online (Prof. Stephen Boyd)",
     "universidad": "Stanford",
     "categoria": "matematicas",
-    "duracion": "20 Clases (~24 Horas)",
+    "duracion": "1:18:27",
     "nivel": "Avanzado / Universidad",
     "idioma": "en",
     "descripcion": "La referencia mundial en optimización convexa de Stephen Boyd: conjuntos convexos, funciones convexas, problemas de optimización lineal y cuadrática, dualidad de Lagrange, condiciones KKT y métodos de punto interior para aprendizaje automático."
@@ -880,37 +880,37 @@
     "descripcion": "Clase magistral universitaria de primer año en la Universidad de Oxford: rigor matemático de límites, derivadas, cálculo analítico y fundamentos del análisis matemático universitario."
   },
   {
-    "id": "R9R99P6X0Rk",
+    "id": "MieZJ0bxv7k",
     "titulo": "Oxford 1st Year Mathematics: Linear Algebra 1",
     "canal": "Oxford Mathematics (Prof. Andy Wathen)",
     "universidad": "Oxford",
     "categoria": "matematicas",
     "playlist": "PL4d5ZtfQonW0A4VHeiY0gSkX1QEraaacE",
-    "duracion": "Clase Magistral (~1 Hora)",
+    "duracion": "51:36",
     "nivel": "Universidad",
     "idioma": "en",
     "descripcion": "Cátedra formal de la Universidad de Oxford sobre álgebra lineal: reducción de sistemas lineales a formas triangulares, matrices escalonadas reducidas por filas y bases de espacios vectoriales."
   },
   {
-    "id": "f5Ue2X2s_jQ",
+    "id": "k0zKoTvngUY",
     "titulo": "Mathematics for Machine Learning: Linear Algebra",
     "canal": "Imperial College London / Coursera (Dr. Sam Cooper & David Dye)",
     "universidad": "Imperial College London",
     "categoria": "matematicas",
     "playlist": "PLiiljHvN6z1_o1ztXTKWPrShrMrBLo5P3",
-    "duracion": "5 Semanas (~15 Horas)",
+    "duracion": "3:50:40",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "El álgebra lineal que todo ingeniero de Machine Learning necesita: operaciones con matrices, transformaciones lineales, determinantes, autovalores, autovectores y su aplicación práctica al algoritmo PageRank de Google."
   },
   {
-    "id": "f3G1a0oJt8g",
+    "id": "u5DM0ljvljI",
     "titulo": "Mathematics for Machine Learning: Multivariate Calculus",
     "canal": "Imperial College London / Coursera (Dr. Sam Cooper)",
     "universidad": "Imperial College London",
     "categoria": "matematicas",
     "playlist": "PLiiljHvN6z193BBzS0Ln8NnqQmzimTW23",
-    "duracion": "6 Semanas (~18 Horas)",
+    "duracion": "1:50",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "Cálculo multivariable aplicado al entrenamiento de redes neuronales: cálculo de gradientes multidimensionales, derivadas direccionales, aproximación de funciones, regresión no lineal y descenso de gradiente."
@@ -927,12 +927,12 @@
     "descripcion": "Comprender las ecuaciones diferenciales desde una perspectiva visual: péndulos no lineales, el plano de fases, series de Fourier en física y cómo las computadoras simulan sistemas dinámicos continuos."
   },
   {
-    "id": "iKT0v1gg-eA",
+    "id": "qBigTkBLU6g",
     "titulo": "StatQuest: Statistics Fundamentals Clearly Explained",
     "canal": "StatQuest with Josh Starmer",
     "categoria": "matematicas",
     "playlist": "PLblh5JKnVLUL4svJmxvEpjP-3PSpG5n-F",
-    "duracion": "Serie Completa (~6 Horas)",
+    "duracion": "3:42",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Las ideas clave de la estadística explicadas paso a paso sin jerga innecesaria: distribución normal, desviación estándar, p-values, intervalos de confianza, test t de Student y regresión lineal."
@@ -948,61 +948,61 @@
     "descripcion": "Un curso universitario completo de 20 horas de álgebra lineal: sistemas lineales, geometría vectorial, espacios de Hilbert, transformaciones lineales, ortogonalidad, determinantes y formas canónicas."
   },
   {
-    "id": "rfPC1b97t5Y",
+    "id": "HfACrKJ_Y2w",
     "titulo": "Calculus 1 – Full College Course",
     "canal": "freeCodeCamp (Dr. Linda Green)",
     "categoria": "matematicas",
-    "duracion": "11:50:00",
+    "duracion": "11:53:48",
     "nivel": "Principiante / Universidad",
     "idioma": "en",
     "descripcion": "Cálculo 1 universitario exhaustivo de 12 horas: límites infinitos, definición épsilon-delta, derivadas de funciones trigonométricas y exponenciales, regla de la cadena, optimización y sumas de Riemann."
   },
   {
-    "id": "1s9Q1g9X-oM",
+    "id": "7gigNsz4Oe8",
     "titulo": "Calculus 2 – Full College Course",
     "canal": "freeCodeCamp (Dr. Linda Green)",
     "categoria": "matematicas",
-    "duracion": "7:30:00",
+    "duracion": "6:52:53",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "Cálculo integral universitario avanzado: técnicas de integración por partes, sustitución trigonométrica, fracciones parciales, integrales impropias, series infinitas de potencias y series de Taylor."
   },
   {
-    "id": "Vxtzuq-X8Qs",
+    "id": "xxpc-HPKN28",
     "titulo": "Statistics – A Full University Course on Data Science Basics",
     "canal": "freeCodeCamp.org",
     "categoria": "matematicas",
-    "duracion": "8:15:00",
+    "duracion": "8:15:04",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Formación universitaria de 8 horas en estadística para ciencia de datos: recolección de datos, estadística descriptiva, probabilidad básica, distribuciones binomial y normal, test de hipótesis y regresión bivariada."
   },
   {
-    "id": "1CA6IfiN-5g",
+    "id": "LwCRRUa8yTU",
     "titulo": "College Algebra – Full Course",
     "canal": "freeCodeCamp.org",
     "categoria": "matematicas",
-    "duracion": "6:43:00",
+    "duracion": "6:43:47",
     "nivel": "Principiante",
     "idioma": "en",
     "descripcion": "Repaso exhaustivo de álgebra superior: operaciones con polinomios, factorización, ecuaciones cuadráticas, funciones racionales, logaritmos, exponentes y sistemas no lineales."
   },
   {
-    "id": "2-5w8oQ17X4",
+    "id": "G9JxuWk7BDA",
     "titulo": "Discrete Mathematics Course for Beginners",
     "canal": "freeCodeCamp.org",
     "categoria": "matematicas",
-    "duracion": "6:10:00",
+    "duracion": "9:05:36",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Matemáticas discretas para ciencias computacionales: teoría de conjuntos, lógica proposicional, tablas de verdad, relaciones de equivalencia, funciones y algoritmos de grafos."
   },
   {
-    "id": "kS54k6-W9wI",
+    "id": "tyDKR4FG3Yw",
     "titulo": "Discrete Math I – Entire Course (Rosen)",
     "canal": "Kimberly Brehm",
     "categoria": "matematicas",
-    "duracion": "Curso Completo",
+    "duracion": "10:20",
     "nivel": "Principiante / Universidad",
     "idioma": "en",
     "descripcion": "El aclamado curso universitario de matemáticas discretas basado en el libro de Kenneth Rosen: lógica, reglas de inferencia, teoría de conjuntos, inducción matemática y combinatoria."
@@ -1031,31 +1031,31 @@
     "descripcion": "Cátedra universitaria completa de Cálculo en una variable de la Universidad de la República (Uruguay): axioma de completitud de los reales, sucesiones, límites, funciones continuas, cálculo diferencial e integral de Riemann."
   },
   {
-    "id": "cW9v-D2HlF0",
+    "id": "TLh_6G7i4_w",
     "titulo": "Derivadas y Cálculo desde Cero – Clase Magistral",
     "canal": "El Traductor de Ingeniería (Damián Pedraza)",
     "categoria": "matematicas",
-    "duracion": "3:10:00",
+    "duracion": "47:23",
     "nivel": "Principiante / Intermedio",
     "idioma": "es",
     "descripcion": "Explicación conceptual profunda y sin fórmulas de memoria: la verdadera definición de la derivada, la recta tangente, la tasa instantánea de cambio y las reglas de derivación demostradas de forma lógica."
   },
   {
-    "id": "k4T0h96l_sE",
+    "id": "B5oxL1AQpLo",
     "titulo": "100 Derivadas Resueltas desde Cero – Curso Completo",
     "canal": "Matemáticas con Juan",
     "categoria": "matematicas",
-    "duracion": "4:30:00",
+    "duracion": "5:08:37",
     "nivel": "Principiante / Intermedio",
     "idioma": "es",
     "descripcion": "Taller integral práctico de cálculo diferencial: 100 derivadas explicadas minuciosamente de menor a mayor complejidad, aplicando reglas de potencias, productos, cocientes y regla de la cadena."
   },
   {
-    "id": "s5e89K4S46c",
+    "id": "eI4an8aSsgw",
     "titulo": "Precalculus Course – Full College Course",
     "canal": "freeCodeCamp (Dr. Linda Green)",
     "categoria": "matematicas",
-    "duracion": "5:15:00",
+    "duracion": "5:22:02",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Fundamentos matemáticos para cálculo y computación: trigonometría, círculo unitario, identidades trigonométricas, funciones inversas, exponenciales y logaritmos."
@@ -1073,12 +1073,12 @@
     "descripcion": "El curso troncal de ingeniería de sistemas operativos del MIT basado en xv6 sobre arquitectura RISC-V: llamadas al sistema, aislamiento de memoria, tablas de páginas multinivel, traps, interrupciones hardware, bloqueos con semáforos y sistemas de archivos con journaling."
   },
   {
-    "id": "A8yC-o-o46Y",
+    "id": "pPzVV2kkGHc",
     "titulo": "UC Berkeley CS162: Operating Systems and System Programming",
     "canal": "UC Berkeley (Prof. John Kubiatowicz)",
     "universidad": "UC Berkeley",
     "categoria": "arquitectura_so",
-    "duracion": "28 Clases (~30 Horas)",
+    "duracion": "1:23:03",
     "nivel": "Avanzado / Universidad",
     "idioma": "en",
     "descripcion": "Cátedra universitaria de Berkeley sobre sistemas operativos: procesos e hilos, primitivas de sincronización (mutex, semáforos, variables de condición), algoritmos de planificación de CPU, memoria virtual y paginación, entrada/salida y sistemas de archivos."
@@ -1118,12 +1118,12 @@
     "descripcion": "La conferencia magistral de los galardonados con el Premio Turing John Hennessy (Stanford) y David Patterson (Berkeley): el fin de la ley de Moore y la escala de Dennard, el auge de RISC-V y las arquitecturas específicas de dominio (DSAs) para aceleración de IA."
   },
   {
-    "id": "kUfxKq24g9s",
+    "id": "9PPrrSyubG0",
     "titulo": "Building an 8-bit Breadboard Computer from Scratch",
     "canal": "Ben Eater",
     "categoria": "arquitectura_so",
     "playlist": "PLUOaI24LpvQN2Y53vWepO2LMabKPIplar",
-    "duracion": "44 Videos (~8 Horas)",
+    "duracion": "15:23",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Construcción paso a paso de una computadora programable de 8 bits en protoboards: módulo de reloj con 555, registros A/B, bus de datos, ALU con sumadores, memoria RAM, microcódigo EEPROM y decodificador de instrucciones."
@@ -1140,45 +1140,45 @@
     "descripcion": "Cátedra enciclopédica de sistemas operativos: gestión de procesos, bloque de control de procesos (PCB), planificación de CPU (FCFS, SJF, Round Robin), concurrencia, interbloqueos (Deadlocks), algoritmo del banquero y memoria virtual."
   },
   {
-    "id": "IaY2NM64S6c",
+    "id": "Ol8D69VKX2k",
     "titulo": "Computer Organization and Architecture (COA) – Full Course",
     "canal": "Neso Academy",
     "categoria": "arquitectura_so",
     "playlist": "PLBlnK6fEyqRj8D3G3P71c7xYn4gS1wZlD",
-    "duracion": "70+ Lecciones (~14 Horas)",
+    "duracion": "7:01",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Organización y microarquitectura de computadoras: ciclo de instrucción fetch-decode-execute, modos de direccionamiento, arquitecturas RISC vs CISC, pipelines con resolución de riesgos (hazards) y mapas de memoria caché."
   },
   {
-    "id": "kYJv8y61Q8k",
+    "id": "ov7byCtRhjM",
     "titulo": "Operating Systems: The 4 Pillars (Three Easy Pieces / OSTEP)",
     "canal": "Prof. Remzi Arpaci-Dusseau (UW-Madison)",
     "universidad": "Univ. of Wisconsin",
     "categoria": "arquitectura_so",
-    "duracion": "Cátedra Magistral",
+    "duracion": "15:00",
     "nivel": "Intermedio / Universidad",
     "idioma": "en",
     "descripcion": "Los 4 pilares fundamentales de los sistemas operativos por el autor de OSTEP: virtualización de CPU (procesos y scheduling), virtualización de memoria (páginas y TLBs), concurrencia (locks y semáforos) y persistencia (archivos y discos)."
   },
   {
-    "id": "QktLoqcFI9c",
+    "id": "QZwneRb-zqA",
     "titulo": "Exploring How Computers Work – From Logic to CPU",
     "canal": "Sebastian Lague",
     "categoria": "arquitectura_so",
     "playlist": "PLFt_AvWsXl0dPhqDfL1CNnOvGYgFP9b3J",
-    "duracion": "1:20:00",
+    "duracion": "18:12",
     "nivel": "Principiante / Intermedio",
     "idioma": "en",
     "descripcion": "Construcción visual e intuitiva de una computadora en software: cómo las compuertas lógicas forman sumadores, cómo los biestables (latches) almacenan memoria y cómo una CPU lee instrucciones para ejecutar programas completos."
   },
   {
-    "id": "JK8i8Wq4T0s",
+    "id": "FZGugFqdr60",
     "titulo": "The Central Processing Unit (CPU) – Microarchitecture",
     "canal": "CrashCourse (Carrie Anne Philbin)",
     "categoria": "arquitectura_so",
     "playlist": "PL1mtdjDVOoOqJzeaJAV15Tq0tZ1vKj7ZV",
-    "duracion": "12:00",
+    "duracion": "11:38",
     "nivel": "Principiante",
     "idioma": "en",
     "descripcion": "Cómo funciona un procesador por dentro: la unidad aritmético-lógica (ALU), registros de control, buses internos de datos y el ciclo de reloj de instrucciones."
@@ -1195,41 +1195,41 @@
     "descripcion": "La arquitectura de los sistemas operativos: el kernel como intermediario entre hardware y software, multiprocesamiento, controladores de dispositivos y sistemas de archivos."
   },
   {
-    "id": "kC7hQpBhi5s",
+    "id": "yK1uBHPdp30",
     "titulo": "Operating Systems Course for Beginners",
     "canal": "freeCodeCamp.org",
     "categoria": "arquitectura_so",
-    "duracion": "2:30:00",
+    "duracion": "24:51:56",
     "nivel": "Principiante",
     "idioma": "en",
     "descripcion": "Fundamentos de sistemas operativos para programadores: espacio de usuario vs espacio de kernel, llamadas al sistema (syscalls), controladores, memoria compartida y seguridad de procesos."
   },
   {
-    "id": "S0tNe6AZq90",
+    "id": "ROjZy1WbCIA",
     "titulo": "Linux Operating System – Crash Course for Beginners",
     "canal": "freeCodeCamp.org",
     "categoria": "arquitectura_so",
-    "duracion": "2:40:00",
+    "duracion": "2:47:56",
     "nivel": "Principiante",
     "idioma": "en",
     "descripcion": "El sistema operativo Linux a fondo: arquitectura del kernel Linux, jerarquía de archivos FHS, permisos POSIX, gestión de procesos en segundo plano y comandos del sistema."
   },
   {
-    "id": "gMef1cXnC-4",
+    "id": "gfmRrPjnEw4",
     "titulo": "Assembly Language Programming with ARM",
     "canal": "freeCodeCamp.org",
     "categoria": "arquitectura_so",
-    "duracion": "2:30:00",
+    "duracion": "2:29:32",
     "nivel": "Intermedio",
     "idioma": "en",
     "descripcion": "Programación en lenguaje ensamblador de bajo nivel para arquitectura ARM: registros de CPU, instrucciones de carga y almacenamiento (load/store), saltos condicionales y manejo de la pila."
   },
   {
-    "id": "gS8T-7o_h1o",
+    "id": "fsuroRYmagw",
     "titulo": "¿Cómo Funciona un Sistema Operativo por Dentro?",
     "canal": "BettaTech",
     "categoria": "arquitectura_so",
-    "duracion": "18:00",
+    "duracion": "8:37",
     "nivel": "Principiante / Intermedio",
     "idioma": "es",
     "descripcion": "Explicación técnica y didáctica en español: qué sucede desde que enciendes el ordenador hasta que carga el kernel, cómo interactúan la BIOS/UEFI, los drivers, la CPU y la memoria RAM."

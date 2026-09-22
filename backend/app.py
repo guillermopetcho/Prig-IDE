@@ -5871,8 +5871,45 @@ def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
     return _ndjson_en_hilo(trabajo)
 
 
+# ----------------------------------------------------------------------------
+# YouTube Search Engine & Registered Keywords (Deep Learning, Machine Learning, Python, C++)
+# ----------------------------------------------------------------------------
+@app.get("/api/youtube/palabras_registradas")
+def youtube_palabras_registradas():
+    """Devuelve las palabras registradas para el motor de búsqueda didáctico de YouTube."""
+    import youtube_buscador
+    return {
+        "status": "ok",
+        "palabras": youtube_buscador.obtener_palabras_registradas()
+    }
+
+
+@app.get("/api/youtube/buscar")
+def youtube_buscar(
+    q: str = Query(..., description="Término o palabra a buscar"),
+    tipo: Optional[str] = Query("todos", description="Tipo: todos, video, playlist"),
+    max_resultados: Optional[int] = Query(16, description="Límite de resultados"),
+    filtro_educativo: Optional[bool] = Query(True, description="Priorizar cursos y tutoriales completos"),
+    forzar: Optional[bool] = Query(False, description="Forzar refresco sin caché")
+):
+    """Busca cursos, tutoriales y listas de reproducción didácticas en YouTube en tiempo real."""
+    import youtube_buscador
+    if not q or not q.strip():
+        raise HTTPException(status_code=400, detail="El parámetro de búsqueda 'q' no puede estar vacío.")
+    
+    resultados = youtube_buscador.buscar_cursos_youtube(
+        query=q.strip(),
+        tipo=tipo or "todos",
+        max_resultados=max_resultados or 16,
+        filtro_educativo=filtro_educativo if filtro_educativo is not None else True,
+        forzar_refresco=bool(forzar)
+    )
+    return resultados
+
+
 # ============================================================================
 # Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
+
 # ============================================================================
 from hub.api import crear_router as _hub_router  # noqa: E402
 
