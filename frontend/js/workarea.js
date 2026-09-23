@@ -119,7 +119,10 @@ class WorkAreaManager {
 
         if (contenedor) {
             // Ocultar las otras vistas que estén dentro de este contenedor
-            contenedor.querySelectorAll('.vista-trabajo').forEach(v => { v.hidden = true; });
+            contenedor.querySelectorAll('.vista-trabajo').forEach(v => {
+                v.hidden = true;
+                v.style.display = 'none';
+            });
 
             let destinoEl = null;
             if (vista && vista.tipo === 'herramienta') {
@@ -128,6 +131,7 @@ class WorkAreaManager {
                     contenedor.appendChild(destinoEl);
                 }
                 destinoEl.hidden = false;
+                destinoEl.style.display = '';
                 this._montarHerramienta(vista, destinoEl);
             } else {
                 destinoEl = document.getElementById(`vista-${id}`);
@@ -136,6 +140,7 @@ class WorkAreaManager {
                         contenedor.appendChild(destinoEl);
                     }
                     destinoEl.hidden = false;
+                    destinoEl.style.display = '';
                 }
             }
         }
@@ -295,11 +300,23 @@ class WorkAreaManager {
             }
 
             // Regla: con solo el editor abierto en panel único, no se ve barra de pestañas
-            if (lado === 'izq' && !this.splitActivo && listaIds.length <= 1 && listaIds[0] === 'editor') {
-                header.hidden = true;
-                barra.innerHTML = '';
-                acciones.innerHTML = '';
-                return;
+            const sinArchivosEditor = !window.editorMgr || window.editorMgr.openTabs.size === 0;
+            const soloEditorOInicio = listaIds.every(x => x === 'editor' || x === 'h:modal-inicio');
+
+            if (lado === 'izq' && !this.splitActivo) {
+                if (listaIds.length <= 1 && listaIds[0] === 'editor') {
+                    header.hidden = true;
+                    barra.innerHTML = '';
+                    acciones.innerHTML = '';
+                    return;
+                }
+                // Si estamos en Inicio sin archivos abiertos en el editor, solo se ve Inicio limpio sin barra de pestañas
+                if (activaId === 'h:modal-inicio' && sinArchivosEditor && soloEditorOInicio) {
+                    header.hidden = true;
+                    barra.innerHTML = '';
+                    acciones.innerHTML = '';
+                    return;
+                }
             }
 
             header.hidden = false;

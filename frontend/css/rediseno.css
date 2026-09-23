@@ -707,7 +707,12 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
 
 .trabajo-vistas { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .vista-trabajo { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.vista-trabajo[hidden] { display: none; }
+.vista-trabajo[hidden],
+#vista-editor[hidden],
+.vista-herramienta-contenedor[hidden],
+[hidden] {
+    display: none !important;
+}
 
 /* Una herramienta incrustada ocupa la pestaña entera, sin cromo de ventana */
 #vista-herramienta .modal-content.incrustado,
@@ -736,6 +741,10 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
     width: 100%;
     overflow: hidden;
     position: relative;
+}
+
+#vista-editor[hidden] {
+    display: none !important;
 }
 
 /* Barra superior de disposición y herramientas del editor */
