@@ -569,30 +569,32 @@ class EditorManager {
         }
     }
 
-    /** Configura drag & drop para mover pestañas entre columnas */
+    /** Configura drag & drop para mover pestañas entre columnas del editor de código */
     setupTabDragAndDrop() {
         [0, 1, 2].forEach(colIndex => {
             const tabsEl = document.getElementById(colIndex === 0 ? 'editor-tabs' : `editor-tabs-${colIndex}`);
-            const colEl = document.getElementById(`editor-col-${colIndex}`);
+            const emptyEl = document.getElementById(`editor-col-empty-${colIndex}`);
 
-            const zonas = [tabsEl, colEl].filter(Boolean);
+            const zonas = [tabsEl, emptyEl].filter(Boolean);
             zonas.forEach(zona => {
                 zona.addEventListener('dragover', (e) => {
+                    if (!e.dataTransfer.types.includes('application/prig-code-tab')) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
-                    if (tabsEl) tabsEl.classList.add('drag-over');
+                    zona.classList.add('drag-over');
                 });
 
                 zona.addEventListener('dragleave', (e) => {
-                    if (tabsEl && (!e.relatedTarget || !zona.contains(e.relatedTarget))) {
-                        tabsEl.classList.remove('drag-over');
+                    if (!e.relatedTarget || !zona.contains(e.relatedTarget)) {
+                        zona.classList.remove('drag-over');
                     }
                 });
 
                 zona.addEventListener('drop', (e) => {
+                    if (!e.dataTransfer.types.includes('application/prig-code-tab')) return;
                     e.preventDefault();
-                    if (tabsEl) tabsEl.classList.remove('drag-over');
-                    const rawData = e.dataTransfer.getData('application/prig-tab') || e.dataTransfer.getData('text/plain');
+                    zona.classList.remove('drag-over');
+                    const rawData = e.dataTransfer.getData('application/prig-code-tab');
                     if (!rawData) return;
                     try {
                         const data = JSON.parse(rawData);
@@ -603,7 +605,7 @@ class EditorManager {
                             }
                         }
                     } catch (err) {
-                        console.error('Error procesando drop de pestaña:', err);
+                        console.error('Error procesando drop de pestaña de código:', err);
                     }
                 });
             });
@@ -941,6 +943,19 @@ class EditorManager {
         const pane = this.panes[colIndex];
         const tabsList = pane.tabs || [];
 
+        // Gestionar estado vacío en columnas secundarias
+        const emptyEl = document.getElementById(`editor-col-empty-${colIndex}`);
+        const monacoEl = document.getElementById(colIndex === 0 ? 'monaco-editor-container' : `monaco-editor-container-${colIndex}`);
+        if (colIndex > 0 && emptyEl) {
+            if (tabsList.length === 0) {
+                emptyEl.style.display = 'flex';
+                if (monacoEl) monacoEl.style.display = 'none';
+            } else {
+                emptyEl.style.display = 'none';
+                if (monacoEl) monacoEl.style.display = 'block';
+            }
+        }
+
         tabsList.forEach(path => {
             const tab = this.openTabs.get(path);
             if (!tab) return;
@@ -974,10 +989,9 @@ class EditorManager {
                 if (event.button === 1) this.closeTabInPane(colIndex, path, event);
             };
 
-            // Drag and drop events en la pestaña
+            // Drag and drop events en la pestaña de código
             tabEl.ondragstart = (e) => {
-                e.dataTransfer.setData('application/prig-tab', JSON.stringify({ path, colIndex }));
-                e.dataTransfer.setData('text/plain', JSON.stringify({ path, colIndex }));
+                e.dataTransfer.setData('application/prig-code-tab', JSON.stringify({ path, colIndex }));
                 tabEl.classList.add('arrastrando');
             };
 

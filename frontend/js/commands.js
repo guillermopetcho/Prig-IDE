@@ -206,39 +206,12 @@
               window.editorMgr.moveTabToPane(window.editorMgr.activePath, window.editorMgr.activeCol, window.editorMgr.activeCol - 1);
             }
           } },
-        { id: 'vista.dividirPaneles', menu: 'Vista', label: 'Dividir área de trabajo (Lado a lado)', accel: 'Ctrl+Alt+\\',
-          run: () => window.workArea && window.workArea.abrirDivision() },
-        { id: 'vista.intercambiarPaneles', menu: 'Vista', label: 'Intercambiar paneles (Izquierda ↔ Derecha)', accel: 'Alt+\\',
-          run: () => window.workArea && window.workArea.intercambiarPaneles() },
-        { id: 'vista.moverAlOtroLado', menu: 'Vista', label: 'Mover pestaña actual al otro lado', accel: 'Alt+Shift+\\',
-          run: () => {
-              if (window.workArea) {
-                  const foco = window.workArea.ladoFoco || 'izq';
-                  const activa = window.workArea.paneles[foco].activa;
-                  if (activa) window.workArea.moverALado(activa, foco === 'izq' ? 'der' : 'izq');
-              }
-          } },
-        // Ctrl+Alt+←/→ (el de VS Code) lo usa GNOME para cambiar de escritorio: no llegaría a Prig
-        { id: 'vista.moverVentanaDerecha', menu: 'Vista', label: 'Mover la ventana al panel derecho', accel: 'Ctrl+K Ctrl+Right',
-          run: () => window.workArea && window.workArea.moverActivaA('der') },
-        { id: 'vista.moverVentanaIzquierda', menu: 'Vista', label: 'Mover la ventana al panel izquierdo', accel: 'Ctrl+K Ctrl+Left',
-          run: () => window.workArea && window.workArea.moverActivaA('izq') },
-        { id: 'vista.enfocarPanelIzquierdo', menu: 'Vista', label: 'Ir al panel izquierdo', accel: 'Ctrl+K Ctrl+1',
-          run: () => window.workArea && window.workArea.enfocarPanel('izq') },
-        { id: 'vista.enfocarPanelDerecho', menu: 'Vista', label: 'Ir al panel derecho', accel: 'Ctrl+K Ctrl+2',
-          run: () => window.workArea && window.workArea.enfocarPanel('der') },
-        { id: 'vista.ventanaSiguiente', menu: 'Vista', label: 'Ventana siguiente', accel: 'Ctrl+Alt+PageDown',
+        { id: 'vista.ventanaSiguiente', menu: 'Vista', label: 'Pestaña de sección siguiente', accel: 'Ctrl+Alt+PageDown',
           run: () => window.workArea && window.workArea.ventanaSiguiente(+1) },
-        { id: 'vista.ventanaAnterior', menu: 'Vista', label: 'Ventana anterior', accel: 'Ctrl+Alt+PageUp',
+        { id: 'vista.ventanaAnterior', menu: 'Vista', label: 'Pestaña de sección anterior', accel: 'Ctrl+Alt+PageUp',
           run: () => window.workArea && window.workArea.ventanaSiguiente(-1) },
-        { id: 'vista.pestanaDerecha', menu: 'Vista', label: 'Correr la ventana un lugar a la derecha', accel: 'Ctrl+Shift+PageDown',
-          run: () => window.workArea && window.workArea.moverPestana(+1) },
-        { id: 'vista.pestanaIzquierda', menu: 'Vista', label: 'Correr la ventana un lugar a la izquierda', accel: 'Ctrl+Shift+PageUp',
-          run: () => window.workArea && window.workArea.moverPestana(-1) },
-        { id: 'vista.cerrarDivision', menu: 'Vista', label: 'Cerrar división del área de trabajo',
-          run: () => window.workArea && window.workArea.cerrarDivision() },
         { id: 'vista.cerrarPestana', menu: 'Vista', label: 'Cerrar pestaña de trabajo', accel: 'Ctrl+Alt+W',
-          run: () => window.workArea.cerrar(window.workArea.activa) },
+          run: () => window.workArea && window.workArea.cerrar(window.workArea.activa) },
         { id: 'vista.ajusteLinea', menu: 'Vista', label: 'Ajuste de línea', accel: 'Alt+Z', separadorAntes: true,
           marcado: () => ide() && ide().estadoVista('ajusteLinea'),
           run: () => ide().alternarVista('ajusteLinea') },
