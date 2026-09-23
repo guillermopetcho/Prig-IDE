@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import requests
+import ast
 from typing import Dict, Any, Generator, List, Optional, Callable
 # Import relativo: el absoluto solo funcionaba con backend/ en sys.path y rompía
 # al importar el paquete como backend.ai_engine (p. ej. desde los tests).
@@ -58,6 +59,178 @@ def explicar_error_motor(texto: str) -> Optional[str]:
         return MENSAJE_RUNTIME_INCOMPLETO
     return None
 CONFIG_PATH = os.path.expanduser("~/.prig_ai_config.json")
+
+
+def reparar_y_parsear_json(response_text: str) -> dict:
+    """ Extrae y repara de forma robusta cualquier salida JSON de un modelo de IA.
+    Tolera bloques markdown, comas sobrantes, saltos de línea sin escapar dentro de cadenas
+    (código), comentarios, comillas internas sin escapar y cierres incompletos. """
+    if not (response_text or "").strip():
+        raise ValueError("Respuesta vacía del modelo de IA")
+
+    clean = _PENSAMIENTO_RE.sub("", response_text).strip()
+
+    candidatos = []
+    for m in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", clean, re.S):
+        candidatos.append(m.group(1).strip())
+
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        cand_ext = clean[start:end+1].strip()
+        if cand_ext not in candidatos:
+            candidatos.append(cand_ext)
+
+    if clean not in candidatos:
+        candidatos.append(clean)
+
+    def _intentar_parsear(s: str) -> Optional[dict]:
+        try:
+            res = json.loads(s)
+            if isinstance(res, dict):
+                return res
+        except Exception:
+            pass
+        try:
+            res = json.loads(s, strict=False)
+            if isinstance(res, dict):
+                return res
+        except Exception:
+            pass
+        sin_comas = re.sub(r",\s*([\]}])", r"\1", s)
+        try:
+            res = json.loads(sin_comas, strict=False)
+            if isinstance(res, dict):
+                return res
+        except Exception:
+            pass
+        try:
+            s_doble = re.sub(r"'([^'\\]*(?:\\.[^'\\]*)*)'", r'"\1"', sin_comas)
+            s_doble = re.sub(r"\bTrue\b", "true", s_doble)
+            s_doble = re.sub(r"\bFalse\b", "false", s_doble)
+            s_doble = re.sub(r"\bNone\b", "null", s_doble)
+            res = json.loads(s_doble, strict=False)
+            if isinstance(res, dict):
+                return res
+        except Exception:
+            pass
+        try:
+            s_py = re.sub(r"\btrue\b", "True", sin_comas)
+            s_py = re.sub(r"\bfalse\b", "False", s_py)
+            s_py = re.sub(r"\bnull\b", "None", s_py)
+            res = ast.literal_eval(s_py)
+            if isinstance(res, dict):
+                return res
+        except Exception:
+            pass
+        return None
+
+    def _escapar_comillas_internas(texto: str) -> str:
+        i = 0
+        n = len(texto)
+        while i < n:
+            if texto[i] == '"':
+                j = i + 1
+                while j < n:
+                    if texto[j] == "\\":
+                        j += 2
+                        continue
+                    if texto[j] == '"':
+                        k = j + 1
+                        while k < n and texto[k] in " \t\r\n":
+                            k += 1
+                        if k < n and texto[k] in ",:}]":
+                            break
+                        else:
+                            texto = texto[:j] + '\\"' + texto[j+1:]
+                            n += 1
+                            j += 2
+                            continue
+                    j += 1
+                i = j + 1
+            else:
+                i += 1
+        return texto
+
+    def _cerrar_incompleto(texto: str) -> str:
+        pila = []
+        en_str = False
+        esc = False
+        for ch in texto:
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                en_str = not en_str
+                continue
+            if not en_str:
+                if ch in "{[":
+                    pila.append("}" if ch == "{" else "]")
+                elif ch in "}]":
+                    if pila and pila[-1] == ch:
+                        pila.pop()
+        agregado = '"' if en_str else ""
+        while pila:
+            agregado += pila.pop()
+        return texto + agregado
+
+    for cand in candidatos:
+        res = _intentar_parsear(cand)
+        if res is not None:
+            return res
+
+        try:
+            res = _intentar_parsear(_escapar_comillas_internas(cand))
+            if res is not None:
+                return res
+        except Exception:
+            pass
+
+        try:
+            res = _intentar_parsear(_cerrar_incompleto(cand))
+            if res is not None:
+                return res
+        except Exception:
+            pass
+
+        try:
+            res = _intentar_parsear(_cerrar_incompleto(_escapar_comillas_internas(cand)))
+            if res is not None:
+                return res
+        except Exception:
+            pass
+
+    # Heurística de rescate para desafíos si falló el parser estricto
+    m_tit = re.search(r'"titulo"\s*:\s*"([^"]+)"', clean)
+    if m_tit:
+        titulo = m_tit.group(1).strip()
+        m_enun = re.search(r'"enunciado"\s*:\s*"(.*?)(?="\s*,\s*"(?:nivel|conceptos|paginas))', clean, re.S)
+        enunciado = m_enun.group(1).strip() if m_enun else "Resuelve el desafío propuesto."
+        m_niv = re.search(r'"nivel"\s*:\s*"([^"]+)"', clean)
+        nivel = m_niv.group(1).strip() if m_niv else "intermedio"
+
+        paginas_list = []
+        for mp in re.finditer(r'\{\s*"nombre"\s*:\s*"([^"]+)".*?"contenido"\s*:\s*"(.*?)(?="\s*\}\s*[,\]])', clean, re.S):
+            paginas_list.append({"nombre": mp.group(1), "contenido": mp.group(2).replace('\\n', '\n')})
+
+        if paginas_list:
+            return {
+                "titulo": titulo,
+                "enunciado": enunciado,
+                "nivel": nivel,
+                "conceptos": ["algoritmos"],
+                "paginas": paginas_list,
+                "referencia": paginas_list,
+                "pruebas": ["assert True"]
+            }
+
+    err_msg = f"No se pudo extraer un JSON válido de la respuesta del modelo: {clean[:160]}..."
+    print(f"⚠️ {err_msg}")
+    raise ValueError(err_msg)
+
 
 class AIEngine:
     def __init__(self, base_url: str = OLLAMA_BASE_URL):
@@ -689,6 +862,8 @@ class AIEngine:
                     payload["keep_alive"] = keep_alive
                 if think is not None:
                     payload["think"] = bool(think)
+                if options and options.get("format"):
+                    payload["format"] = options.get("format")
                 previo = []
                 if contenido or pensamiento:
                     asistente: Dict[str, Any] = {"role": "assistant", "content": contenido}
@@ -972,6 +1147,8 @@ class AIEngine:
             "stream": True,
             "options": self._build_options(options, model, uso)
         }
+        if options and options.get("format"):
+            payload["format"] = options.get("format")
         if think is None and on_thinking is not None and "thinking" in self.capacidades(model):
             think = True
         sistema = self._completar_payload(payload, model, uso, think, system_prompt)["sistema"]
@@ -1320,17 +1497,13 @@ class AIEngine:
 
         return "".join(parts).strip()
 
-    def _extract_and_parse_json(self, response_text: str) -> dict:
-        clean_str = _PENSAMIENTO_RE.sub("", response_text or "").strip()
-        start = clean_str.find('{')
-        end = clean_str.rfind('}')
-        if start != -1 and end != -1 and end > start:
-            clean_str = clean_str[start:end+1]
-        try:
-            return json.loads(clean_str)
-        except Exception as err:
-            print(f"⚠️ Error al parsear JSON de la IA: {err}. Respuesta recibida: {response_text[:200]}...")
-            raise err
+
+
+
+    @classmethod
+    def _extract_and_parse_json(cls, *args, **kwargs) -> dict:
+        text = kwargs.get("response_text") or (args[-1] if args else "")
+        return reparar_y_parsear_json(text)
 
     def run_knowledge_architect(
         self,

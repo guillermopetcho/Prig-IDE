@@ -41,10 +41,14 @@ def _error_de_modelo(texto: str) -> Optional[str]:
 
 
 def generar(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.3,
-            on_token: Optional[Callable[[str], None]] = None) -> str:
+            on_token: Optional[Callable[[str], None]] = None,
+            formato: Optional[str] = None) -> str:
     partes = []
+    opciones = {"temperature": temperatura}
+    if formato:
+        opciones["format"] = formato
     for trozo in ai.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
-                                      options={"temperature": temperatura}, uso="tutor",
+                                      options=opciones, uso="tutor",
                                       on_token=on_token):
         partes.append(trozo)
     texto = "".join(partes)
@@ -360,13 +364,21 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
                   + (f"\nEl intento anterior no sirvió porque: {fallo_anterior}\nCorrígelo.\n" if fallo_anterior else "")
                   + "\nCrea el desafío.")
         try:
-            texto = generar(ai, modelo, prompt, sistema, temperatura=0.4)
-            datos = _normalizar_creado(ai._extract_and_parse_json(texto), lenguaje=lenguaje)
+            texto = generar(ai, modelo, prompt, sistema, temperatura=0.4, formato="json")
+            try:
+                datos_crudos = ai._extract_and_parse_json(texto)
+            except Exception:
+                from ai_engine.ai_engine_class import reparar_y_parsear_json
+                datos_crudos = reparar_y_parsear_json(texto)
+            datos = _normalizar_creado(datos_crudos, lenguaje=lenguaje)
         except ErrorDesafio:
             raise
         except Exception as e:
-            fallo_anterior = f"no devolviste un JSON válido ({str(e)[:120]})"
-            historial.append({"intento": n, "motivo": fallo_anterior})
+            fallo_anterior = (
+                "La respuesta no tuvo un formato JSON válido o se cortó antes de cerrar las llaves. "
+                "Devuelve ÚNICAMENTE el objeto JSON completo con las llaves, cerrando todas las comillas."
+            )
+            historial.append({"intento": n, "motivo": str(e)[:120]})
             continue
         datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)
         if lenguaje == "python":
@@ -426,9 +438,9 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
                   f"Lenguaje objetivo: {lenguaje}\n"
                   f"Nivel sugerido: {nivel}\n"
                   f"Tema/Contexto: {tema or ruta}\n\n"
-                  f"Contenido original del archivo en GitHub:\n```\n{contenido[:6000]}\n```\n"
+                  f"Contenido original del archivo en GitHub (recortado):\n```\n{contenido[:3500]}\n```\n"
                   + (f"\nEl intento anterior falló porque: {fallo_anterior}\nCorrige este problema.\n" if fallo_anterior else "")
-                  + "\nGenera el desafío didáctico interactivo.")
+                  + "\nGenera el desafío didáctico interactivo. Responde ÚNICAMENTE con el objeto JSON válido.")
 
         tokens_recibidos = 0
         ultimo_aviso = time.time()
@@ -442,14 +454,22 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
                 avisar({"tipo": "progreso", "mensaje": f"Intento {n} de {intentos}: redactando desafío… ({tokens_recibidos} tokens)", "intento": n, "tokens": tokens_recibidos})
 
         try:
-            texto = generar(ai, modelo, prompt, sistema, temperatura=0.3, on_token=al_token)
-            datos = _normalizar_creado(ai._extract_and_parse_json(texto), lenguaje=lenguaje)
+            texto = generar(ai, modelo, prompt, sistema, temperatura=0.3, on_token=al_token, formato="json")
+            try:
+                datos_crudos = ai._extract_and_parse_json(texto)
+            except Exception:
+                from ai_engine.ai_engine_class import reparar_y_parsear_json
+                datos_crudos = reparar_y_parsear_json(texto)
+            datos = _normalizar_creado(datos_crudos, lenguaje=lenguaje)
         except ErrorDesafio:
             raise
         except Exception as e:
-            fallo_anterior = f"no devolviste un JSON válido ({str(e)[:120]})"
-            historial.append({"intento": n, "motivo": fallo_anterior})
-            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior}… Reintentando con correcciones…", "intento": n, "descartado": True})
+            fallo_anterior = (
+                "La respuesta no tuvo un formato JSON válido o se cortó antes de cerrar las llaves. "
+                "Devuelve ÚNICAMENTE el objeto JSON completo con las llaves, cerrando todas las comillas."
+            )
+            historial.append({"intento": n, "motivo": str(e)[:120]})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: formato no válido ({str(e)[:80]}). Reintentando con estructura corregida…", "intento": n, "descartado": True})
             continue
 
         datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)

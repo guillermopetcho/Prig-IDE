@@ -440,6 +440,124 @@ class PruebaAnalizarPropuesta(unittest.TestCase):
         self.assertIn("especialista en algoritmia", sys_prompt)
 
 
+class PruebaReparacionJSON(unittest.TestCase):
+
+    def test_reparar_json_saltos_linea_literales(self):
+        from ai_engine.ai_engine_class import reparar_y_parsear_json
+        raw = "{\n  \"titulo\": \"Suma\",\n  \"paginas\": [\n    {\n      \"nombre\": \"s.py\",\n      \"contenido\": \"def f():\n    return 1\"\n    }\n  ]\n}"
+        d = reparar_y_parsear_json(raw)
+        self.assertEqual(d["titulo"], "Suma")
+        self.assertIn("def f():\n    return 1", d["paginas"][0]["contenido"])
+
+    def test_reparar_json_comillas_internas_en_codigo(self):
+        from ai_engine.ai_engine_class import reparar_y_parsear_json
+        raw = """```json
+{
+  "titulo": "Inclusión C++",
+  "paginas": [
+    {
+      "nombre": "sol.cpp",
+      "contenido": "#include "sol.h"
+int main() {
+    std::cout << "Hola" << std::endl;
+    return 0;
+}"
+    }
+  ],
+  "referencia": [
+    {
+      "nombre": "sol.cpp",
+      "contenido": "#include "sol.h"
+int main() { return 0; }"
+    }
+  ],
+  "pruebas": ["REQUIRE(true);"]
+}
+```"""
+        d = reparar_y_parsear_json(raw)
+        self.assertEqual(d["titulo"], "Inclusión C++")
+        self.assertIn('#include "sol.h"', d["paginas"][0]["contenido"])
+
+    def test_reparar_json_comas_sobrantes_y_python_bool(self):
+        from ai_engine.ai_engine_class import reparar_y_parsear_json
+        raw = """{
+  'titulo': 'Test Python Booleans',
+  'nivel': 'intermedio',
+  'conceptos': ['listas', 'loops',],
+  'paginas': [
+    {'nombre': 'a.py', 'contenido': 'x = True\ny = None',},
+  ],
+  'referencia': [
+    {'nombre': 'a.py', 'contenido': 'x = False',},
+  ],
+  'pruebas': ['assert True',],
+}"""
+        d = reparar_y_parsear_json(raw)
+        self.assertEqual(d["titulo"], "Test Python Booleans")
+        self.assertEqual(d["conceptos"], ["listas", "loops"])
+
+    def test_reparar_json_truncado(self):
+        from ai_engine.ai_engine_class import reparar_y_parsear_json
+        raw = """{
+  "titulo": "Desafío Truncado",
+  "paginas": [
+    {"nombre": "a.py", "contenido": "def sumar():\\n    return 1"}
+  ],
+  "referencia": [
+    {"nombre": "a.py", "contenido": "def sumar():\\n    return 1"}
+  ],
+  "pruebas": ["assert sumar() == 1"
+"""
+        d = reparar_y_parsear_json(raw)
+        self.assertEqual(d["titulo"], "Desafío Truncado")
+        self.assertEqual(len(d["paginas"]), 1)
+
+    def test_replicar_con_salida_malformada_reparable(self):
+        raw_llm_output = r'''Aquí tienes la adaptación a desafío:
+```json
+{
+  "titulo": "Función Concatenar",
+  "enunciado": "Implementa concatenar(a, b).",
+  "nivel": "principiante",
+  "conceptos": ["strings",],
+  "paginas": [
+    {
+      "nombre": "concat.py",
+      "contenido": "def concatenar(a, b):
+    # TODO: implementar
+    return ''",
+    }
+  ],
+  "referencia": [
+    {
+      "nombre": "concat.py",
+      "contenido": "def concatenar(a, b):
+    return a + b",
+    }
+  ],
+  "pruebas": [
+    "from concat import concatenar\nassert concatenar('a', 'b') == 'ab'",
+    "from concat import concatenar\nassert concatenar('', '') == ''",
+  ]
+}
+```
+Espero que te sea muy útil.
+'''
+        ai = ModeloFalsoReplicar([raw_llm_output])
+        d = tu.replicar_desde_github(
+            ai=ai,
+            runner=RUNNER,
+            modelo="test-model",
+            ref="test/repo",
+            ruta="concat.py",
+            contenido="def concat(a, b): return a + b",
+            lenguaje="python"
+        )
+        self.assertEqual(d["titulo"], "Función Concatenar")
+        self.assertEqual(len(d["paginas"]), 1)
+        self.assertEqual(d["comprobacion"]["pruebas"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -285,6 +285,8 @@ class MotorGemini:
         config = {}
         if options and options.get("temperature") is not None:
             config["temperature"] = float(options["temperature"])
+        if options and options.get("format") == "json":
+            config["responseMimeType"] = "application/json"
         if config:
             cuerpo["generationConfig"] = config
         url = f"{_base()}/models/{model}:streamGenerateContent"
