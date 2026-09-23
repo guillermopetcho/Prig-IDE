@@ -430,6 +430,66 @@ class PruebaTutor(unittest.TestCase):
         self.assertIn("# TODO: apilar\n        pass", reparado)
         self.assertEqual(tu.reparar_cuerpos_vacios("def f(:\n  pass"), "def f(:\n  pass")   # otros errores no se tocan
 
+    def test_limpiar_codigo(self):
+        fence_py = "```python\ndef foo():\n    return 42\n```"
+        self.assertEqual(tu.limpiar_codigo(fence_py, "python"), "def foo():\n    return 42")
+
+        fence_cpp = "```cpp\nint foo() { return 42; }\n```"
+        self.assertEqual(tu.limpiar_codigo(fence_cpp, "cpp"), "int foo() { return 42; }")
+
+        barras_py = "// Comentario de C++\ndef foo():\n    // TODO: implement\n    return 0"
+        limpio = tu.limpiar_codigo(barras_py, "python")
+        self.assertIn("# Comentario de C++", limpio)
+        self.assertIn("    # TODO: implement", limpio)
+        self.assertNotIn("//", limpio)
+
+    def test_repara_cuerpos_vacios_con_fences_y_barras(self):
+        codigo = "```python\nclass Test:\n    def metodo(self):\n        // TODO: por hacer\n```"
+        reparado = tu.reparar_cuerpos_vacios(codigo)
+        compile(reparado, "test.py", "exec")
+        self.assertIn("pass", reparado)
+        self.assertNotIn("```", reparado)
+        self.assertNotIn("//", reparado)
+
+    def test_repara_cuerpos_vacios_final_de_archivo_y_def_consecutivos(self):
+        c1 = "def f():"
+        r1 = tu.reparar_cuerpos_vacios(c1)
+        compile(r1, "c1.py", "exec")
+        self.assertIn("pass", r1)
+
+        c2 = "def a():\ndef b():\n    pass"
+        r2 = tu.reparar_cuerpos_vacios(c2)
+        compile(r2, "c2.py", "exec")
+        self.assertEqual(r2.count("pass"), 2)
+
+    def test_crear_repara_referencia_y_fences(self):
+        # Desafío con fences en paginas y un cuerpo vacío sin pass en referencia
+        ref_con_stub = PILA["contenido"] + "\n\ndef helper():\n    # TODO: stub sin pass\n"
+        desafio_con_fences = desafio_json(
+            paginas=[{"nombre": "pila.py", "descripcion": "La pila", "contenido": f"```python\n{PILA_VACIA['contenido']}\n```"}],
+            referencia=[{"nombre": "pila.py", "contenido": f"```python\n{ref_con_stub}\n```"}],
+            pruebas=[f"```python\n{p}\n```" for p in ASSERTS]
+        )
+        ai = ModeloFalso([desafio_con_fences])
+        d = tu.crear(ai, RUNNER, "m", "pilas", intentos=1)
+        self.assertEqual(len(d["intentos_creacion"]), 1)
+        self.assertTrue(d["intentos_creacion"][0]["valido"])
+        self.assertNotIn("```", d["paginas"][0]["contenido"])
+        # Verificar que la referencia se reparó y compila
+        ref_reparada = d["privado"]["referencia"][0]["contenido"]
+        self.assertNotIn("```", ref_reparada)
+        self.assertIn("pass", ref_reparada)
+        compile(ref_reparada, "pila.py", "exec")
+
+    def test_detecta_pruebas_con_error_sintaxis(self):
+        pruebas_malas = ["from pila import Pila", "assert (1 == "]
+        error = tu._pruebas_sin_compilar(pruebas_malas, "python")
+        self.assertIsNotNone(error)
+        self.assertIn("prueba 2", error)
+
+        pruebas_buenas = ["from pila import Pila", "assert 1 == 1"]
+        self.assertIsNone(tu._pruebas_sin_compilar(pruebas_buenas, "python"))
+
     def test_rechaza_pagina_que_ya_trae_la_solucion(self):
         resuelta = desafio_json(paginas=[{"nombre": "pila.py", "contenido": PILA["contenido"]}, {"nombre": "extra.py", "contenido": "def f():\n    pass\n"}],
                                 referencia=[{"nombre": "pila.py", "contenido": PILA["contenido"]}, {"nombre": "extra.py", "contenido": "def f():\n    return 1\n"}],

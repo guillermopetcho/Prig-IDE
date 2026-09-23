@@ -5174,13 +5174,12 @@ def _desafio(fn, *args, **kwargs):
 
 def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
     """ El pedido; si no, el modelo elegido para ese rol en Configuración; si no, el del tutor / explicación """
-    return (
-        ai_engine.modelo_para(rol, modelo)
-        or ai_engine.config.get("modelo_explicar")
-        or ai_engine.config.get("agent2_model")
-        or ai_engine.config.get("agent1_model")
-        or "qwen2.5-coder:7b"
-    )
+    tutor = ai_engine.config.get("agent1_model") or ai_engine.config.get("agent2_model") or "qwen2.5-coder:7b"
+    if modelo:
+        return modelo
+    if rol:
+        return ai_engine.modelo_para(rol) or tutor
+    return tutor
 
 
 def _motor_desafios(modelo: Optional[str], rol: Optional[str] = None):

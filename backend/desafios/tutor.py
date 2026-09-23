@@ -132,7 +132,7 @@ def _enunciado(d: Dict[str, Any]) -> str:
 
 SISTEMA_CREAR = """Eres un CREADOR DE DESAFÍOS DE PROGRAMACIÓN en Python para aprender razonando.
 
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown alrededor) con esta forma:
+Devuelve ÚNICAMENTE un objeto JSON válido (sin bloques markdown ni ``` alrededor ni dentro de los campos) con esta forma:
 {
   "titulo": "Título breve",
   "enunciado": "Contexto del problema, qué hay que construir, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
@@ -157,8 +157,8 @@ REGLAS:
    (el nombre del módulo es el de la página sin .py). Nombres de página: minúsculas, _ y .py.
 2. El código de partida tiene firmas, docstrings y `pass` o `raise NotImplementedError`,
    con comentarios TODO que orienten. NUNCA la solución: CADA página con funciones o clases
-   debe tener algo por implementar. Un programa principal de ejemplo puede venir hecho solo
-   si no contiene lógica que pidan las pruebas.
+   debe tener algo por implementar. SIEMPRE incluye `pass` en cuerpos incompletos para que
+   el código compile limpiamente.
 3. "referencia" tiene exactamente las mismas páginas que "paginas", completas y correctas.
 4. "pruebas": entre 4 y 8 fragmentos INDEPENDIENTES; cada uno importa lo que usa y termina en
    assert. Incluye casos normales y casos límite (vacío, cero, negativos, repetidos…).
@@ -166,12 +166,12 @@ REGLAS:
 5. Si el nivel es 'senior', incluye en el enunciado las cotas asintóticas requeridas (tiempo y espacio O(...))
    y prueba casos exigentes y límites de escala.
 6. Solo biblioteca estándar. Nada de input(), red, archivos ni aleatoriedad sin semilla.
-7. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
+7. Usa \\n para los saltos de línea dentro de las cadenas JSON. NUNCA envuelvas el valor de "contenido" en cercas ```."""
 
 
 SISTEMA_CREAR_CPP = """Eres un CREADOR DE DESAFÍOS DE PROGRAMACIÓN en C++ (estándar C++20) para aprender razonando.
 
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown alrededor) con esta forma:
+Devuelve ÚNICAMENTE un objeto JSON válido (sin bloques markdown ni ``` alrededor ni dentro de los campos) con esta forma:
 {
   "titulo": "Título breve",
   "enunciado": "Contexto del problema, qué hay que construir, firmas de funciones o clases, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
@@ -198,12 +198,12 @@ REGLAS:
 4. "pruebas": entre 4 y 8 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE, solo la línea con REQUIRE o bloque).
 5. Si el nivel es 'senior', especifica complejidades O(...) en el enunciado, aprovecha características de C++20 (ranges, concepts, move semantics si aplica) y garantiza eficiencia sin copias innecesarias.
 6. Solo biblioteca estándar C++ (STL). Nada de librerías externas ni entrada interactiva std::cin.
-7. Usa \\n para los saltos de línea dentro de las cadenas JSON."""
+7. Usa \\n para los saltos de línea dentro de las cadenas JSON. NUNCA envuelvas el valor de "contenido" en cercas ```."""
 
 
 SISTEMA_REPLICAR = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en Python.
 
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código alrededor) con esta forma:
+Devuelve ÚNICAMENTE un objeto JSON válido (sin bloques markdown ni ``` alrededor ni dentro de los campos) con esta forma:
 {
   "titulo": "Título breve y descriptivo en español",
   "enunciado": "Explicación clara del problema en español, requisitos, reglas y 2 o 3 ejemplos de entrada → salida (en markdown)",
@@ -222,17 +222,17 @@ Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código 
 }
 
 REGLAS:
-1. El código de partida ("paginas") NO debe contener la solución: incluye las firmas de funciones/clases, docstrings explicativos y comentarios # TODO con pass o retorno neutro. Debe compilar limpiamente pero fallar las pruebas.
+1. El código de partida ("paginas") NO debe contener la solución: incluye las firmas de funciones/clases, docstrings explicativos y comentarios # TODO con pass o retorno neutro. CADA función, método o clase sin implementar DEBE tener `pass` para que el código compile sin errores de sintaxis pero falle las pruebas.
 2. "referencia" debe implementar la solución correcta, eficiente y completa.
 3. "pruebas": de 3 a 6 aserciones independientes con assert, importando el módulo de las páginas.
 4. Si es de nivel 'senior' o algoritmo complejo, incluye en el enunciado las cotas de complejidad esperadas.
 5. Solo biblioteca estándar de Python.
-6. Usa \\n para saltos de línea dentro de cadenas JSON."""
+6. Usa \\n para saltos de línea dentro de cadenas JSON. NUNCA envuelvas el valor de "contenido" en cercas ```."""
 
 
 SISTEMA_REPLICAR_CPP = """Eres un EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN. Tu tarea es tomar código, un ejercicio, algoritmo o problema de un repositorio de GitHub y convertirlo en un DESAFÍO DIDÁCTICO interactivo para Prig IDE en C++ (estándar C++20).
 
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques de código alrededor) con esta forma:
+Devuelve ÚNICAMENTE un objeto JSON válido (sin bloques markdown ni ``` alrededor ni dentro de los campos) con esta forma:
 {
   "titulo": "Título breve y descriptivo en español",
   "enunciado": "Explicación clara del problema en español, firmas de funciones o clases, requisitos y 2 o 3 ejemplos de entrada → salida (en markdown)",
@@ -258,8 +258,43 @@ REGLAS:
 3. "pruebas": de 3 a 6 aserciones con REQUIRE(...) de Catch2 (no incluyas TEST_CASE).
 4. Si es de nivel 'senior', detalla requerimientos de complejidad y asegura el uso óptimo de memoria y STL.
 5. Solo biblioteca estándar C++ (STL).
-6. Usa \\n para saltos de línea dentro de cadenas JSON."""
+6. Usa \\n para saltos de línea dentro de cadenas JSON. NUNCA envuelvas el valor de "contenido" en cercas ```."""
 
+
+
+def limpiar_codigo(codigo: str, lenguaje: str = "python") -> str:
+    """ Limpia delimitadores markdown (```python ... ```), espacios superfluos
+    y adapta comentarios de estilo C en Python para que el código sea sintácticamente válido. """
+    if not isinstance(codigo, str):
+        return ""
+    texto = codigo.strip()
+
+    # Quitar delimitadores markdown al inicio y al final si el modelo envolvió el contenido en ellos
+    if texto.startswith("```"):
+        lineas = texto.splitlines()
+        if lineas and lineas[0].strip().startswith("```"):
+            lineas = lineas[1:]
+        if lineas and lineas[-1].strip() == "```":
+            lineas = lineas[:-1]
+        texto = "\n".join(lineas).strip()
+
+    # Si aún quedase un bloque cerrado por ``` al final
+    if texto.endswith("```"):
+        texto = texto[:-3].rstrip()
+
+    if lenguaje == "python":
+        lineas_p = []
+        for linea in texto.split("\n"):
+            stripped = linea.lstrip()
+            # Convertir comentarios de estilo C '//' al inicio de línea en '#'
+            if stripped.startswith("//"):
+                indent = len(linea) - len(stripped)
+                lineas_p.append(" " * indent + "#" + stripped[2:])
+            else:
+                lineas_p.append(linea)
+        texto = "\n".join(lineas_p)
+
+    return texto
 
 
 def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[str, Any]:
@@ -271,15 +306,21 @@ def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[
             nombre = str(p.get("nombre") or p.get("name") or "").strip()
             if nombre and not (nombre.endswith(".py") or nombre.endswith((".cpp", ".h", ".hpp", ".cc", ".cxx"))):
                 nombre += ".cpp" if lenguaje == "cpp" else ".py"
-            item = {"nombre": nombre, "contenido": str(p.get("contenido") or p.get("content") or "")}
+            contenido = limpiar_codigo(str(p.get("contenido") or p.get("content") or ""), lenguaje)
+            item = {"nombre": nombre, "contenido": contenido}
             if con_desc:
                 item["descripcion"] = str(p.get("descripcion") or "")
             salida.append(item)
         return salida
 
-    pruebas = datos.get("pruebas") or datos.get("tests") or []
-    if isinstance(pruebas, str):
-        pruebas = [b for b in re.split(r"\n\s*\n", pruebas) if b.strip()]
+    pruebas_raw = datos.get("pruebas") or datos.get("tests") or []
+    if isinstance(pruebas_raw, str):
+        pruebas_raw = [b for b in re.split(r"\n\s*\n", pruebas_raw) if b.strip()]
+    pruebas = []
+    for t in pruebas_raw:
+        limpio = limpiar_codigo(str(t), lenguaje).strip()
+        if limpio:
+            pruebas.append(limpio)
     nivel = str(datos.get("nivel") or "intermedio").lower()
     return {
         "titulo": str(datos.get("titulo") or "Desafío").strip()[:120],
@@ -288,27 +329,43 @@ def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[
         "conceptos": [str(c) for c in (datos.get("conceptos") or [])][:6],
         "paginas": paginas(datos.get("paginas")),
         "referencia": paginas(datos.get("referencia"), con_desc=False),
-        "pruebas": [str(t) for t in pruebas if str(t).strip()],
+        "pruebas": pruebas,
         "lenguaje": lenguaje,
     }
 
 
 def reparar_cuerpos_vacios(codigo: str, maximo: int = 30) -> str:
-    """ Añade `pass` a def/class/if… cuyo cuerpo es solo comentarios TODO.
+    """ Añade `pass` a def/class/if… cuyo cuerpo es solo comentarios TODO o está vacío.
 
     Los modelos pequeños dejan con frecuencia métodos así, que no compilan: el alumno
     empezaría con un error de sintaxis y las pruebas fallarían por eso, no por lo que
     falta programar. """
+    codigo = limpiar_codigo(codigo, "python")
     lineas = codigo.split("\n")
     for _ in range(maximo):
         try:
             compile("\n".join(lineas), "<pagina>", "exec")
             break
         except SyntaxError as e:
-            m = re.search(r"expected an indented block after .* on line (\d+)", str(e.msg))
-            if not m:
+            m = re.search(r"expected an indented block.*on line (\d+)", str(e.msg))
+            cabecera = None
+            if m:
+                cabecera = int(m.group(1)) - 1
+            elif "expected an indented block" in str(e.msg):
+                idx = (e.lineno or 1) - 1
+                while idx >= 0:
+                    linea_strip = lineas[idx].strip()
+                    if linea_strip.endswith(":") and any(linea_strip.startswith(kw) for kw in (
+                        "def ", "class ", "if ", "elif ", "else:", "for ", "while ",
+                        "try:", "except", "finally:", "with ", "async def ", "async for ", "async with "
+                    )):
+                        cabecera = idx
+                        break
+                    idx -= 1
+
+            if cabecera is None or cabecera < 0 or cabecera >= len(lineas):
                 break
-            cabecera = int(m.group(1)) - 1
+
             sangria = len(lineas[cabecera]) - len(lineas[cabecera].lstrip()) + 4
             i = cabecera + 1
             while i < len(lineas) and (not lineas[i].strip() or (lineas[i].strip().startswith("#")
@@ -328,6 +385,17 @@ def _sin_compilar(paginas: List[Dict[str, Any]], lenguaje: str = "python") -> Op
             compile(p["contenido"], p["nombre"], "exec")
         except SyntaxError as e:
             return f"{p['nombre']} (línea {e.lineno}: {e.msg})"
+    return None
+
+
+def _pruebas_sin_compilar(pruebas: List[str], lenguaje: str = "python") -> Optional[str]:
+    if lenguaje == "cpp":
+        return None
+    for i, fragmento in enumerate(pruebas, 1):
+        try:
+            compile(fragmento, f"<prueba {i}>", "exec")
+        except SyntaxError as e:
+            return f"prueba {i} (línea {e.lineno}: {e.msg})"
     return None
 
 
@@ -384,9 +452,22 @@ def crear(ai, runner, modelo: str, tema: str, nivel: str = "intermedio", context
         if lenguaje == "python":
             for p in datos["paginas"]:
                 p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+            for p in datos["referencia"]:
+                p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+        elif lenguaje == "cpp":
+            for p in datos["paginas"]:
+                p["contenido"] = limpiar_codigo(p["contenido"], "cpp")
+            for p in datos["referencia"]:
+                p["contenido"] = limpiar_codigo(p["contenido"], "cpp")
         rota = _sin_compilar(datos["paginas"], lenguaje=lenguaje) or _sin_compilar(datos["referencia"], lenguaje=lenguaje)
         if rota:
             fallo_anterior = f"el código no compila: {rota}. Pon pass en los cuerpos sin implementar"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior}", "intento": n, "descartado": True})
+            continue
+        pruebas_rotas = _pruebas_sin_compilar(datos["pruebas"], lenguaje=lenguaje)
+        if pruebas_rotas:
+            fallo_anterior = f"las pruebas no compilan: {pruebas_rotas}. Corrige la sintaxis de los asserts"
             historial.append({"intento": n, "motivo": fallo_anterior})
             avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior}", "intento": n, "descartado": True})
             continue
@@ -476,10 +557,24 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
         if lenguaje == "python":
             for p in datos["paginas"]:
                 p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+            for p in datos["referencia"]:
+                p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
+        elif lenguaje == "cpp":
+            for p in datos["paginas"]:
+                p["contenido"] = limpiar_codigo(p["contenido"], "cpp")
+            for p in datos["referencia"]:
+                p["contenido"] = limpiar_codigo(p["contenido"], "cpp")
 
         rota = _sin_compilar(datos["paginas"], lenguaje=lenguaje) or _sin_compilar(datos["referencia"], lenguaje=lenguaje)
         if rota:
             fallo_anterior = f"el código no compila: {rota}. Pon pass en los cuerpos sin implementar"
+            historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior[:120]}… Reintentando con correcciones…", "intento": n, "descartado": True})
+            continue
+
+        pruebas_rotas = _pruebas_sin_compilar(datos["pruebas"], lenguaje=lenguaje)
+        if pruebas_rotas:
+            fallo_anterior = f"las pruebas no compilan: {pruebas_rotas}. Corrige la sintaxis de los asserts"
             historial.append({"intento": n, "motivo": fallo_anterior})
             avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior[:120]}… Reintentando con correcciones…", "intento": n, "descartado": True})
             continue
