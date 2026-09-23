@@ -270,45 +270,7 @@ class WorkAreaManager {
     }
 
     initResizer() {
-        // No-op ya que el modo dividido entre secciones está desactivado permanentemente
-    }
-
-    initResizer() {
-        if (!this.resizer) return;
-        let arrastrando = false;
-
-        this.resizer.addEventListener('mousedown', (e) => {
-            if (!this.splitActivo) return;
-            arrastrando = true;
-            this.resizer.classList.add('arrastrando');
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!arrastrando || !this.splitActivo) return;
-            const cont = document.getElementById('trabajo-split-contenedor');
-            if (!cont) return;
-            const rect = cont.getBoundingClientRect();
-            const offsetX = e.clientX - rect.left;
-            const pct = Math.max(15, Math.min(85, (offsetX / rect.width) * 100));
-            this.anchoIzq = pct;
-            this.panelIzq.style.width = `${pct}%`;
-            if (window.editorMgr && window.editorMgr.editor) window.editorMgr.editor.layout();
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (arrastrando) {
-                arrastrando = false;
-                this.resizer.classList.remove('arrastrando');
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-                try {
-                    localStorage.setItem('prig_workarea_split_pct', this.anchoIzq.toFixed(1));
-                } catch (e) { /* ignorar */ }
-                if (window.editorMgr && window.editorMgr.editor) window.editorMgr.editor.layout();
-            }
-        });
+        // No-op: las secciones se mantienen al 100% de ancho sin división de espacio de trabajo
     }
 
     // ------------------------------------------------------------------
@@ -349,10 +311,9 @@ class WorkAreaManager {
                 if (!v) return;
 
                 const t = document.createElement('div');
-                t.className = 'trabajo-tab' + (v.id === activaId ? ' activo' : '')
-                    + (this.splitActivo && lado === this.ladoFoco && v.id === activaId ? ' foco' : '');
+                t.className = 'trabajo-tab' + (v.id === activaId ? ' activo' : '');
                 t.dataset.id = v.id;
-                t.title = `${v.titulo} · arrastra para moverla o ponerla al lado · clic derecho para más opciones`;
+                t.title = v.titulo;
 
                 t.innerHTML = `
                     <i class="fa-solid ${v.icono}"></i>
@@ -360,8 +321,7 @@ class WorkAreaManager {
                     ${v.fija ? '' : '<i class="fa-solid fa-xmark tab-cerrar" title="Cerrar pestaña"></i>'}
                 `;
 
-                t.onclick = () => { if (!this._recienArrastrada) this.activar(v.id, lado); };
-                t.addEventListener('pointerdown', (e) => this._alPresionarPestana(e, v.id, lado, t));
+                t.onclick = () => this.activar(v.id, lado);
                 // Clic con la rueda: cerrar, como en VS Code
                 t.addEventListener('auxclick', (e) => { if (e.button === 1 && !v.fija) { e.preventDefault(); this.cerrar(v.id); } });
 
@@ -385,126 +345,6 @@ class WorkAreaManager {
             // Pintar botones de acción de la cabecera
             acciones.innerHTML = '';
         });
-    }
-
-    // ------------------------------------------------------------------
-    // Arrastrar pestañas (clic sostenido), como en VS Code
-    // ------------------------------------------------------------------
-
-    _alPresionarPestana(e, id, lado, tabEl) {
-        if (e.button !== 0 || e.target.closest('.tab-cerrar')) return;
-        const inicio = { x: e.clientX, y: e.clientY };
-        let arrastre = null;
-
-        const mover = (ev) => {
-            if (!arrastre) {
-                if (Math.hypot(ev.clientX - inicio.x, ev.clientY - inicio.y) < 6) return;
-                arrastre = this._empezarArrastre(ev, id, tabEl);
-            }
-            arrastre.fantasma.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 10}px)`;
-            arrastre.destino = this._destinoArrastre(ev.clientX, ev.clientY, id);
-            this._pintarDestino(arrastre.destino);
-        };
-        const terminar = (ev, cancelado = false) => {
-            tabEl.removeEventListener('pointermove', mover);
-            tabEl.removeEventListener('pointerup', soltar);
-            tabEl.removeEventListener('pointercancel', cancelar);
-            document.removeEventListener('keydown', teclaEsc, true);
-            try { tabEl.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberado */ }
-            if (!arrastre) return;
-            this._terminarArrastre(arrastre, tabEl);
-            // El clic que sigue al soltar no debe activar la pestaña de origen
-            this._recienArrastrada = true;
-            setTimeout(() => { this._recienArrastrada = false; }, 0);
-            const d = arrastre.destino;
-            if (!cancelado && d) this._soltar(id, lado, d);
-        };
-        const soltar = (ev) => terminar(ev);
-        const cancelar = (ev) => terminar(ev, true);
-        const teclaEsc = (ev) => {
-            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); terminar(ev, true); }
-        };
-
-        // Con la captura, el movimiento llega aunque el puntero pase sobre Monaco o un iframe
-        try { tabEl.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
-        tabEl.addEventListener('pointermove', mover);
-        tabEl.addEventListener('pointerup', soltar);
-        tabEl.addEventListener('pointercancel', cancelar);
-        document.addEventListener('keydown', teclaEsc, true);
-    }
-
-    _empezarArrastre(ev, id, tabEl) {
-        const fantasma = tabEl.cloneNode(true);
-        fantasma.classList.add('wa-fantasma');
-        fantasma.classList.remove('foco');
-        fantasma.removeAttribute('title');
-        document.body.appendChild(fantasma);
-        const zona = document.createElement('div');
-        zona.className = 'wa-zona-drop';
-        zona.hidden = true;
-        const marca = document.createElement('div');
-        marca.className = 'wa-marca-drop';
-        marca.hidden = true;
-        document.body.append(zona, marca);
-        tabEl.classList.add('arrastrando');
-        document.body.classList.add('wa-arrastrando');
-        return { id, fantasma, zona, marca, destino: null };
-    }
-
-    _terminarArrastre(arrastre, tabEl) {
-        arrastre.fantasma.remove();
-        arrastre.zona.remove();
-        arrastre.marca.remove();
-        tabEl.classList.remove('arrastrando');
-        document.body.classList.remove('wa-arrastrando');
-    }
-
-    /**
-     * ¿Dónde caería la pestaña si se suelta en (x, y)?
-     *  · sobre la barra de pestañas: reordena en la barra principal;
-     *  · las secciones nunca se dividen ni se fusionan lateralmente.
-     */
-    _destinoArrastre(x, y, id) {
-        const el = document.elementFromPoint(x, y);
-        if (!el) return null;
-        const barra = this.barraIzq;
-        const header = this.headerIzq;
-        if (header && !header.hidden && header.contains(el)) {
-            const tabs = [...barra.querySelectorAll('.trabajo-tab')].filter(t => t.dataset.id !== id);
-            let indice = tabs.length;
-            for (let i = 0; i < tabs.length; i++) {
-                const r = tabs[i].getBoundingClientRect();
-                if (x < r.left + r.width / 2) { indice = i; break; }
-            }
-            const ref = tabs[indice] || tabs[indice - 1];
-            let marcaX;
-            if (!ref) marcaX = barra.getBoundingClientRect().left + 2;
-            else if (tabs[indice]) marcaX = ref.getBoundingClientRect().left;
-            else marcaX = ref.getBoundingClientRect().right;
-            return { tipo: 'barra', lado: 'izq', indice, marca: { x: marcaX, rect: header.getBoundingClientRect() } };
-        }
-        return null;
-    }
-
-    _pintarDestino(d) {
-        const zona = document.querySelector('.wa-zona-drop');
-        const marca = document.querySelector('.wa-marca-drop');
-        if (!zona || !marca) return;
-        zona.hidden = !(d && d.rect);
-        marca.hidden = !(d && d.marca);
-        if (d && d.rect) {
-            Object.assign(zona.style, { left: `${d.rect.left}px`, top: `${d.rect.top}px`,
-                                        width: `${d.rect.width}px`, height: `${d.rect.height}px` });
-        }
-        if (d && d.marca) {
-            Object.assign(marca.style, { left: `${d.marca.x - 1}px`, top: `${d.marca.rect.top + 3}px`,
-                                         height: `${d.marca.rect.height - 6}px` });
-        }
-    }
-
-    _soltar(id, ladoOrigen, d) {
-        if (d && d.tipo === 'barra') this.moverA(id, 'izq', d.indice);
-        else this.activar(id, 'izq');
     }
 
     _mostrarMenuContextualTab(e, vistaId, ladoActual) {

@@ -464,6 +464,7 @@
                         <!-- Open file tabs dynamically injected -->
                       </div>
                       <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
+                        <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
                         <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
                       </div>
                     </div>
@@ -489,6 +490,7 @@
                         <!-- Pestañas de Columna 1 -->
                       </div>
                       <div class="editor-col-actions">
+                        <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
                         <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
                         <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
                         <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
@@ -578,18 +580,6 @@
               <!-- Aquí se aloja la herramienta que se abra como pestaña -->
               <div id="vista-herramienta" class="vista-trabajo" hidden></div>
             </div>
-          </div>
-
-          <!-- DIVISOR REDIMENSIONABLE -->
-          <div id="resizer-trabajo" class="resizer-trabajo" hidden title="Arrastra para cambiar el ancho de los paneles"></div>
-
-          <!-- PANEL DERECHO -->
-          <div id="panel-trabajo-der" class="panel-trabajo" hidden>
-            <div id="trabajo-header-der" class="trabajo-pane-header" hidden>
-              <div id="trabajo-tabs-der" class="trabajo-tabs"></div>
-              <div id="trabajo-acciones-der" class="trabajo-pane-acciones"></div>
-            </div>
-            <div id="trabajo-vistas-der" class="trabajo-vistas"></div>
           </div>
 
         </div>
@@ -2665,9 +2655,9 @@
   <script src="/static/js/commands.js?v=23"></script>
   <script src="/static/js/menubar.js?v=10"></script>
   <script src="/static/js/layout.js?v=8"></script>
-  <script src="/static/js/workarea.js?v=15"></script>
+  <script src="/static/js/workarea.js?v=16"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
-  <script src="/static/js/editor.js?v=13"></script>
+  <script src="/static/js/editor.js?v=14"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=8"></script>
   <script src="/static/js/terminal.js?v=6"></script>

@@ -257,6 +257,16 @@ class EditorManager {
         if (btnCol3) btnCol3.onclick = () => this.setColumnLayout(3);
         if (btnSplit) btnSplit.onclick = () => this.splitRight();
 
+        // Botones de división inline en cada columna [data-split-col]
+        document.querySelectorAll('[data-split-col]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const col = parseInt(btn.dataset.splitCol, 10);
+                const activePath = this.panes[col]?.activePath || this.activePath;
+                this.splitRight(activePath);
+            };
+        });
+
         // Botones de cierre y movimiento en cabeceras de columnas
         document.querySelectorAll('[data-cerrar-col]').forEach(btn => {
             btn.onclick = (e) => {
@@ -373,9 +383,9 @@ class EditorManager {
             if (col0) { col0.style.flex = 'none'; col0.style.width = `${w0}%`; }
             if (col1) { col1.style.flex = 'none'; col1.style.width = `${100 - w0}%`; }
 
-            // Si Col 1 no tiene pestañas y Col 0 tiene varias, mover una o clonar la activa
+            // Si Col 1 no tiene pestañas y Col 0 tiene varias, mover una o clonar la activa para ver 2 códigos
             if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length > 1) {
-                const moverRuta = this.panes[0].tabs[this.panes[0].tabs.length - 1];
+                const moverRuta = this.panes[0].tabs[1] || this.panes[0].tabs[this.panes[0].tabs.length - 1];
                 this.moveTabToPane(moverRuta, 0, 1);
             } else if (this.panes[1].tabs.length === 0 && this.panes[0].activePath) {
                 this.openFileInPane(1, this.panes[0].activePath);
@@ -395,9 +405,19 @@ class EditorManager {
             if (col1) { col1.style.flex = 'none'; col1.style.width = '33.33%'; }
             if (col2) { col2.style.flex = 'none'; col2.style.width = '33.34%'; }
 
-            // Si Col 2 no tiene pestañas, poblar con archivo actual
-            if (this.panes[2].tabs.length === 0 && this.activePath) {
-                this.openFileInPane(2, this.activePath);
+            // Distribuir pestañas abiertas entre las 3 columnas si están vacías
+            if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length >= 2) {
+                const mover1 = this.panes[0].tabs[1];
+                this.moveTabToPane(mover1, 0, 1);
+            }
+            if (this.panes[2].tabs.length === 0 && this.panes[0].tabs.length >= 2) {
+                const mover2 = this.panes[0].tabs[this.panes[0].tabs.length - 1];
+                this.moveTabToPane(mover2, 0, 2);
+            } else if (this.panes[2].tabs.length === 0 && this.panes[1].tabs.length >= 2) {
+                const mover2 = this.panes[1].tabs[this.panes[1].tabs.length - 1];
+                this.moveTabToPane(mover2, 1, 2);
+            } else if (this.panes[2].tabs.length === 0 && this.panes[0].activePath) {
+                this.openFileInPane(2, this.panes[0].activePath);
             }
         }
 
@@ -574,19 +594,24 @@ class EditorManager {
         [0, 1, 2].forEach(colIndex => {
             const tabsEl = document.getElementById(colIndex === 0 ? 'editor-tabs' : `editor-tabs-${colIndex}`);
             const emptyEl = document.getElementById(`editor-col-empty-${colIndex}`);
+            const colEl = document.getElementById(`editor-col-${colIndex}`);
 
-            const zonas = [tabsEl, emptyEl].filter(Boolean);
+            const zonas = [tabsEl, emptyEl, colEl].filter(Boolean);
             zonas.forEach(zona => {
                 zona.addEventListener('dragover', (e) => {
                     if (!e.dataTransfer.types.includes('application/prig-code-tab')) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
+                    if (colEl) colEl.classList.add('drag-over');
                     zona.classList.add('drag-over');
                 });
 
                 zona.addEventListener('dragleave', (e) => {
                     if (!e.relatedTarget || !zona.contains(e.relatedTarget)) {
                         zona.classList.remove('drag-over');
+                        if (colEl && (!e.relatedTarget || !colEl.contains(e.relatedTarget))) {
+                            colEl.classList.remove('drag-over');
+                        }
                     }
                 });
 
@@ -594,6 +619,7 @@ class EditorManager {
                     if (!e.dataTransfer.types.includes('application/prig-code-tab')) return;
                     e.preventDefault();
                     zona.classList.remove('drag-over');
+                    if (colEl) colEl.classList.remove('drag-over');
                     const rawData = e.dataTransfer.getData('application/prig-code-tab');
                     if (!rawData) return;
                     try {
@@ -707,8 +733,15 @@ class EditorManager {
         this.setActiveTabInPane(colIndex, path);
     }
 
-    /** Establece la pestaña activa en el panel actualmente enfocado (compatibilidad) */
+    /** Establece la pestaña activa en el panel actualmente enfocado (o el panel que contiene el archivo) */
     setActiveTab(path) {
+        for (let i = 0; i < this.numColumns; i++) {
+            if (this.panes[i].tabs && this.panes[i].tabs.includes(path)) {
+                this.setActiveTabInPane(i, path);
+                this.setActivePane(i);
+                return;
+            }
+        }
         this.setActiveTabInPane(this.activeCol, path);
     }
 
@@ -952,7 +985,10 @@ class EditorManager {
                 if (monacoEl) monacoEl.style.display = 'none';
             } else {
                 emptyEl.style.display = 'none';
-                if (monacoEl) monacoEl.style.display = 'block';
+                if (monacoEl) {
+                    monacoEl.style.display = '';
+                    this.panes[colIndex].editor?.layout();
+                }
             }
         }
 

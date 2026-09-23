@@ -884,6 +884,11 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
     outline: 1px dashed var(--accent-blue, #89b4fa);
 }
 
+.editor-col.drag-over {
+    outline: 2px dashed var(--accent-blue, #89b4fa) !important;
+    outline-offset: -2px;
+}
+
 .tab-item.arrastrando {
     opacity: 0.4;
 }
