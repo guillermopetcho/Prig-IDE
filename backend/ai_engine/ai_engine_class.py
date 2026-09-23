@@ -71,7 +71,7 @@ def reparar_y_parsear_json(response_text: str) -> dict:
     clean = _PENSAMIENTO_RE.sub("", response_text).strip()
 
     candidatos = []
-    for m in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", clean, re.S):
+    for m in re.finditer(r"```(?:json)?\s*([\{\[].*?[\}\]])\s*```", clean, re.S):
         candidatos.append(m.group(1).strip())
 
     start = clean.find("{")
@@ -85,23 +85,33 @@ def reparar_y_parsear_json(response_text: str) -> dict:
         candidatos.append(clean)
 
     def _intentar_parsear(s: str) -> Optional[dict]:
+        def _como_dict(val):
+            if isinstance(val, dict):
+                return val
+            if isinstance(val, list) and val and isinstance(val[0], dict):
+                return val[0]
+            return None
+
         try:
             res = json.loads(s)
-            if isinstance(res, dict):
-                return res
+            d = _como_dict(res)
+            if d is not None:
+                return d
         except Exception:
             pass
         try:
             res = json.loads(s, strict=False)
-            if isinstance(res, dict):
-                return res
+            d = _como_dict(res)
+            if d is not None:
+                return d
         except Exception:
             pass
         sin_comas = re.sub(r",\s*([\]}])", r"\1", s)
         try:
             res = json.loads(sin_comas, strict=False)
-            if isinstance(res, dict):
-                return res
+            d = _como_dict(res)
+            if d is not None:
+                return d
         except Exception:
             pass
         try:
@@ -110,8 +120,9 @@ def reparar_y_parsear_json(response_text: str) -> dict:
             s_doble = re.sub(r"\bFalse\b", "false", s_doble)
             s_doble = re.sub(r"\bNone\b", "null", s_doble)
             res = json.loads(s_doble, strict=False)
-            if isinstance(res, dict):
-                return res
+            d = _como_dict(res)
+            if d is not None:
+                return d
         except Exception:
             pass
         try:
@@ -119,8 +130,9 @@ def reparar_y_parsear_json(response_text: str) -> dict:
             s_py = re.sub(r"\bfalse\b", "False", s_py)
             s_py = re.sub(r"\bnull\b", "None", s_py)
             res = ast.literal_eval(s_py)
-            if isinstance(res, dict):
-                return res
+            d = _como_dict(res)
+            if d is not None:
+                return d
         except Exception:
             pass
         return None

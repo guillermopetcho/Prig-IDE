@@ -44,7 +44,7 @@ def generar(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.3
             on_token: Optional[Callable[[str], None]] = None,
             formato: Optional[str] = None) -> str:
     partes = []
-    opciones = {"temperature": temperatura}
+    opciones = {"temperature": temperatura, "num_predict": 4096}
     if formato:
         opciones["format"] = formato
     for trozo in ai.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
@@ -56,6 +56,121 @@ def generar(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.3
     if error:
         raise ErrorDesafio(error)
     return _PENSAMIENTO.sub("", texto).strip()
+
+
+def vaciar_cuerpos(codigo: str) -> str:
+    """ En Python, toma un archivo de código con solución completa y vacía los cuerpos
+    de las funciones y métodos reemplazándolos con pass, preservando firmas y docstrings. """
+    import ast
+    try:
+        tree = ast.parse(codigo)
+        nuevos_stmt = []
+        for n in tree.body:
+            if isinstance(n, ast.If):
+                t = n.test
+                if isinstance(t, ast.Compare) and getattr(getattr(t.left, "id", None), "strip", lambda: "")() == "__name__":
+                    continue
+            nuevos_stmt.append(n)
+        tree.body = nuevos_stmt
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                doc = ast.get_docstring(node)
+                nuevos = []
+                if doc:
+                    nuevos.append(ast.Expr(value=ast.Constant(value=doc)))
+                nuevos.append(ast.Pass())
+                node.body = nuevos
+        return ast.unparse(tree)
+    except Exception:
+        return codigo
+
+
+def vaciar_cuerpos_cpp(codigo: str) -> str:
+    """ En C++, toma un archivo de código con solución y vacía los cuerpos de funciones
+    sustituyéndolos por // TODO y return {}; (o vacío si es void), preservando main e includes. """
+    try:
+        n = len(codigo)
+        func_pattern = re.compile(
+            r'(?m)^([ \t]*(?:template\s*<[^>]+>\s*)?'
+            r'(?:(?:inline|static|constexpr|virtual|explicit|friend)\s+)*'
+            r'([\w:~<>,*&]+(?:\s+[\w:~<>,*&]+)*)\s+'
+            r'([a-zA-Z_]\w*(?:::[a-zA-Z_]\w*)?)\s*'
+            r'\([^)]*\)\s*(?:const\b)?\s*(?:noexcept\b)?\s*(?:->\s*[\w:~<>,*&]+\s*)?'
+            r')\{'
+        )
+        last_end = 0
+        res = []
+        for match in func_pattern.finditer(codigo):
+            start_header = match.start(1)
+            brace_open = match.end() - 1
+            return_type = match.group(2).strip()
+            func_name = match.group(3).strip()
+
+            if func_name in ("if", "while", "for", "switch", "catch"):
+                continue
+
+            depth = 1
+            i = brace_open + 1
+            in_string = False
+            in_char = False
+            in_line_comment = False
+            in_block_comment = False
+
+            while i < n and depth > 0:
+                c = codigo[i]
+                if in_line_comment:
+                    if c == '\n':
+                        in_line_comment = False
+                elif in_block_comment:
+                    if c == '*' and i + 1 < n and codigo[i + 1] == '/':
+                        in_block_comment = False
+                        i += 1
+                elif in_string:
+                    if c == '\\':
+                        i += 1
+                    elif c == '"':
+                        in_string = False
+                elif in_char:
+                    if c == '\\':
+                        i += 1
+                    elif c == "'":
+                        in_char = False
+                else:
+                    if c == '/' and i + 1 < n and codigo[i + 1] == '/':
+                        in_line_comment = True
+                        i += 1
+                    elif c == '/' and i + 1 < n and codigo[i + 1] == '*':
+                        in_block_comment = True
+                        i += 1
+                    elif c == '"':
+                        in_string = True
+                    elif c == "'":
+                        in_char = True
+                    elif c == '{':
+                        depth += 1
+                    elif c == '}':
+                        depth -= 1
+                i += 1
+
+            if depth == 0:
+                res.append(codigo[last_end:brace_open])
+                is_void = return_type == "void" or "void" in return_type.split()
+                is_main = func_name == "main" or func_name.endswith("::main")
+                if is_main:
+                    res.append(codigo[brace_open:i])
+                elif is_void:
+                    res.append("{\n    // TODO: implementar solución\n}")
+                else:
+                    res.append("{\n    // TODO: implementar solución\n    return {};\n}")
+                last_end = i
+
+        res.append(codigo[last_end:])
+        vaciado = "".join(res)
+        return vaciado if vaciado.strip() else codigo
+    except Exception:
+        return codigo
+
 
 
 def extraer_contenido_cuaderno(texto_ipynb: str) -> str:
@@ -297,7 +412,16 @@ def limpiar_codigo(codigo: str, lenguaje: str = "python") -> str:
     return texto
 
 
-def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[str, Any]:
+def _normalizar_creado(datos: Any, lenguaje: str = "python") -> Dict[str, Any]:
+    if isinstance(datos, list) and datos and isinstance(datos[0], dict):
+        datos = datos[0]
+    elif not isinstance(datos, dict):
+        datos = {}
+    if "desafio" in datos and isinstance(datos["desafio"], dict):
+        datos = datos["desafio"]
+    elif "challenge" in datos and isinstance(datos["challenge"], dict):
+        datos = datos["challenge"]
+
     def paginas(lista, con_desc=True):
         salida = []
         for p in lista or []:
@@ -313,22 +437,98 @@ def _normalizar_creado(datos: Dict[str, Any], lenguaje: str = "python") -> Dict[
             salida.append(item)
         return salida
 
-    pruebas_raw = datos.get("pruebas") or datos.get("tests") or []
+    def extraer_lista(clave_principal, alternativas, def_nombre="solucion"):
+        val = None
+        for k in [clave_principal] + alternativas:
+            if k in datos and datos[k]:
+                val = datos[k]
+                break
+        if not val:
+            return []
+        if isinstance(val, dict):
+            return [val]
+        if isinstance(val, str):
+            nom = f"{def_nombre}.cpp" if lenguaje == "cpp" else f"{def_nombre}.py"
+            return [{"nombre": nom, "contenido": val}]
+        if isinstance(val, list):
+            res = []
+            for item in val:
+                if isinstance(item, dict):
+                    res.append(item)
+                elif isinstance(item, str):
+                    nom = f"{def_nombre}.cpp" if lenguaje == "cpp" else f"{def_nombre}.py"
+                    res.append({"nombre": nom, "contenido": item})
+            return res
+        return []
+
+    pags_raw = extraer_lista("paginas", ["pages", "archivos", "files", "plantilla", "codigo_partida", "codigo_inicial", "codigo", "starter_code"], "solucion")
+    refs_raw = extraer_lista("referencia", ["reference", "solucion", "solution", "codigo_solucion", "soluciones", "codigo_referencia", "complete_code"], "solucion")
+
+    pags = paginas(pags_raw)
+    refs = paginas(refs_raw, con_desc=False)
+
+    if pags and not refs:
+        refs = [{"nombre": p["nombre"], "contenido": p["contenido"]} for p in pags]
+    elif refs and not pags:
+        pags = [{"nombre": r["nombre"], "contenido": r["contenido"], "descripcion": "Código de partida"} for r in refs]
+
+    # Sincronizar nombres entre páginas de partida y referencia cuando tienen el mismo conteo
+    if len(pags) == 1 and len(refs) == 1:
+        if pags[0]["nombre"] != refs[0]["nombre"]:
+            refs[0]["nombre"] = pags[0]["nombre"]
+    elif len(pags) == len(refs) and len(pags) > 1:
+        nombres_pags = [p["nombre"] for p in pags]
+        nombres_refs = [r["nombre"] for r in refs]
+        if sorted(nombres_pags) != sorted(nombres_refs):
+            for i in range(len(pags)):
+                refs[i]["nombre"] = pags[i]["nombre"]
+
+    pruebas_raw = None
+    for k in ("pruebas", "tests", "asserts", "test_cases", "comprobaciones", "comprobacion"):
+        if k in datos and datos[k]:
+            pruebas_raw = datos[k]
+            break
+    if isinstance(pruebas_raw, dict):
+        pruebas_raw = pruebas_raw.get("asserts") or pruebas_raw.get("tests") or []
     if isinstance(pruebas_raw, str):
         pruebas_raw = [b for b in re.split(r"\n\s*\n", pruebas_raw) if b.strip()]
     pruebas = []
-    for t in pruebas_raw:
+    for t in pruebas_raw or []:
         limpio = limpiar_codigo(str(t), lenguaje).strip()
         if limpio:
             pruebas.append(limpio)
+
+    if lenguaje == "python" and pags:
+        nombres_modulos = {p["nombre"][:-3] for p in pags if p["nombre"].endswith(".py")}
+        if len(nombres_modulos) == 1:
+            mod_esperado = next(iter(nombres_modulos))
+            pruebas_alineadas = []
+            stdlib_comunes = {
+                "math", "typing", "collections", "itertools", "functools", "re",
+                "os", "sys", "random", "json", "heapq", "bisect", "unittest",
+                "doctest", "string", "copy", "time", "datetime", "abc", "operator"
+            }
+            for frag in pruebas:
+                lineas = frag.split("\n")
+                lineas_mod = []
+                for l in lineas:
+                    m = re.match(r"^(\s*from\s+)([a-zA-Z0-9_]+)(\s+import\s+.*)$", l)
+                    if m:
+                        mod_importado = m.group(2)
+                        if mod_importado not in nombres_modulos and mod_importado not in stdlib_comunes:
+                            l = f"{m.group(1)}{mod_esperado}{m.group(3)}"
+                    lineas_mod.append(l)
+                pruebas_alineadas.append("\n".join(lineas_mod))
+            pruebas = pruebas_alineadas
+
     nivel = str(datos.get("nivel") or "intermedio").lower()
     return {
         "titulo": str(datos.get("titulo") or "Desafío").strip()[:120],
         "enunciado": str(datos.get("enunciado") or "").strip(),
         "nivel": nivel if nivel in NIVELES else "intermedio",
         "conceptos": [str(c) for c in (datos.get("conceptos") or [])][:6],
-        "paginas": paginas(datos.get("paginas")),
-        "referencia": paginas(datos.get("referencia"), con_desc=False),
+        "paginas": pags,
+        "referencia": refs,
         "pruebas": pruebas,
         "lenguaje": lenguaje,
     }
@@ -521,6 +721,7 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
                   f"Tema/Contexto: {tema or ruta}\n\n"
                   f"Contenido original del archivo en GitHub (recortado):\n```\n{contenido[:3500]}\n```\n"
                   + (f"\nEl intento anterior falló porque: {fallo_anterior}\nCorrige este problema.\n" if fallo_anterior else "")
+                  + "\nIMPORTANTE: El código en 'paginas' DEBE ser didáctico e incompleto (solo firmas con pass o return dummy / TODOs). NUNCA pongas la solución resuelta en 'paginas'. La solución completa va ÚNICAMENTE en 'referencia'."
                   + "\nGenera el desafío didáctico interactivo. Responde ÚNICAMENTE con el objeto JSON válido.")
 
         tokens_recibidos = 0
@@ -556,11 +757,21 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
         datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)
         if lenguaje == "python":
             for p in datos["paginas"]:
+                pr = next((r for r in datos["referencia"] if r["nombre"] == p["nombre"]), None)
+                if pr and p["contenido"].strip() == pr["contenido"].strip() and len(p["contenido"].strip()) > 30:
+                    vaciado = vaciar_cuerpos(p["contenido"])
+                    if vaciado.strip() != pr["contenido"].strip():
+                        p["contenido"] = vaciado
                 p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
             for p in datos["referencia"]:
                 p["contenido"] = reparar_cuerpos_vacios(p["contenido"])
         elif lenguaje == "cpp":
             for p in datos["paginas"]:
+                pr = next((r for r in datos["referencia"] if r["nombre"] == p["nombre"]), None)
+                if pr and p["contenido"].strip() == pr["contenido"].strip() and p["nombre"].endswith(('.cpp', '.cc', '.cxx')) and len(p["contenido"].strip()) > 30:
+                    vaciado = vaciar_cuerpos_cpp(p["contenido"])
+                    if vaciado.strip() != pr["contenido"].strip():
+                        p["contenido"] = vaciado
                 p["contenido"] = limpiar_codigo(p["contenido"], "cpp")
             for p in datos["referencia"]:
                 p["contenido"] = limpiar_codigo(p["contenido"], "cpp")

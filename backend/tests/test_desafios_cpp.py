@@ -233,6 +233,66 @@ TEST_CASE("Stack size check", "[stack]") {
         r = ej.comprobar(RUNNER, [STACK_H, STACK_CPP, MAIN_CPP], desafio)
         self.assertTrue(r["aprobado"], r)
 
+    def test_cpp_standalone_sin_cabecera_comprobar(self):
+        # Desafío de archivo único .cpp sin cabeceras .h
+        solucion_cpp = {
+            "nombre": "solucion.cpp",
+            "contenido": "int suma(int a, int b) { return a + b; }\nint main() { return 0; }\n"
+        }
+        desafio = {
+            "lenguaje": "cpp",
+            "comprobacion": {
+                "tipo": "cpp_asserts",
+                "asserts": ["REQUIRE(suma(2, 3) == 5);", "REQUIRE(suma(-1, 1) == 0);"],
+                "pruebas": 2
+            }
+        }
+        r = ej.comprobar(RUNNER, [solucion_cpp], desafio)
+        self.assertTrue(r["aprobado"], r)
+
+    def test_cpp_standalone_validar_desafio(self):
+        paginas = [{"nombre": "solucion.cpp", "contenido": "int suma(int a, int b) { return 0; }\nint main() { return 0; }"}]
+        referencia = [{"nombre": "solucion.cpp", "contenido": "int suma(int a, int b) { return a + b; }\nint main() { return 0; }"}]
+        privado = {
+            "comprobacion": {
+                "tipo": "cpp_asserts",
+                "asserts": ["REQUIRE(suma(2, 3) == 5);", "REQUIRE(suma(0, 0) == 0);"]
+            },
+            "referencia": referencia
+        }
+        v = ej.validar_desafio(RUNNER, paginas, referencia, privado, minimo_pruebas=2)
+        self.assertTrue(v["valido"], v.get("motivo"))
+
+    def test_vaciar_cuerpos_cpp(self):
+        codigo = (
+            "#include <iostream>\n"
+            "#include <vector>\n"
+            "int suma(int a, int b) {\n"
+            "    return a + b;\n"
+            "}\n"
+            "void log_msg(const std::string& m) {\n"
+            "    std::cout << m << std::endl;\n"
+            "}\n"
+            "class Solution {\n"
+            "public:\n"
+            "    bool es_valido(int x) {\n"
+            "        return x > 0;\n"
+            "    }\n"
+            "};\n"
+            "int main() {\n"
+            "    std::cout << 'x';\n"
+            "    return 0;\n"
+            "}\n"
+        )
+        vaciado = tu.vaciar_cuerpos_cpp(codigo)
+        self.assertIn("return {};", vaciado)
+        self.assertIn("// TODO: implementar solución", vaciado)
+        self.assertIn("class Solution", vaciado)
+        self.assertIn("int main()", vaciado)
+        self.assertNotIn("return a + b;", vaciado)
+        self.assertNotIn("return x > 0;", vaciado)
+
+
 
 class DescargaFalsaCpp:
     def __init__(self):

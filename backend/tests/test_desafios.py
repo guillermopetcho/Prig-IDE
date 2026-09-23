@@ -547,6 +547,78 @@ class PruebaTutor(unittest.TestCase):
         self.assertEqual(tu.palabras_clave(ModeloFalso(['{"terminos": ["stack", "linked list"]}']), "m", "pila"), ["stack", "linked list"])
         self.assertEqual(tu.palabras_clave(ModeloFalso(["no sé"]), "m", "pila"), [])
 
+    def test_vaciar_cuerpos_python(self):
+        codigo = (
+            "import math\n\n"
+            "class Calculadora:\n"
+            "    def sumar(self, a: int, b: int) -> int:\n"
+            "        \"\"\"Suma dos valores.\"\"\"\n"
+            "        return a + b\n\n"
+            "def es_primo(n):\n"
+            "    return n > 1\n\n"
+            "if __name__ == '__main__':\n"
+            "    print('test')\n"
+        )
+        vaciado = tu.vaciar_cuerpos(codigo)
+        compile(vaciado, "calc.py", "exec")
+        self.assertIn("class Calculadora", vaciado)
+        self.assertIn("def sumar", vaciado)
+        self.assertIn("Suma dos valores", vaciado)
+        self.assertIn("pass", vaciado)
+        self.assertNotIn("__main__", vaciado)
+        self.assertNotIn("return a + b", vaciado)
+
+    def test_normalizar_creado_formatos_alternativos(self):
+        # Array envolvente y claves alternativas
+        datos_crudos = [{
+            "titulo": "Contador",
+            "enunciado": "Cuenta palabras",
+            "pages": [{"nombre": "contador.py", "contenido": "def contar(s):\n    pass\n"}],
+            "solution": [{"nombre": "solucion.py", "contenido": "def contar(s):\n    return len(s.split())\n"}],
+            "asserts": ["from modulo import contar\nassert contar('hola mundo') == 2"]
+        }]
+        norm = tu._normalizar_creado(datos_crudos, lenguaje="python")
+        self.assertEqual(norm["titulo"], "Contador")
+        self.assertEqual(len(norm["paginas"]), 1)
+        self.assertEqual(len(norm["referencia"]), 1)
+        # Nombres sincronizados
+        self.assertEqual(norm["paginas"][0]["nombre"], "contador.py")
+        self.assertEqual(norm["referencia"][0]["nombre"], "contador.py")
+        # Importación alineada de 'from modulo import' a 'from contador import'
+        self.assertIn("from contador import contar", norm["pruebas"][0])
+
+    def test_replicar_desde_github_auto_vacia_solucion_en_partida(self):
+        # Simular que el modelo devolvió la solución completa tanto en paginas como en referencia
+        sol_completa = (
+            "def duplicar(x: int) -> int:\n"
+            "    \"\"\"Multiplica por dos.\"\"\"\n"
+            "    return x * 2\n"
+        )
+        payload = {
+            "titulo": "Duplicar",
+            "enunciado": "Multiplica un entero por dos.",
+            "nivel": "principiante",
+            "conceptos": ["funciones"],
+            "paginas": [{"nombre": "duplicar.py", "contenido": sol_completa}],
+            "referencia": [{"nombre": "duplicar.py", "contenido": sol_completa}],
+            "pruebas": [
+                "from duplicar import duplicar\nassert duplicar(2) == 4",
+                "from duplicar import duplicar\nassert duplicar(0) == 0"
+            ]
+        }
+        ai = ModeloFalso([json.dumps(payload)])
+        d = tu.replicar_desde_github(
+            ai, RUNNER, "m", "usuario/repo", "duplicar.py",
+            contenido=sol_completa, lenguaje="python", intentos=1
+        )
+        self.assertEqual(d["titulo"], "Duplicar")
+        # La página de partida debe haber sido auto-vaciada a pass
+        self.assertIn("pass", d["paginas"][0]["contenido"])
+        self.assertNotIn("return x * 2", d["paginas"][0]["contenido"])
+        # La referencia debe conservar la solución
+        self.assertIn("return x * 2", d["privado"]["referencia"][0]["contenido"])
+        self.assertTrue(d["intentos_creacion"][0]["valido"])
+
 
 if __name__ == "__main__":
     unittest.main()

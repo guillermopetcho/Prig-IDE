@@ -220,7 +220,10 @@ int main() {
 '''
 
 ARNES = r'''
-import contextlib, doctest, importlib, io, json, sys, traceback, unittest
+import contextlib, doctest, importlib, io, json, sys, traceback, unittest, builtins
+
+builtins.input = lambda *args, **kwargs: ""
+sys.stdin = io.StringIO("")
 
 MARCA = "__PRIG_RESULTADO__"
 with open("_prig_config.json", encoding="utf-8") as f:
@@ -407,6 +410,7 @@ def comprobar(runner, paginas: List[Dict[str, Any]], privado: Dict[str, Any], ti
         tipo = c.get("tipo")
         test_file = None
         extra_sources = []
+        tiene_h = True
         if tipo in ("cpp_test", "catch2", "unittest"):
             archivos = dict(c.get("archivos") or {})
             if not archivos and "codigo" in c:
@@ -431,6 +435,13 @@ def comprobar(runner, paginas: List[Dict[str, Any]], privado: Dict[str, Any], ti
             for inc in (c.get("includes") or []):
                 if inc not in lineas_h:
                     lineas_h.append(inc)
+
+            tiene_h = bool(lineas_h)
+            if not tiene_h:
+                # Si no hay archivos .h/.hpp, incluir directamente los archivos .cpp en el arnés
+                cpp_files = [p["nombre"] for p in paginas if p["nombre"].endswith(('.cpp', '.cc', '.cxx', '.c')) and p["nombre"] != test_file]
+                for idx, cf in enumerate(cpp_files, 1):
+                    lineas_h.append(f'#define main __prig_disabled_main_{idx}\n#include "{cf}"\n#undef main')
 
             cuerpo_asserts = []
             for i, fragmento in enumerate(c.get("asserts") or [], 1):
@@ -458,12 +469,12 @@ def comprobar(runner, paginas: List[Dict[str, Any]], privado: Dict[str, Any], ti
 
         with Carpeta(paginas, extras) as carpeta:
             carpeta_salida = carpeta
-            todos_fuentes = [
+            todos_fuentes = ([
                 os.path.join(carpeta, p["nombre"])
                 for p in paginas
                 if p["nombre"].endswith(('.cpp', '.cc', '.cxx', '.c')) and p["nombre"] != test_file
                 and not re.search(r"\bint\s+main\s*\(", p.get("contenido") or "")
-            ] + [os.path.join(carpeta, s) for s in extra_sources]
+            ] if tiene_h else []) + [os.path.join(carpeta, s) for s in extra_sources]
             r = runner.run_file(os.path.join(carpeta, test_file), cwd=carpeta, timeout=timeout,
                                 run_id=run_id or f"desafio_{uuid.uuid4().hex[:8]}",
                                 extra_sources=todos_fuentes)
