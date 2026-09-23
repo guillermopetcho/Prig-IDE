@@ -199,7 +199,7 @@ class App {
                 body: JSON.stringify({ path, run_id: this.currentRunId })
             });
             const data = await prigJson(res);
-            window.terminalMgr.setResult(data);
+            window.terminalMgr.setResult(data, path);
         } catch (e) {
             window.terminalMgr.setResult({
                 success: false,
@@ -207,7 +207,7 @@ class App {
                 stderr: 'Error de servidor backend: ' + e,
                 exit_code: 1,
                 elapsed: 0
-            });
+            }, path);
         }
     }
 

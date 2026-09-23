@@ -182,6 +182,19 @@
           .des-orden { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:18px 0; font-size:11px; }
           .des-orden div { background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:8px 4px; }
           .des-orden i { display:block; font-size:16px; margin-bottom:4px; color:var(--accent-blue); }
+          .des-eval-backdrop { position:fixed; inset:0; z-index:100000; background:rgba(10,10,16,.75); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; padding:20px; animation:desFadeIn .2s ease-out; }
+          @keyframes desFadeIn { from { opacity:0; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
+          @keyframes desPulso { 0%, 100% { opacity:.6; transform:scaleX(.95); } 50% { opacity:1; transform:scaleX(1); } }
+          .des-eval-dialog { background:var(--bg-panel, #181825); border:1px solid var(--border-color, #313244); border-radius:14px; width:100%; max-width:680px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 16px 40px rgba(0,0,0,.6); overflow:hidden; }
+          .des-eval-cab { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border-color, #313244); background:rgba(255,255,255,.02); }
+          .des-eval-cuerpo { padding:16px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+          .des-eval-pie { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px 20px; border-top:1px solid var(--border-color, #313244); background:rgba(0,0,0,.2); }
+          .des-eval-score-pill { font-size:15px; font-weight:800; padding:4px 14px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; }
+          .des-eval-score-pill.aprobado { background:rgba(166,227,161,.2); color:var(--accent-green, #a6e3a1); border:1px solid var(--accent-green, #a6e3a1); }
+          .des-eval-score-pill.parcial { background:rgba(249,226,175,.2); color:var(--accent-yellow, #f9e2af); border:1px solid var(--accent-yellow, #f9e2af); }
+          .des-eval-score-pill.error { background:rgba(243,139,168,.2); color:var(--accent-red, #f38ba8); border:1px solid var(--accent-red, #f38ba8); }
+          .des-eval-tarjeta { background:rgba(0,0,0,.25); border:1px solid var(--border-color, #313244); border-radius:8px; padding:12px 14px; }
+          .des-eval-tarjeta-titulo { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent-purple, #cba6f7); font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
         `;
         document.head.appendChild(css);
     }
@@ -1004,6 +1017,8 @@
               <span class="des-mini">${esc(d.nivel || '')}</span>
               ${(d.conceptos || []).slice(0, 5).map(x => `<span class="des-mini">${esc(x)}</span>`).join('')}
               <span style="flex:1"></span>
+              <button class="des-btn primario" id="des-cab-abrir-editor" title="Crear archivo en el espacio de trabajo y resolver en el editor"><i class="fa-solid fa-code"></i> Resolver en el Editor</button>
+              <button class="des-btn morado" id="des-cab-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar con IA</button>
               ${original ? `<button class="des-btn" id="des-traducir">${d.enunciado_es && estado.idioma === 'es' ? '<i class="fa-solid fa-language"></i> Ver original' : '<i class="fa-solid fa-language"></i> Traducir al español'}</button>` : ''}
               ${(d.origen || {}).otras_funciones && d.origen.otras_funciones.length ? `<select id="des-otra-funcion" class="des-campo" style="width:auto;" title="Otra función del mismo archivo"><option value="">Otra función…</option>${d.origen.otras_funciones.map(f => `<option>${esc(f)}</option>`).join('')}</select>` : ''}
             </div>
@@ -1031,6 +1046,7 @@
 
           <section class="des-seccion" id="des-sec-paginas">
             <div class="des-seccion-titulo"><span class="num">4</span> Páginas de código <span style="flex:1"></span>
+              <button class="des-btn primario" id="des-abrir-editor" title="Abrir y programar este archivo en el editor de Prig"><i class="fa-solid fa-code"></i> Resolver en el Editor</button>
               <button class="des-btn" id="des-pagina-nueva"><i class="fa-solid fa-file-circle-plus"></i> Nueva página</button>
               <button class="des-btn" id="des-pagina-importar"><i class="fa-solid fa-file-import"></i> Importar archivo</button>
               <input type="file" id="des-pagina-archivo" accept=".py,.cpp,.hpp,.h,.cc,.cxx,.c,text/x-python,text/x-c,text/x-c++" multiple hidden></div>
@@ -1047,6 +1063,7 @@
               ${d.comprobacion && d.comprobacion.tipo !== 'ninguna'
                 ? `<button class="des-btn primario" id="des-comprobar"><i class="fa-solid fa-circle-check"></i> Comprobar con ${d.comprobacion.pruebas || ''} pruebas</button>`
                 : '<span class="des-ayuda"><i class="fa-solid fa-circle-info"></i> Este desafío no tiene pruebas automáticas: ejecuta tu página y compara el resultado.</span>'}
+              <button class="des-btn morado" id="des-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar salida con IA</button>
               <button class="des-btn amarillo" id="des-pista" ${(p.pistas || 0) >= 3 ? 'disabled' : ''}><i class="fa-solid fa-lightbulb"></i> Pista ${(p.pistas || 0) ? `(${Math.min(p.pistas, 3)}/3)` : ''}</button>
               ${d.pistas_fuente ? '<button class="des-btn amarillo" id="des-pista-autor"><i class="fa-solid fa-book"></i> Pistas del autor</button>' : ''}
               ${d.comprobacion && d.comprobacion.tipo !== 'ninguna' ? `<button class="des-btn rojo" id="des-solucion"><i class="fa-solid fa-flag"></i> ${d.solucion_disponible ? 'Ver solución' : 'Rendirme y ver solución'}</button>` : ''}
@@ -1087,6 +1104,7 @@
             </div>
             <div class="des-fila" style="justify-content:center; margin-top:10px; gap:8px; flex-wrap:wrap;">
               <button class="des-btn primario" id="des-rapido-crear"><i class="fa-solid fa-wand-magic-sparkles"></i> Armar desafío con IA</button>
+              <button class="des-btn morado" id="des-rapido-sorpresa" title="Generar un desafío sorpresa aleatorio con IA"><i class="fa-solid fa-dice"></i> Desafío sorpresa</button>
               <button class="des-btn" id="des-rapido-internet"><i class="fa-solid fa-globe"></i> Buscar desafíos</button>
               <button class="des-btn morado" id="des-rapido-analizar"><i class="fa-solid fa-brain"></i> Analizar propuesta</button>
             </div>
@@ -1129,6 +1147,42 @@
             if (!tema()) return avisarRapidoVacio();
             crearConModelo({ tema: tema(), nivel: $('des-rapido-nivel').value, lenguaje: langSel ? langSel.value : estado.lenguaje });
         };
+        const TEMAS_SORPRESA = {
+            python: [
+                "Búsqueda binaria y cotas de complejidad",
+                "Manejo de cadenas: detector y contador de anagramas",
+                "Árbol binario de búsqueda y recorridos",
+                "Pila y cola: verificador de paréntesis balanceados",
+                "Programación dinámica: subsecuencia común más larga (LCS)",
+                "Algoritmo de ordenamiento rápido (Quicksort)",
+                "Compresión de cadenas Run-Length Encoding (RLE)",
+                "Detección de ciclos en grafos o listas enlazadas",
+                "Simulación de autómata celular (Juego de la Vida)",
+                "Algoritmo Voraz (Greedy) para asignación de intervalos"
+            ],
+            cpp: [
+                "Punteros inteligentes (std::unique_ptr) y semántica de movimiento",
+                "Algoritmos STL y lambdas en C++20",
+                "Implementación de vector dinámico con templates",
+                "Árbol binario de búsqueda con smart pointers",
+                "Algoritmo de Dijkstra con std::priority_queue",
+                "Sobrecarga de operadores y clase Matrix",
+                "Parsing de expresiones aritméticas con std::stack",
+                "Contenedor asociativo con std::unordered_map",
+                "Manipulación con std::string_view",
+                "Cola de prioridad y heap personalizado"
+            ]
+        };
+        const btnSorpresa = $('des-rapido-sorpresa');
+        if (btnSorpresa) {
+            btnSorpresa.onclick = () => {
+                const lang = langSel ? langSel.value : estado.lenguaje;
+                const lista = TEMAS_SORPRESA[lang] || TEMAS_SORPRESA.python;
+                const t = lista[Math.floor(Math.random() * lista.length)];
+                $('des-rapido').value = t;
+                crearConModelo({ tema: t, nivel: $('des-rapido-nivel').value, lenguaje: lang });
+            };
+        }
         $('des-rapido-internet').onclick = () => {
             if (!tema()) return avisarRapidoVacio();
             estado.internet.tema = tema();
@@ -1636,7 +1690,440 @@
         on('des-pista', () => pedirPista(false));
         on('des-pista-autor', () => pedirPista(true));
         on('des-solucion', verSolucion);
+        on('des-cab-abrir-editor', () => abrirEnEditor(d));
+        on('des-abrir-editor', () => abrirEnEditor(d));
+        on('des-cab-evaluar-ia', () => {
+            if (window.desafiosEvaluador) window.desafiosEvaluador.evaluarDesafio(d);
+        });
+        on('des-evaluar-ia', () => {
+            if (window.desafiosEvaluador) window.desafiosEvaluador.evaluarDesafio(d);
+        });
     }
+
+    // ================================================================== integración con el editor de código
+    function slugify(texto) {
+        return String(texto || 'desafio')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 36) || 'desafio';
+    }
+
+    function generarCabeceraArchivo(d, paginaNombre, lenguaje) {
+        const esCpp = lenguaje === 'cpp' || /\.(cpp|hpp|h|cc|cxx|c)$/i.test(paginaNombre);
+        const pref = esCpp ? '//' : '#';
+        const barra = pref + ' ' + '='.repeat(76);
+        const sep = pref + ' ' + '-'.repeat(76);
+        const enunciadoRaw = (d.enunciado_es || d.enunciado || '').trim();
+        const lineasEnunciado = enunciadoRaw ? enunciadoRaw.split('\n').map(l => `${pref} ${l}`).join('\n') : `${pref} (Sin descripción)`;
+
+        return [
+            barra,
+            `${pref} Prig-Desafio-ID: ${d.id}`,
+            `${pref} Desafío: ${d.titulo || 'Sin título'}`,
+            `${pref} Nivel: ${(d.nivel || 'intermedio').toUpperCase()} | Lenguaje: ${esCpp ? 'C++' : 'Python'}`,
+            sep,
+            `${pref} ENUNCIADO:`,
+            lineasEnunciado,
+            sep,
+            `${pref} INSTRUCCIONES:`,
+            `${pref} 1. Programa tu solución en este archivo.`,
+            `${pref} 2. Presiona F5 para ejecutar y probar tu solución en la Terminal.`,
+            `${pref} 3. Haz clic en "🤖 Evaluar salida con IA" en la Terminal (o usa Ctrl+Shift+E)`,
+            `${pref}    para que el modelo analice tu código y la salida de la consola.`,
+            barra,
+            ''
+        ].join('\n');
+    }
+
+    async function abrirEnEditor(desafio = null) {
+        const d = desafio || estado.d;
+        if (!d) return alert('No hay ningún desafío seleccionado.');
+
+        guardarAhora();
+
+        const lang = d.lenguaje || estado.lenguaje || 'python';
+        const slug = slugify(d.titulo || 'desafio') + (d.id ? `_${String(d.id).slice(-6)}` : '');
+        const carpeta = `desafios/${slug}`;
+        const paginas = paginasActuales();
+
+        if (!paginas.length) {
+            const nomDef = lang === 'cpp' ? 'solucion.cpp' : 'solucion.py';
+            paginas.push({ nombre: nomDef, contenido: '', descripcion: 'Solución' });
+        }
+
+        let rutaPrincipal = null;
+
+        for (const p of paginas) {
+            const rutaArchivo = `${carpeta}/${p.nombre}`;
+            if (!rutaPrincipal && !p.nombre.endsWith('.h') && !p.nombre.endsWith('.hpp')) {
+                rutaPrincipal = rutaArchivo;
+            }
+
+            let existe = false;
+            try {
+                const check = await fetch(`/api/file?path=${encodeURIComponent(rutaArchivo)}`);
+                if (check.ok) existe = true;
+            } catch (e) { existe = false; }
+
+            if (!existe) {
+                let contenido = p.contenido || '';
+                if (!contenido.includes('Prig-Desafio-ID:')) {
+                    const cab = generarCabeceraArchivo(d, p.nombre, lang);
+                    contenido = cab + '\n' + contenido;
+                }
+                try {
+                    await fetch('/api/file', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path: rutaArchivo, content: contenido })
+                    });
+                } catch (e) {
+                    console.error('Error creando archivo de desafío:', e);
+                }
+            }
+        }
+
+        if (!rutaPrincipal) {
+            rutaPrincipal = `${carpeta}/${paginas[0].nombre}`;
+        }
+
+        if (window.fileTreeMgr && window.fileTreeMgr.loadTree) {
+            window.fileTreeMgr.loadTree();
+        }
+
+        if (window.workArea && window.workArea.activar) {
+            window.workArea.activar('editor');
+        }
+
+        if (window.editorMgr && window.editorMgr.openFileByPath) {
+            await window.editorMgr.openFileByPath(rutaPrincipal);
+        }
+
+        if (window.terminalMgr) {
+            window.terminalMgr.appendLine(`\n[Desafío "${d.titulo}" abierto en el editor: ${rutaPrincipal}]`, 'info');
+            window.terminalMgr.appendLine(`[Instrucciones: Programa tu solución, presiona F5 para ejecutar y luego haz clic en "Evaluar con IA"]\n`, 'info');
+        }
+    }
+
+    function resolverEnEditorActivo() {
+        if (estado.d) {
+            return abrirEnEditor(estado.d);
+        }
+        abrir();
+    }
+
+    function solicitarCreacionRapida(temaOpcional = null, nivelOpcional = null, lenguajeOpcional = null) {
+        if (temaOpcional) {
+            return crearConModelo({
+                tema: temaOpcional,
+                nivel: nivelOpcional || 'intermedio',
+                lenguaje: lenguajeOpcional || estado.lenguaje
+            });
+        }
+        if (estado.d) {
+            const tema = prompt('Escribe el tema o concepto a practicar (ej: "Recursión", "Búsqueda binaria"):');
+            if (tema && tema.trim()) {
+                crearConModelo({
+                    tema: tema.trim(),
+                    nivel: nivelOpcional || 'intermedio',
+                    lenguaje: lenguajeOpcional || estado.lenguaje
+                });
+            }
+        } else {
+            const inp = $('des-rapido');
+            if (inp) {
+                inp.focus();
+                inp.select();
+            }
+        }
+    }
+
+    // ================================================================== evaluador con IA
+    let modalEl = null;
+
+    function cerrarModalEvaluacion() {
+        if (modalEl) {
+            modalEl.remove();
+            modalEl = null;
+        }
+    }
+
+    function mostrarModalResultado(resultado, ctx = {}) {
+        cerrarModalEvaluacion();
+
+        modalEl = document.createElement('div');
+        modalEl.id = 'des-eval-modal-backdrop';
+        modalEl.className = 'des-eval-backdrop';
+
+        if (resultado.cargando) {
+            modalEl.innerHTML = `
+              <div class="des-eval-dialog" style="max-width:440px; text-align:center; padding:32px 24px;">
+                <i class="fa-solid fa-brain fa-bounce" style="font-size:38px; color:var(--accent-purple); margin-bottom:16px;"></i>
+                <h3 style="margin:0 0 8px; color:#fff; font-size:18px;">Evaluando solución con IA...</h3>
+                <p style="color:var(--text-muted); font-size:12.5px; line-height:1.5; margin:0 0 16px;">
+                  El modelo está analizando el código, la salida de la terminal y los requisitos del desafío.
+                </p>
+                <div class="des-barra-prog" style="width:100%;"><div style="width:75%; animation: desPulso 1.5s infinite ease-in-out;"></div></div>
+              </div>
+            `;
+            document.body.appendChild(modalEl);
+            return;
+        }
+
+        if (resultado.error) {
+            modalEl.innerHTML = `
+              <div class="des-eval-dialog" style="max-width:480px;">
+                <div class="des-eval-cab">
+                  <span style="font-weight:700; color:var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i> Error de evaluación</span>
+                  <button class="des-btn" data-cerrar><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="des-eval-cuerpo">
+                  <div class="des-error">${esc(resultado.error)}</div>
+                </div>
+                <div class="des-eval-pie">
+                  <button class="des-btn" data-cerrar>Cerrar</button>
+                  <button class="des-btn morado" id="des-eval-reintentar"><i class="fa-solid fa-rotate"></i> Reintentar</button>
+                </div>
+              </div>
+            `;
+            modalEl.querySelectorAll('[data-cerrar]').forEach(b => b.onclick = cerrarModalEvaluacion);
+            const btnReint = modalEl.querySelector('#des-eval-reintentar');
+            if (btnReint) btnReint.onclick = () => {
+                if (ctx.reintentar) ctx.reintentar();
+            };
+            document.body.appendChild(modalEl);
+            return;
+        }
+
+        const ev = resultado;
+        const cal = ev.calificacion !== undefined ? ev.calificacion : (ev.aprobado ? 10 : 5);
+        const est = ev.aprobado ? 'aprobado' : (ev.estado === 'parcial' ? 'parcial' : 'error');
+        const estTexto = ev.aprobado ? '¡DESAFÍO SUPERADO!' : (ev.estado === 'parcial' ? 'CASI LISTO' : 'REVISIÓN REQUERIDA');
+        const estIcono = ev.aprobado ? 'fa-circle-check' : (ev.estado === 'parcial' ? 'fa-circle-half-stroke' : 'fa-circle-xmark');
+
+        let salidaHtml = '';
+        if (ctx.salida || ctx.stderr) {
+            salidaHtml = `
+              <div style="font-family:'Fira Code',monospace; font-size:11.5px; background:rgba(0,0,0,0.4); border-radius:6px; padding:8px 10px; max-height:120px; overflow-y:auto; margin-bottom:8px;">
+                ${ctx.salida ? `<div style="color:var(--text-main); white-space:pre-wrap;">${esc(ctx.salida.slice(0, 1000))}</div>` : ''}
+                ${ctx.stderr ? `<div style="color:var(--accent-red); white-space:pre-wrap;">${esc(ctx.stderr.slice(0, 1000))}</div>` : ''}
+              </div>
+            `;
+        }
+
+        modalEl.innerHTML = `
+          <div class="des-eval-dialog">
+            <div class="des-eval-cab">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="des-eval-score-pill ${est}">
+                  <i class="fa-solid ${estIcono}"></i> ${cal} / 10
+                </div>
+                <div>
+                  <div style="font-weight:700; color:#fff; font-size:14px;">${estTexto}</div>
+                  <div style="font-size:11px; color:var(--text-muted);">${esc(ctx.titulo || 'Evaluación con IA de Prig')}</div>
+                </div>
+              </div>
+              <button class="des-btn" data-cerrar title="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="des-eval-cuerpo">
+              ${ev.resumen ? `<div style="font-size:13px; font-weight:600; line-height:1.5; color:var(--text-main); padding:8px 12px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:3px solid var(--accent-purple);">${esc(ev.resumen)}</div>` : ''}
+
+              <div class="des-eval-tarjeta">
+                <div class="des-eval-tarjeta-titulo"><i class="fa-solid fa-terminal"></i> Análisis de la salida de consola (Exit Code: ${ctx.exitCode ?? 0})</div>
+                ${salidaHtml}
+                <div class="des-md" style="font-size:12.5px;">${md(ev.analisis_salida || 'Sin observaciones sobre la salida.')}</div>
+              </div>
+
+              <div class="des-eval-tarjeta">
+                <div class="des-eval-tarjeta-titulo"><i class="fa-solid fa-code"></i> Revisión del código</div>
+                <div class="des-md" style="font-size:12.5px;">${md(ev.analisis_codigo || 'Código revisado sin incidencias mayores.')}</div>
+              </div>
+
+              ${ev.consejos && ev.consejos.length ? `
+                <div class="des-eval-tarjeta">
+                  <div class="des-eval-tarjeta-titulo"><i class="fa-solid fa-lightbulb"></i> Sugerencias y buenas prácticas</div>
+                  <ul style="margin:4px 0 0; padding-left:18px; font-size:12px; line-height:1.55; color:var(--text-main);">
+                    ${ev.consejos.map(c => `<li>${esc(c)}</li>`).join('')}
+                  </ul>
+                </div>` : ''}
+
+              ${ev.resultado_pruebas && ev.resultado_pruebas.total ? `
+                <div class="des-eval-tarjeta">
+                  <div class="des-eval-tarjeta-titulo"><i class="fa-solid fa-vial-circle-check"></i> Pruebas automatizadas</div>
+                  <div style="font-size:12px; color:var(--text-muted);">
+                    ${ev.resultado_pruebas.pasados} de ${ev.resultado_pruebas.total} pruebas completadas con éxito.
+                  </div>
+                </div>` : ''}
+            </div>
+
+            <div class="des-eval-pie">
+              <button class="des-btn" data-cerrar><i class="fa-solid fa-code"></i> Volver al Editor</button>
+              ${ctx.desafioId ? `<button class="des-btn azul" id="des-eval-ir-desafios"><i class="fa-solid fa-chess-knight"></i> Ver en Desafíos</button>` : ''}
+              <button class="des-btn morado" id="des-eval-repetir"><i class="fa-solid fa-rotate"></i> Volver a evaluar</button>
+            </div>
+          </div>
+        `;
+
+        modalEl.querySelectorAll('[data-cerrar]').forEach(b => b.onclick = () => {
+            cerrarModalEvaluacion();
+            if (window.workArea && window.workArea.activar) window.workArea.activar('editor');
+        });
+
+        const btnDes = modalEl.querySelector('#des-eval-ir-desafios');
+        if (btnDes && ctx.desafioId) {
+            btnDes.onclick = () => {
+                cerrarModalEvaluacion();
+                abrir({ id: ctx.desafioId });
+            };
+        }
+
+        const btnRep = modalEl.querySelector('#des-eval-repetir');
+        if (btnRep) {
+            btnRep.onclick = () => {
+                if (ctx.reintentar) ctx.reintentar();
+            };
+        }
+
+        modalEl.onclick = (e) => {
+            if (e.target === modalEl) cerrarModalEvaluacion();
+        };
+
+        document.body.appendChild(modalEl);
+    }
+
+    async function evaluarDesafio(desafio = null, paginas = null) {
+        const d = desafio || estado.d;
+        if (!d) return alert('No hay un desafío abierto.');
+
+        guardarAhora();
+        const pags = paginas || paginasActuales();
+        const salida = (window.terminalMgr && window.terminalMgr.lastResult) ? (window.terminalMgr.lastResult.stdout || '') : '';
+        const stderr = (window.terminalMgr && window.terminalMgr.lastResult) ? (window.terminalMgr.lastResult.stderr || '') : '';
+        const exitCode = (window.terminalMgr && window.terminalMgr.lastResult && window.terminalMgr.lastResult.exit_code !== undefined)
+            ? window.terminalMgr.lastResult.exit_code : 0;
+
+        mostrarModalResultado({ cargando: true });
+
+        const reintentar = () => evaluarDesafio(d, pags);
+
+        try {
+            const res = await fetch('/api/desafios/evaluar-salida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    desafio_id: d.id,
+                    paginas: pags,
+                    salida: salida,
+                    stderr: stderr,
+                    exit_code: exitCode,
+                    modelo: estado.modelo
+                })
+            });
+
+            if (!res.ok) throw new Error(await window.prigErrorDetail(res));
+            const data = await res.json();
+
+            if (data.aprobado && d) {
+                d.progreso = d.progreso || {};
+                d.progreso.estado = 'resuelto';
+                pintarContadores();
+                if (typeof panelMis === 'function') panelMis();
+            }
+
+            mostrarModalResultado(data, {
+                desafioId: d.id,
+                titulo: d.titulo,
+                salida, stderr, exitCode,
+                reintentar
+            });
+        } catch (e) {
+            mostrarModalResultado({ error: e.message }, { reintentar });
+        }
+    }
+
+    async function evaluarArchivoActivo(opciones = {}) {
+        let ruta = opciones.filePath || (window.editorMgr && window.editorMgr.getActivePath ? window.editorMgr.getActivePath() : null);
+        let codigo = (window.editorMgr && window.editorMgr.getContent ? window.editorMgr.getContent() : '') || '';
+
+        if (!codigo && ruta) {
+            try {
+                const res = await fetch(`/api/file?path=${encodeURIComponent(ruta)}`);
+                if (res.ok) {
+                    const fData = await res.json();
+                    codigo = fData.content || '';
+                }
+            } catch (e) {}
+        }
+
+        if (!codigo && !ruta) {
+            return alert('Abre un archivo de solución en el editor para evaluarlo.');
+        }
+
+        let desafioId = opciones.desafioId || null;
+        if (!desafioId && codigo) {
+            const m = codigo.match(/(?:#|\/\/)\s*Prig-Desafio-ID:\s*([^\r\n]+)/i);
+            if (m && m[1].trim()) desafioId = m[1].trim();
+        }
+        if (!desafioId && estado.d && estado.d.id) {
+            desafioId = estado.d.id;
+        }
+
+        const nombre = ruta ? ruta.split(/[/\\]/).pop() : (codigo.includes('#include') ? 'solucion.cpp' : 'solucion.py');
+        const paginas = [{ nombre, contenido: codigo, descripcion: 'Archivo de solución' }];
+
+        const salida = opciones.salida !== undefined ? opciones.salida : (window.terminalMgr?.lastResult?.stdout || '');
+        const stderr = opciones.stderr !== undefined ? opciones.stderr : (window.terminalMgr?.lastResult?.stderr || '');
+        const exitCode = opciones.exitCode !== undefined ? opciones.exitCode : (window.terminalMgr?.lastResult?.exit_code ?? 0);
+
+        mostrarModalResultado({ cargando: true });
+
+        const reintentar = () => evaluarArchivoActivo(opciones);
+
+        try {
+            const res = await fetch('/api/desafios/evaluar-salida', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    desafio_id: desafioId,
+                    paginas: paginas,
+                    salida: salida,
+                    stderr: stderr,
+                    exit_code: exitCode,
+                    modelo: estado.modelo
+                })
+            });
+
+            if (!res.ok) throw new Error(await window.prigErrorDetail(res));
+            const data = await res.json();
+
+            if (data.aprobado && estado.d && (!desafioId || estado.d.id === desafioId)) {
+                estado.d.progreso = estado.d.progreso || {};
+                estado.d.progreso.estado = 'resuelto';
+                pintarContadores();
+                if (typeof panelMis === 'function') panelMis();
+            }
+
+            mostrarModalResultado(data, {
+                desafioId: desafioId,
+                titulo: estado.d ? estado.d.titulo : nombre,
+                salida, stderr, exitCode,
+                reintentar
+            });
+        } catch (e) {
+            mostrarModalResultado({ error: e.message }, { reintentar });
+        }
+    }
+
+    window.desafiosEvaluador = {
+        evaluarDesafio,
+        evaluarArchivoActivo,
+        mostrarModalResultado,
+        cerrarModal: cerrarModalEvaluacion
+    };
 
     // ================================================================== entrada pública
     /**
@@ -1669,5 +2156,13 @@
     }
 
     window.addEventListener('beforeunload', guardarAhora);
-    window.Desafios = { abrir, estado };
+    window.Desafios = {
+        abrir,
+        estado,
+        abrirEnEditor,
+        resolverEnEditorActivo,
+        solicitarCreacionRapida,
+        crearConModelo,
+        evaluarDesafio
+    };
 })();

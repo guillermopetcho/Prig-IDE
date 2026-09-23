@@ -336,6 +336,12 @@
           run: () => window.notebookMgr.restartSession() },
         { id: 'ejecutar.limpiarConsola', menu: 'Ejecutar', label: 'Limpiar consola', accel: 'Ctrl+K Ctrl+K', separadorAntes: true,
           run: () => window.terminalMgr.clear() },
+        { id: 'desafios.evaluarSalida', menu: 'Ejecutar', label: 'Desafíos: Evaluar con IA (código y salida)', accel: 'Ctrl+Shift+E', separadorAntes: true,
+          run: () => { if (window.desafiosEvaluador) window.desafiosEvaluador.evaluarArchivoActivo(); } },
+        { id: 'desafios.abrirEnEditor', menu: 'Ejecutar', label: 'Desafíos: Resolver en el editor',
+          run: () => { if (window.Desafios && window.Desafios.resolverEnEditorActivo) window.Desafios.resolverEnEditorActivo(); } },
+        { id: 'desafios.crearConIA', menu: 'Ejecutar', label: 'Desafíos: Crear con IA…',
+          run: () => { if (window.Desafios) { window.Desafios.abrir(); window.Desafios.solicitarCreacionRapida(); } } },
 
         // ---------------- Secciones ----------------
         // Grupo 1: Inicio, Perfil, Biblioteca, Desafíos, Diagramas, Papers, Agenticos

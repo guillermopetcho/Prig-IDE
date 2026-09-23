@@ -5278,6 +5278,19 @@ class DesafioAnalizarPropuestaRequest(BaseModel):
     modelo: Optional[str] = None
 
 
+class DesafioEvaluarSalidaRequest(BaseModel):
+    id: Optional[str] = None
+    titulo: Optional[str] = None
+    enunciado: Optional[str] = None
+    lenguaje: Optional[str] = "python"
+    codigo: str = ""
+    nombre_archivo: Optional[str] = "solucion.py"
+    salida: str = ""
+    stderr: Optional[str] = ""
+    exit_code: int = 0
+    modelo: Optional[str] = None
+
+
 class YouTubeAnalisisRequest(BaseModel):
     video_id: str
     titulo: str
@@ -5804,6 +5817,77 @@ def desafios_analizar_propuesta(req: DesafioAnalizarPropuestaRequest):
                                                                req.lenguaje or "python",
                                                                req.nivel or "intermedio"), avisar)}
     return _ndjson_en_hilo(trabajo)
+
+
+@app.post("/api/desafios/evaluar-salida")
+def desafios_evaluar_salida(req: DesafioEvaluarSalidaRequest):
+    """ El modelo evalúa la solución del alumno analizando tanto el código como la salida de ejecución. """
+    d = None
+    if req.id:
+        try:
+            d = _desafio(desafios_almacen.obtener, req.id)
+        except Exception:
+            d = None
+
+    if not d:
+        d = {
+            "id": req.id or "desafio_editor",
+            "titulo": req.titulo or "Desafío de programación",
+            "enunciado": req.enunciado or "Desafío resuelto en el editor de código.",
+            "nivel": "intermedio",
+            "lenguaje": req.lenguaje or "python",
+            "paginas": [{"nombre": req.nombre_archivo or "solucion.py", "contenido": req.codigo}]
+        }
+
+    paginas = [{"nombre": req.nombre_archivo or "solucion.py", "contenido": req.codigo}]
+
+    # Si el desafío tiene pruebas internas, correr comprobación automatizada para enriquecer la evaluación
+    resultado_pruebas = None
+    if d and d.get("privado") and d.get("privado", {}).get("pruebas"):
+        try:
+            resultado_pruebas = _desafio(
+                des_ejec.comprobar,
+                runner,
+                paginas,
+                d.get("privado") or {},
+                run_id=f"eval_{d.get('id', 'editor')}"
+            )
+        except Exception as e:
+            print(f"Comprobación automática opcional no pudo ejecutarse: {e}")
+
+    modelo = _modelo_desafios(req.modelo, "codigo")
+    motor, nombre_modelo = _motor_desafios(modelo)
+
+    resultado = des_tutor.evaluar_con_salida(
+        ai=motor,
+        modelo=nombre_modelo,
+        d=d,
+        paginas=paginas,
+        salida=req.salida or "",
+        stderr=req.stderr or "",
+        exit_code=req.exit_code,
+        resultado_pruebas=resultado_pruebas
+    )
+
+    # Si es un desafío guardado y la solución fue aprobada, actualizar progreso
+    if req.id and d and resultado.get("aprobado"):
+        try:
+            def cambio(x):
+                x["paginas_usuario"] = paginas
+                if "progreso" in x:
+                    x["progreso"]["estado"] = "resuelto"
+                    x["progreso"]["intentos"] = x["progreso"].get("intentos", 0) + 1
+            desafios_almacen.modificar(req.id, cambio)
+            _registrar_telemetria(d, "submission", passed=True, hints_used=0, stderr=req.stderr or "", elapsed=0)
+        except Exception as e:
+            print(f"No se pudo actualizar estado en almacén: {e}")
+
+    return {
+        "ok": True,
+        "evaluacion": resultado,
+        "desafio_id": req.id,
+        "pruebas_automatizadas": resultado_pruebas
+    }
 
 
 @app.post("/api/youtube/analizar")

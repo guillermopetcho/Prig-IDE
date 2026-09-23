@@ -683,3 +683,93 @@ def chat(ai, modelo: str, mensajes: List[Dict[str, str]], d: Optional[Dict[str, 
 def conversacion_como_contexto(mensajes: List[Dict[str, str]]) -> str:
     return "\n".join(f"{'Alumno' if m.get('rol') == 'usuario' else 'Tutor'}: {str(m.get('texto'))[:800]}"
                      for m in (mensajes or [])[-10:])
+
+
+# ===========================================================================
+# Evaluación de la solución y salida por el modelo
+# ===========================================================================
+
+SISTEMA_EVALUAR_SALIDA = """Eres un TUTOR Y EVALUADOR EXPERTO DE PROGRAMACIÓN.
+Tu misión es evaluar la solución del alumno para un desafío de programación.
+Debes analizar detalladamente:
+1. El CÓDIGO que programó el alumno.
+2. La SALIDA que produjo al ejecutarse (código de salida, stdout, stderr).
+3. El resultado de las pruebas automatizadas (si las hay).
+
+Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown ni bloques ```json alrededor) con este formato exacto:
+{
+  "aprobado": true o false,
+  "calificacion": número entero del 1 al 10,
+  "estado": "aprobado" | "parcial" | "error",
+  "resumen": "Resumen conciso en 1 o 2 oraciones del veredicto.",
+  "analisis_salida": "Qué imprimió el programa y por qué cumple o no con lo que pide el enunciado.",
+  "analisis_codigo": "Calidad, lógica, buenas prácticas, legibilidad y posibles casos límite.",
+  "consejos": ["Consejo 1...", "Consejo 2..."]
+}
+
+REGLAS DE EVALUACIÓN:
+1. 'aprobado' es true SOLO si el código corre limpiamente (exit_code 0 y sin excepciones no controladas) Y la salida/lógica cumple satisfactoriamente con el objetivo del desafío.
+2. Si el proceso falló con errores de sintaxis, excepciones (Traceback) o la salida no cumple lo pedido, 'aprobado' debe ser false y 'estado' debe ser 'error'.
+3. Si el alumno casi lo logra pero le faltó un caso o tuvo un fallo menor, califica con 6-7, 'aprobado' es false y 'estado' es 'parcial'.
+4. Si la solución es excelente, califica con 9-10 y 'aprobado' es true.
+5. Sé pedagógico, motivador y claro en español."""
+
+
+def evaluar_con_salida(ai, modelo: str, d: Dict[str, Any], paginas: List[Dict[str, Any]],
+                       salida: str, stderr: str = "", exit_code: int = 0,
+                       resultado_pruebas: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    lenguaje = d.get("lenguaje") or "python"
+    titulo = d.get("titulo") or "Desafío de programación"
+    enunciado = _enunciado(d)
+    codigo_str = _paginas_texto(paginas, 6000)
+
+    pruebas_info = ""
+    if resultado_pruebas:
+        pruebas_info = (f"\nPRUEBAS AUTOMATIZADAS:\n"
+                        f"- Total: {resultado_pruebas.get('total', 0)}\n"
+                        f"- Pasadas: {resultado_pruebas.get('pasados', 0)}\n"
+                        f"- Aprobado: {resultado_pruebas.get('aprobado', False)}\n")
+        if resultado_pruebas.get("fallos"):
+            pruebas_info += "- Fallos detectados:\n" + "\n".join(
+                f"  * {f.get('nombre', '')}: {f.get('mensaje', '')}" for f in resultado_pruebas["fallos"][:4]
+            )
+
+    prompt = (
+        f"LENGUAJE: {lenguaje}\n"
+        f"DESAFÍO: {titulo}\n"
+        f"NIVEL: {d.get('nivel', 'intermedio')}\n\n"
+        f"ENUNCIADO Y REQUISITOS:\n{enunciado[:4000]}\n\n"
+        f"CÓDIGO DEL ALUMNO:\n{codigo_str}\n\n"
+        f"RESULTADO DE LA EJECUCIÓN DEL ALUMNO:\n"
+        f"- Código de salida (Exit Code): {exit_code}\n"
+        f"- STDOUT:\n{salida[:4000] if salida else '(vacío)'}\n"
+        f"- STDERR:\n{stderr[:2000] if stderr else '(vacío)'}\n"
+        f"{pruebas_info}\n"
+        f"Evalúa la solución y responde ÚNICAMENTE con el JSON solicitado."
+    )
+
+    respuesta_texto = generar(ai, modelo, prompt, SISTEMA_EVALUAR_SALIDA, temperatura=0.2)
+    try:
+        if hasattr(ai, "_extract_and_parse_json"):
+            datos = ai._extract_and_parse_json(respuesta_texto)
+        else:
+            import json as _json
+            m = re.search(r"\{[\s\S]*\}", respuesta_texto)
+            datos = _json.loads(m.group(0)) if m else {}
+    except Exception:
+        datos = {}
+
+    if not isinstance(datos, dict) or not datos.get("resumen"):
+        aprobado = (exit_code == 0 and not stderr and ("aprobado" in respuesta_texto.lower() or "correcto" in respuesta_texto.lower()))
+        datos = {
+            "aprobado": aprobado,
+            "calificacion": 8 if aprobado else 4,
+            "estado": "aprobado" if aprobado else "error",
+            "resumen": respuesta_texto[:250].strip() or ("Solución evaluada." if aprobado else "La ejecución tuvo observaciones."),
+            "analisis_salida": f"Salida observada (exit code {exit_code}).",
+            "analisis_codigo": "Revisa la lógica y los casos de prueba.",
+            "consejos": ["Comprueba los casos borde y optimiza la eficiencia."]
+        }
+
+    return datos
+
