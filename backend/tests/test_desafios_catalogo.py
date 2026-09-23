@@ -110,6 +110,37 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         self.assertGreaterEqual(len(destacados_jake["archivos"]), 5)
         self.assertTrue(any(a["nombre"].endswith(".ipynb") for a in destacados_jake["archivos"]))
 
+    def test_categoria_cursos_notebooks_cpp(self):
+        cursos_cpp = [r for r in cat.listar_repositorios(categoria="cursos_notebooks") if "cpp" in r["lenguajes"]]
+        self.assertGreaterEqual(len(cursos_cpp), 4)
+        self.assertTrue(any(r["ref"] == "rambasnet/CPP-Fundamentals" for r in cursos_cpp))
+        self.assertTrue(any(r["ref"] == "changkun/modern-cpp-tutorial" for r in cursos_cpp))
+        self.assertTrue(any(r["ref"] == "PacktPublishing/The-Modern-Cpp-Challenge" for r in cursos_cpp))
+        self.assertTrue(any(r["ref"] == "hsf-training/cpluspluscourse" for r in cursos_cpp))
+
+        # Verificar cuadernos Jupyter de C++
+        destacados_ram = cat.listar_ejercicios_repo("rambasnet/CPP-Fundamentals")
+        self.assertGreaterEqual(len(destacados_ram["archivos"]), 5)
+        self.assertTrue(any(a["nombre"].endswith(".ipynb") and a["lenguaje"] == "cpp" for a in destacados_ram["archivos"]))
+
+        # Verificar código de C++ moderno
+        destacados_changkun = cat.listar_ejercicios_repo("changkun/modern-cpp-tutorial")
+        self.assertGreaterEqual(len(destacados_changkun["archivos"]), 5)
+        self.assertTrue(any(a["nombre"].endswith(".cpp") and a["lenguaje"] == "cpp" for a in destacados_changkun["archivos"]))
+
+        # Verificar patrones de diseño GoF y proyectos gráficos
+        repo_patrones = cat.obtener_repositorio("JakubVojvoda/design-patterns-cpp")
+        self.assertIsNotNone(repo_patrones)
+        self.assertIn("cpp", repo_patrones["lenguajes"])
+
+        repo_renderer = cat.obtener_repositorio("ssloy/tinyrenderer")
+        self.assertIsNotNone(repo_renderer)
+        self.assertIn("cpp", repo_renderer["lenguajes"])
+
+        repo_raytracing = cat.obtener_repositorio("RayTracing/raytracing.github.io")
+        self.assertIsNotNone(repo_raytracing)
+        self.assertIn("cpp", repo_raytracing["lenguajes"])
+
     def test_obtener_repositorio(self):
         repo = cat.obtener_repositorio("TheAlgorithms/Python")
         self.assertIsNotNone(repo)

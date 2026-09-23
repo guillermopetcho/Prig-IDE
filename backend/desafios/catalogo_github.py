@@ -517,6 +517,102 @@ CATALOGO_REPOSITORIOS_GITHUB: List[Dict[str, Any]] = [
         "licencia": "MIT",
         "estrellas_aprox": "5.5k",
         "dificultad": "principiante"
+    },
+    {
+        "ref": "rambasnet/CPP-Fundamentals",
+        "nombre": "C++ Fundamentals (Jupyter Notebooks)",
+        "descripcion": "Curso universitario completo de C++ CS1/CS2 basado en 'Think C++' y desarrollado íntegramente en cuadernos Jupyter interactivos con kernel xeus-cling: sintaxis, punteros, clases, STL, lambdas y testing.",
+        "lenguajes": ["cpp"],
+        "categoria": "cursos_notebooks",
+        "etiquetas": ["curso", "notebooks", "c++", "xeus-cling", "punteros", "poo", "stl", "testing"],
+        "ruta_ejercicios": "notebooks",
+        "licencia": "MIT",
+        "estrellas_aprox": "500",
+        "dificultad": "principiante a intermedio"
+    },
+    {
+        "ref": "changkun/modern-cpp-tutorial",
+        "nombre": "Modern C++ Tutorial: C++11 to C++26 On the Fly",
+        "descripcion": "Tutorial exhaustivo de C++ moderno (C++11/14/17/20/23/26) con código fuente modular por capítulo y ejercicios prácticos resueltos: lambdas, punteros inteligentes, semántica de movimiento, concepts y concurrencia.",
+        "lenguajes": ["cpp"],
+        "categoria": "cursos_notebooks",
+        "etiquetas": ["curso", "modern-cpp", "c++20", "c++23", "smart-pointers", "move-semantics", "concurrencia", "ejercicios"],
+        "ruta_ejercicios": "code",
+        "licencia": "MIT",
+        "estrellas_aprox": "25k",
+        "dificultad": "intermedio a avanzado"
+    },
+    {
+        "ref": "PacktPublishing/The-Modern-Cpp-Challenge",
+        "nombre": "The Modern C++ Challenge (100 Retos Prácticos)",
+        "descripcion": "100 desafíos de programación práctica en C++ moderno por Marius Bancila divididos en 12 capítulos: matemáticas, strings/regex, fechas, estructuras de datos, algoritmos, concurrencia y patrones.",
+        "lenguajes": ["cpp"],
+        "categoria": "cursos_notebooks",
+        "etiquetas": ["ejercicios", "retos", "modern-cpp", "c++17", "matematicas", "algoritmos", "concurrencia"],
+        "ruta_ejercicios": "Chapter01",
+        "licencia": "MIT",
+        "estrellas_aprox": "2.2k",
+        "dificultad": "intermedio a avanzado"
+    },
+    {
+        "ref": "JakubVojvoda/design-patterns-cpp",
+        "nombre": "Design Patterns in C++ (23 Patrones GoF)",
+        "descripcion": "Implementación limpia y canónica en C++ moderno de los 23 patrones de diseño clásicos de la banda de los cuatro (GoF): Creacionales, Estructurales y de Comportamiento con programas ejecutables.",
+        "lenguajes": ["cpp"],
+        "categoria": "sintaxis",
+        "etiquetas": ["patrones-de-diseno", "gof", "singleton", "factory", "observer", "strategy", "poo", "arquitectura"],
+        "ruta_ejercicios": "",
+        "licencia": "MIT",
+        "estrellas_aprox": "4.6k",
+        "dificultad": "intermedio a avanzado"
+    },
+    {
+        "ref": "hsf-training/cpluspluscourse",
+        "nombre": "HSF C++ Course (CERN & Scientific Computing)",
+        "descripcion": "Curso oficial de C++ de la High Energy Physics Software Foundation utilizado en el CERN: lecciones y ejercicios prácticos de gestión de memoria, STL, templates, concurrencia y POO moderna.",
+        "lenguajes": ["cpp"],
+        "categoria": "cursos_notebooks",
+        "etiquetas": ["curso", "cern", "scientific-computing", "smart-pointers", "stl", "templates", "concurrencia", "ejercicios"],
+        "ruta_ejercicios": "exercises",
+        "licencia": "CC BY 4.0",
+        "estrellas_aprox": "1.5k",
+        "dificultad": "principiante a avanzado"
+    },
+    {
+        "ref": "AnthonyCalandra/modern-cpp-features",
+        "nombre": "Modern C++ Features Cheatsheet & Examples",
+        "descripcion": "Referencia y guía práctica de cabecera con ejemplos ejecutables de todas las características incorporadas en C++11, C++14, C++17, C++20 y C++23: auto, constexpr, structured bindings, conceptos y rangos.",
+        "lenguajes": ["cpp"],
+        "categoria": "sintaxis",
+        "etiquetas": ["referencia", "cheatsheet", "c++11", "c++14", "c++17", "c++20", "c++23", "conceptos", "rangos"],
+        "ruta_ejercicios": "",
+        "licencia": "MIT",
+        "estrellas_aprox": "20k",
+        "dificultad": "todos los niveles"
+    },
+    {
+        "ref": "ssloy/tinyrenderer",
+        "nombre": "Tiny Renderer: OpenGL en 500 Líneas de C++",
+        "descripcion": "Curso formativo legendario de gráficos por computadora: construye un motor de renderizado 3D por software desde cero en C++ puro (Bresenham, rasterización de triángulos, z-buffer y shaders).",
+        "lenguajes": ["cpp"],
+        "categoria": "proyectos",
+        "etiquetas": ["proyectos", "renderizado", "graficos-3d", "opengl", "rasterizacion", "shaders", "c++"],
+        "ruta_ejercicios": "",
+        "licencia": "WTFPL / MIT",
+        "estrellas_aprox": "37k",
+        "dificultad": "intermedio a senior"
+    },
+    {
+        "ref": "RayTracing/raytracing.github.io",
+        "nombre": "Ray Tracing in One Weekend (Serie C++)",
+        "descripcion": "El célebre curso y mini-libros de Peter Shirley para construir un trazador de rayos (*ray tracer*) en C++ moderno: vectores, rayos, materiales dieléctricos, cámara, BVH, texturas y simulación Monte Carlo.",
+        "lenguajes": ["cpp"],
+        "categoria": "proyectos",
+        "etiquetas": ["proyectos", "ray-tracing", "graficos", "monte-carlo", "bvh", "matematicas", "c++"],
+        "ruta_ejercicios": "src",
+        "licencia": "CC0 1.0",
+        "estrellas_aprox": "10k",
+        "dificultad": "intermedio a avanzado"
     }
 ]
 
@@ -898,6 +994,115 @@ EJERCICIOS_DESTACADOS_REPO: Dict[str, List[Dict[str, Any]]] = {
         {"ruta": "python/09_functions.py", "nombre": "09_functions.py", "bytes": 1700, "lenguaje": "python"},
         {"ruta": "python/10_decorators.py", "nombre": "10_decorators.py", "bytes": 1550, "lenguaje": "python"},
         {"ruta": "python/11_calling_api.py", "nombre": "11_calling_api.py", "bytes": 1900, "lenguaje": "python"},
+    ],
+    "rambasnet/cpp-fundamentals": [
+        {"ruta": "notebooks/Introduction.ipynb", "nombre": "Introduction.ipynb", "bytes": 8200, "lenguaje": "cpp"},
+        {"ruta": "notebooks/DataTypesAndVariables.ipynb", "nombre": "DataTypesAndVariables.ipynb", "bytes": 11500, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Conditionals.ipynb", "nombre": "Conditionals.ipynb", "bytes": 13200, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Loops.ipynb", "nombre": "Loops.ipynb", "bytes": 14000, "lenguaje": "cpp"},
+        {"ruta": "notebooks/UserDefinedFunctions.ipynb", "nombre": "UserDefinedFunctions.ipynb", "bytes": 16400, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Arrays.ipynb", "nombre": "Arrays.ipynb", "bytes": 15100, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Pointers.ipynb", "nombre": "Pointers.ipynb", "bytes": 19800, "lenguaje": "cpp"},
+        {"ruta": "notebooks/ClassesAndObjects.ipynb", "nombre": "ClassesAndObjects.ipynb", "bytes": 22400, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Vectors.ipynb", "nombre": "Vectors.ipynb", "bytes": 14500, "lenguaje": "cpp"},
+        {"ruta": "notebooks/SequenceContainers.ipynb", "nombre": "SequenceContainers.ipynb", "bytes": 18200, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Maps.ipynb", "nombre": "Maps.ipynb", "bytes": 12800, "lenguaje": "cpp"},
+        {"ruta": "notebooks/FunctionPointersAndLambda.ipynb", "nombre": "FunctionPointersAndLambda.ipynb", "bytes": 17200, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Recursion.ipynb", "nombre": "Recursion.ipynb", "bytes": 13900, "lenguaje": "cpp"},
+        {"ruta": "notebooks/ErrorHandling.ipynb", "nombre": "ErrorHandling.ipynb", "bytes": 11400, "lenguaje": "cpp"},
+        {"ruta": "notebooks/Unittesting.ipynb", "nombre": "Unittesting.ipynb", "bytes": 15600, "lenguaje": "cpp"},
+    ],
+    "changkun/modern-cpp-tutorial": [
+        {"ruta": "code/1/1.1.c.cpp", "nombre": "1.1.c.cpp (Compatibilidad C)", "bytes": 1200, "lenguaje": "cpp"},
+        {"ruta": "code/2/2.01.nullptr.cpp", "nombre": "2.01.nullptr.cpp", "bytes": 950, "lenguaje": "cpp"},
+        {"ruta": "code/2/2.02.constexpr.cpp", "nombre": "2.02.constexpr.cpp", "bytes": 1100, "lenguaje": "cpp"},
+        {"ruta": "code/2/2.06.structured.binding.cpp", "nombre": "2.06.structured.binding.cpp", "bytes": 1350, "lenguaje": "cpp"},
+        {"ruta": "code/2/2.13.lambda.cpp", "nombre": "2.13.lambda.cpp", "bytes": 2100, "lenguaje": "cpp"},
+        {"ruta": "code/3/3.1.lambda.capture.cpp", "nombre": "3.1.lambda.capture.cpp", "bytes": 1600, "lenguaje": "cpp"},
+        {"ruta": "code/3/3.2.function.wrap.cpp", "nombre": "3.2.function.wrap.cpp", "bytes": 1850, "lenguaje": "cpp"},
+        {"ruta": "code/3/3.3.rvalue.cpp", "nombre": "3.3.rvalue.cpp", "bytes": 2400, "lenguaje": "cpp"},
+        {"ruta": "code/4/4.1.linear.container.cpp", "nombre": "4.1.linear.container.cpp", "bytes": 1750, "lenguaje": "cpp"},
+        {"ruta": "code/5/5.1.shared.ptr.cpp", "nombre": "5.1.shared.ptr.cpp", "bytes": 2200, "lenguaje": "cpp"},
+        {"ruta": "code/7/7.1.threads.cpp", "nombre": "7.1.threads.cpp", "bytes": 1900, "lenguaje": "cpp"},
+        {"ruta": "code/7/7.2.mutex.cpp", "nombre": "7.2.mutex.cpp", "bytes": 2050, "lenguaje": "cpp"},
+        {"ruta": "code/7/7.3.future.cpp", "nombre": "7.3.future.cpp", "bytes": 2150, "lenguaje": "cpp"},
+        {"ruta": "exercises/2/1.cpp", "nombre": "Ejercicio 2.1 (Templates & Auto)", "bytes": 850, "lenguaje": "cpp"},
+        {"ruta": "exercises/2/2.cpp", "nombre": "Ejercicio 2.2 (Structured Bindings)", "bytes": 980, "lenguaje": "cpp"},
+    ],
+    "packtpublishing/the-modern-cpp-challenge": [
+        {"ruta": "Chapter01/problem_01/main.cpp", "nombre": "problem_01 (Suma múltiplos de 3 o 5)", "bytes": 1100, "lenguaje": "cpp"},
+        {"ruta": "Chapter01/problem_02/main.cpp", "nombre": "problem_02 (Máximo Común Divisor)", "bytes": 980, "lenguaje": "cpp"},
+        {"ruta": "Chapter01/problem_03/main.cpp", "nombre": "problem_03 (Mínimo Común Múltiplo)", "bytes": 1050, "lenguaje": "cpp"},
+        {"ruta": "Chapter01/problem_04/main.cpp", "nombre": "problem_04 (Mayor primo menor a n)", "bytes": 1300, "lenguaje": "cpp"},
+        {"ruta": "Chapter01/problem_05/main.cpp", "nombre": "problem_05 (Primos gemelos)", "bytes": 1400, "lenguaje": "cpp"},
+        {"ruta": "Chapter01/problem_08/main.cpp", "nombre": "problem_08 (Números de Armstrong)", "bytes": 1250, "lenguaje": "cpp"},
+        {"ruta": "Chapter02/problem_15/main.cpp", "nombre": "problem_15 (Tipo de datos IPv4)", "bytes": 2400, "lenguaje": "cpp"},
+        {"ruta": "Chapter03/problem_23/main.cpp", "nombre": "problem_23 (Conversión binario a hex)", "bytes": 1600, "lenguaje": "cpp"},
+        {"ruta": "Chapter04/problem_32/main.cpp", "nombre": "problem_32 (Triángulo de Pascal)", "bytes": 1800, "lenguaje": "cpp"},
+        {"ruta": "Chapter05/problem_39/main.cpp", "nombre": "problem_39 (Medición de tiempo)", "bytes": 2100, "lenguaje": "cpp"},
+        {"ruta": "Chapter06/problem_45/main.cpp", "nombre": "problem_45 (Cola de Prioridad)", "bytes": 2600, "lenguaje": "cpp"},
+        {"ruta": "Chapter07/problem_61/main.cpp", "nombre": "problem_61 (Parallel Transform)", "bytes": 2800, "lenguaje": "cpp"},
+        {"ruta": "Chapter08/problem_67/main.cpp", "nombre": "problem_67 (Validador de contraseñas)", "bytes": 2200, "lenguaje": "cpp"},
+    ],
+    "jakubvojvoda/design-patterns-cpp": [
+        {"ruta": "singleton/main.cpp", "nombre": "singleton.cpp (Patrón Singleton)", "bytes": 1300, "lenguaje": "cpp"},
+        {"ruta": "factory-method/main.cpp", "nombre": "factory_method.cpp (Patrón Factory Method)", "bytes": 1750, "lenguaje": "cpp"},
+        {"ruta": "abstract-factory/main.cpp", "nombre": "abstract_factory.cpp (Patrón Abstract Factory)", "bytes": 2400, "lenguaje": "cpp"},
+        {"ruta": "builder/main.cpp", "nombre": "builder.cpp (Patrón Builder)", "bytes": 2100, "lenguaje": "cpp"},
+        {"ruta": "prototype/main.cpp", "nombre": "prototype.cpp (Patrón Prototype)", "bytes": 1650, "lenguaje": "cpp"},
+        {"ruta": "adapter/main.cpp", "nombre": "adapter.cpp (Patrón Adapter)", "bytes": 1500, "lenguaje": "cpp"},
+        {"ruta": "bridge/main.cpp", "nombre": "bridge.cpp (Patrón Bridge)", "bytes": 1800, "lenguaje": "cpp"},
+        {"ruta": "composite/main.cpp", "nombre": "composite.cpp (Patrón Composite)", "bytes": 2300, "lenguaje": "cpp"},
+        {"ruta": "decorator/main.cpp", "nombre": "decorator.cpp (Patrón Decorator)", "bytes": 1950, "lenguaje": "cpp"},
+        {"ruta": "facade/main.cpp", "nombre": "facade.cpp (Patrón Facade)", "bytes": 1700, "lenguaje": "cpp"},
+        {"ruta": "observer/main.cpp", "nombre": "observer.cpp (Patrón Observer)", "bytes": 2200, "lenguaje": "cpp"},
+        {"ruta": "strategy/main.cpp", "nombre": "strategy.cpp (Patrón Strategy)", "bytes": 1600, "lenguaje": "cpp"},
+        {"ruta": "command/main.cpp", "nombre": "command.cpp (Patrón Command)", "bytes": 1900, "lenguaje": "cpp"},
+        {"ruta": "state/main.cpp", "nombre": "state.cpp (Patrón State)", "bytes": 2050, "lenguaje": "cpp"},
+        {"ruta": "template-method/main.cpp", "nombre": "template_method.cpp (Patrón Template Method)", "bytes": 1550, "lenguaje": "cpp"},
+    ],
+    "hsf-training/cpluspluscourse": [
+        {"ruta": "exercises/basicTypes/basicTypes.cpp", "nombre": "basicTypes.cpp", "bytes": 1200, "lenguaje": "cpp"},
+        {"ruta": "exercises/control/control.cpp", "nombre": "control.cpp", "bytes": 1600, "lenguaje": "cpp"},
+        {"ruta": "exercises/functions/functions.cpp", "nombre": "functions.cpp", "bytes": 1800, "lenguaje": "cpp"},
+        {"ruta": "exercises/loopsRefsAuto/loops.cpp", "nombre": "loops.cpp", "bytes": 1750, "lenguaje": "cpp"},
+        {"ruta": "exercises/classes/classes.cpp", "nombre": "classes.cpp", "bytes": 2300, "lenguaje": "cpp"},
+        {"ruta": "exercises/smartPointers/smartPointers.cpp", "nombre": "smartPointers.cpp", "bytes": 2100, "lenguaje": "cpp"},
+        {"ruta": "exercises/move/move.cpp", "nombre": "move.cpp", "bytes": 2400, "lenguaje": "cpp"},
+        {"ruta": "exercises/polymorphism/polymorphism.cpp", "nombre": "polymorphism.cpp", "bytes": 2600, "lenguaje": "cpp"},
+        {"ruta": "exercises/templates/templates.cpp", "nombre": "templates.cpp", "bytes": 2250, "lenguaje": "cpp"},
+        {"ruta": "exercises/stl/stl.cpp", "nombre": "stl.cpp", "bytes": 2700, "lenguaje": "cpp"},
+        {"ruta": "exercises/concepts/concepts.cpp", "nombre": "concepts.cpp", "bytes": 2100, "lenguaje": "cpp"},
+        {"ruta": "exercises/condition_variable/condition_variable.cpp", "nombre": "condition_variable.cpp", "bytes": 2900, "lenguaje": "cpp"},
+    ],
+    "anthonycalandra/modern-cpp-features": [
+        {"ruta": "CPP11.md", "nombre": "CPP11.md (Guía y Ejemplos C++11)", "bytes": 45000, "lenguaje": "markdown"},
+        {"ruta": "CPP14.md", "nombre": "CPP14.md (Guía y Ejemplos C++14)", "bytes": 18000, "lenguaje": "markdown"},
+        {"ruta": "CPP17.md", "nombre": "CPP17.md (Guía y Ejemplos C++17)", "bytes": 38000, "lenguaje": "markdown"},
+        {"ruta": "CPP20.md", "nombre": "CPP20.md (Guía y Ejemplos C++20)", "bytes": 35000, "lenguaje": "markdown"},
+        {"ruta": "CPP23.md", "nombre": "CPP23.md (Guía y Ejemplos C++23)", "bytes": 16000, "lenguaje": "markdown"},
+        {"ruta": "README.md", "nombre": "README.md (Resumen Global)", "bytes": 4200, "lenguaje": "markdown"},
+    ],
+    "ssloy/tinyrenderer": [
+        {"ruta": "main.cpp", "nombre": "main.cpp (Pipeline de Renderizado)", "bytes": 3800, "lenguaje": "cpp"},
+        {"ruta": "geometry.h", "nombre": "geometry.h (Álgebra Lineal y Vectores)", "bytes": 3100, "lenguaje": "cpp"},
+        {"ruta": "model.h", "nombre": "model.h (Carga de Modelos 3D OBJ)", "bytes": 1400, "lenguaje": "cpp"},
+        {"ruta": "model.cpp", "nombre": "model.cpp (Implementación Modelo)", "bytes": 2700, "lenguaje": "cpp"},
+        {"ruta": "our_gl.h", "nombre": "our_gl.h (Interfaz Shaders)", "bytes": 1800, "lenguaje": "cpp"},
+        {"ruta": "our_gl.cpp", "nombre": "our_gl.cpp (Rasterización y Z-Buffer)", "bytes": 4200, "lenguaje": "cpp"},
+        {"ruta": "tgaimage.h", "nombre": "tgaimage.h (Estructura Imagen TGA)", "bytes": 2300, "lenguaje": "cpp"},
+        {"ruta": "tgaimage.cpp", "nombre": "tgaimage.cpp (Buffer Píxeles)", "bytes": 5500, "lenguaje": "cpp"},
+    ],
+    "raytracing/raytracing.github.io": [
+        {"ruta": "src/InOneWeekend/main.cc", "nombre": "InOneWeekend/main.cc (Trazador de Rayos)", "bytes": 3200, "lenguaje": "cpp"},
+        {"ruta": "src/InOneWeekend/vec3.h", "nombre": "InOneWeekend/vec3.h (Vector 3D)", "bytes": 4100, "lenguaje": "cpp"},
+        {"ruta": "src/InOneWeekend/ray.h", "nombre": "InOneWeekend/ray.h (Rayo Óptico)", "bytes": 1100, "lenguaje": "cpp"},
+        {"ruta": "src/InOneWeekend/sphere.h", "nombre": "InOneWeekend/sphere.h (Intersección Esferas)", "bytes": 2800, "lenguaje": "cpp"},
+        {"ruta": "src/InOneWeekend/camera.h", "nombre": "InOneWeekend/camera.h (Cámara y Antialiasing)", "bytes": 4600, "lenguaje": "cpp"},
+        {"ruta": "src/InOneWeekend/material.h", "nombre": "InOneWeekend/material.h (Materiales y Reflejos)", "bytes": 3600, "lenguaje": "cpp"},
+        {"ruta": "src/TheNextWeek/main.cc", "nombre": "TheNextWeek/main.cc (BVH y Texturas)", "bytes": 3900, "lenguaje": "cpp"},
+        {"ruta": "src/TheNextWeek/bvh.h", "nombre": "TheNextWeek/bvh.h (Árbol BVH)", "bytes": 3400, "lenguaje": "cpp"},
+        {"ruta": "src/TheRestOfYourLife/main.cc", "nombre": "TheRestOfYourLife/main.cc (Muestreo Monte Carlo)", "bytes": 4200, "lenguaje": "cpp"},
     ]
 }
 
@@ -954,16 +1159,24 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
             if ruta_sub and not path.startswith(ruta_sub):
                 continue
             ext = os.path.splitext(path)[1].lower()
-            if ext in (".py", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".md"):
+            if ext in (".py", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".md", ".ipynb"):
                 # Excluir tests internos, configs, builds
                 if any(part.startswith((".", "test_", "tests_", "CMake")) for part in path.split("/")):
                     if not ("challenge" in path.lower() or "exercise" in path.lower() or "problem" in path.lower()):
                         continue
+                lang = "python"
+                if ext in (".cpp", ".cc", ".cxx", ".h", ".hpp"):
+                    lang = "cpp"
+                elif ext == ".ipynb":
+                    repo_langs = (repo_meta.get("lenguajes") or []) if repo_meta else []
+                    lang = "cpp" if "cpp" in repo_langs and "python" not in repo_langs else "python"
+                elif ext == ".md":
+                    lang = "markdown"
                 salida.append({
                     "ruta": path,
                     "nombre": os.path.basename(path),
                     "bytes": a.get("bytes", 0),
-                    "lenguaje": "python" if ext == ".py" else "cpp" if ext in (".cpp", ".cc", ".cxx", ".h", ".hpp") else "markdown",
+                    "lenguaje": lang,
                     "es_ejercicio": True
                 })
             if len(salida) >= limite:
