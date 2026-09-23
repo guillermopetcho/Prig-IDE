@@ -195,17 +195,37 @@ class EditorManager {
             this.setActivePane(colIndex);
         });
 
-        // Atajo Ctrl+S
+        // --- Atajos Nativos VS Code Registrados Directamente en Monaco ---
+        // Atajo Ctrl+S: Guardar archivo
         ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
             if (window.app) window.app.saveCurrentFile();
         });
 
-        // Atajo Ctrl+\ (dividir al lado)
+        // Atajo Ctrl+\: Dividir editor al lado (panel derecho)
         ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Backslash, () => {
             this.splitRight();
         });
 
-        // Atajo Ctrl+Enter: prompt en línea o ejecutar código
+        // Atajo F5 y Ctrl+F5: Ejecutar archivo/código
+        ed.addCommand(monaco.KeyCode.F5, () => {
+            if (window.app) window.app.runCode();
+        });
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.F5, () => {
+            if (window.app) window.app.runCode();
+        });
+
+        // Atajo Shift+Enter: Ejecutar selección o celda de cuaderno
+        ed.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            if (window.notebookMgr && window.notebookMgr.activo) {
+                window.notebookMgr.runSingleCell(window.notebookMgr.celdaActiva || 0);
+            } else if (window.IDE && typeof window.IDE.ejecutarSeleccion === 'function') {
+                window.IDE.ejecutarSeleccion();
+            } else if (window.app) {
+                window.app.runCode();
+            }
+        });
+
+        // Atajo Ctrl+Enter: Prompt en línea si existe Prig//:, celda en cuaderno, o insertar línea debajo (VS Code estándar)
         ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             const position = ed.getPosition();
             if (position) {
@@ -229,7 +249,142 @@ class EditorManager {
                     return;
                 }
             }
-            if (window.app) window.app.runCode();
+
+            if (window.notebookMgr && window.notebookMgr.activo) {
+                window.notebookMgr.runSingleCell(window.notebookMgr.celdaActiva || 0);
+                return;
+            }
+
+            const accion = ed.getAction('editor.action.insertLineAfter');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+Shift+Enter: Insertar línea encima
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            const accion = ed.getAction('editor.action.insertLineBefore');
+            if (accion) accion.run();
+        });
+
+        // Atajo Shift+Alt+Down: Duplicar línea abajo (VS Code estándar)
+        ed.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.DownArrow, () => {
+            const accion = ed.getAction('editor.action.copyLinesDownAction');
+            if (accion) accion.run();
+        });
+
+        // Atajo Shift+Alt+Up: Duplicar línea arriba (VS Code estándar)
+        ed.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.UpArrow, () => {
+            const accion = ed.getAction('editor.action.copyLinesUpAction');
+            if (accion) accion.run();
+        });
+
+        // Atajo Alt+Down: Mover línea abajo
+        ed.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.DownArrow, () => {
+            const accion = ed.getAction('editor.action.moveLinesDownAction');
+            if (accion) accion.run();
+        });
+
+        // Atajo Alt+Up: Mover línea arriba
+        ed.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.UpArrow, () => {
+            const accion = ed.getAction('editor.action.moveLinesUpAction');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+Alt+Down: Añadir cursor abajo
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.DownArrow, () => {
+            const accion = ed.getAction('editor.action.insertCursorBelow');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+Alt+Up: Añadir cursor arriba
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.UpArrow, () => {
+            const accion = ed.getAction('editor.action.insertCursorAbove');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+Shift+K: Eliminar línea
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyK, () => {
+            const accion = ed.getAction('editor.action.deleteLines');
+            if (accion) accion.run();
+        });
+
+        // Atajo Shift+Alt+F: Formatear documento
+        ed.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+            const accion = ed.getAction('editor.action.formatDocument');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+D: Añadir siguiente coincidencia a la selección
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD, () => {
+            const accion = ed.getAction('editor.action.addSelectionToNextFindMatch');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+U: Deshacer última selección o cursor
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyU, () => {
+            ed.trigger('prig', 'cursorUndo', null);
+        });
+
+        // Atajo Ctrl+Shift+L: Seleccionar todas las coincidencias
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyL, () => {
+            const accion = ed.getAction('editor.action.selectHighlights');
+            if (accion) accion.run();
+        });
+
+        // Atajo F2: Renombrar símbolo
+        ed.addCommand(monaco.KeyCode.F2, () => {
+            const accion = ed.getAction('editor.action.rename');
+            if (accion) accion.run();
+        });
+
+        // Atajo F12: Ir a definición
+        ed.addCommand(monaco.KeyCode.F12, () => {
+            const accion = ed.getAction('editor.action.revealDefinition');
+            if (accion) accion.run();
+        });
+
+        // Atajo Alt+F12: Vista previa de definición
+        ed.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.F12, () => {
+            const accion = ed.getAction('editor.action.peekDefinition');
+            if (accion) accion.run();
+        });
+
+        // Atajo Ctrl+F12: Ir a implementación
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.F12, () => {
+            const accion = ed.getAction('editor.action.goToImplementation');
+            if (accion) accion.run();
+        });
+
+        // Atajo Shift+F12: Ver referencias
+        ed.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, () => {
+            const accion = ed.getAction('editor.action.goToReferences');
+            if (accion) accion.run();
+        });
+
+        // Atajos Ctrl+1, Ctrl+2, Ctrl+3: Enfocar columna 1, 2, 3
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit1, () => {
+            this.setActivePane(0);
+            if (this.panes[0]?.editor) this.panes[0].editor.focus();
+        });
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit2, () => {
+            this.setActivePane(1);
+            if (this.panes[1]?.editor) this.panes[1].editor.focus();
+        });
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit3, () => {
+            this.setActivePane(2);
+            if (this.panes[2]?.editor) this.panes[2].editor.focus();
+        });
+
+        // Atajo Ctrl+W: Cerrar pestaña en el panel activo
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW, () => {
+            if (this.activePath) this.closeTabInPane(this.activeCol, this.activePath);
+        });
+
+        // Atajos Ctrl+PageDown / Ctrl+PageUp: Siguiente / anterior pestaña
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.PageDown, () => {
+            if (window.IDE && typeof window.IDE.cambiarPestana === 'function') window.IDE.cambiarPestana(+1);
+        });
+        ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.PageUp, () => {
+            if (window.IDE && typeof window.IDE.cambiarPestana === 'function') window.IDE.cambiarPestana(-1);
         });
 
         window.dispatchEvent(new CustomEvent('prig:editor-creado', { detail: { editor: ed, principal: (colIndex === 0) } }));

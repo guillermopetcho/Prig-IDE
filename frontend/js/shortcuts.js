@@ -73,8 +73,11 @@ class ShortcutManager {
     buscarConflicto(accel, exceptoId) {
         if (!accel) return null;
         const normal = this.normalizar(accel);
+        const actual = window.PrigCommands.todos().find(c => c.id === exceptoId);
         return window.PrigCommands.todos().find(
-            c => c.id !== exceptoId && this.normalizar(this.accel(c.id)) === normal
+            c => c.id !== exceptoId &&
+                 this.normalizar(this.accel(c.id)) === normal &&
+                 !(actual && ((actual.cuando === 'editor' && c.cuando === 'cuaderno') || (actual.cuando === 'cuaderno' && c.cuando === 'editor')))
         ) || null;
     }
 
@@ -102,15 +105,27 @@ class ShortcutManager {
             // "+" no puede ir dentro de un atajo (es el separador): se trata como "="
             '+': '=',
         };
-        // Con Alt pulsado, algunos sistemas devuelven un carácter especial en e.key
-        // (Alt+Z → "Ω" en macOS): se usa la tecla física para letras y números.
-        if (e.altKey && /^Key[A-Z]$/.test(e.code || '')) tecla = e.code.slice(3);
+
+        // Mapeo preciso por código físico para garantizar compatibilidad con teclados internacionales y VS Code
+        if (e.code === 'BracketLeft') tecla = '[';
+        else if (e.code === 'BracketRight') tecla = ']';
+        else if (e.code === 'Backslash') tecla = '\\';
+        else if (e.code === 'Backquote') tecla = '`';
+        else if (e.code === 'Slash') tecla = '/';
+        else if (e.code === 'Period') tecla = '.';
+        else if (e.code === 'Comma') tecla = ',';
+        else if (e.code === 'Semicolon') tecla = ';';
+        else if (e.code === 'Equal') tecla = '=';
+        else if (e.code === 'Minus') tecla = '-';
+        else if (e.altKey && /^Key[A-Z]$/.test(e.code || '')) tecla = e.code.slice(3).toLowerCase();
         else if (e.altKey && /^Digit[0-9]$/.test(e.code || '')) tecla = e.code.slice(5);
+        else tecla = mapa[tecla] || tecla;
+
         tecla = mapa[tecla] || tecla.toLowerCase();
-        // Símbolos que en cada distribución salen con o sin Mayús: en un teclado
-        // español "/" es Mayús+7. Para que "Ctrl+/" funcione en cualquier teclado, un
-        // símbolo se identifica por el carácter y no cuenta la Mayús que lo produjo.
-        if (tecla.length === 1 && !/[a-z0-9]/.test(tecla)) {
+
+        // En teclados donde "/" requiere Mayús (ej. Shift+7 en teclado español),
+        // no cuenta el Mayús para que Ctrl+/ funcione universalmente.
+        if (tecla === '/' && partes.includes('shift') && !partes.includes('alt')) {
             const i = partes.indexOf('shift');
             if (i >= 0) partes.splice(i, 1);
         }
@@ -148,15 +163,20 @@ class ShortcutManager {
         return !!(t && t.closest && t.closest('.monaco-editor'));
     }
 
+    /** ¿La vista activa es un cuaderno interactivo (Jupyter)? */
+    _enCuaderno(e) {
+        return !!(window.notebookMgr && window.notebookMgr.activo);
+    }
+
     /**
-     * ¿Aplica este comando aquí? `cuando: 'editor'` son las acciones de edición de
-     * código: fuera del editor, Ctrl+Z, Ctrl+A o Alt+Arriba tienen que seguir
-     * haciendo lo normal en el cuadro de chat o en un campo de búsqueda. Antes
-     * Ctrl+Z y Ctrl+F se secuestraban en cualquier sitio.
+     * ¿Aplica este comando aquí?
+     * `cuando: 'editor'` son acciones del editor de código tradicional.
+     * `cuando: 'cuaderno'` son acciones específicas de las celdas de notebook.
      */
     _aplica(cmd, e) {
         if (cmd.nativo) return false;
-        if (cmd.cuando === 'editor') return this._enEditor(e);
+        if (cmd.cuando === 'editor') return this._enEditor(e) && !this._enCuaderno(e);
+        if (cmd.cuando === 'cuaderno') return this._enCuaderno(e);
         return true;
     }
 
