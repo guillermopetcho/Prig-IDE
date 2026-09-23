@@ -176,7 +176,8 @@ class PruebaReplicacionGitHub(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="prig_rep_test_")
         self.env = mock.patch.dict(os.environ, {
             "PRIG_DESAFIOS_DIR": self.tmp,
-            "PRIG_DESAFIOS_CACHE": os.path.join(self.tmp, "cache")
+            "PRIG_DESAFIOS_CACHE": os.path.join(self.tmp, "cache"),
+            "PRIG_GITHUB_DIR": os.path.join(self.tmp, "github")
         })
         self.env.start()
 
@@ -324,6 +325,75 @@ class PruebaReplicacionGitHub(unittest.TestCase):
         self.assertEqual(d["nivel"], "senior")
         self.assertEqual(d["lenguaje"], "python")
         self.assertIn("fenwick-tree", d["conceptos"])
+
+    def test_extraer_contenido_cuaderno_ipynb(self):
+        cuaderno = {
+            "cells": [
+                {
+                    "cell_type": "markdown",
+                    "source": ["# Título del ejercicio\n", "Escribe una función que sume dos números."]
+                },
+                {
+                    "cell_type": "code",
+                    "source": ["def suma(a, b):\n", "    return a + b\n"]
+                }
+            ]
+        }
+        texto_crudo = json.dumps(cuaderno)
+        extraido = tu.extraer_contenido_cuaderno(texto_crudo)
+        self.assertIn("# [Instrucciones / Explicación]", extraido)
+        self.assertIn("Título del ejercicio", extraido)
+        self.assertIn("```\ndef suma(a, b):", extraido)
+
+        # Si no es JSON válido, devuelve el texto tal cual
+        self.assertEqual(tu.extraer_contenido_cuaderno("def simple(): pass"), "def simple(): pass")
+
+    def test_descargar_contenido_archivo_cache_y_red(self):
+        # 1. Parámetros vacíos
+        self.assertEqual(cat.descargar_contenido_archivo("", ""), "")
+
+        # 2. Descarga desde CDN de GitHub y almacenamiento en caché
+        with mock.patch("requests.get") as mock_get:
+            mock_resp = mock.MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.content = b"print('hola desde github')"
+            mock_get.return_value = mock_resp
+
+            contenido = cat.descargar_contenido_archivo("test_user/test_repo", "ejercicio.py")
+            self.assertEqual(contenido, "print('hola desde github')")
+            self.assertTrue(mock_get.called)
+
+            # 3. La segunda vez debe salir de la caché en disco sin consultar requests
+            mock_get.reset_mock()
+            contenido_cache = cat.descargar_contenido_archivo("test_user/test_repo", "ejercicio.py")
+            self.assertEqual(contenido_cache, "print('hola desde github')")
+            self.assertFalse(mock_get.called)
+
+    def test_replicar_desde_github_emite_progreso(self):
+        respuesta_json = json.dumps({
+            "titulo": "Prueba de Progreso",
+            "enunciado": "Devuelve True.",
+            "nivel": "principiante",
+            "conceptos": ["test"],
+            "paginas": [{"nombre": "sol.py", "contenido": "def f():\n    pass\n"}],
+            "referencia": [{"nombre": "sol.py", "contenido": "def f():\n    return True\n"}],
+            "pruebas": ["from sol import f\nassert f() is True", "from sol import f\nassert f() == True"]
+        })
+        ai = ModeloFalsoReplicar([respuesta_json])
+        eventos = []
+        d = tu.replicar_desde_github(
+            ai=ai,
+            runner=RUNNER,
+            modelo="test-model",
+            ref="test/repo",
+            ruta="sol.py",
+            contenido="def f(): pass",
+            lenguaje="python",
+            avisar=lambda ev: eventos.append(ev)
+        )
+        self.assertEqual(d["titulo"], "Prueba de Progreso")
+        self.assertTrue(any(ev.get("tipo") == "progreso" for ev in eventos))
+        self.assertTrue(any("analiza y adapta" in ev.get("mensaje", "") for ev in eventos))
 
 
 class PruebaAnalizarPropuesta(unittest.TestCase):

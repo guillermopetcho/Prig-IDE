@@ -784,17 +784,25 @@
     }
 
     async function replicarDesdeGitHub(ref, ruta, lenguaje, tema) {
-        mostrarTarea(`Replicando «${ruta.split('/').pop()}» desde GitHub`, [
-            `Analizando ${ref}/${ruta} con el modelo de IA…`,
-            'Extrayendo código de partida con TODOs y solución de referencia…',
-            'Generando y validando las pruebas automáticas…'
+        const nombreArchivo = (ruta || '').split('/').pop() || 'ejercicio';
+        mostrarTarea(`Replicando «${nombreArchivo}» desde GitHub`, [
+            `Conectando con GitHub para obtener ${ref}/${ruta}…`
         ]);
+        const pedido = ++estado.pedido;
         try {
             const d = await flujo('/api/desafios/github/replicar', {
                 ref, ruta, lenguaje: lenguaje || estado.lenguaje, tema: tema || '', modelo: estado.modelo
+            }, (ev) => {
+                if (ev.tipo === 'progreso' && estado.tarea && pedido === estado.pedido) {
+                    estado.tarea.lineas.push(ev.mensaje);
+                    pintarHoja();
+                }
             });
+            if (pedido !== estado.pedido) return;
             abrirDesafio(d);
+            if (estado.panel === 'mis') panelMis();
         } catch (e) {
+            if (pedido !== estado.pedido || !estado.tarea) return;
             estado.tarea.error = e.message;
             pintarHoja();
         }

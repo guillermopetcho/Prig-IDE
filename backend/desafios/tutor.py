@@ -13,6 +13,7 @@ Reglas que atraviesan todo el módulo:
 """
 
 import re
+import time
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 from . import ejecucion
@@ -39,13 +40,40 @@ def _error_de_modelo(texto: str) -> Optional[str]:
     return None
 
 
-def generar(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.3) -> str:
-    texto = "".join(ai.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
-                                         options={"temperature": temperatura}, uso="tutor"))
+def generar(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.3,
+            on_token: Optional[Callable[[str], None]] = None) -> str:
+    partes = []
+    for trozo in ai.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
+                                      options={"temperature": temperatura}, uso="tutor",
+                                      on_token=on_token):
+        partes.append(trozo)
+    texto = "".join(partes)
     error = _error_de_modelo(texto)
     if error:
         raise ErrorDesafio(error)
     return _PENSAMIENTO.sub("", texto).strip()
+
+
+def extraer_contenido_cuaderno(texto_ipynb: str) -> str:
+    """ Extrae de un cuaderno Jupyter (.ipynb) las celdas de teoría en markdown y los bloques de código,
+    para que el modelo reciba un texto pedagógico limpio en lugar de un JSON crudo con metadatos. """
+    try:
+        import json
+        data = json.loads(texto_ipynb)
+        celdas = data.get("cells") or []
+        partes = []
+        for c in celdas:
+            ctype = c.get("cell_type")
+            src = "".join(c.get("source") or [])
+            if not src.strip():
+                continue
+            if ctype == "markdown":
+                partes.append(f"# [Instrucciones / Explicación]\n{src.strip()}\n")
+            elif ctype == "code":
+                partes.append(f"```\n{src.strip()}\n```\n")
+        return "\n\n".join(partes) if partes else texto_ipynb
+    except Exception:
+        return texto_ipynb
 
 
 def flujo(ai, modelo: str, prompt: str, sistema: str, temperatura: float = 0.4,
@@ -401,14 +429,27 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
                   f"Contenido original del archivo en GitHub:\n```\n{contenido[:6000]}\n```\n"
                   + (f"\nEl intento anterior falló porque: {fallo_anterior}\nCorrige este problema.\n" if fallo_anterior else "")
                   + "\nGenera el desafío didáctico interactivo.")
+
+        tokens_recibidos = 0
+        ultimo_aviso = time.time()
+
+        def al_token(_tok: str) -> None:
+            nonlocal tokens_recibidos, ultimo_aviso
+            tokens_recibidos += 1
+            ahora = time.time()
+            if ahora - ultimo_aviso >= 2.0:
+                ultimo_aviso = ahora
+                avisar({"tipo": "progreso", "mensaje": f"Intento {n} de {intentos}: redactando desafío… ({tokens_recibidos} tokens)", "intento": n, "tokens": tokens_recibidos})
+
         try:
-            texto = generar(ai, modelo, prompt, sistema, temperatura=0.3)
+            texto = generar(ai, modelo, prompt, sistema, temperatura=0.3, on_token=al_token)
             datos = _normalizar_creado(ai._extract_and_parse_json(texto), lenguaje=lenguaje)
         except ErrorDesafio:
             raise
         except Exception as e:
             fallo_anterior = f"no devolviste un JSON válido ({str(e)[:120]})"
             historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior}… Reintentando con correcciones…", "intento": n, "descartado": True})
             continue
 
         datos["enunciado"] = re.sub(r"^\s*(markdown( en español)?|enunciado)\s*:\s*", "", datos["enunciado"], flags=re.I)
@@ -420,17 +461,20 @@ def replicar_desde_github(ai, runner, modelo: str, ref: str, ruta: str, contenid
         if rota:
             fallo_anterior = f"el código no compila: {rota}. Pon pass en los cuerpos sin implementar"
             historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior[:120]}… Reintentando con correcciones…", "intento": n, "descartado": True})
             continue
 
         resuelta = _pagina_ya_resuelta(datos)
         if resuelta:
             fallo_anterior = f"la página {resuelta} del código de partida ya trae la solución: deja su lógica sin implementar"
             historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior[:120]}… Reintentando con correcciones…", "intento": n, "descartado": True})
             continue
 
         if len(datos["pruebas"]) < 2:
             fallo_anterior = "hacen falta al menos 3 pruebas"
             historial.append({"intento": n, "motivo": fallo_anterior})
+            avisar({"tipo": "progreso", "mensaje": f"Intento {n} descartado: {fallo_anterior[:120]}… Reintentando con correcciones…", "intento": n, "descartado": True})
             continue
 
         avisar({"tipo": "progreso", "mensaje": f"Intento {n}: comprobando que la solución pasa las pruebas y el código de partida no…", "intento": n})

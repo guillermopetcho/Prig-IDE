@@ -583,7 +583,14 @@
                     lenguaje: lang,
                     modelo: estado.modelo
                 }, (ev) => {
-                    if (ev.tipo === 'progreso') btnRep.title = ev.mensaje;
+                    if (ev.tipo === 'progreso') {
+                        btnRep.title = ev.mensaje;
+                        if (ev.tokens) {
+                            btnRep.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${ev.tokens} tok…`;
+                        } else if (ev.intento) {
+                            btnRep.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Intento ${ev.intento}…`;
+                        }
+                    }
                 });
                 if (window.Desafios && window.Desafios.abrir) {
                     window.Desafios.abrir({ id: r.id });

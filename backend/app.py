@@ -5508,15 +5508,30 @@ def desafios_github_replicar(req: DesafioReplicarGitHubRequest):
     """ Replica cualquier archivo o ejercicio de GitHub en un desafío interactivo y evaluable de Prig (NDJSON). """
     modelo = _modelo_desafios(req.modelo, "codigo")
     motor, nombre_modelo = _motor_desafios(modelo)
-
-    contenido = req.contenido
-    if not contenido:
-        info_archivo = _github(github_lector.leer_archivo, req.ref, req.ruta)
-        contenido = info_archivo.get("contenido") or ""
-
     lenguaje = req.lenguaje or ("cpp" if req.ruta.endswith((".cpp", ".cc", ".cxx", ".h", ".hpp")) else "python")
 
     def trabajo(avisar):
+        contenido = req.contenido
+        if not contenido:
+            avisar({"tipo": "progreso", "mensaje": f"Descargando archivo desde GitHub ({req.ref}/{req.ruta})…"})
+            contenido = des_catalogo.descargar_contenido_archivo(req.ref, req.ruta)
+            if not contenido:
+                try:
+                    info_archivo = _github(github_lector.leer_archivo, req.ref, req.ruta)
+                    contenido = info_archivo.get("contenido") or ""
+                except Exception:
+                    contenido = ""
+
+        if not (contenido or "").strip():
+            raise des_tutor.ErrorDesafio(
+                f"No se pudo obtener el contenido del archivo '{req.ruta}' de '{req.ref}'. "
+                "Verifica que el archivo exista y que haya conexión con GitHub."
+            )
+
+        if req.ruta.lower().endswith((".ipynb", ".json")):
+            avisar({"tipo": "progreso", "mensaje": "Extrayendo celdas de teoría y código del cuaderno Jupyter…"})
+            contenido = des_tutor.extraer_contenido_cuaderno(contenido)
+
         d = des_tutor.replicar_desde_github(
             motor, runner, nombre_modelo, req.ref, req.ruta, contenido,
             lenguaje=lenguaje, tema=req.tema or "", nivel=req.nivel or "intermedio",

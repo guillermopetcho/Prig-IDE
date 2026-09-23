@@ -1209,3 +1209,69 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
     }
 
 
+def descargar_contenido_archivo(ref: str, ruta: str, timeout: int = 10) -> str:
+    """ Descarga el contenido crudo de un archivo de GitHub de forma rápida, eficiente y resiliente.
+
+    1. Busca primero en la caché local en disco para permitir modo offline.
+    2. Si no está en caché, consulta directamente raw.githubusercontent.com evitando
+       el límite de 60 consultas/hora de la API REST de GitHub.
+    3. Si la descarga directa falla, recurre a github_lector.leer_archivo como respaldo.
+    """
+    ref_limpia = re.sub(r"\.git$", "", (ref or "").strip("/"))
+    ruta_limpia = (ruta or "").lstrip("/")
+    if not ref_limpia or not ruta_limpia:
+        return ""
+
+    import github_lector
+    from github_lector import carpeta as github_carpeta
+
+    cache_dir = os.path.join(github_carpeta(), "archivos", ref_limpia.replace("/", "__"))
+    if os.path.exists(cache_dir):
+        # 1. Comprobar si ya existe en la caché local
+        import hashlib
+        cache_file = os.path.join(cache_dir, hashlib.sha1(ruta_limpia.encode()).hexdigest() + ".txt")
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+
+    # 2. Descarga directa desde CDN crudo de GitHub (sin consumir cuota de API)
+    ramas_a_probar = ["main", "master", "release"]
+    repo_meta = obtener_repositorio(ref_limpia)
+    if repo_meta and repo_meta.get("rama"):
+        ramas_a_probar.insert(0, repo_meta["rama"])
+
+    cabeceras = {"User-Agent": "Prig-IDE/1.0"}
+    tok = github_lector.token()
+    if tok:
+        cabeceras["Authorization"] = f"Bearer {tok['token']}"
+
+    for r_rama in dict.fromkeys(ramas_a_probar):
+        url = f"https://raw.githubusercontent.com/{ref_limpia}/{r_rama}/{requests.utils.quote(ruta_limpia)}"
+        try:
+            resp = requests.get(url, headers=cabeceras, timeout=timeout)
+            if resp.status_code == 200:
+                contenido = resp.content.decode("utf-8", errors="replace")
+                # Guardar en caché local para acceso offline futuro
+                try:
+                    os.makedirs(cache_dir, exist_ok=True)
+                    import hashlib
+                    cache_file = os.path.join(cache_dir, hashlib.sha1(ruta_limpia.encode()).hexdigest() + ".txt")
+                    with open(cache_file, "w", encoding="utf-8") as f:
+                        f.write(contenido)
+                except Exception:
+                    pass
+                return contenido
+        except Exception:
+            continue
+
+    # 3. Respaldo vía github_lector
+    try:
+        info = github_lector.leer_archivo(ref_limpia, ruta_limpia)
+        return info.get("contenido") or ""
+    except Exception:
+        return ""
+
+
