@@ -97,6 +97,19 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         res_hld = cat.listar_repositorios(busqueda="hld")
         self.assertTrue(any(r["ref"] == "Jonathan-Uy/CSES-Solutions" for r in res_hld))
 
+    def test_categoria_cursos_notebooks(self):
+        cursos = cat.listar_repositorios(categoria="cursos_notebooks")
+        self.assertGreaterEqual(len(cursos), 5)
+        self.assertTrue(any(r["ref"] == "Asabeneh/30-Days-Of-Python" for r in cursos))
+        self.assertTrue(any(r["ref"] == "jakevdp/PythonDataScienceHandbook" for r in cursos))
+        self.assertTrue(any(r["ref"] == "ageron/handson-ml3" for r in cursos))
+        self.assertTrue(any(r["ref"] == "Pierian-Data/Complete-Python-3-Bootcamp" for r in cursos))
+
+        # Verificar que tienen cuadernos y ejercicios destacados
+        destacados_jake = cat.listar_ejercicios_repo("jakevdp/PythonDataScienceHandbook")
+        self.assertGreaterEqual(len(destacados_jake["archivos"]), 5)
+        self.assertTrue(any(a["nombre"].endswith(".ipynb") for a in destacados_jake["archivos"]))
+
     def test_obtener_repositorio(self):
         repo = cat.obtener_repositorio("TheAlgorithms/Python")
         self.assertIsNotNone(repo)
