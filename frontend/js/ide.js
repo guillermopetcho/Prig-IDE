@@ -91,8 +91,9 @@
     function editorActivo() {
         const principal = ed() && ed().editor;
         if (ultimoEditor && editores.has(ultimoEditor)) {
+            const paneEditors = (ed() && ed().panes || []).map(p => p.editor).filter(Boolean);
             const grupos = (window.workArea && window.workArea.grupos || []).map(g => g.editor);
-            if (ultimoEditor === principal || grupos.includes(ultimoEditor)) return ultimoEditor;
+            if (ultimoEditor === principal || paneEditors.includes(ultimoEditor) || grupos.includes(ultimoEditor)) return ultimoEditor;
         }
         return principal;
     }
@@ -1016,22 +1017,41 @@
     }
 
     function instalarContextuales() {
-        const tabs = $('editor-tabs');
-        if (tabs && !tabs.dataset.ideContextual) {
-            tabs.dataset.ideContextual = '1';
-            tabs.addEventListener('contextmenu', (e) => {
+        const gridCont = $('editor-grid-container') || $('vista-editor');
+        if (gridCont && !gridCont.dataset.ideContextual) {
+            gridCont.dataset.ideContextual = '1';
+            gridCont.addEventListener('contextmenu', (e) => {
                 const el = e.target.closest('.tab-item');
                 if (!el || !el.dataset.path) return;
                 e.preventDefault();
                 const ruta = el.dataset.path;
-                menuContextual(e.clientX, e.clientY, [
-                    { label: 'Cerrar', run: () => ed().closeTab(ruta) },
+                const col = parseInt(el.dataset.col !== undefined ? el.dataset.col : (ed()?.activeCol || 0), 10);
+
+                const items = [
+                    { label: 'Cerrar', run: () => (ed() && ed().closeTabInPane) ? ed().closeTabInPane(col, ruta) : ed().closeTab(ruta) },
                     { label: 'Cerrar las demás', run: () => cerrarOtras(ruta) },
                     { label: 'Cerrar las de la derecha', run: () => cerrarALaDerecha(ruta) },
                     { label: 'Cerrar guardadas', comando: 'archivo.cerrarGuardadas', run: cerrarGuardadas },
                     { label: 'Cerrar todas', comando: 'archivo.cerrarTodas', run: cerrarTodas },
                     '-',
-                    { label: 'Abrir al lado', comando: 'vista.dividir', run: () => { ed().setActiveTab(ruta); window.workArea.dividir(); } },
+                    { label: 'Abrir al lado', comando: 'vista.dividir', run: () => {
+                        if (ed() && ed().splitRight) ed().splitRight(ruta);
+                        else { ed().setActiveTab(ruta); window.workArea.dividir(); }
+                    } },
+                    { label: 'Mover al panel derecho', deshabilitado: col >= 2, run: () => {
+                        if (ed() && ed().moveTabToPane) ed().moveTabToPane(ruta, col, Math.min(2, col + 1));
+                    } },
+                ];
+
+                if (col > 0) {
+                    items.push({
+                        label: 'Mover al panel izquierdo',
+                        run: () => { if (ed() && ed().moveTabToPane) ed().moveTabToPane(ruta, col, col - 1); }
+                    });
+                }
+
+                items.push(
+                    '-',
                     { label: 'Revertir archivo', deshabilitado: !ed().isDirty(ruta), run: () => revertir(ruta) },
                     '-',
                     { label: 'Copiar ruta', comando: 'archivo.copiarRuta', run: () => copiarRuta(false, ruta) },
@@ -1041,7 +1061,8 @@
                     { label: 'Renombrar…', run: () => renombrar(ruta) },
                     { label: 'Duplicar', run: () => duplicar(ruta) },
                     { label: 'Eliminar…', run: () => eliminar(ruta) },
-                ]);
+                );
+                menuContextual(e.clientX, e.clientY, items);
             });
         }
 
@@ -1074,7 +1095,12 @@
                     '-',
                 ] : [
                     { label: 'Abrir', run: () => abrirEnPosicion(ruta) },
-                    { label: 'Abrir al lado', run: async () => { if (await abrirEnPosicion(ruta)) window.workArea.dividir(); } },
+                    { label: 'Abrir al lado', run: async () => {
+                        if (await abrirEnPosicion(ruta)) {
+                            if (ed() && ed().splitRight) ed().splitRight(ruta);
+                            else window.workArea.dividir();
+                        }
+                    } },
                     ...(ejecutable ? [{ label: 'Ejecutar', run: async () => { if (await abrirEnPosicion(ruta)) window.app.runCode(); } }] : []),
                     '-',
                     { label: 'Nuevo archivo aquí…', run: () => window.fileTreeMgr.createItem(false, carpeta) },

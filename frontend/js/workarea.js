@@ -877,68 +877,15 @@ class WorkAreaManager {
     // ------------------------------------------------------------------
 
     dividir() {
-        const principal = window.editorMgr;
-        if (!principal || !principal.activePath) {
-            window.layoutMgr?.mensajeEstado('Abre un archivo antes de dividir', 2000);
-            return;
+        if (window.editorMgr) {
+            window.editorMgr.splitRight();
         }
-        if (this.grupos.length >= 2) {
-            window.layoutMgr?.mensajeEstado('Máximo tres columnas de código', 2000);
-            return;
-        }
-
-        const cont = document.getElementById('editor-grupos');
-        if (!cont || typeof monaco === 'undefined') return;
-
-        const path = principal.activePath;
-        const tab = principal.openTabs.get(path);
-        const id = `grupo_${Date.now()}`;
-
-        const col = document.createElement('div');
-        col.className = 'editor-grupo';
-        col.innerHTML = `
-            <div class="grupo-cabecera">
-                <span class="grupo-nombre"></span>
-                <button class="grupo-cerrar" title="Cerrar columna"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="grupo-monaco"></div>`;
-        col.querySelector('.grupo-nombre').textContent = tab ? tab.name : path.split('/').pop();
-        cont.appendChild(col);
-        cont.hidden = false;
-
-        const ed = monaco.editor.create(col.querySelector('.grupo-monaco'), {
-            model: tab ? tab.model : null,
-            theme: localStorage.getItem('prig_editor_theme') || 'prig-dark',
-            fontSize: parseInt(localStorage.getItem('prig_editor_font_size') || '14', 10),
-            automaticLayout: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-        });
-
-        const grupo = { id, path, editor: ed, el: col };
-        this.grupos.push(grupo);
-        window.dispatchEvent(new CustomEvent('prig:editor-creado', { detail: { editor: ed, principal: false } }));
-        col.querySelector('.grupo-cerrar').onclick = () => this.cerrarGrupo(id);
-
-        document.getElementById('monaco-editor-container')?.classList.add('con-divisiones');
-        setTimeout(() => { ed.layout(); if (principal.editor) principal.editor.layout(); }, 60);
-        window.layoutMgr?.mensajeEstado(`Dividido: ${grupo.path.split('/').pop()}`, 1600);
     }
 
     cerrarGrupo(id) {
-        const g = this.grupos.find(x => x.id === id);
-        if (!g) return;
-        g.editor.dispose();
-        g.el.remove();
-        this.grupos = this.grupos.filter(x => x.id !== id);
-        if (!this.grupos.length) {
-            const cont = document.getElementById('editor-grupos');
-            if (cont) cont.hidden = true;
-            document.getElementById('monaco-editor-container')?.classList.remove('con-divisiones');
+        if (window.editorMgr) {
+            window.editorMgr.setColumnLayout(Math.max(1, window.editorMgr.numColumns - 1));
         }
-        setTimeout(() => {
-            if (window.editorMgr && window.editorMgr.editor) window.editorMgr.editor.layout();
-        }, 60);
     }
 }
 

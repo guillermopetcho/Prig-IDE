@@ -184,7 +184,28 @@
         { id: 'vista.cuaderno', menu: 'Vista', label: 'Abrir vista de Cuaderno', accel: 'Ctrl+Alt+N',
           run: () => window.workArea.activar('editor') },
         { id: 'vista.dividir', menu: 'Vista', label: 'Abrir el archivo al lado', accel: 'Ctrl+\\',
-          run: () => window.workArea.dividir() },
+          run: () => window.editorMgr && window.editorMgr.splitRight() },
+        { id: 'vista.editor1Columna', menu: 'Vista', label: 'Disposición del editor: 1 columna',
+          marcado: () => window.editorMgr && window.editorMgr.numColumns === 1,
+          run: () => window.editorMgr && window.editorMgr.setColumnLayout(1) },
+        { id: 'vista.editor2Columnas', menu: 'Vista', label: 'Disposición del editor: 2 columnas (Lado a lado)',
+          marcado: () => window.editorMgr && window.editorMgr.numColumns === 2,
+          run: () => window.editorMgr && window.editorMgr.setColumnLayout(2) },
+        { id: 'vista.editor3Columnas', menu: 'Vista', label: 'Disposición del editor: 3 columnas (Tres lados)',
+          marcado: () => window.editorMgr && window.editorMgr.numColumns === 3,
+          run: () => window.editorMgr && window.editorMgr.setColumnLayout(3) },
+        { id: 'vista.moverArchivoDerecha', menu: 'Vista', label: 'Mover archivo de código al panel derecho', accel: 'Ctrl+Alt+Right',
+          run: () => {
+            if (window.editorMgr && window.editorMgr.activePath) {
+              window.editorMgr.moveTabToPane(window.editorMgr.activePath, window.editorMgr.activeCol, Math.min(2, window.editorMgr.activeCol + 1));
+            }
+          } },
+        { id: 'vista.moverArchivoIzquierda', menu: 'Vista', label: 'Mover archivo de código al panel izquierdo', accel: 'Ctrl+Alt+Left',
+          run: () => {
+            if (window.editorMgr && window.editorMgr.activePath && window.editorMgr.activeCol > 0) {
+              window.editorMgr.moveTabToPane(window.editorMgr.activePath, window.editorMgr.activeCol, window.editorMgr.activeCol - 1);
+            }
+          } },
         { id: 'vista.dividirPaneles', menu: 'Vista', label: 'Dividir área de trabajo (Lado a lado)', accel: 'Ctrl+Alt+\\',
           run: () => window.workArea && window.workArea.abrirDivision() },
         { id: 'vista.intercambiarPaneles', menu: 'Vista', label: 'Intercambiar paneles (Izquierda ↔ Derecha)', accel: 'Alt+\\',

@@ -5955,12 +5955,12 @@ async def youtube_abrir_externo(request: Request):
 
 
 @app.get("/api/youtube/transcripcion")
-def youtube_transcripcion(video_id: str, idioma: str = "es"):
-    """ Extrae la transcripción estructurada y traducida con intervalos de tiempo """
+def youtube_transcripcion(video_id: str, idioma: str = "es", forzar: bool = False):
+    """ Extrae la transcripción estructurada y traducida con intervalos de tiempo con soporte de caché persistente """
     if not video_id:
         raise HTTPException(status_code=400, detail="Falta el parámetro 'video_id'")
     import youtube_analisis
-    return youtube_analisis.extraer_transcripcion_estructurada(video_id, idioma_destino=idioma)
+    return youtube_analisis.extraer_transcripcion_estructurada(video_id, idioma_destino=idioma, forzar_refresco=forzar)
 
 
 @app.post("/api/youtube/traducir_texto")

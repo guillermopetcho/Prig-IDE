@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prig IDE - Editor de Código & Tutor IA</title>
   <link rel="stylesheet" href="/static/css/style.css?v=9">
-  <link rel="stylesheet" href="/static/css/rediseno.css?v=18">
+  <link rel="stylesheet" href="/static/css/rediseno.css?v=19">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -432,23 +432,93 @@
 
             <div id="trabajo-vistas" class="trabajo-vistas">
               <div id="vista-editor" class="vista-trabajo">
-                <!-- Columnas adicionales al usar "Abrir el archivo al lado" (Ctrl+\) -->
-                <div id="editor-grupos" class="editor-grupos" hidden></div>
-                <div id="editor-tabs" class="tab-bar">
-                  <!-- Open file tabs dynamically injected -->
+                <!-- Barra superior de disposición del editor (1, 2 y 3 columnas) -->
+                <div id="editor-layout-bar" class="editor-layout-bar">
+                  <div class="editor-layout-info">
+                    <span class="editor-layout-badge"><i class="fa-solid fa-code"></i> Editor</span>
+                    <span id="editor-layout-info-cols" style="font-size:11px; opacity:0.75;">(1 Columna)</span>
+                  </div>
+                  <div class="editor-layout-actions">
+                    <button id="btn-editor-cols-1" class="editor-layout-btn active" title="1 Columna (Editor individual)" data-cols="1">
+                      <i class="fa-regular fa-square"></i> 1 Col
+                    </button>
+                    <button id="btn-editor-cols-2" class="editor-layout-btn" title="2 Columnas (Lado a lado - Ver 2 códigos)" data-cols="2">
+                      <i class="fa-solid fa-table-columns"></i> 2 Cols
+                    </button>
+                    <button id="btn-editor-cols-3" class="editor-layout-btn" title="3 Columnas (Tres lados - Ver 3 códigos)" data-cols="3">
+                      <i class="fa-solid fa-table-cells"></i> 3 Cols
+                    </button>
+                    <div class="editor-layout-sep"></div>
+                    <button id="btn-editor-split-side" class="editor-layout-btn" title="Abrir archivo al lado (Ctrl+\)">
+                      <i class="fa-solid fa-arrow-right-to-bracket"></i> Abrir al lado
+                    </button>
+                  </div>
                 </div>
 
-                <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
-                  <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
-                    Cuaderno Jupyter</button>
-                  <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
-                    Raw</button>
+                <!-- Cuadrícula flexible de columnas del editor -->
+                <div id="editor-grid-container" class="editor-grid-container">
+                  <!-- COLUMNA 0 (Principal / Izquierda) -->
+                  <div id="editor-col-0" class="editor-col activa" data-col="0" style="flex: 1 1 100%; width: 100%;">
+                    <div class="editor-col-header">
+                      <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
+                        <!-- Open file tabs dynamically injected -->
+                      </div>
+                      <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
+                        <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                      </div>
+                    </div>
+                    <div class="editor-col-body">
+                      <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
+                        <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
+                          Cuaderno Jupyter</button>
+                        <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
+                          Raw</button>
+                      </div>
+                      <div id="monaco-editor-container" class="monaco-container"></div>
+                      <div id="notebook-view-container" style="display:none;"></div>
+                    </div>
+                  </div>
+
+                  <!-- DIVISOR 0 (Entre Col 0 y Col 1) -->
+                  <div id="editor-resizer-0" class="editor-col-resizer" data-resizer="0" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                  <!-- COLUMNA 1 (Centro o Derecha) -->
+                  <div id="editor-col-1" class="editor-col" data-col="1" style="display: none;">
+                    <div class="editor-col-header">
+                      <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
+                        <!-- Pestañas de Columna 1 -->
+                      </div>
+                      <div class="editor-col-actions">
+                        <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                        <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                      </div>
+                    </div>
+                    <div class="editor-col-body">
+                      <div id="monaco-editor-container-1" class="monaco-container"></div>
+                    </div>
+                  </div>
+
+                  <!-- DIVISOR 1 (Entre Col 1 y Col 2) -->
+                  <div id="editor-resizer-1" class="editor-col-resizer" data-resizer="1" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                  <!-- COLUMNA 2 (Derecha extrema) -->
+                  <div id="editor-col-2" class="editor-col" data-col="2" style="display: none;">
+                    <div class="editor-col-header">
+                      <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
+                        <!-- Pestañas de Columna 2 -->
+                      </div>
+                      <div class="editor-col-actions">
+                        <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button class="editor-col-action-btn cerrar" data-cerrar-col="2" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                      </div>
+                    </div>
+                    <div class="editor-col-body">
+                      <div id="monaco-editor-container-2" class="monaco-container"></div>
+                    </div>
+                  </div>
                 </div>
 
-                <div id="monaco-editor-container"></div>
-                <!-- El cuaderno se pinta aquí, en la misma vista que el código: antes vivía en una
-                     vista aparte que nunca se mostraba y un .ipynb abierto se veía en blanco -->
-                <div id="notebook-view-container" style="display:none;"></div>
                 <!-- Sin archivos abiertos: nada de «Hola, mundo», solo cómo empezar -->
                 <div id="editor-vacio" class="editor-vacio" hidden>
                   <i class="fa-solid fa-code"></i>
@@ -2582,12 +2652,12 @@
   <script src="/static/js/prig_net.js?v=7"></script>
   <script src="/static/js/apariencia.js?v=7"></script>
   <script src="/static/js/shortcuts.js?v=9"></script>
-  <script src="/static/js/commands.js?v=21"></script>
+  <script src="/static/js/commands.js?v=22"></script>
   <script src="/static/js/menubar.js?v=10"></script>
   <script src="/static/js/layout.js?v=8"></script>
-  <script src="/static/js/workarea.js?v=13"></script>
+  <script src="/static/js/workarea.js?v=14"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
-  <script src="/static/js/editor.js?v=11"></script>
+  <script src="/static/js/editor.js?v=12"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=8"></script>
   <script src="/static/js/terminal.js?v=6"></script>
@@ -2617,7 +2687,7 @@
   <script src="/static/js/global_config.js?v=12"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>
   <script src="/static/js/desafios.js?v=7"></script>
-  <script src="/static/js/ide.js?v=3"></script>
+  <script src="/static/js/ide.js?v=4"></script>
   <script src="/static/js/app.js?v=7"></script>
 
 </body>

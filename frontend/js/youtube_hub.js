@@ -1796,6 +1796,30 @@ const VIDEOS_CURADOS = [
         guardarExplicaciones(videoId, lista);
     }
 
+    const _precargasEnProgreso = new Set();
+    function precargarTranscripcion(videoId, idioma = 'es') {
+        if (!videoId || String(videoId).startsWith('pl_')) return;
+        const cacheClave = `prig_yt_trans_${videoId}_${idioma}`;
+        if (localStorage.getItem(cacheClave)) return;
+        const claveProgreso = `${videoId}_${idioma}`;
+        if (_precargasEnProgreso.has(claveProgreso)) return;
+        _precargasEnProgreso.add(claveProgreso);
+
+        fetch(`/api/youtube/transcripcion?video_id=${encodeURIComponent(videoId)}&idioma=${encodeURIComponent(idioma)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.ok && data.segmentos && data.segmentos.length > 0) {
+                    try {
+                        localStorage.setItem(cacheClave, JSON.stringify(data));
+                    } catch (e) {}
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                _precargasEnProgreso.delete(claveProgreso);
+            });
+    }
+
     async function cargarTranscripcion(videoId, idioma = 'es', forzarRefresco = false) {
         if (!videoId) return;
 
@@ -1842,7 +1866,8 @@ const VIDEOS_CURADOS = [
         }
 
         try {
-            const resp = await fetch(`/api/youtube/transcripcion?video_id=${encodeURIComponent(videoId)}&idioma=${encodeURIComponent(idioma)}`);
+            const forzarParam = forzarRefresco ? '&forzar=true' : '';
+            const resp = await fetch(`/api/youtube/transcripcion?video_id=${encodeURIComponent(videoId)}&idioma=${encodeURIComponent(idioma)}${forzarParam}`);
             const data = await resp.json();
             if (data.ok && data.segmentos && data.segmentos.length > 0) {
                 try {
@@ -3253,6 +3278,27 @@ const VIDEOS_CURADOS = [
                 }
             };
         });
+
+        // Pre-carga ultra rápida al pasar el cursor sobre cualquier tarjeta
+        raiz.querySelectorAll('.yt-tarjeta').forEach(tar => {
+            tar.addEventListener('mouseenter', () => {
+                const vidId = tar.dataset.videoId;
+                if (vidId && !String(vidId).startsWith('pl_')) {
+                    precargarTranscripcion(vidId, estado.idiomaSubtitulos || 'es');
+                }
+            }, { once: true });
+        });
+
+        // Pre-carga progresiva en segundo plano de las primeras tarjetas visibles tras un breve respiro
+        setTimeout(() => {
+            const visibles = Array.from(raiz.querySelectorAll('.yt-tarjeta')).slice(0, 3);
+            visibles.forEach(tar => {
+                const vidId = tar.dataset.videoId;
+                if (vidId && !String(vidId).startsWith('pl_')) {
+                    precargarTranscripcion(vidId, estado.idiomaSubtitulos || 'es');
+                }
+            });
+        }, 500);
     }
 
     function procesarEntradaOUrl(texto) {
@@ -3295,13 +3341,36 @@ const VIDEOS_CURADOS = [
     }
 
     function reproducir(video) {
+        if (!video) return;
         estado.videoActual = video;
         estado.vista = 'reproductor';
         estado.pestanaLateral = 'traduccion';
         estado.subpestanaTraduccion = 'transcripcion';
         estado.filtroTextoTraduccion = '';
-        if (video && video.id && !String(video.id).startsWith('pl_')) {
-            cargarTranscripcion(video.id, estado.idiomaSubtitulos || 'es');
+
+        const vidId = video.id;
+        const idm = estado.idiomaSubtitulos || 'es';
+        const cacheClave = `prig_yt_trans_${vidId}_${idm}`;
+
+        // Cargar inmediatamente desde caché si existe ANTES de pintar para mostrar traducción en 0ms
+        if (vidId && !String(vidId).startsWith('pl_')) {
+            try {
+                const enCache = localStorage.getItem(cacheClave);
+                if (enCache) {
+                    const parsed = JSON.parse(enCache);
+                    if (parsed && parsed.ok && parsed.segmentos && parsed.segmentos.length > 0) {
+                        estado.transcripcion = {
+                            cargando: false,
+                            error: null,
+                            datos: parsed,
+                            videoId: vidId,
+                            idioma: idm
+                        };
+                    }
+                }
+            } catch (e) {}
+
+            cargarTranscripcion(vidId, idm);
         }
         pintar();
     }
@@ -3606,10 +3675,19 @@ const VIDEOS_CURADOS = [
                         </div>
 
                         ${estado.transcripcion.cargando ? `
-                          <div class="yt-loading-box" style="margin-top:10px;">
-                            <i class="fa-solid fa-circle-notch yt-loading-spinner" style="color:var(--accent-blue, #89b4fa);"></i>
-                            <div style="font-weight:700; color:#fff;">Cargando explicación y traducción...</div>
-                            <div style="font-size:11px; color:var(--text-muted);">Extrayendo subtítulos oficiales y generando traducción en español...</div>
+                          <div style="margin-top:10px; background:rgba(255,255,255,0.02); border:1px dashed rgba(137,180,250,0.3); border-radius:8px; padding:14px 12px;">
+                            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                              <i class="fa-solid fa-circle-notch yt-loading-spinner" style="color:var(--accent-blue, #89b4fa); font-size:13px;"></i>
+                              <div style="font-weight:700; color:#fff; font-size:12px;">Traduciendo y sincronizando la explicación...</div>
+                            </div>
+                            <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:12px;">
+                              Sincronizando subtítulos de YouTube y adaptando texto didáctico al español...
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                              <div style="height:13px; width:92%; background:rgba(255,255,255,0.07); border-radius:4px; animation: yt-pulse 1.2s infinite ease-in-out;"></div>
+                              <div style="height:13px; width:80%; background:rgba(255,255,255,0.05); border-radius:4px; animation: yt-pulse 1.2s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                              <div style="height:13px; width:86%; background:rgba(255,255,255,0.06); border-radius:4px; animation: yt-pulse 1.2s infinite ease-in-out; animation-delay: 0.4s;"></div>
+                            </div>
                           </div>
                         ` : estado.transcripcion.error ? `
                           <div style="text-align:center; padding:20px 10px; color:var(--text-muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:8px;">
