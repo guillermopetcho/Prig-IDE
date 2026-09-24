@@ -349,8 +349,6 @@
           run: () => window.Inicio && window.Inicio.abrir() },
         { id: 'herr.perfil', menu: 'Secciones', label: 'Perfil', accel: 'Alt+4',
           run: () => window.workArea.abrirHerramienta('modal-perfil', 'Perfil', 'fa-chart-pie') },
-        { id: 'herr.carrera', menu: 'Secciones', label: 'Carrera', accel: 'Alt+C',
-          run: () => { window.workArea.abrirHerramienta('modal-perfil', 'Perfil', 'fa-chart-pie'); if (window.cambiarPestanaPerfil) window.cambiarPestanaPerfil('carrera'); } },
         { id: 'herr.biblioteca', menu: 'Secciones', label: 'Biblioteca', accel: 'Alt+1',
           run: () => window.workArea.abrirHerramienta('modal-book-library', 'Biblioteca', 'fa-book-bookmark') },
         { id: 'herr.practica', menu: 'Secciones', label: 'Desafíos', accel: 'Alt+3',
@@ -431,7 +429,6 @@
     const ALIASES = {
         'sec.inicio': 'herr.inicio',
         'sec.perfil': 'herr.perfil',
-        'sec.carrera': 'herr.carrera',
         'sec.biblioteca': 'herr.biblioteca',
         'sec.desafios': 'herr.practica',
         'sec.diagramas': 'herr.diagramas',

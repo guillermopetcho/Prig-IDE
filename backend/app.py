@@ -4215,42 +4215,6 @@ def export_dataset_file():
     raise HTTPException(status_code=404, detail="Dataset file not found")
 
 # ==========================================
-# CARRERAS UNIVERSITARIAS Y MATERIAS
-# ==========================================
-
-@app.get("/api/carreras")
-def get_carreras():
-    """Devuelve el catálogo de carreras universitarias y materias."""
-    carreras_file = os.path.join(frontend_dir, "data", "carreras.json")
-    if os.path.exists(carreras_file):
-        try:
-            with open(carreras_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error leyendo carreras: {e}")
-    raise HTTPException(status_code=404, detail="Archivo de carreras no encontrado")
-
-
-@app.get("/api/carreras/materia")
-def get_carrera_materia(archivo: str = Query(...)):
-    """Devuelve el contenido Markdown de una materia en carreras/."""
-    base_project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    carreras_root = os.path.join(base_project_dir, "carreras")
-
-    clean_path = os.path.normpath(archivo.strip().lstrip("/"))
-    target_abs = os.path.normpath(os.path.join(base_project_dir, clean_path))
-
-    if not (target_abs.startswith(carreras_root) and os.path.isfile(target_abs)):
-        raise HTTPException(status_code=404, detail="Archivo de materia no encontrado")
-
-    try:
-        with open(target_abs, "r", encoding="utf-8") as f:
-            contenido = f.read()
-        return {"ok": True, "ruta": clean_path, "contenido": contenido}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error leyendo archivo de materia: {e}")
-
-# ==========================================
 # LANZADOR DE VENTANA NATIVA INDEPENDIENTE PARA NOTE
 # ==========================================
 
