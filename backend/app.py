@@ -1,9 +1,12 @@
 import os
 import re
+import asyncio
 import sys
 import json
 import queue
+import shutil
 import signal
+import logging
 import threading
 import subprocess
 import zipfile
@@ -16,11 +19,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
+logger = logging.getLogger("prig")
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from file_manager import FileManager
 from runner import CodeRunner
 from ai_engine import AIEngine
-from ai_engine.ai_engine_class import explicar_error_motor
+from ai_engine.ai_engine_class import explicar_error_motor, fijar_cancelacion
 from book_service import BookService
 from librerias_service import LibreriasService
 from papers_service import PapersService
@@ -594,7 +599,7 @@ def download_paper(req: PaperDownloadRequest):
 @app.post("/api/papers/ask")
 def ask_paper(req: PaperAskRequest):
     modelo = req.modelo or ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-    return StreamingResponse(
+    return StreamingResponse(_flujo_cancelable(
         papers_service.ask_paper_stream(
             paper_id=req.paper_id,
             pregunta=req.pregunta,
@@ -602,7 +607,7 @@ def ask_paper(req: PaperAskRequest):
             modelo=modelo,
             tipo=req.tipo or "analisis",
             historial=req.historial
-        ),
+        )),
         media_type="text/plain; charset=utf-8"
     )
 
@@ -665,7 +670,7 @@ def guided_generate_stream(req: GuidedGenerateRequest):
         except Exception as err:
             yield json.dumps({"type": "error", "message": str(err)}, ensure_ascii=False) + "\n"
 
-    return StreamingResponse(emit(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emit()), media_type="application/x-ndjson")
 
 @app.post("/api/guided/cancel")
 @app.post("/api/ai/cancel")
@@ -1024,7 +1029,7 @@ def knowledge_ask(req: KnowledgeAskRequest):
 
         yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
 
-    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="application/x-ndjson")
 
 # ======================================================================
 # Base de conocimiento: paquetes extraídos de libros completos
@@ -1391,7 +1396,7 @@ def job_prepare_stream(req: JobPrepareRequest):
             yield json.dumps({"tipo": "fin", "manifest": resultado.get("manifest", {})},
                              ensure_ascii=False) + "\n"
 
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 @app.get("/api/job/list")
@@ -1646,7 +1651,7 @@ def flujos_descargar(req: DescargaRequest):
             return
         yield json.dumps({"tipo": "fin", "modelo": req.modelo}) + "\n"
 
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 def _version_ollama() -> str:
@@ -1785,7 +1790,7 @@ def flujos_ejecutar(req: FlujoEjecutar):
                     yield json.dumps(evento, ensure_ascii=False) + "\n"
             except Exception as err:
                 yield json.dumps({"tipo": "error", "mensaje": str(err)}, ensure_ascii=False) + "\n"
-        return StreamingResponse(emitir_v2(), media_type="application/x-ndjson")
+        return StreamingResponse(_flujo_cancelable(emitir_v2()), media_type="application/x-ndjson")
 
     motor = _motor_flujos()
 
@@ -1807,7 +1812,7 @@ def flujos_ejecutar(req: FlujoEjecutar):
             eid = flow_store.anotar_ejecucion(flujo, req.entrada, registro, segundos)
             yield json.dumps({"tipo": "guardado", "ejecucion": eid}) + "\n"
 
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 @app.get("/api/flujos/historial")
@@ -1915,7 +1920,7 @@ def libro_analizar(req: FichaRequest):
             flow_store.anotar_ejecucion(flujo, f"ficha de {titulo}", registro, segundos)
         yield json.dumps({"tipo": "ficha", "ficha": ficha}, ensure_ascii=False) + "\n"
 
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 @app.get("/api/libros/material")
@@ -2015,7 +2020,7 @@ def sondear_libros(req: SondeoRequest):
             yield json.dumps(r, ensure_ascii=False) + "\n"
         yield json.dumps({"tipo": "fin"}) + "\n"
 
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 @app.post("/api/sondeo/preparar")
@@ -2429,7 +2434,7 @@ def github_exportado(ruta: str, descargar: bool = False):
 @app.get("/api/github/widget/config")
 def github_widget_config():
     cfg = github_stats_widget.leer_config()
-    token = github_lector.leer_token()
+    token = (github_lector.token() or {}).get("token")
     user_info = None
     if token:
         try:
@@ -2478,7 +2483,7 @@ def github_widget_preview(req: GithubWidgetPreviewRequest):
     )
     svg = github_stats_widget.generar_svg(stats, cfg)
 
-    token = github_lector.leer_token()
+    token = (github_lector.token() or {}).get("token")
     login = "username"
     if token:
         try:
@@ -2510,7 +2515,7 @@ def github_widget_preview(req: GithubWidgetPreviewRequest):
 
 @app.post("/api/github/widget/publicar")
 def github_widget_publicar(req: GithubWidgetPublicarRequest):
-    token = github_lector.leer_token()
+    token = (github_lector.token() or {}).get("token")
     if not token:
         raise HTTPException(
             status_code=400,
@@ -3063,7 +3068,7 @@ def update_ollama_stream():
                 except Exception:
                     pass
 
-    return StreamingResponse(emit(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emit()), media_type="application/x-ndjson")
 
 
 @app.post("/api/ai/ollama/launch-terminal-update")
@@ -3244,7 +3249,7 @@ def pull_model(req: ModelPullRequest):
                 yield status_msg
         except Exception as e:
             yield f"Error en el servidor backend: {str(e)}\n"
-    return StreamingResponse(event_stream(), media_type="text/plain")
+    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 @app.post("/api/ai/workflow/run")
 def run_workflow(req: WorkflowRequest):
@@ -3302,7 +3307,7 @@ def run_workflow(req: WorkflowRequest):
             
         yield json.dumps({"status": "finished", "final_result": current_context}) + "\n"
         
-    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="application/x-ndjson")
 
 class AIInlineCompleteRequest(BaseModel):
     code_prefix: str
@@ -3585,12 +3590,12 @@ def ai_chat(req: AIChatRequest):
             def gemini_eventos():
                 for chunk in motor_gem.generate_response(prompt, nombre_gem, sys_prompt):
                     yield json.dumps({"t": "texto", "v": chunk}, ensure_ascii=False) + "\n"
-            return StreamingResponse(gemini_eventos(), media_type="application/x-ndjson")
+            return StreamingResponse(_flujo_cancelable(gemini_eventos()), media_type="application/x-ndjson")
         else:
-            return StreamingResponse(motor_gem.generate_response(prompt, nombre_gem, sys_prompt), media_type="text/plain")
+            return StreamingResponse(_flujo_cancelable(motor_gem.generate_response(prompt, nombre_gem, sys_prompt)), media_type="text/plain")
 
     if req.eventos:
-        return StreamingResponse(_chat_eventos(req, prompt, sys_prompt, modelo=modelo), media_type="application/x-ndjson")
+        return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo)), media_type="application/x-ndjson")
 
     def event_stream():
         should_web_search = req.use_web or ai_engine.web_search.should_auto_search(req.prompt)
@@ -3601,7 +3606,7 @@ def ai_chat(req: AIChatRequest):
             for chunk in ai_engine.generate_response(prompt, modelo, sys_prompt, uso="tutor"):
                 yield chunk
 
-    return StreamingResponse(event_stream(), media_type="text/plain")
+    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 
 def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None):
@@ -3969,7 +3974,7 @@ def explain_seguimiento_block(req: SeguimientoExplainRequest):
         except Exception as e:
             yield f"\n[Error: {str(e)}]"
             
-    return StreamingResponse(generator(), media_type="text/plain")
+    return StreamingResponse(_flujo_cancelable(generator()), media_type="text/plain")
 
 class SeguimientoQuizRequest(BaseModel):
     goal: str
@@ -4249,7 +4254,7 @@ Formatea la respuesta en Markdown limpio (títulos ##, ###, bloques de código `
         for chunk in ai_engine.generate_response(prompt, model=req.model, system_prompt=sys_prompt):
             yield chunk
 
-    return StreamingResponse(stream_explanation(), media_type="text/plain")
+    return StreamingResponse(_flujo_cancelable(stream_explanation()), media_type="text/plain")
 
 # ==========================================
 # ENDPOINTS EXPORTADOR PDF CARPETAS & NOTEBOOKS
@@ -4327,12 +4332,71 @@ def _perfil_valido(perfil: str, tirador: str = "equilibrado"):
         raise HTTPException(status_code=400, detail=f"Preferencia desconocida: {tirador}")
 
 
-def _ndjson_en_hilo(trabajo):
-    """ Ejecuta `trabajo(avisar)` en un hilo y emite sus eventos como NDJSON """
+def _flujo_cancelable(contenido):
+    """ Envuelve el cuerpo de una respuesta en streaming para que se detenga si el cliente se va.
+
+    El generador síncrono se ejecuta entero en un hilo propio, con SU evento de cancelación
+    (lo leen generate_response y chat_eventos). Si el cliente cierra la conexión (cierra la
+    sección, recarga, pulsa Detener), se cancela en el acto solo esta petición: el modelo deja
+    de generar. Antes Starlette tardaba en cerrar el generador y el modelo seguía en la GPU,
+    y para cortarlo había que usar /api/ai/cancel, que detenía TODAS las secciones.
+    Un generador asíncrono se devuelve tal cual (ya se entera de la desconexión). """
+    if hasattr(contenido, "__aiter__"):
+        return contenido
     cola: "queue.Queue" = queue.Queue()
-    resultado: Dict[str, Any] = {}
+    cancelar = threading.Event()
+    FIN = object()
 
     def correr():
+        fijar_cancelacion(cancelar)
+        try:
+            for trozo in contenido:
+                if cancelar.is_set():
+                    break
+                cola.put(trozo)
+        except BaseException as e:           # se vuelve a lanzar del lado de la respuesta
+            cola.put(e)
+        finally:
+            fijar_cancelacion(None)
+            cerrar = getattr(contenido, "close", None)
+            if cancelar.is_set() and cerrar:
+                try:
+                    cerrar()                  # sus finally sueltan la conexión con Ollama
+                except Exception:
+                    pass
+            cola.put(FIN)
+
+    async def emitir():
+        threading.Thread(target=correr, daemon=True).start()
+        bucle = asyncio.get_running_loop()
+        completo = False
+        try:
+            while True:
+                trozo = await bucle.run_in_executor(None, cola.get)
+                if trozo is FIN:
+                    break
+                if isinstance(trozo, BaseException):
+                    raise trozo
+                yield trozo
+            completo = True
+        finally:
+            if not completo:
+                cancelar.set()
+    return emitir()
+
+
+def _ndjson_en_hilo(trabajo):
+    """ Ejecuta `trabajo(avisar)` en un hilo y emite sus eventos como NDJSON.
+
+    Si el cliente se va antes del final (cerró la sección, recargó, pulsó Cancelar), se
+    activa la cancelación de ESTA petición: el modelo deja de generar. Antes el hilo seguía
+    hasta terminar, ocupando la GPU para nadie. Las demás secciones no se enteran. """
+    cola: "queue.Queue" = queue.Queue()
+    resultado: Dict[str, Any] = {}
+    cancelar = threading.Event()
+
+    def correr():
+        fijar_cancelacion(cancelar)
         try:
             resultado["fin"] = trabajo(cola.put)
         except recursos_cal.Cancelado:
@@ -4340,25 +4404,36 @@ def _ndjson_en_hilo(trabajo):
         except Exception as e:
             resultado["error"] = str(e)
         finally:
+            fijar_cancelacion(None)
             cola.put(None)
 
     hilo = threading.Thread(target=correr, daemon=True)
     hilo.start()
 
-    def emitir():
-        while True:
-            evento = cola.get()
-            if evento is None:
-                break
-            yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
-        hilo.join(timeout=5)
-        if "error" in resultado:
-            yield json.dumps({"tipo": "error", "mensaje": resultado["error"]},
-                             ensure_ascii=False) + "\n"
-        else:
-            yield json.dumps({"tipo": "fin", "resultado": resultado.get("fin")},
-                             ensure_ascii=False, default=str) + "\n"
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    async def emitir():
+        # Asíncrono a propósito: si el cliente se va, Starlette cancela esta tarea y el
+        # CancelledError llega aquí en el acto (con un generador síncrono quedaba bloqueado en
+        # un hilo y la cancelación no se enteraba hasta mucho después)
+        bucle = asyncio.get_running_loop()
+        completo = False
+        try:
+            while True:
+                evento = await bucle.run_in_executor(None, cola.get)
+                if evento is None:
+                    break
+                yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+            await bucle.run_in_executor(None, hilo.join, 5)
+            if "error" in resultado:
+                yield json.dumps({"tipo": "error", "mensaje": resultado["error"]},
+                                 ensure_ascii=False) + "\n"
+            else:
+                yield json.dumps({"tipo": "fin", "resultado": resultado.get("fin")},
+                                 ensure_ascii=False, default=str) + "\n"
+            completo = True
+        finally:
+            if not completo:
+                cancelar.set()
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 def _gpu_ocupada() -> bool:
@@ -4687,7 +4762,7 @@ def _ndjson(generador):
             yield json.dumps({"fase": "fin"}) + "\n"
         except (ErrorConfig, ErrorGestion, requests_lib.RequestException) as e:
             yield json.dumps({"fase": "error", "mensaje": str(e)}, ensure_ascii=False) + "\n"
-    return StreamingResponse(emitir(), media_type="application/x-ndjson")
+    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 def _num_gpus() -> int:
@@ -6116,4 +6191,7 @@ if os.path.exists(assets_dir):
 
 @app.get("/")
 def serve_index():
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
+    # no-cache: el navegador puede guardarlo, pero lo revalida siempre. Sin esto, tras
+    # actualizar Prig la ventana seguía con un index.html viejo que pedía versiones viejas
+    # de los scripts (las nuevas llevan otro ?v=, pero solo si index.html es el nuevo).
+    return FileResponse(os.path.join(frontend_dir, "index.html"), headers={"Cache-Control": "no-cache"})

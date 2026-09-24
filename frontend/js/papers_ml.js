@@ -82,10 +82,13 @@
 
         async cargarModelos() {
             try {
-                const res = await window.prigFetchJson('/api/modelos/instalados');
-                if (res && res.modelos && res.modelos.length) {
-                    this.modelosDisponibles = res.modelos.map(m => m.name || m);
-                    this.modelo = this.modelosDisponibles[0];
+                const res = await window.prigFetchJson('/api/modelos');
+                // Los de embeddings no conversan: no sirven para explicar un paper
+                const chat = ((res && res.modelos) || []).filter(m => !(m.capacidades || []).includes('embedding'));
+                if (chat.length) {
+                    this.modelosDisponibles = chat.map(m => m.nombre || m.name || m);
+                    const preferido = window.PrigModelos ? window.PrigModelos.para('explicar') : null;
+                    this.modelo = this.modelosDisponibles.includes(preferido) ? preferido : this.modelosDisponibles[0];
                 }
             } catch (e) {
                 this.modelosDisponibles = ['qwen2.5-coder:7b', 'llama3', 'mistral'];

@@ -258,9 +258,8 @@ class AprendizajeGuiadoManager {
             this.abortController = null;
         }
 
-        try {
-            fetch('/api/guided/cancel', { method: 'POST' }).catch(() => {});
-        } catch (e) {}
+        // Cortar la conexión (arriba) basta: el servidor lo nota y detiene SOLO esta generación.
+        // Antes también llamaba a /api/guided/cancel, que detenía lo de todas las secciones.
 
         if (this.btnCancel) this.btnCancel.style.display = 'none';
         if (this.btnGenerate) {

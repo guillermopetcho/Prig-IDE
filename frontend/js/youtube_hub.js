@@ -3433,6 +3433,12 @@ const VIDEOS_CURADOS = [
         const superadosObj = objetivos.filter(o => o.superado).length;
         const transDatos = (estado.transcripcion && estado.transcripcion.datos) || null;
         const segmentosTranscripcion = (transDatos && transDatos.segmentos) ? transDatos.segmentos : [];
+        // Filtrado por el buscador de la transcripción: lo usan la cabecera (recuento) y la lista
+        const filtroTraduccion = (estado.filtroTextoTraduccion || '').toLowerCase().trim();
+        const segmentosFiltrados = filtroTraduccion
+            ? segmentosTranscripcion.filter(s => (s.texto && s.texto.toLowerCase().includes(filtroTraduccion))
+                || (s.texto_original && s.texto_original.toLowerCase().includes(filtroTraduccion)))
+            : segmentosTranscripcion;
 
         if (v && v.id && !String(v.id).startsWith('pl_')) {
             if (estado.transcripcion.videoId !== v.id && !estado.transcripcion.cargando) {
@@ -3706,11 +3712,6 @@ const VIDEOS_CURADOS = [
                             <button class="yt-btn azul" id="yt-btn-reintentar-transcripcion"><i class="fa-solid fa-rotate-right"></i> Cargar transcripción</button>
                           </div>
                         ` : (() => {
-                          const filtro = (estado.filtroTextoTraduccion || '').toLowerCase().trim();
-                          const segmentosFiltrados = filtro
-                            ? segmentosTranscripcion.filter(s => (s.texto && s.texto.toLowerCase().includes(filtro)) || (s.texto_original && s.texto_original.toLowerCase().includes(filtro)))
-                            : segmentosTranscripcion;
-
                           if (segmentosFiltrados.length === 0) {
                             return `
                               <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:11px;">
@@ -4654,7 +4655,7 @@ const VIDEOS_CURADOS = [
                 const nombre = prompt('Guardar resumen en el proyecto como:', sugerido);
                 if (!nombre) return;
                 try {
-                    await window.prigFetchJson('/api/files/write', {
+                    await window.prigFetchJson('/api/file', {
                         method: 'POST',
                         body: JSON.stringify({ path: nombre, content: md })
                     });
@@ -5008,7 +5009,7 @@ const VIDEOS_CURADOS = [
                 const nombre = prompt('Nombre del archivo de notas en tu proyecto:', sugerido);
                 if (!nombre) return;
                 try {
-                    await window.prigFetchJson('/api/files/write', {
+                    await window.prigFetchJson('/api/file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ path: nombre, content: cuerpoMd })

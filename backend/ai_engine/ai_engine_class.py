@@ -30,6 +30,26 @@ MENSAJE_RUNTIME_INCOMPLETO = (
 )
 
 
+
+# ---------------------------------------------------------------------------
+# Cancelación por petición
+#
+# Cada petición HTTP que genera con el modelo (app._ndjson_en_hilo) corre en su hilo y deja
+# aquí SU evento de cancelación. Si el cliente se va (cierra la sección, recarga, pulsa
+# Cancelar), se activa solo ese evento: se detiene esa generación y no las de las demás
+# secciones. Sin esto el modelo seguía generando en la GPU para nadie hasta terminar.
+# ---------------------------------------------------------------------------
+_contexto_hilo = threading.local()
+
+
+def cancelacion_actual() -> "Optional[threading.Event]":
+    """ El evento de cancelación de la petición que atiende este hilo, o None """
+    return getattr(_contexto_hilo, "cancelar", None)
+
+
+def fijar_cancelacion(evento: "Optional[threading.Event]"):
+    _contexto_hilo.cancelar = evento
+
 def _dirs_libreria_ollama(binario: str) -> List[str]:
     """ Dónde busca Ollama su carpeta lib/ollama, en el mismo orden que él """
     exe = os.path.dirname(os.path.realpath(binario))
@@ -1007,7 +1027,7 @@ class AIEngine:
         # «Detener» cierra las conexiones activas; durante una pausa térmica no hay ninguna,
         # así que el chat se apunta aquí para que también lo despierte
         if cancelar is None:
-            cancelar = threading.Event()
+            cancelar = cancelacion_actual() or threading.Event()
         with self._streams_lock:
             self.__dict__.setdefault("_cancelables", set()).add(cancelar)
         monitor = gobernador.monitor.trabajando() if gobernador is not None else None
@@ -1175,7 +1195,7 @@ class AIEngine:
         tope = int(payload["options"].get("num_predict") or 0)
         respuesta, pensamiento, generados = "", "", 0
         in_think_tag = False
-        cancelar = threading.Event()
+        cancelar = cancelacion_actual() or threading.Event()
         with self._streams_lock:
             self.__dict__.setdefault("_cancelables", set()).add(cancelar)
         monitor = gobernador.monitor.trabajando() if gobernador is not None else None
@@ -1206,6 +1226,8 @@ class AIEngine:
                 ultimo_control = time.time()
                 motivo, terminado, pensando_ahora = None, False, False
                 for line in res.iter_lines():
+                    if cancelar.is_set():
+                        break                   # cerrar la conexión (abajo) hace que Ollama deje de generar
                     if not line:
                         continue
                     data = json.loads(line.decode('utf-8'))

@@ -102,7 +102,7 @@ SINONIMOS: Dict[str, List[str]] = {
     "comprension de listas": ["list-comprehensions"], "comprensiones": ["list-comprehensions", "other-comprehensions"],
     "list comprehension": ["list-comprehensions"],
     "lista": ["lists", "list-methods"], "listas": ["lists", "list-methods"], "arreglo": ["lists"], "arreglos": ["lists"],
-    "array": ["lists"], "vector": ["lists"],
+    "array": ["lists"],
     "diccionario": ["dicts", "dict-methods", "hashes"], "diccionarios": ["dicts", "dict-methods", "hashes"],
     "hash": ["dicts", "hashes"], "mapa": ["dicts"],
     "conjunto": ["sets"], "conjuntos": ["sets"], "tupla": ["tuples"], "tuplas": ["tuples"],

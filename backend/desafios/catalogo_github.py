@@ -1179,8 +1179,23 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
                     "lenguaje": lang,
                     "es_ejercicio": True
                 })
-            if len(salida) >= limite:
-                break
+
+        # Los destacados curados van primero («como base»): sin esto quedaban ocultos detrás de
+        # los primeros archivos del árbol (en un curso de C++ en cuadernos, 50 .cpp antes que
+        # el primer .ipynb). Solo los que existen de verdad en el repositorio.
+        if destacados and salida:
+            vivos = {x["ruta"]: x for x in salida}
+            primero = []
+            for d in destacados:
+                if d["ruta"] in vivos:
+                    x = dict(vivos.pop(d["ruta"]))
+                    if d.get("lenguaje"):
+                        x["lenguaje"] = d["lenguaje"]
+                    if d.get("nombre"):
+                        x["nombre"] = d["nombre"]
+                    primero.append(x)
+            salida = primero + [x for x in salida if x["ruta"] in vivos]
+        salida = salida[:limite]
     except Exception:
         # Si GitHub API está limitada (60 consultas/h), sin conexión o bloqueada, no fallamos
         salida = []

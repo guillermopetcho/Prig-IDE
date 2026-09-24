@@ -236,15 +236,15 @@ def crear_router(runner, motor: Callable, consumir: Callable, ndjson: Callable, 
         s = servicio()
         if "/" not in texto and "." not in texto:                  # un usuario suelto: su perfil o nombre pack
             if texto.lower().startswith("prig-"):
-                t = gl.token()
-                login = (t or {}).get("usuario") or (t or {}).get("login")
-                if login:
-                    texto = f"https://github.com/{login}/{texto}"
-                else:
-                    texto = f"https://github.com/{texto}"
+                # Un pack suelto («prig-ml»): de tu propia cuenta, si Prig ya la conoce (se guarda al publicar)
+                login = (s._estado().get("github") or {}).get("login")
+                if not login:
+                    raise HTTPException(status_code=400, detail=f"¿De quién es «{texto}»? Escribe usuario/{texto} "
+                                                                f"o el enlace completo (github.com/usuario/{texto}).")
+                texto = f"https://github.com/{login}/{texto}"
             else:
                 texto = f"https://github.com/{texto.lstrip('@')}/prig"
-        elif "/" in texto and not texto.startswith(("http://", "https://", "git@")):
+        elif "/" in texto and not texto.startswith(("http://", "https://", "git@", "/", "file://")):
             texto = f"https://github.com/{texto.lstrip('@')}"
         return h(s.seguir, texto, autor())
 

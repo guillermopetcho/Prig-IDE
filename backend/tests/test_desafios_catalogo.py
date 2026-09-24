@@ -19,6 +19,12 @@ from desafios.ejecucion import ErrorDesafio
 RUNNER = CodeRunner()
 
 
+def sin_red():
+    """ GitHub no disponible: se comprueban los datos curados del catálogo, no el repositorio
+    vivo (que cambia y gasta la cuota de 60 consultas por hora) """
+    return mock.patch("github_lector.abrir", side_effect=Exception("sin red en las pruebas"))
+
+
 class ModeloFalsoReplicar:
     """ Doble del motor de IA para replicar desafíos de GitHub """
     def __init__(self, respuestas):
@@ -106,9 +112,24 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         self.assertTrue(any(r["ref"] == "Pierian-Data/Complete-Python-3-Bootcamp" for r in cursos))
 
         # Verificar que tienen cuadernos y ejercicios destacados
-        destacados_jake = cat.listar_ejercicios_repo("jakevdp/PythonDataScienceHandbook")
+        with sin_red():
+            destacados_jake = cat.listar_ejercicios_repo("jakevdp/PythonDataScienceHandbook")
         self.assertGreaterEqual(len(destacados_jake["archivos"]), 5)
         self.assertTrue(any(a["nombre"].endswith(".ipynb") for a in destacados_jake["archivos"]))
+
+    def test_destacados_primero_con_el_repositorio_vivo(self):
+        """ Con GitHub disponible, los destacados curados van primero aunque el árbol vivo
+        tenga decenas de archivos antes (antes quedaban fuera del límite de 50) """
+        destacados = cat.EJERCICIOS_DESTACADOS_REPO["rambasnet/cpp-fundamentals"]
+        arbol = [{"ruta": f"src/ejemplo_{i}.cpp", "bytes": 100} for i in range(80)]
+        arbol += [{"ruta": d["ruta"], "bytes": 200} for d in destacados]
+        arbol.append({"ruta": "no/curado.ipynb", "bytes": 1})
+        with mock.patch("github_lector.abrir", return_value={"nombre": "CPP-Fundamentals", "archivos": arbol}):
+            r = cat.listar_ejercicios_repo("rambasnet/CPP-Fundamentals")
+        self.assertEqual(len(r["archivos"]), 50)
+        rutas = [a["ruta"] for a in r["archivos"]]
+        self.assertEqual(rutas[:len(destacados)], [d["ruta"] for d in destacados])
+        self.assertTrue(any(a["nombre"].endswith(".ipynb") and a["lenguaje"] == "cpp" for a in r["archivos"]))
 
     def test_categoria_cursos_notebooks_cpp(self):
         cursos_cpp = [r for r in cat.listar_repositorios(categoria="cursos_notebooks") if "cpp" in r["lenguajes"]]
@@ -119,12 +140,14 @@ class PruebaCatalogoGitHub(unittest.TestCase):
         self.assertTrue(any(r["ref"] == "hsf-training/cpluspluscourse" for r in cursos_cpp))
 
         # Verificar cuadernos Jupyter de C++
-        destacados_ram = cat.listar_ejercicios_repo("rambasnet/CPP-Fundamentals")
+        with sin_red():
+            destacados_ram = cat.listar_ejercicios_repo("rambasnet/CPP-Fundamentals")
         self.assertGreaterEqual(len(destacados_ram["archivos"]), 5)
         self.assertTrue(any(a["nombre"].endswith(".ipynb") and a["lenguaje"] == "cpp" for a in destacados_ram["archivos"]))
 
         # Verificar código de C++ moderno
-        destacados_changkun = cat.listar_ejercicios_repo("changkun/modern-cpp-tutorial")
+        with sin_red():
+            destacados_changkun = cat.listar_ejercicios_repo("changkun/modern-cpp-tutorial")
         self.assertGreaterEqual(len(destacados_changkun["archivos"]), 5)
         self.assertTrue(any(a["nombre"].endswith(".cpp") and a["lenguaje"] == "cpp" for a in destacados_changkun["archivos"]))
 

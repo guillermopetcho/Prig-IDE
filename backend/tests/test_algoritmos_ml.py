@@ -4,9 +4,13 @@ y el Sistema Modular de Diagramas de Machine Learning / Deep Learning.
 """
 
 import os
+import sys
 import unittest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# backend/ en el path, como el resto de las pruebas: así funciona tanto desde la raíz del
+# repositorio como desde backend/ («from backend.x» solo funcionaba desde la raíz)
+sys.path.insert(0, os.path.join(RAIZ, "backend"))
 DOCS_DIR = os.path.join(RAIZ, "docs")
 ALGORITMOS_DIR = os.path.join(DOCS_DIR, "algoritmos_ml")
 PAPERS_FILE = os.path.join(DOCS_DIR, "papers_machine_learning_referencias.md")
@@ -959,7 +963,7 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
 
     def test_papers_service_list_and_get(self):
         """Verifica que PapersService liste, filtre y cargue las 21 monografías y metadatos."""
-        from backend.papers_service import PapersService
+        from papers_service import PapersService
         ps = PapersService()
         papers = ps.list_papers()
         self.assertEqual(len(papers), 21)
@@ -984,7 +988,7 @@ class TestAnalisisPapersSeminales(unittest.TestCase):
     def test_papers_service_download(self):
         """Verifica que PapersService descargue y guarde la monografía en la carpeta del workspace."""
         import tempfile
-        from backend.papers_service import PapersService
+        from papers_service import PapersService
         ps = PapersService()
         with tempfile.TemporaryDirectory() as tmpdir:
             res = ps.download_paper("20_transformer_y_atencion", tmpdir, tipo="analisis")

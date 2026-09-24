@@ -13,12 +13,9 @@ Nada se escribe en ~/.prig_ai_config.json: se parchea la configuración en memor
 import os
 import sys
 import unittest
-import tempfile
 from unittest import mock
 
-_TMP_TEST_DIR = tempfile.mkdtemp(prefix="prig_test_env_")
-os.environ["HOME"] = _TMP_TEST_DIR
-os.environ["PRIG_BOOKS_DIR"] = os.path.join(_TMP_TEST_DIR, "books")
+# La carpeta personal temporal la fija tests/__init__.py para toda la suite
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)

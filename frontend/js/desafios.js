@@ -97,8 +97,17 @@
         return fin;
     }
 
-    const flujo = (url, cuerpo, alEvento) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}) })
+    // `senal` (AbortController.signal) corta SOLO esta petición: el servidor ve la desconexión
+    // y detiene su generación, sin tocar lo que estén haciendo otras secciones
+    const flujo = (url, cuerpo, alEvento, senal) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}), signal: senal })
         .then(res => leerNdjson(res, alEvento || (() => {})));
+
+    /** Una tarea larga (crear, replicar) a la vez: la anterior se corta al empezar otra */
+    function nuevaTareaControlada() {
+        if (estado.tareaCtrl) estado.tareaCtrl.abort();
+        estado.tareaCtrl = new AbortController();
+        return estado.tareaCtrl.signal;
+    }
 
     const nombreModulo = (texto, defExt = null) => {
         const esCpp = (estado.d && estado.d.lenguaje === 'cpp') || estado.lenguaje === 'cpp';
@@ -789,6 +798,7 @@
             `Conectando con GitHub para obtener ${ref}/${ruta}…`
         ]);
         const pedido = ++estado.pedido;
+        const senal = nuevaTareaControlada();
         try {
             const d = await flujo('/api/desafios/github/replicar', {
                 ref, ruta, lenguaje: lenguaje || estado.lenguaje, tema: tema || '', modelo: estado.modelo
@@ -797,7 +807,7 @@
                     estado.tarea.lineas.push(ev.mensaje);
                     pintarHoja();
                 }
-            });
+            }, senal);
             if (pedido !== estado.pedido) return;
             abrirDesafio(d);
             if (estado.panel === 'mis') panelMis();
@@ -940,10 +950,11 @@
         mostrarTarea(`Creando un desafío sobre ${tema}`, ['El modelo escribe el enunciado, el código de partida, la solución y las pruebas. Después se ejecutan: solo llega a ti si la solución pasa y el código de partida no.']);
 
         const pedido = ++estado.pedido;
+        const senal = nuevaTareaControlada();
         try {
             const d = await flujo('/api/desafios/crear', { lenguaje: estado.lenguaje, ...cuerpo, modelo: estado.modelo }, (ev) => {
                 if (ev.tipo === 'progreso' && estado.tarea && pedido === estado.pedido) { estado.tarea.lineas.push(ev.mensaje); pintarHoja(); }
-            });
+            }, senal);
             if (pedido !== estado.pedido) return;
             abrirDesafio(d);
             if (estado.panel === 'mis') panelMis();
@@ -1224,10 +1235,12 @@
         const volver = $('des-tarea-volver');
         if (volver) volver.onclick = () => { estado.tarea = null; pintarHoja(); };
         const cancelar = $('des-tarea-cancelar');
-        if (cancelar) cancelar.onclick = async () => {
+        if (cancelar) cancelar.onclick = () => {
+            // Solo esta tarea: antes era /api/ai/cancel, que cortaba también lo que el modelo
+            // estuviera respondiendo en Kaggle, GitHub, el chat…
             estado.pedido++;
             estado.tarea = null;
-            await fetch('/api/ai/cancel', { method: 'POST' }).catch(() => {});
+            if (estado.tareaCtrl) { estado.tareaCtrl.abort(); estado.tareaCtrl = null; }
             pintarHoja();
         };
     }

@@ -109,7 +109,45 @@
           .gh-cifras span { display:block; font-size:10px; color:var(--text-muted); }
           .gh-cifras b { color:#fff; font-size:13px; }
           .gh-lenguajes { display:flex; height:8px; border-radius:4px; overflow:hidden; margin:10px 0 5px; }
-          .gh-repo { flex:1; min-height:0; display:grid; grid-template-columns:250px minmax(0,1.15fr) minmax(0,1fr); }
+          /* Vista del repositorio como un IDE: árbol | código | profesor, con divisores arrastrables.
+             Los anchos van en variables (--a árbol, --p profesor, --ph alto del profesor abajo) */
+          .gh-repo { flex:1; min-height:0; display:grid; --a:250px; --p:38%; --ph:40%; --s1:6px; --s2:6px;
+                     grid-template-columns:var(--a) var(--s1) minmax(0,1fr) var(--s2) var(--p); grid-template-rows:minmax(0,1fr); }
+          .gh-repo.prof-abajo { grid-template-columns:var(--a) var(--s1) minmax(0,1fr); grid-template-rows:minmax(0,1fr) var(--s2) var(--ph); }
+          .gh-repo > .gh-arbol { grid-column:1; grid-row:1 / -1; min-width:0; border-right:none; }
+          .gh-repo > .gh-div-arbol { grid-column:2; grid-row:1 / -1; }
+          .gh-repo > .gh-centro { grid-column:3; grid-row:1; }
+          .gh-repo > .gh-div-prof { grid-column:4; grid-row:1; }
+          .gh-repo > .gh-profesor { grid-column:5; grid-row:1; min-width:0; border-left:none; }
+          .gh-repo.prof-abajo > .gh-div-prof { grid-column:3; grid-row:2; }
+          .gh-repo.prof-abajo > .gh-profesor { grid-column:3; grid-row:3; }
+          .gh-repo.sin-arbol { --a:0px; --s1:0px; } .gh-repo.sin-arbol > .gh-arbol, .gh-repo.sin-arbol > .gh-div-arbol { display:none; }
+          .gh-repo.sin-prof { --p:0px; --ph:0px; --s2:0px; } .gh-repo.sin-prof > .gh-profesor, .gh-repo.sin-prof > .gh-div-prof { display:none; }
+          .gh-div { background:transparent; position:relative; z-index:2; touch-action:none; }
+          .gh-div::after { content:''; position:absolute; inset:0; background:var(--border-color); transition:background .12s; }
+          .gh-div-arbol, .gh-div-prof { cursor:col-resize; }
+          .gh-div-arbol::after, .gh-repo:not(.prof-abajo) .gh-div-prof::after { left:2px; right:2px; }
+          .gh-repo.prof-abajo .gh-div-prof { cursor:row-resize; } .gh-repo.prof-abajo .gh-div-prof::after { top:2px; bottom:2px; }
+          .gh-div:hover::after, .gh-div.arrastrando::after { background:#58a6ff; }
+          body.gh-redimensionando, body.gh-redimensionando * { user-select:none !important; }
+          .gh-vista-btns { display:inline-flex; border:1px solid var(--border-color); border-radius:7px; overflow:hidden; }
+          .gh-vista-btns button { background:rgba(255,255,255,.04); border:none; color:var(--text-muted); padding:5px 9px; cursor:pointer; font-size:12px; }
+          .gh-vista-btns button + button { border-left:1px solid var(--border-color); }
+          .gh-vista-btns button.activo { color:#58a6ff; background:rgba(88,166,255,.14); }
+          .gh-cabecera.compacta .gh-lenguajes, .gh-cabecera.compacta .gh-leyenda-leng, .gh-cabecera.compacta .gh-avatar { display:none; }
+          /* Cuadernos Jupyter del repositorio, renderizados como cuaderno */
+          .gh-nb { padding:12px 16px 30px; display:flex; flex-direction:column; gap:10px; }
+          .gh-nb-celda { border:1px solid rgba(255,255,255,.07); border-radius:8px; overflow:hidden; }
+          .gh-nb-celda.md { border-color:transparent; }
+          .gh-nb-celda .gh-md { padding:4px 8px; }
+          .gh-nb-in { display:flex; background:rgba(0,0,0,.2); }
+          .gh-nb-prompt { color:#79c0ff; font-family:'Fira Code',monospace; font-size:11px; padding:10px 8px; min-width:52px; text-align:right; user-select:none; opacity:.8; }
+          .gh-nb-in pre { margin:0; padding:10px 12px; overflow-x:auto; flex:1; font-family:'Fira Code',monospace; font-size:12px; line-height:1.5; }
+          .gh-nb-in pre code { background:transparent !important; padding:0 !important; }
+          .gh-nb-out { border-top:1px solid rgba(255,255,255,.06); padding:8px 12px 8px 72px; font-family:'Fira Code',monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-word; color:var(--text-main); max-height:420px; overflow:auto; }
+          .gh-nb-out.error { color:var(--accent-red); }
+          .gh-nb-out img { max-width:100%; background:#fff; border-radius:4px; }
+          .gh-nb-out table { border-collapse:collapse; font-size:11px; } .gh-nb-out td, .gh-nb-out th { border:1px solid rgba(255,255,255,.12); padding:2px 6px; }
           .gh-cabecera { padding:10px 16px; border-bottom:1px solid var(--border-color); background:var(--bg-panel); }
           .gh-arbol { border-right:1px solid var(--border-color); overflow-y:auto; padding:8px 6px; font-size:12px; }
           .gh-arbol details > summary { cursor:pointer; padding:3px 6px; border-radius:5px; list-style:none; color:var(--text-main); }
@@ -140,8 +178,8 @@
           .gh-menu { position:absolute; z-index:20; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:5px; box-shadow:0 8px 24px rgba(0,0,0,.4); min-width:250px; }
           .gh-menu button { display:flex; width:100%; gap:8px; align-items:flex-start; background:none; border:none; color:var(--text-main); padding:7px 9px; border-radius:6px; cursor:pointer; text-align:left; font-size:12px; }
           .gh-menu button:hover { background:rgba(255,255,255,.06); }
-          @media (max-width: 1150px) { .gh-repo { grid-template-columns:210px minmax(0,1fr); } .gh-profesor { grid-column:1 / -1; border-left:none; border-top:1px solid var(--border-color); max-height:45vh; } .gh-partes { grid-template-columns:1fr; } }
-          @container (max-width: 1150px) { .gh-repo { grid-template-columns:210px minmax(0,1fr); } .gh-profesor { grid-column:1 / -1; border-left:none; border-top:1px solid var(--border-color); max-height:45vh; } .gh-partes { grid-template-columns:1fr; } .gh-cuadro { border-left:none; border-top:1px solid var(--border-color); } }
+          @media (max-width: 1150px) { .gh-partes { grid-template-columns:1fr; } }
+          @container (max-width: 1150px) { .gh-partes { grid-template-columns:1fr; } .gh-cuadro { border-left:none; border-top:1px solid var(--border-color); } }
           @container (max-width: 780px) {
             #github-raiz { grid-template-columns:52px 1fr; }
             .gh-nav { padding:10px 6px; align-items:center; }
@@ -149,9 +187,8 @@
             .gh-nav-item { font-size:0; gap:0; padding:9px; justify-content:center; }
             .gh-nav-item i { font-size:14px; }
             #gh-token { display:none; }
-            .gh-repo { grid-template-columns:160px minmax(0,1fr); }
           }
-          @container (max-width: 520px) { .gh-repo { grid-template-columns:1fr; grid-auto-rows:max-content; overflow-y:auto; } .gh-arbol { max-height:30vh; border-right:none; border-bottom:1px solid var(--border-color); } .gh-cifras { grid-template-columns:repeat(2,1fr); } }
+          @container (max-width: 520px) { .gh-cifras { grid-template-columns:repeat(2,1fr); } }
         `;
         document.head.appendChild(css);
     }
@@ -446,19 +483,89 @@
         pintarRepo();
     }
 
+    // ================================================================== disposición tipo IDE
+    // Anchos y posición del profesor, recordados entre sesiones
+    const disposicion = (() => {
+        const def = { arbol: true, prof: 'der', a: 250, p: 0.38, ph: 0.4 };
+        try { return { ...def, ...JSON.parse(leerLocal('prig_gh_disposicion') || '{}') }; } catch (e) { return def; }
+    })();
+
+    function aplicarDisposicion() {
+        const g = $('gh-repo');
+        if (!g) return;
+        g.classList.toggle('sin-arbol', !disposicion.arbol);
+        g.classList.toggle('prof-abajo', disposicion.prof === 'abajo');
+        g.classList.toggle('sin-prof', disposicion.prof === 'no');
+        if (disposicion.arbol) g.style.setProperty('--a', `${Math.round(disposicion.a)}px`); else g.style.removeProperty('--a');
+        if (disposicion.prof !== 'no') {
+            g.style.setProperty('--p', `${(disposicion.p * 100).toFixed(1)}%`);
+            g.style.setProperty('--ph', `${(disposicion.ph * 100).toFixed(1)}%`);
+        } else { g.style.removeProperty('--p'); g.style.removeProperty('--ph'); }
+        const marcar = (id, si) => { const b = $(id); if (b) b.classList.toggle('activo', si); };
+        marcar('gh-v-arbol', disposicion.arbol);
+        marcar('gh-v-der', disposicion.prof === 'der');
+        marcar('gh-v-abajo', disposicion.prof === 'abajo');
+        marcar('gh-v-no', disposicion.prof === 'no');
+    }
+
+    function cambiarDisposicion(cambios) {
+        Object.assign(disposicion, cambios);
+        guardarLocal('prig_gh_disposicion', JSON.stringify(disposicion));
+        aplicarDisposicion();
+    }
+
+    function activarDivisores() {
+        const g = $('gh-repo');
+        const arrastrar = (div, mover) => {
+            if (!div) return;
+            div.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                div.setPointerCapture(e.pointerId);
+                div.classList.add('arrastrando');
+                document.body.classList.add('gh-redimensionando');
+                const r = g.getBoundingClientRect();
+                const alMover = (ev) => { mover(ev, r); aplicarDisposicion(); };
+                const alSoltar = () => {
+                    div.removeEventListener('pointermove', alMover);
+                    div.removeEventListener('pointerup', alSoltar);
+                    div.removeEventListener('pointercancel', alSoltar);
+                    div.classList.remove('arrastrando');
+                    document.body.classList.remove('gh-redimensionando');
+                    guardarLocal('prig_gh_disposicion', JSON.stringify(disposicion));
+                };
+                div.addEventListener('pointermove', alMover);
+                div.addEventListener('pointerup', alSoltar);
+                div.addEventListener('pointercancel', alSoltar);
+            });
+            // Doble clic: volver al tamaño por defecto
+            div.addEventListener('dblclick', () => mover(null, null));
+        };
+        const lim = (v, a, b) => Math.max(a, Math.min(b, v));
+        arrastrar($('gh-div-arbol'), (ev, r) => {
+            disposicion.a = ev ? lim(ev.clientX - r.left, 120, r.width * 0.5) : 250;
+            if (!ev) cambiarDisposicion({});
+        });
+        arrastrar($('gh-div-prof'), (ev, r) => {
+            if (!ev) { disposicion.p = 0.38; disposicion.ph = 0.4; cambiarDisposicion({}); return; }
+            if (disposicion.prof === 'abajo') disposicion.ph = lim((r.bottom - ev.clientY) / r.height, 0.15, 0.8);
+            else disposicion.p = lim((r.right - ev.clientX) / r.width, 0.18, 0.7);
+        });
+    }
+
     function pintarRepo() {
         const r = estado.repo;
         const hoja = $('gh-hoja');
         const nExplicados = Object.keys(r.explicadas.archivos).length;
         hoja.innerHTML = `
-          <div class="gh-cabecera">
+          <div class="gh-cabecera ${estado.archivo ? 'compacta' : ''}" id="gh-cabecera">
             <div class="gh-fila" style="flex-wrap:nowrap;">
               <img class="gh-avatar" style="width:26px; height:26px;" src="${esc(r.avatar || '')}&s=52" alt="" onerror="this.style.visibility='hidden'">
               <span style="color:#fff; font-size:16px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(r.ref)}</span>
               <span class="gh-ayuda"><i class="fa-regular fa-star"></i> ${miles(r.estrellas)} · <i class="fa-solid fa-code-fork"></i> ${miles(r.forks)} · ${r.archivos.length} archivos${r.truncado ? ' (lista recortada)' : ''}</span>
             </div>
             ${r.lenguajes.length ? `<div class="gh-lenguajes" title="${esc(r.lenguajes.map(l => `${l.nombre} ${l.pct}%`).join(' · '))}">${r.lenguajes.map(l => `<div style="width:${l.pct}%; background:${colorDe(l.nombre)};"></div>`).join('')}</div>
-              <div class="gh-fila gh-ayuda">${r.lenguajes.slice(0, 5).map(l => `<span><i class="fa-solid fa-circle" style="color:${colorDe(l.nombre)}; font-size:8px;"></i> ${esc(l.nombre)} ${l.pct}%</span>`).join('')}</div>` : ''}
+              <div class="gh-fila gh-ayuda gh-leyenda-leng">${r.lenguajes.slice(0, 5).map(l => `<span><i class="fa-solid fa-circle" style="color:${colorDe(l.nombre)}; font-size:8px;"></i> ${esc(l.nombre)} ${l.pct}%</span>`).join('')}</div>` : ''}
             <div class="gh-fila" style="margin-top:8px;">
               <button class="gh-btn morado" id="gh-explicar-repo"><i class="fa-solid fa-diagram-project"></i> Explicar el repositorio</button>
               <button class="gh-btn ${estado.guardados.some(g => g.ref === r.ref) ? 'activo' : ''}" id="gh-guardar"><i class="fa-${estado.guardados.some(g => g.ref === r.ref) ? 'solid' : 'regular'} fa-bookmark"></i> ${estado.guardados.some(g => g.ref === r.ref) ? 'Guardado' : 'Guardar'}</button>
@@ -468,12 +575,20 @@
               <span style="flex:1"></span>
               <select class="gh-campo" id="gh-nivel" title="Profundidad de las explicaciones">${['principiante', 'intermedio', 'avanzado'].map(n => `<option ${n === estado.nivel ? 'selected' : ''}>${n}</option>`).join('')}</select>
               <select class="gh-campo" id="gh-modelo" style="max-width:220px;" title="Modelo que te acompaña"></select>
+              <div class="gh-vista-btns" title="Disposición de los paneles (los divisores se arrastran)">
+                <button id="gh-v-arbol" title="Mostrar u ocultar el árbol de archivos"><i class="fa-solid fa-folder-tree"></i></button>
+                <button id="gh-v-der" title="Profesor a la derecha"><i class="fa-solid fa-table-columns"></i></button>
+                <button id="gh-v-abajo" title="Profesor abajo"><i class="fa-solid fa-table-list"></i></button>
+                <button id="gh-v-no" title="Ocultar el profesor"><i class="fa-regular fa-comment-slash"></i></button>
+              </div>
             </div>
             <div id="gh-repo-estado" class="gh-ayuda" style="margin-top:6px;">${r.local ? `<i class="fa-solid fa-circle-check" style="color:#3fb950;"></i> Descargado en <b>${esc(r.local.relativa)}</b> · ` : ''}${nExplicados} archivos explicados${r.explicadas.repo ? ' · con explicación del repositorio' : ''}</div>
           </div>
-          <div class="gh-repo">
+          <div class="gh-repo" id="gh-repo">
             <div class="gh-arbol"><input class="gh-campo" id="gh-filtro" placeholder="Filtrar archivos…" value="${esc(estado.filtroArbol)}" style="width:100%; margin-bottom:6px;"><div id="gh-arbol"></div></div>
+            <div class="gh-div gh-div-arbol" id="gh-div-arbol" title="Arrastra para cambiar el ancho del árbol"></div>
             <div class="gh-centro" id="gh-centro"></div>
+            <div class="gh-div gh-div-prof" id="gh-div-prof" title="Arrastra para cambiar el tamaño del profesor"></div>
             <div class="gh-profesor">
               <div class="gh-explicacion" id="gh-explicacion"></div>
               <div class="gh-chat">
@@ -484,6 +599,12 @@
             </div>
           </div>`;
         pintarModelos($('gh-modelo'));
+        aplicarDisposicion();
+        $('gh-v-arbol').onclick = () => cambiarDisposicion({ arbol: !disposicion.arbol });
+        $('gh-v-der').onclick = () => cambiarDisposicion({ prof: 'der' });
+        $('gh-v-abajo').onclick = () => cambiarDisposicion({ prof: 'abajo' });
+        $('gh-v-no').onclick = () => cambiarDisposicion({ prof: disposicion.prof === 'no' ? 'der' : 'no' });
+        activarDivisores();
         $('gh-nivel').onchange = (e) => { estado.nivel = e.target.value; guardarLocal('prig_github_nivel', estado.nivel); };
         $('gh-explicar-repo').onclick = () => explicar(null, !!estado.repo.explicadas.repo && estado.explicacion && estado.explicacion.tipo === 'repo');
         $('gh-guardar').onclick = async () => { await alternarGuardado(r.ref); pintarRepo(); };
@@ -525,10 +646,72 @@
         c.querySelectorAll('[data-ruta]').forEach(el => el.onclick = () => abrirArchivo(el.dataset.ruta));
     }
 
+    // ================================================================== cuadernos Jupyter
+    const texto = (v) => Array.isArray(v) ? v.join('') : String(v ?? '');
+    const sinAnsi = (t) => t.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+
+    function lenguajeCuaderno(nb) {
+        const m = nb.metadata || {};
+        const l = String((m.kernelspec && m.kernelspec.language) || (m.language_info && m.language_info.name) || 'python').toLowerCase();
+        return /c\+\+|cpp|xcpp|cling/.test(l) ? 'cpp' : l === 'r' ? 'r' : l === 'julia' ? 'julia' : 'python';
+    }
+
+    function resaltar(codigo, lenguaje) {
+        if (!window.hljs || codigo.length > 100000) return esc(codigo);
+        try { return hljs.getLanguage(lenguaje) ? hljs.highlight(codigo, { language: lenguaje }).value : hljs.highlightAuto(codigo).value; }
+        catch (e) { return esc(codigo); }
+    }
+
+    /** Una salida de celda. El HTML y el SVG de un repositorio ajeno solo se muestran saneados
+     * (DOMPurify); sin saneador, su versión en texto. */
+    function salidaCelda(o) {
+        const tipo = o.output_type;
+        if (tipo === 'stream') {
+            return `<div class="gh-nb-out ${o.name === 'stderr' ? 'error' : ''}">${esc(sinAnsi(texto(o.text)))}</div>`;
+        }
+        if (tipo === 'error' || tipo === 'pyerr') {
+            const tb = (o.traceback || []).map(sinAnsi).join('\n') || `${o.ename}: ${o.evalue}`;
+            return `<div class="gh-nb-out error">${esc(tb)}</div>`;
+        }
+        const d = o.data || (o.text ? { 'text/plain': o.text } : {});
+        if (d['image/png']) return `<div class="gh-nb-out"><img alt="" src="data:image/png;base64,${esc(texto(d['image/png']).replace(/\s/g, ''))}"></div>`;
+        if (d['image/jpeg']) return `<div class="gh-nb-out"><img alt="" src="data:image/jpeg;base64,${esc(texto(d['image/jpeg']).replace(/\s/g, ''))}"></div>`;
+        if (window.DOMPurify && d['image/svg+xml']) return `<div class="gh-nb-out">${DOMPurify.sanitize(texto(d['image/svg+xml']), { USE_PROFILES: { svg: true } })}</div>`;
+        if (window.DOMPurify && d['text/html']) return `<div class="gh-nb-out" style="white-space:normal;">${DOMPurify.sanitize(texto(d['text/html']))}</div>`;
+        if (d['text/markdown']) return `<div class="gh-nb-out gh-md" data-md="${esc(texto(d['text/markdown']))}"></div>`;
+        if (d['text/plain']) return `<div class="gh-nb-out">${esc(sinAnsi(texto(d['text/plain'])))}</div>`;
+        return '';
+    }
+
+    /** El .ipynb como cuaderno: markdown, código resaltado y salidas. false si no se puede leer. */
+    function pintarCuaderno(contenedor, crudo) {
+        let nb;
+        try { nb = JSON.parse(crudo); } catch (e) { return false; }
+        const celdas = nb.cells || (nb.worksheets && nb.worksheets[0] && nb.worksheets[0].cells);
+        if (!Array.isArray(celdas)) return false;
+        const lenguaje = lenguajeCuaderno(nb);
+        contenedor.innerHTML = `<div class="gh-nb">${celdas.map((cel, i) => {
+            const src = texto(cel.source ?? cel.input);
+            if (cel.cell_type === 'markdown') return `<div class="gh-nb-celda md"><div class="gh-md" data-celda="${i}"></div></div>`;
+            if (cel.cell_type === 'code') {
+                const n = cel.execution_count ?? cel.prompt_number;
+                return `<div class="gh-nb-celda"><div class="gh-nb-in"><div class="gh-nb-prompt">[${n ?? ' '}]:</div>
+                  <pre><code class="hljs">${resaltar(src, lenguaje)}</code></pre></div>${(cel.outputs || []).map(salidaCelda).join('')}</div>`;
+            }
+            return `<div class="gh-nb-celda"><div class="gh-nb-out">${esc(src)}</div></div>`;
+        }).join('') || '<div class="gh-vacio">El cuaderno está vacío.</div>'}</div>`;
+        contenedor.querySelectorAll('[data-celda]').forEach(el => md(el, texto(celdas[+el.dataset.celda].source)));
+        contenedor.querySelectorAll('[data-md]').forEach(el => md(el, el.dataset.md));
+        return true;
+    }
+
     function pintarCentro() {
         const c = $('gh-centro');
         if (!c) return;
         const r = estado.repo;
+        // Dentro de un archivo, la cabecera se compacta: sin barra de lenguajes ni foto
+        const cab = $('gh-cabecera');
+        if (cab) cab.classList.toggle('compacta', !!estado.archivo);
         if (!estado.archivo) {
             c.innerHTML = r.readme ? `<div class="gh-ayuda" style="padding:10px 22px 0;"><i class="fa-regular fa-file-lines"></i> ${esc(r.readme_ruta)}</div><div class="gh-md" id="gh-readme"></div>`
                 : '<div class="gh-vacio">Este repositorio no tiene README. Elige un archivo a la izquierda.</div>';
@@ -551,14 +734,21 @@
             return;
         }
         const esCodigo = /\.(py|cpp|cc|cxx|c|hpp|h|ipynb)$/i.test(a.ruta);
+        const esCuaderno = /\.ipynb$/i.test(a.ruta);
         const cabecera = `<div class="gh-fila gh-ayuda" style="padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.06); position:sticky; top:0; background:var(--bg-dark); z-index:1;">
-            <i class="fa-regular fa-file-code"></i> <b style="color:#fff;">${esc(a.ruta)}</b> · ${a.lineas} líneas · ${tam(a.bytes)}
+            <i class="fa-regular ${esCuaderno ? 'fa-note-sticky' : 'fa-file-code'}"></i> <b style="color:#fff;">${esc(a.ruta)}</b> · ${esCuaderno ? 'cuaderno Jupyter' : `${a.lineas} líneas`} · ${tam(a.bytes)}
             <span style="flex:1"></span>
+            ${esCuaderno ? `<button class="gh-btn" id="gh-ver-json" title="Alternar entre el cuaderno y su JSON">${estado.verJson ? '<i class="fa-solid fa-book-open"></i> Ver cuaderno' : '<i class="fa-solid fa-code"></i> Ver JSON'}</button>` : ''}
             ${esCodigo ? '<button class="gh-btn verde" id="gh-replicar-desafio" title="Replicar este archivo como un desafío interactivo en Prig"><i class="fa-solid fa-chess-knight"></i> Replicar como Desafío</button>' : ''}
             <button class="gh-btn" id="gh-volver-readme">README</button></div>`;
         if (a.lenguaje === 'markdown') {
             c.innerHTML = cabecera + '<div class="gh-md" id="gh-md-archivo"></div>';
             md($('gh-md-archivo'), a.contenido);
+        } else if (esCuaderno && !estado.verJson && (() => {
+            c.innerHTML = cabecera + '<div id="gh-cuaderno"></div>';
+            return pintarCuaderno($('gh-cuaderno'), a.contenido);
+        })()) {
+            // pintado como cuaderno; si el JSON no se entiende, cae abajo como texto
         } else {
             let html = esc(a.contenido);
             if (window.hljs && a.contenido.length < 200000) {
@@ -568,6 +758,8 @@
             c.innerHTML = cabecera + `<div class="gh-lineas"><div class="num">${nums}</div><pre class="gh-codigo"><code class="hljs">${html}</code></pre></div>`;
         }
         $('gh-volver-readme').onclick = () => { estado.archivo = null; pintarArbol(); pintarCentro(); pintarExplicacion(); };
+        const verJson = $('gh-ver-json');
+        if (verJson) verJson.onclick = () => { estado.verJson = !estado.verJson; pintarCentro(); };
         const btnRep = $('gh-replicar-desafio');
         if (btnRep) btnRep.onclick = async () => {
             btnRep.disabled = true;
