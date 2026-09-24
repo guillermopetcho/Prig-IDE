@@ -1,5 +1,9 @@
 import os
 import sys
+
+# Blindar QtWebEngine contra bloqueos en decodificación de video en Linux
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-accelerated-video-decode --disable-dev-shm-usage")
+
 import time
 import socket
 import signal
@@ -9,8 +13,75 @@ import traceback
 import webbrowser
 import urllib.error
 import urllib.request
+from typing import Optional
 
 import uvicorn
+
+
+def obtener_navegador_ejecutable() -> Optional[str]:
+    """ Encuentra un binario de navegador web real y ejecutable en el sistema. """
+    import shutil
+    import subprocess
+    env_browser = os.environ.get("BROWSER")
+    candidatos = []
+    if env_browser:
+        candidatos.extend(env_browser.split(":"))
+    candidatos.extend([
+        "google-chrome",
+        "google-chrome-stable",
+        "/opt/google/chrome/google-chrome",
+        "chromium",
+        "chromium-browser",
+        "firefox",
+        "sensible-browser",
+        "x-www-browser",
+        "gnome-www-browser",
+        "xdg-open",
+    ])
+    for cand in candidatos:
+        cand = cand.strip()
+        if not cand:
+            continue
+        ruta = shutil.which(cand) or (cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None)
+        if ruta:
+            if "firefox" in os.path.basename(ruta).lower():
+                try:
+                    res = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=1.5)
+                    if "snap install firefox" in res.stderr or "snap install firefox" in res.stdout:
+                        continue
+                except Exception:
+                    continue
+            return ruta
+    return None
+
+
+def lanzar_navegador_desacoplado(url: str) -> bool:
+    """ Abre una URL en segundo plano desacoplado, sin bloquear NUNCA el bucle de eventos de Qt. """
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return False
+
+    def _lanzar():
+        try:
+            import subprocess
+            binario = obtener_navegador_ejecutable()
+            if binario:
+                subprocess.Popen(
+                    [binario, url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+                return
+            import webbrowser
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"⚠️ Error abriendo navegador para {url}: {e}", file=sys.stderr)
+
+    t = threading.Thread(target=_lanzar, daemon=True, name="prig-browser-open")
+    t.start()
+    return True
 
 HOST = "127.0.0.1"
 PREFERRED_PORT = 8000
@@ -212,8 +283,7 @@ def _blindar_qt() -> None:
             if is_main_frame:
                 if url_str.startswith("http://") or url_str.startswith("https://"):
                     if not (url_str.startswith("http://127.0.0.1") or url_str.startswith("http://localhost")):
-                        import webbrowser
-                        webbrowser.open(url_str)
+                        lanzar_navegador_desacoplado(url_str)
                         return False
         except Exception:
             pass
@@ -221,9 +291,23 @@ def _blindar_qt() -> None:
 
     webview_qt.BrowserView.WebPage.acceptNavigationRequest = accept_nav
 
+    # Desacoplar también NavigationHandler (popups y enlaces target="_blank")
+    # para que NUNCA ejecute webbrowser.open de forma síncrona en el hilo de Qt
+    def accept_nav_handler(self, url, nav_type, is_main_frame):
+        try:
+            url_str = url.toString() if hasattr(url, "toString") else str(url)
+            lanzar_navegador_desacoplado(url_str)
+        except Exception:
+            pass
+        return False
+
+    if hasattr(webview_qt.BrowserView, "NavigationHandler"):
+        webview_qt.BrowserView.NavigationHandler.acceptNavigationRequest = accept_nav_handler
+
     try:
         import webview
         webview.settings["ALLOW_DOWNLOADS"] = True
+        webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
     except Exception:
         pass
 
@@ -312,7 +396,8 @@ def main():
     # antes un fallo del backend terminaba el programa sin abrir absolutamente nada.
     print("💡 Abriendo Prig IDE en el navegador...")
     try:
-        webbrowser.open(target_url)
+        if not lanzar_navegador_desacoplado(target_url):
+            webbrowser.open(target_url)
     except Exception as e:
         print(f"⚠️ Tampoco se pudo abrir el navegador ({e}).")
     print(f"🌐 Prig IDE activo en: {target_url}")

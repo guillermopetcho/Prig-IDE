@@ -13,6 +13,9 @@ class PerfilManager {
         if (!modal) return;
         modal.style.display = 'flex';
         await this.loadDataset();
+        if (window.carreraMgr && document.getElementById('tab-btn-perfil-carrera')?.classList.contains('active')) {
+            window.carreraMgr.render();
+        }
     }
 
     closeModal() {

@@ -1,0 +1,2142 @@
+[
+  {
+    "id": "ingenieria_inteligencia_artificial",
+    "nombre": "Ingeniería en Inteligencia Artificial",
+    "codigo": "IIA",
+    "titulo_obtenido": "Ingeniero/a en Inteligencia Artificial",
+    "duracion_anios": 5,
+    "total_materias": 36,
+    "descripcion": "Carrera universitaria enfocada en el diseño, entrenamiento, evaluación y despliegue a gran escala de sistemas inteligentes basados en aprendizaje automático, redes neuronales profundas, procesamiento de lenguaje natural y visión computacional, con sólidos fundamentos matemáticos y de ingeniería de software.",
+    "etapas": [
+      {
+        "numero": 1,
+        "nombre": "Etapa 1: Fundamentos Matemáticos y Algorítmicos",
+        "slug": "etapa_1_fundamentos",
+        "descripcion": "Bases matemáticas rigurosas (álgebra lineal, cálculo, lógica) y primeros pasos en programación estructurada con Python y entorno Linux.",
+        "materias": [
+          {
+            "codigo": "IIA-101",
+            "nombre": "Álgebra Lineal y Geometría Analítica",
+            "slug": "IIA-101-algebra-lineal-y-geometria",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Dominar operaciones matriciales, espacios vectoriales, transformaciones lineales y factorizaciones fundamentales (SVD, Eigenvalues) esenciales para Machine Learning y visión por computadora.",
+            "temas": [
+              "Sistemas de ecuaciones lineales y eliminación gaussiana",
+              "Espacios y subespacios vectoriales, bases, dimensión",
+              "Transformaciones lineales y cambio de base",
+              "Autovalores, autovectores y diagonalización",
+              "Descomposición en Valores Singulares (SVD) y pseudoinversa de Moore-Penrose"
+            ],
+            "youtube_queries": [
+              "Algebra lineal 3Blue1Brown esencia",
+              "Linear Algebra Gilbert Strang MIT",
+              "Algebra lineal para Machine Learning Python"
+            ],
+            "github_repos": [
+              "https://github.com/fastai/numerical-linear-algebra",
+              "https://github.com/MarcDeisenroth/mml-book-code"
+            ],
+            "prig_desafios": [
+              "algebra_vectores_matrices",
+              "descomposicion_svd_numpy"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-101-algebra-lineal-y-geometria.md"
+          },
+          {
+            "codigo": "IIA-102",
+            "nombre": "Cálculo Diferencial e Integral",
+            "slug": "IIA-102-calculo-diferencial-e-integral",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Comprender la tasa de cambio instantáneo, límites, derivadas, integrales y series de Taylor para modelar fenómenos continuos y optimización analítica.",
+            "temas": [
+              "Límites, continuidad y asíntotas",
+              "Derivadas, reglas de derivación y regla de la cadena",
+              "Aplicaciones de la derivada: extremos locales y curvatura",
+              "Integración definida e indefinida, Teorema Fundamental del Cálculo",
+              "Polinomios y series de Taylor, aproximaciones numéricas"
+            ],
+            "youtube_queries": [
+              "Calculo diferencial 3Blue1Brown",
+              "Calculo integral desde cero universidad",
+              "Derivadas e integrales para Machine Learning"
+            ],
+            "github_repos": [
+              "https://github.com/sympy/sympy",
+              "https://github.com/scipy/scipy"
+            ],
+            "prig_desafios": [
+              "derivacion_simbolica_python",
+              "aproximacion_taylor"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-102-calculo-diferencial-e-integral.md"
+          },
+          {
+            "codigo": "IIA-103",
+            "nombre": "Introducción a la Programación con Python",
+            "slug": "IIA-103-introduccion-a-la-programacion-python",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Adquirir fluidez absoluta en el lenguaje Python moderno: tipos de datos nativos, control de flujo, funciones, gestión de errores, tests y buenas prácticas.",
+            "temas": [
+              "Tipos de datos básicos, listas, tuplas, conjuntos y diccionarios",
+              "Control de flujo: condicionales if/else y bucles for/while",
+              "Funciones puras, argumentos variables (*args, **kwargs) y lambdas",
+              "Manejo de excepciones, archivos y serialización JSON",
+              "Pruebas unitarias automatizadas con pytest y convención PEP 8"
+            ],
+            "youtube_queries": [
+              "Harvard CS50P David Malan Python",
+              "Curso Python desde cero completo español",
+              "Python para ciencia de datos inicial"
+            ],
+            "github_repos": [
+              "https://github.com/TheAlgorithms/Python",
+              "https://github.com/asweigart/simple-turtle-tutorial-for-python"
+            ],
+            "prig_desafios": [
+              "python_basico_estructuras",
+              "funciones_recursivas_testing"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-103-introduccion-a-la-programacion-python.md"
+          },
+          {
+            "codigo": "IIA-104",
+            "nombre": "Lógica y Estructuras Discretas",
+            "slug": "IIA-104-logica-y-estructuras-discretas",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Desarrollar el razonamiento formal mediante lógica proposicional, de predicados, inducción y teoría de grafos elementales.",
+            "temas": [
+              "Lógica proposicional, tablas de verdad y conectivos",
+              "Lógica de predicados de primer orden y cuantificadores",
+              "Inducción matemática y relaciones de recurrencia",
+              "Conjuntos, relaciones binarias y funciones",
+              "Grafos básicos, dígrafos y recorridos elementales"
+            ],
+            "youtube_queries": [
+              "Matematica discreta universidad completa",
+              "Logica proposicional computacion",
+              "Discrete Mathematics for Computer Science"
+            ],
+            "github_repos": [
+              "https://github.com/jwasham/coding-interview-university"
+            ],
+            "prig_desafios": [
+              "tablas_verdad_parser",
+              "induccion_recorridos_grafos"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-104-logica-y-estructuras-discretas.md"
+          },
+          {
+            "codigo": "IIA-105",
+            "nombre": "Física Computacional y Modelado de Sistemas",
+            "slug": "IIA-105-fisica-computacional-y-sistemas",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-102"
+            ],
+            "objetivos": "Modelar dinámicas del mundo real mediante ecuaciones diferenciales, simulación numérica por métodos de Euler/Runge-Kutta y análisis de señales.",
+            "temas": [
+              "Cinemática y leyes del movimiento de Newton",
+              "Sistemas dinámicos continuos y osciladores armónicos",
+              "Integración numérica: métodos de Euler, Verlet y Runge-Kutta 4",
+              "Simulación de partículas y fuerzas en Python",
+              "Introducción al procesamiento de señales y transformadas"
+            ],
+            "youtube_queries": [
+              "Computational Physics with Python",
+              "Simulacion fisica numerica Python",
+              "Differential equations 3Blue1Brown"
+            ],
+            "github_repos": [
+              "https://github.com/BenLangmead/comp-phys",
+              "https://github.com/cossio/ComputationalPhysics"
+            ],
+            "prig_desafios": [
+              "simulador_euler_runge_kutta",
+              "orbita_gravitacional_n_cuerpos"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-105-fisica-computacional-y-sistemas.md"
+          },
+          {
+            "codigo": "IIA-106",
+            "nombre": "Taller de Pensamiento Computacional y Entorno Linux",
+            "slug": "IIA-106-taller-de-pensamiento-computacional",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Dominar la terminal Linux/Bash, control de versiones Git/GitHub, automatización con scripts y arquitectura de desarrollo moderna.",
+            "temas": [
+              "Filosofía Unix, jerarquía de directorios y permisos POSIX",
+              "Tuberías, redirecciones y comandos estándar (grep, awk, sed, find)",
+              "Control de versiones distribuido con Git: ramas, merges, rebase",
+              "Automatización con scripts de Bash y tareas programadas (cron)",
+              "Depuración de software con GDB y profiling de procesos"
+            ],
+            "youtube_queries": [
+              "Curso Linux terminal completo desde cero",
+              "Git y GitHub tutorial definitivo",
+              "The Missing Semester of Your CS Education MIT"
+            ],
+            "github_repos": [
+              "https://github.com/git/git",
+              "https://github.com/jlevy/the-art-of-command-line"
+            ],
+            "prig_desafios": [
+              "bash_scripts_automatizacion",
+              "git_workflow_simulado"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-106-taller-de-pensamiento-computacional.md"
+          },
+          {
+            "codigo": "IIA-107",
+            "nombre": "Cálculo Multivariable y Vectorial",
+            "slug": "IIA-107-calculo-multivariable-y-vectorial",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-101",
+              "IIA-102"
+            ],
+            "objetivos": "Calcular gradientes, matrices jacobianas y hessianas, optimizar funciones multivariables y comprender multiplicadores de Lagrange.",
+            "temas": [
+              "Campos escalares y vectoriales en R^n",
+              "Derivadas parciales, plano tangente y diferencial total",
+              "Vector gradiente y matriz jacobiana",
+              "Matriz Hessiana, concavidad y clasificación de puntos críticos",
+              "Optimización con restricciones y multiplicadores de Lagrange"
+            ],
+            "youtube_queries": [
+              "Multivariable Calculus MIT Strang",
+              "Calculo multivariable gradiente hessiano",
+              "Optimizacion matematica para IA"
+            ],
+            "github_repos": [
+              "https://github.com/MarcDeisenroth/mml-book-code"
+            ],
+            "prig_desafios": [
+              "calculo_gradiente_multivariable",
+              "optimizador_lagrange_python"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_1_fundamentos/IIA-107-calculo-multivariable-y-vectorial.md"
+          }
+        ]
+      },
+      {
+        "numero": 2,
+        "nombre": "Etapa 2: Estructuras de Datos, Probabilidad y Computación",
+        "slug": "etapa_2_computacion_y_probabilidad",
+        "descripcion": "Estructuras de datos eficientes, teoría de probabilidades, optimización matemática y arquitectura de hardware para procesamiento tensorial.",
+        "materias": [
+          {
+            "codigo": "IIA-201",
+            "nombre": "Estructuras de Datos y Algoritmos",
+            "slug": "IIA-201-estructuras-de-datos-y-algoritmos",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-103",
+              "IIA-104"
+            ],
+            "objetivos": "Implementar y comparar estructuras lineales y no lineales evaluando complejidad temporal y espacial Big O.",
+            "temas": [
+              "Notación Asintótica: O grande, Omega y Theta",
+              "Listas enlazadas, pilas y colas de prioridad",
+              "Tablas Hash y resolución de colisiones (channelling, open addressing)",
+              "Árboles binarios de búsqueda y árboles autobalanceados (AVL, Red-Black)",
+              "Heaps binarios, Heapsort y aplicaciones en colas de prioridad"
+            ],
+            "youtube_queries": [
+              "Data Structures and Algorithms FreeCodeCamp",
+              "Estructuras de datos en Python completas",
+              "Algoritmos y complejidad Big O"
+            ],
+            "github_repos": [
+              "https://github.com/TheAlgorithms/Python",
+              "https://github.com/kamyu104/LeetCode-Solutions"
+            ],
+            "prig_desafios": [
+              "arbol_binario_busqueda",
+              "tabla_hash_colisiones"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-201-estructuras-de-datos-y-algoritmos.md"
+          },
+          {
+            "codigo": "IIA-202",
+            "nombre": "Probabilidad y Estadística Inferencial",
+            "slug": "IIA-202-probabilidad-y-estadistica-inferencial",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-102",
+              "IIA-107"
+            ],
+            "objetivos": "Modelar la incertidumbre mediante variables aleatorias, inferencia paramétrica, estimación por máxima verosimilitud y tests de hipótesis.",
+            "temas": [
+              "Axiomas de Kolmogorov, probabilidad condicional e independencia",
+              "Variables aleatorias discretas (Binomial, Poisson, Geométrica)",
+              "Variables aleatorias continuas (Normal, Exponencial, Chi-cuadrado, Beta)",
+              "Teorema Central del Límite y Ley de los Grandes Números",
+              "Estimación por Máxima Verosimilitud (MLE) e intervalos de confianza"
+            ],
+            "youtube_queries": [
+              "Probability and Statistics Khan Academy",
+              "Estadistica inferencial para ciencia de datos",
+              "StatQuest Josh Starmer Probability"
+            ],
+            "github_repos": [
+              "https://github.com/scipy/scipy",
+              "https://github.com/AllenDowney/ThinkStats2"
+            ],
+            "prig_desafios": [
+              "estimador_maxima_verosimilitud",
+              "simulacion_monte_carlo_probabilidad"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-202-probabilidad-y-estadistica-inferencial.md"
+          },
+          {
+            "codigo": "IIA-203",
+            "nombre": "Organización y Arquitectura de Computadoras",
+            "slug": "IIA-203-organizacion-y-arquitectura-de-computadoras",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-106"
+            ],
+            "objetivos": "Comprender la ejecución de instrucciones a bajo nivel, la jerarquía de memorias caché y la aceleración paralela con GPUs/TPUs.",
+            "temas": [
+              "Modelo de Von Neumann, CPU, registros y ciclo de instrucción",
+              "Jerarquía de memoria: Registros, L1/L2/L3 Caché, RAM y TLB",
+              "Paralelismo a nivel de instrucción (ILP), pipeline y predicción de ramas",
+              "Arquitectura SIMD y computación vectorial",
+              "Arquitectura de GPUs: CUDA cores, Tensor Cores y memoria compartida"
+            ],
+            "youtube_queries": [
+              "Computer Architecture Crash Course",
+              "Arquitectura de computadoras universidad",
+              "GPU Architecture and CUDA tutorial"
+            ],
+            "github_repos": [
+              "https://github.com/olcf/cuda-training-series"
+            ],
+            "prig_desafios": [
+              "simulador_cache_l1",
+              "vectorizacion_simd_numpy"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-203-organizacion-y-arquitectura-de-computadoras.md"
+          },
+          {
+            "codigo": "IIA-204",
+            "nombre": "Bases de Datos Relacionales y SQL",
+            "slug": "IIA-204-bases-de-datos-relacionales-y-sql",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-103",
+              "IIA-104"
+            ],
+            "objetivos": "Diseñar esquemas relacionales normalizados, escribir consultas SQL avanzadas y garantizar integridad transaccional ACID.",
+            "temas": [
+              "Modelo Entidad-Relación y diseño conceptual",
+              "Teoría de la normalización (1FN, 2FN, 3FN y BCNF)",
+              "Lenguaje SQL: DDL, DML, JOINs complejos y subconsultas",
+              "Funciones de ventana (Window Functions) y CTEs (Common Table Expressions)",
+              "Transacciones ACID, bloqueos y planes de ejecución de índices B-Tree"
+            ],
+            "youtube_queries": [
+              "Curso SQL desde cero PostgreSQL",
+              "Bases de datos relacionales normalizacion",
+              "Advanced SQL Window Functions"
+            ],
+            "github_repos": [
+              "https://github.com/dbt-labs/jaffle_shop"
+            ],
+            "prig_desafios": [
+              "consultas_sql_joins_agregaciones",
+              "optimizacion_indices_postgresql"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-204-bases-de-datos-relacionales-y-sql.md"
+          },
+          {
+            "codigo": "IIA-205",
+            "nombre": "Programación Orientada a Objetos y Patrones de Diseño",
+            "slug": "IIA-205-programacion-orientada-a-objetos-y-patrones",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-103"
+            ],
+            "objetivos": "Construir software modular, desacoplado y reutilizable aplicando encapsulamiento, herencia, polimorfismo y patrones GoF.",
+            "temas": [
+              "Clases, instancias, atributos de clase e instancia y métodos mágicos",
+              "Herencia simple y múltiple (MRO), polimorfismo y composición",
+              "Principios de diseño SOLID explicados con ejemplos",
+              "Patrones Creacionales: Factory Method, Singleton, Builder",
+              "Patrones Estructurales y de Comportamiento: Adapter, Strategy, Observer"
+            ],
+            "youtube_queries": [
+              "Patrones de diseno software en Python",
+              "Principios SOLID explicados",
+              "Object Oriented Programming Full Course"
+            ],
+            "github_repos": [
+              "https://github.com/faif/python-patterns"
+            ],
+            "prig_desafios": [
+              "patron_estrategia_ia",
+              "patron_observador_eventos"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-205-programacion-orientada-a-objetos-y-patrones.md"
+          },
+          {
+            "codigo": "IIA-206",
+            "nombre": "Optimización Convexa y Métodos Numéricos",
+            "slug": "IIA-206-optimizacion-convexa-y-metodos-numericos",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-101",
+              "IIA-107"
+            ],
+            "objetivos": "Comprender la geometría de la convexidad, el descenso por gradiente estocástico y algoritmos de optimización de segundo orden.",
+            "temas": [
+              "Conjuntos convexos, funciones convexas y epígrafes",
+              "Condiciones de optimalidad de Karush-Kuhn-Tucker (KKT)",
+              "Descenso por gradiente, tasa de aprendizaje y momento de Nesterov",
+              "Optimizadores adaptativos: AdaGrad, RMSprop y Adam/AdamW",
+              "Métodos de segundo orden: Newton-Raphson y cuasi-Newton (BFGS, L-BFGS)"
+            ],
+            "youtube_queries": [
+              "Convex Optimization Stephen Boyd Stanford",
+              "Optimizacion convexa y descenso por gradiente",
+              "StatQuest Gradient Descent Adam"
+            ],
+            "github_repos": [
+              "https://github.com/cvxpy/cvxpy"
+            ],
+            "prig_desafios": [
+              "optimizador_adam_desde_cero",
+              "descenso_gradiente_convexa"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-206-optimizacion-convexa-y-metodos-numericos.md"
+          },
+          {
+            "codigo": "IIA-207",
+            "nombre": "Análisis y Diseño de Algoritmos Avanzados",
+            "slug": "IIA-207-analisis-y-diseno-de-algoritmos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-201"
+            ],
+            "objetivos": "Dominar técnicas paradigmáticas de diseño algorítmico: divide y vencerás, programación dinámica, algoritmos voraces y grafos complejos.",
+            "temas": [
+              "Estrategia Divide y Vencerás y Teorema Maestro",
+              "Programación Dinámica: subestructura óptima y superposición de subproblemas",
+              "Algoritmos Voraces (Greedy): árboles de expansión mínima (Kruskal, Prim)",
+              "Caminos más cortos: Dijkstra, Bellman-Ford y algoritmo A*",
+              "Clases de complejidad P, NP, NP-Completo y problemas NP-Duros"
+            ],
+            "youtube_queries": [
+              "Design and Analysis of Algorithms MIT",
+              "Programacion dinamica desde cero",
+              "Algoritmo Dijkstra y A estrella grafos"
+            ],
+            "github_repos": [
+              "https://github.com/williamfiset/Algorithms"
+            ],
+            "prig_desafios": [
+              "programacion_dinamica_mochila",
+              "algoritmo_a_estrella_pathfinding"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_2_computacion_y_probabilidad/IIA-207-analisis-y-diseno-de-algoritmos.md"
+          }
+        ]
+      },
+      {
+        "numero": 3,
+        "nombre": "Etapa 3: Aprendizaje Automático y Gestión de Datos",
+        "slug": "etapa_3_aprendizaje_automatico_y_datos",
+        "descripcion": "Modelos supervisados y no supervisados clásicos, ingeniería de características, procesamiento distribuido de Big Data y MLOps inicial.",
+        "materias": [
+          {
+            "codigo": "IIA-301",
+            "nombre": "Fundamentos de Aprendizaje Automático",
+            "slug": "IIA-301-fundamentos-de-aprendizaje-automatico",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-202",
+              "IIA-206"
+            ],
+            "objetivos": "Interiorizar el ciclo de vida del aprendizaje estadístico, la compensación sesgo-varianza y las métricas de generalización.",
+            "temas": [
+              "Taxonomía del ML: supervisado, no supervisado, autosupervisado y refuerzo",
+              "Compromiso Sesgo-Varianza (Bias-Variance Tradeoff)",
+              "Estrategias de validación: Holdout, K-Fold y Stratified K-Fold",
+              "Regularización L1 (Lasso) y L2 (Ridge) y ElasticNet",
+              "Curvas de aprendizaje, curvas ROC, PR y calibración de umbrales"
+            ],
+            "youtube_queries": [
+              "Machine Learning Andrew Ng Stanford",
+              "Curso Machine Learning completo scikit-learn",
+              "StatQuest Machine Learning Basics"
+            ],
+            "github_repos": [
+              "https://github.com/ageron/handson-ml3",
+              "https://github.com/scikit-learn/scikit-learn"
+            ],
+            "prig_desafios": [
+              "curva_sesgo_varianza",
+              "regularizacion_lasso_ridge"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-301-fundamentos-de-aprendizaje-automatico.md"
+          },
+          {
+            "codigo": "IIA-302",
+            "nombre": "Aprendizaje Supervisado y Modelos Predictivos",
+            "slug": "IIA-302-aprendizaje-supervisado-y-regresion",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-301"
+            ],
+            "objetivos": "Entrenar, tunear y desplegar modelos supervisados para clasificación y regresión basados en ensambles y árboles de decisión.",
+            "temas": [
+              "Regresión lineal simple, múltiple y polinómica",
+              "Regresión Logística multiclase (One-vs-Rest, Softmax)",
+              "Árboles de decisión: impureza de Gini y ganancia de información (Entropía)",
+              "Ensamble por Bagging: Random Forest y evaluación OOB",
+              "Ensamble por Boosting: AdaBoost, Gradient Boosting, XGBoost y LightGBM"
+            ],
+            "youtube_queries": [
+              "XGBoost and LightGBM StatQuest",
+              "Random Forest y ensambles Machine Learning",
+              "Regresion logistica explicada matematicamente"
+            ],
+            "github_repos": [
+              "https://github.com/dmlc/xgboost",
+              "https://github.com/microsoft/LightGBM"
+            ],
+            "prig_desafios": [
+              "xgboost_clasificacion_tunear",
+              "random_forest_desde_cero"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-302-aprendizaje-supervisado-y-regresion.md"
+          },
+          {
+            "codigo": "IIA-303",
+            "nombre": "Aprendizaje No Supervisado y Reducción de Dimensionalidad",
+            "slug": "IIA-303-aprendizaje-no-supervisado-y-clustering",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-301"
+            ],
+            "objetivos": "Descubrir patrones latentes en datos no etiquetados mediante agrupamiento, modelos generativos de densidad y proyecciones geométricas.",
+            "temas": [
+              "K-Means, inicialización K-Means++ y método del codo",
+              "Agrupamiento jerárquico aglomerativo y dendrogramas",
+              "DBSCAN y clustering basado en densidad con detección de ruido",
+              "Modelos de Mezclas Gaussianas (GMM) y algoritmo EM",
+              "Análisis de Componentes Principales (PCA), t-SNE y UMAP"
+            ],
+            "youtube_queries": [
+              "PCA Principal Component Analysis StatQuest",
+              "Clustering KMeans DBSCAN tutorial",
+              "t-SNE and UMAP explained"
+            ],
+            "github_repos": [
+              "https://github.com/lmcinnes/umap"
+            ],
+            "prig_desafios": [
+              "pca_reduccion_dimensionalidad",
+              "dbscan_clustering_ruido"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-303-aprendizaje-no-supervisado-y-clustering.md"
+          },
+          {
+            "codigo": "IIA-304",
+            "nombre": "Bases de Datos NoSQL y Big Data",
+            "slug": "IIA-304-bases-de-datos-nosql-y-big-data",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-204"
+            ],
+            "objetivos": "Manejar grandes volúmenes de datos distribuidos en motores NoSQL, bases de datos vectoriales y clústeres Spark.",
+            "temas": [
+              "Teorema CAP, consistencia eventual y escalabilidad horizontal",
+              "Bases documentales (MongoDB) y clave-valor en memoria (Redis)",
+              "Bases de datos vectoriales para IA: embeddings, índices HNSW e IVF (Chroma, Milvus, Qdrant)",
+              "Arquitectura Hadoop, HDFS y paradigma MapReduce",
+              "Apache Spark: DataFrames distribuidos, RDDs y Spark SQL"
+            ],
+            "youtube_queries": [
+              "Apache Spark Big Data tutorial completo",
+              "Vector Databases explained for LLMs",
+              "MongoDB NoSQL curso practico"
+            ],
+            "github_repos": [
+              "https://github.com/apache/spark",
+              "https://github.com/chroma-core/chroma"
+            ],
+            "prig_desafios": [
+              "consultas_vectoriales_faiss",
+              "spark_dataframes_agregaciones"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-304-bases-de-datos-nosql-y-big-data.md"
+          },
+          {
+            "codigo": "IIA-305",
+            "nombre": "Procesamiento, Limpieza y Feature Engineering",
+            "slug": "IIA-305-procesamiento-y-limpieza-de-datos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-301"
+            ],
+            "objetivos": "Limpiar datos sucios, imputar valores faltantes, extraer variables predictivas y orquestar pipelines reproducibles de Scikit-Learn.",
+            "temas": [
+              "Manejo de valores nulos (MCAR, MAR, MNAR) e imputación avanzada (KNN, Iterative)",
+              "Detección y tratamiento de outliers (IQR, Isolation Forest, Z-score)",
+              "Codificación categórica: One-Hot, Ordinal, Target Encoding y Embeddings",
+              "Transformaciones matemáticas: Box-Cox, escalado MinMax y RobustScaler",
+              "Creación de Transformers personalizados y Pipelines en scikit-learn"
+            ],
+            "youtube_queries": [
+              "Feature Engineering for Machine Learning",
+              "Limpieza de datos con Pandas y Scikit-Learn",
+              "Data Preprocessing pipelines Python"
+            ],
+            "github_repos": [
+              "https://github.com/scikit-learn/scikit-learn",
+              "https://github.com/pandas-dev/pandas"
+            ],
+            "prig_desafios": [
+              "pipeline_limpieza_preprocesamiento",
+              "target_encoder_personalizado"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-305-procesamiento-y-limpieza-de-datos.md"
+          },
+          {
+            "codigo": "IIA-306",
+            "nombre": "Estadística Bayesiana y Modelos Gráficos",
+            "slug": "IIA-306-estadistica-bayesiana-y-modelos-graficos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-202"
+            ],
+            "objetivos": "Construir modelos generativos probabilísticos incorporando conocimiento a priori y cuantificación rigurosa de incertidumbre.",
+            "temas": [
+              "Regla de Bayes actualizada: Prior, Likelihood y Posterior",
+              "Distribuciones a priori conjugadas y no informativas",
+              "Muestreo Markov Chain Monte Carlo (MCMC) y algoritmo Metropolis-Hastings",
+              "Muestreador No-U-Turn (NUTS) en PyMC y Stan",
+              "Redes Bayesianas y Modelos Ocultos de Markov (HMM)"
+            ],
+            "youtube_queries": [
+              "Bayesian Statistics course university",
+              "PyMC tutorial Probabilistic Programming",
+              "Markov Chain Monte Carlo MCMC"
+            ],
+            "github_repos": [
+              "https://github.com/pymc-devs/pymc",
+              "https://github.com/CamDavidsonPilon/Probabilistic-Programming-and-Bayesian-Methods-for-Hackers"
+            ],
+            "prig_desafios": [
+              "regresion_bayesiana_pymc",
+              "filtro_kalman_basico"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-306-estadistica-bayesiana-y-modelos-graficos.md"
+          },
+          {
+            "codigo": "IIA-307",
+            "nombre": "Computación en la Nube y DevOps / MLOps",
+            "slug": "IIA-307-computacion-en-la-nube-y-devops-mlops",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-106",
+              "IIA-301"
+            ],
+            "objetivos": "Contenerizar aplicaciones de IA en Docker, gestionar pipelines de CI/CD y versionar datos y modelos con DVC y MLflow.",
+            "temas": [
+              "Contenedores Docker: Dockerfile, imágenes, volúmenes y redes",
+              "Orquestación local con Docker Compose",
+              "Integración continua (CI) y entrega continua (CD) con GitHub Actions",
+              "Versionado de datasets y modelos con DVC (Data Version Control)",
+              "Tracking de experimentos y registro de modelos con MLflow"
+            ],
+            "youtube_queries": [
+              "Docker para Data Science y Machine Learning",
+              "MLOps tutorial completo principiantes",
+              "GitHub Actions CI CD automatizacion"
+            ],
+            "github_repos": [
+              "https://github.com/mlflow/mlflow",
+              "https://github.com/iterative/dvc"
+            ],
+            "prig_desafios": [
+              "dockerfile_api_machine_learning",
+              "mlflow_tracking_metricas"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_3_aprendizaje_automatico_y_datos/IIA-307-computacion-en-la-nube-y-devops-mlops.md"
+          }
+        ]
+      },
+      {
+        "numero": 4,
+        "nombre": "Etapa 4: IA Avanzada, Redes Neuronales y Procesamiento de Lenguaje",
+        "slug": "etapa_4_ia_avanzada_nlp_y_generativa",
+        "descripcion": "Deep Learning, visión por computadora, NLP moderno con Transformers, aprendizaje por refuerzo y agentes autónomos.",
+        "materias": [
+          {
+            "codigo": "IIA-401",
+            "nombre": "Redes Neuronales y Deep Learning",
+            "slug": "IIA-401-redes-neuronales-y-deep-learning",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-301",
+              "IIA-302"
+            ],
+            "objetivos": "Implementar arquitecturas neuronales profundas en PyTorch, dominando la retropropagación analítica y técnicas de regularización.",
+            "temas": [
+              "Perceptrón Multicapa (MLP) y funciones de activación (ReLU, GELU, Swish)",
+              "Algoritmo de Retropropagación (Backpropagation) y grafos computacionales",
+              "Técnicas de regularización: Dropout, Weight Decay y Batch Normalization",
+              "Frameworks modernos: Tensores, Autograd y módulos en PyTorch",
+              "Inicialización de pesos (He, Xavier) y entrenamiento en GPU"
+            ],
+            "youtube_queries": [
+              "Deep Learning Specialization Andrew Ng",
+              "PyTorch for Deep Learning Bootcamp",
+              "Neural Networks from Scratch 3Blue1Brown"
+            ],
+            "github_repos": [
+              "https://github.com/pytorch/pytorch",
+              "https://github.com/karpathy/micrograd"
+            ],
+            "prig_desafios": [
+              "mlp_backpropagation_numpy",
+              "pytorch_clasificador_cifar10"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-401-redes-neuronales-y-deep-learning.md"
+          },
+          {
+            "codigo": "IIA-402",
+            "nombre": "Visión por Computadora (Computer Vision)",
+            "slug": "IIA-402-vision-por-computadora",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-401"
+            ],
+            "objetivos": "Procesar imágenes y video con redes convolucionales, detección de objetos en tiempo real (YOLO) y Vision Transformers.",
+            "temas": [
+              "Filtros espaciales, convolución 2D, pooling y padding",
+              "Arquitecturas clásicas y modernas: AlexNet, VGG, ResNet y EfficientNet",
+              "Detección de objetos: Single-Shot Detectors (YOLOv8/v9) y Faster R-CNN",
+              "Segmentación semántica e instantánea: U-Net y Mask R-CNN",
+              "Vision Transformers (ViT) y modelos fundacionales multimodales (CLIP)"
+            ],
+            "youtube_queries": [
+              "Computer Vision CS231n Stanford",
+              "YOLO object detection tutorial PyTorch",
+              "Vision Transformers explained"
+            ],
+            "github_repos": [
+              "https://github.com/ultralytics/ultralytics",
+              "https://github.com/huggingface/transformers"
+            ],
+            "prig_desafios": [
+              "convolucion_2d_desde_cero",
+              "yolo_deteccion_tiempo_real"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-402-vision-por-computadora.md"
+          },
+          {
+            "codigo": "IIA-403",
+            "nombre": "Procesamiento del Lenguaje Natural (NLP)",
+            "slug": "IIA-403-procesamiento-del-lenguaje-natural",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-401"
+            ],
+            "objetivos": "Analizar, clasificar y generar texto utilizando modelos de lenguaje estadísticos, embeddings vectoriales y redes recurrentes.",
+            "temas": [
+              "Tokenización (BPE, WordPiece) y normalización de texto",
+              "Representaciones distribuidas: Word2Vec (Skip-gram, CBOW) y FastText",
+              "Redes Neuronales Recurrentes (RNN), GRU y LSTM para secuencias",
+              "Modelos Secuencia a Secuencia (Seq2Seq) y mecanismo de atención de Bahdanau",
+              "Métricas de evaluación de texto: Perplejidad, BLEU, ROUGE y Exact Match"
+            ],
+            "youtube_queries": [
+              "Natural Language Processing CS224N Stanford",
+              "NLP con Hugging Face y PyTorch",
+              "Word2Vec y LSTMs explicados"
+            ],
+            "github_repos": [
+              "https://github.com/huggingface/transformers",
+              "https://github.com/karpathy/makemore"
+            ],
+            "prig_desafios": [
+              "tokenizador_bpe_desde_cero",
+              "clasificador_sentimiento_lstm"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-403-procesamiento-del-lenguaje-natural.md"
+          },
+          {
+            "codigo": "IIA-404",
+            "nombre": "Aprendizaje por Refuerzo (Reinforcement Learning)",
+            "slug": "IIA-404-aprendizaje-por-refuerzo",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-401"
+            ],
+            "objetivos": "Diseñar agentes autónomos que optimizan su política de decisiones interactuando con entornos dinámicos.",
+            "temas": [
+              "Procesos de Decisión de Markov (MDP) y ecuación de Bellman",
+              "Aprendizaje por Diferencia Temporal: Q-Learning y SARSA",
+              "Deep Q-Networks (DQN) con Replay Buffer y Target Network",
+              "Métodos de Gradiente de Política: REINFORCE, Actor-Critic (A2C)",
+              "Proximal Policy Optimization (PPO) y entornos Gymnasium"
+            ],
+            "youtube_queries": [
+              "Reinforcement Learning David Silver UCL",
+              "Deep Reinforcement Learning tutorial PyTorch",
+              "PPO y DQN explicados"
+            ],
+            "github_repos": [
+              "https://github.com/Farama-Foundation/Gymnasium",
+              "https://github.com/DLR-RM/stable-baselines3"
+            ],
+            "prig_desafios": [
+              "q_learning_cartpole",
+              "dqn_agente_lunar_lander"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-404-aprendizaje-por-refuerzo.md"
+          },
+          {
+            "codigo": "IIA-405",
+            "nombre": "Modelos Generativos y Arquitecturas Transformer",
+            "slug": "IIA-405-modelos-generativos-y-arquitecturas-transformer",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-403"
+            ],
+            "objetivos": "Dominar el mecanismo de autoatención escalada (Transformer) y los modelos fundacionales de lenguaje (LLMs) y difusión.",
+            "temas": [
+              "Mecanismo de Autoatención Escalada Multi-Head (Attention is All You Need)",
+              "Arquitectura Transformer Encoder-Decoder, Positional Encoding",
+              "Transformers autorregresivos (GPT, LLaMA) vs codificadores (BERT)",
+              "Fine-tuning eficiente en parámetros (PEFT): LoRA y QLoRA",
+              "Modelos de Difusión para generación de imágenes (DDPM, Stable Diffusion)"
+            ],
+            "youtube_queries": [
+              "Andrej Karpathy Let's build GPT from scratch",
+              "Attention is all you need explicacion",
+              "Fine tuning LLaMA LoRA tutorial"
+            ],
+            "github_repos": [
+              "https://github.com/karpathy/nanoGPT",
+              "https://github.com/huggingface/peft"
+            ],
+            "prig_desafios": [
+              "mecanismo_atencion_transformer",
+              "nanogpt_entrenamiento_pequeno"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-405-modelos-generativos-y-arquitecturas-transformer.md"
+          },
+          {
+            "codigo": "IIA-406",
+            "nombre": "Sistemas de Recomendación",
+            "slug": "IIA-406-sistemas-de-recomendacion",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-302",
+              "IIA-304"
+            ],
+            "objetivos": "Construir motores de recomendación personalizados a gran escala combinando filtrado colaborativo y redes neuronales Two-Tower.",
+            "temas": [
+              "Filtrado colaborativo basado en usuarios y basado en ítems",
+              "Factorización de matrices: SVD, SVD++ y Alternating Least Squares (ALS)",
+              "Filtrado basado en contenido y enriquecimiento con metadatos",
+              "Arquitecturas neuronales Two-Tower para recuperación y ranking",
+              "Métricas de recomendación: NDCG@K, Precision@K, Recall@K y MAP"
+            ],
+            "youtube_queries": [
+              "Recommendation Systems tutorial Machine Learning",
+              "Two Tower neural network recommendation",
+              "Matrix Factorization ALS"
+            ],
+            "github_repos": [
+              "https://github.com/microsoft/recommenders"
+            ],
+            "prig_desafios": [
+              "filtrado_colaborativo_matriz",
+              "two_tower_embeddings_ranking"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-406-sistemas-de-recomendacion.md"
+          },
+          {
+            "codigo": "IIA-407",
+            "nombre": "IA Explicable (XAI), Métricas y Evaluación Rigurosa",
+            "slug": "IIA-407-ia-explicable-y-evaluacion-de-modelos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-301",
+              "IIA-401"
+            ],
+            "objetivos": "Interpretar cajas negras neuronales mediante atribución de características, gradientes integrados y métricas éticas libres de sesgos.",
+            "temas": [
+              "El dilema entre interpretabilidad y rendimiento en IA",
+              "Métodos de interpretabilidad agnósticos al modelo: LIME y SHAP (Valores de Shapley)",
+              "Interpretabilidad en Deep Learning: Grad-CAM y Integrated Gradients",
+              "Detección y mitigación de sesgos estadísticos y equidad algorítmica (Fairness)",
+              "Calibración de probabilidades (Platt Scaling, Isotonic Regression)"
+            ],
+            "youtube_queries": [
+              "Explainable AI SHAP LIME tutorial",
+              "Interpretable Machine Learning Christoph Molnar",
+              "AI Fairness and Bias mitigation"
+            ],
+            "github_repos": [
+              "https://github.com/slundberg/shap",
+              "https://github.com/marcotcr/lime"
+            ],
+            "prig_desafios": [
+              "shap_valores_interpretabilidad",
+              "grad_cam_mapa_calor_cnn"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-407-ia-explicable-y-evaluacion-de-modelos.md"
+          },
+          {
+            "codigo": "IIA-408",
+            "nombre": "Agentes Inteligentes, Razonamiento y Búsqueda Heurística",
+            "slug": "IIA-408-agentes-inteligentes-y-razonamiento",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-207",
+              "IIA-405"
+            ],
+            "objetivos": "Diseñar agentes autónomos capaces de razonar, planificar secuencias de acciones, usar herramientas externas y memorias persistentes.",
+            "temas": [
+              "Agentes inteligentes reactivos, basados en modelos y basados en objetivos",
+              "Juegos adversariales: Minimax con poda Alfa-Beta",
+              "Planificación automática y grafos de planificación (STRIPS, PDDL)",
+              "Agentes impulsados por LLMs: ReAct, Chain-of-Thought y Tree-of-Thoughts",
+              "Sistemas RAG (Retrieval-Augmented Generation) y orquestación con LangChain/LlamaIndex"
+            ],
+            "youtube_queries": [
+              "AI Agents tutorial LangChain LangGraph",
+              "Minimax and Alpha Beta Pruning CS50 AI",
+              "RAG Retrieval Augmented Generation complete"
+            ],
+            "github_repos": [
+              "https://github.com/langchain-ai/langchain",
+              "https://github.com/run-llama/llama_index"
+            ],
+            "prig_desafios": [
+              "agente_react_herramientas",
+              "minimax_ta_te_ti_alfa_beta"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_4_ia_avanzada_nlp_y_generativa/IIA-408-agentes-inteligentes-y-razonamiento.md"
+          }
+        ]
+      },
+      {
+        "numero": 5,
+        "nombre": "Etapa 5: Proyecto Final, Despliegue y Ética",
+        "slug": "etapa_5_proyecto_y_produccion",
+        "descripcion": "Ingeniería de producción de IA (MLOps), regulación jurídica, seguridad adversaria, computación cuántica y capstone final.",
+        "materias": [
+          {
+            "codigo": "IIA-501",
+            "nombre": "Arquitectura MLOps y Despliegue de Modelos a Escala",
+            "slug": "IIA-501-arquitectura-mlops-y-despliegue",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "IIA-307",
+              "IIA-401"
+            ],
+            "objetivos": "Empaquetar, servir con baja latencia y monitorear modelos de Deep Learning en producción continua.",
+            "temas": [
+              "APIs de inferencia de alto rendimiento con FastAPI y BentoML",
+              "Servidores de inferencia dedicados: Triton Inference Server y vLLM",
+              "Técnicas de optimización e inferencia: Cuantización (INT8, FP4, GGUF), TensorRT y ONNX",
+              "Monitoreo en vivo: Detección de Data Drift y Concept Drift (Evidently AI)",
+              "Estrategias de despliegue: Canario, Blue-Green y pruebas A/B"
+            ],
+            "youtube_queries": [
+              "MLOps Full Course deployment production",
+              "vLLM and LLM serving at scale",
+              "Quantization GGUF and ONNX tutorial"
+            ],
+            "github_repos": [
+              "https://github.com/vllm-project/vllm",
+              "https://github.com/microsoft/onnxruntime"
+            ],
+            "prig_desafios": [
+              "fastapi_serving_modelo_onnx",
+              "detector_data_drift_drift"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-501-arquitectura-mlops-y-despliegue.md"
+          },
+          {
+            "codigo": "IIA-502",
+            "nombre": "Ética, Privacidad y Regulación en Inteligencia Artificial",
+            "slug": "IIA-502-etica-privacidad-y-regulacion-en-ia",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-407"
+            ],
+            "objetivos": "Comprender los marcos legales internacionales (EU AI Act), la privacidad diferencial y el impacto sociotécnico de la IA.",
+            "temas": [
+              "Marco regulatorio europeo (EU AI Act) y categorización de riesgos",
+              "Privacidad Diferencial: presupuestos épsilon y ruido de Laplace",
+              "Aprendizaje Federado (Federated Learning) para entrenamiento descentralizado",
+              "Propiedad intelectual, derechos de autor en modelos generativos y licencias",
+              "Alineación de IA (AI Alignment) y seguridad existencial"
+            ],
+            "youtube_queries": [
+              "AI Ethics and Governance Harvard",
+              "Differential Privacy mathematically explained",
+              "EU AI Act explained in 10 minutes"
+            ],
+            "github_repos": [
+              "https://github.com/OpenMined/PySyft"
+            ],
+            "prig_desafios": [
+              "privacidad_diferencial_laplace",
+              "federated_learning_simulado"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-502-etica-privacidad-y-regulacion-en-ia.md"
+          },
+          {
+            "codigo": "IIA-503",
+            "nombre": "Seguridad y Robustez en Sistemas de IA",
+            "slug": "IIA-503-seguridad-en-modelos-de-ia",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-401"
+            ],
+            "objetivos": "Defender y auditar sistemas de IA frente a ataques adversarios, envenenamiento de datos e inyecciones de prompts.",
+            "temas": [
+              "Ataques de evasión y perturbaciones adversarias (FGSM, PGD)",
+              "Envenenamiento de datos de entrenamiento (Data Poisoning y Backdoors)",
+              "Ataques de extracción de modelos e inferencia de membresía (MIA)",
+              "Seguridad en LLMs: Prompt Injection, Jailbreaks y Data Leakage",
+              "Estrategias de robustecimiento: Entrenamiento adversario y guardrails"
+            ],
+            "youtube_queries": [
+              "Adversarial Machine Learning FGSM PGD",
+              "LLM Security Prompt Injection and Jailbreaks",
+              "AI Cybersecurity explained"
+            ],
+            "github_repos": [
+              "https://github.com/Trusted-AI/adversarial-robustness-toolbox",
+              "https://github.com/NVIDIA/NeMo-Guardrails"
+            ],
+            "prig_desafios": [
+              "ataque_adversario_fgsm",
+              "prompt_injection_guardrail"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-503-seguridad-en-modelos-de-ia.md"
+          },
+          {
+            "codigo": "IIA-504",
+            "nombre": "Computación Cuántica y Fronteras de la Inteligencia Artificial",
+            "slug": "IIA-504-computacion-cuantica-y-computacion-avanzada",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-101",
+              "IIA-401"
+            ],
+            "objetivos": "Comprender los principios de qubits, circuitos cuánticos y algoritmos de Quantum Machine Learning con Qiskit.",
+            "temas": [
+              "Qubits, esfera de Bloch, superposición cuántica y entrelazamiento",
+              "Compuertas cuánticas unitarias (Pauli-X, Hadamard, CNOT)",
+              "Algoritmos cuánticos seminales: Deutsch-Jozsa, Grover y Shor",
+              "Quantum Machine Learning (QML): Variational Quantum Classifiers (VQC)",
+              "Simulación de circuitos cuánticos en Python con Qiskit y PennyLane"
+            ],
+            "youtube_queries": [
+              "Quantum Computing for Computer Scientists Microsoft",
+              "Qiskit tutorial IBM Quantum",
+              "Quantum Machine Learning PennyLane"
+            ],
+            "github_repos": [
+              "https://github.com/Qiskit/qiskit",
+              "https://github.com/PennyLaneAI/pennylane"
+            ],
+            "prig_desafios": [
+              "circuito_cuantico_qiskit_campana",
+              "clasificador_cuantico_variacional"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-504-computacion-cuantica-y-computacion-avanzada.md"
+          },
+          {
+            "codigo": "IIA-505",
+            "nombre": "Taller de Emprendimiento Tecnológico y Gestión de Innovación",
+            "slug": "IIA-505-taller-de-emprendimiento-tecnologico",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "IIA-307"
+            ],
+            "objetivos": "Transformar modelos y prototipos de IA en productos comerciales viables con métricas de negocio, unit economics y levantamiento de capital.",
+            "temas": [
+              "Metodología Lean Startup y diseño de Producto Mínimo Viable (MVP)",
+              "Estructura de costos de IA: cómputo en GPUs, costos de API y token economics",
+              "Patentes de algoritmos, secretos comerciales y propiedad intelectual",
+              "Métricas de retención, CAC, LTV y monetización de modelos B2B/B2C",
+              "Pitch deck efectivo y negociación con fondos de Venture Capital"
+            ],
+            "youtube_queries": [
+              "Y Combinator Startup School AI",
+              "How to build an AI startup product",
+              "Unit economics for Machine Learning"
+            ],
+            "github_repos": [
+              "https://github.com/kuchin/awesome-cto"
+            ],
+            "prig_desafios": [
+              "calculadora_token_economics_ia",
+              "mvp_dashboard_metricas"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-505-taller-de-emprendimiento-tecnologico.md"
+          },
+          {
+            "codigo": "IIA-506",
+            "nombre": "Proyecto Final Integrador (Capstone Project en IA)",
+            "slug": "IIA-506-proyecto-final-integrador-capstone",
+            "horas": 128,
+            "creditos": 8,
+            "correlatividades": [
+              "IIA-402",
+              "IIA-403",
+              "IIA-501"
+            ],
+            "objetivos": "Diseñar, entrenar, evaluar y desplegar en producción un sistema de inteligencia artificial completo que resuelva un problema real de alta complejidad.",
+            "temas": [
+              "Definición formal del problema, benchmark y recopilación de dataset",
+              "Investigación del estado del arte (SOTA) y diseño arquitectónico",
+              "Entrenamiento riguroso con control de experimentos y ablation studies",
+              "Despliegue escalable en contenedor con API REST/gRPC y UI interactiva",
+              "Defensa pública de tesis y memoria técnica reproducible en GitHub"
+            ],
+            "youtube_queries": [
+              "Stanford CS230 Deep Learning Final Projects",
+              "How to write a Machine Learning Thesis",
+              "Building an end to end AI application"
+            ],
+            "github_repos": [
+              "https://github.com/ashleve/lightning-hydra-template"
+            ],
+            "prig_desafios": [
+              "ablation_study_experimento",
+              "benchmark_comparativo_sota"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-506-proyecto-final-integrador-capstone.md"
+          },
+          {
+            "codigo": "IIA-507",
+            "nombre": "Práctica Profesional Supervisada (PPS)",
+            "slug": "IIA-507-practica-profesional-supervisada",
+            "horas": 200,
+            "creditos": 10,
+            "correlatividades": [
+              "IIA-501"
+            ],
+            "objetivos": "Integrarse en un equipo profesional de ingeniería o laboratorio de I+D resolviendo desafíos reales de la industria.",
+            "temas": [
+              "Dinámica de trabajo en equipo ágil (Scrum / Kanban)",
+              "Integración de modelos en bases de código heredadas (Legacy Code)",
+              "Revisión de código por pares (Code Reviews) y estándares corporativos",
+              "Resolución de incidentes en tiempo real y post-mortems",
+              "Elaboración del informe final de prácticas y lecciones aprendidas"
+            ],
+            "youtube_queries": [
+              "Software Engineering in Production Google",
+              "Working as a Machine Learning Engineer",
+              "Code Review best practices for ML"
+            ],
+            "github_repos": [
+              "https://github.com/visenger/awesome-mlops"
+            ],
+            "prig_desafios": [
+              "refactor_legacy_model_code",
+              "post_mortem_reporte_incidente"
+            ],
+            "archivo_markdown": "carreras/ingenieria_inteligencia_artificial/etapa_5_proyecto_y_produccion/IIA-507-practica-profesional-supervisada.md"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "licenciatura_programacion",
+    "nombre": "Licenciatura en Programación y Ciencias de la Computación",
+    "codigo": "LPR",
+    "titulo_obtenido": "Licenciado/a en Programación / Computación",
+    "duracion_anios": 4,
+    "total_materias": 28,
+    "descripcion": "Carrera orientada al dominio exhaustivo del ciclo de vida del software, la algoritmia formal, múltiples paradigmas de programación, arquitectura de sistemas distribuidos, seguridad y computación de alto rendimiento.",
+    "etapas": [
+      {
+        "numero": 1,
+        "nombre": "Etapa 1: Algoritmos y Fundamentos de la Computación",
+        "slug": "etapa_1_algoritmos_y_fundamentos",
+        "descripcion": "Pensamiento computacional, álgebra booleana, algoritmia fundamental, estructuras de datos iniciales y herramientas de ingeniería.",
+        "materias": [
+          {
+            "codigo": "LPR-101",
+            "nombre": "Elementos de Programación y Lógica Algorítmica",
+            "slug": "LPR-101-elementos-de-programacion",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Aprender a descomponer problemas complejos en algoritmos precisos, empleando tipos primitivos, estructuras de control y modularización.",
+            "temas": [
+              "Concepto de algoritmo, tipos de datos primitivos y operadores",
+              "Estructuras de selección e iteración (bucles)",
+              "Modularización con funciones, paso de parámetros por valor y referencia",
+              "Arreglos unidimensionales (vectores) y multidimensionales (matrices)",
+              "Algoritmos elementales de búsqueda lineal y ordenamiento por burbuja"
+            ],
+            "youtube_queries": [
+              "Curso introduccion a la programacion logica algoritmos",
+              "CS50 Introduction to Computer Science Malan",
+              "Aprender a programar desde cero algoritmos"
+            ],
+            "github_repos": [
+              "https://github.com/TheAlgorithms/Python"
+            ],
+            "prig_desafios": [
+              "algoritmo_busqueda_lineal",
+              "matrices_rotacion_inversion"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-101-elementos-de-programacion.md"
+          },
+          {
+            "codigo": "LPR-102",
+            "nombre": "Álgebra y Geometría Analítica",
+            "slug": "LPR-102-algebra-y-geometria-analitica",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Dominar álgebra lineal y geometría vectorial aplicadas a computación gráfica y estructuras de datos espaciales.",
+            "temas": [
+              "Vectores en el plano y en el espacio, producto escalar y vectorial",
+              "Rectas y planos en R^3",
+              "Matrices, determinantes y sistemas de ecuaciones lineales",
+              "Transformaciones geométricas en 2D y 3D (rotación, traslación, escala)",
+              "Introducción a cuaterniones y proyecciones gráficas"
+            ],
+            "youtube_queries": [
+              "Algebra lineal aplicada a videojuegos y graficos",
+              "Algebra y geometria analitica universidad",
+              "Vectors and matrices for game developers"
+            ],
+            "github_repos": [
+              "https://github.com/MarcDeisenroth/mml-book-code"
+            ],
+            "prig_desafios": [
+              "rotacion_matriz_2d_3d",
+              "producto_vectorial_normales"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-102-algebra-y-geometria-analitica.md"
+          },
+          {
+            "codigo": "LPR-103",
+            "nombre": "Sistemas de Procesamiento de Datos y Lógica Digital",
+            "slug": "LPR-103-sistemas-de-procesamiento-de-datos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Entender la representación de la información en binario, álgebra de Boole, compuertas lógicas y diseño combinacional.",
+            "temas": [
+              "Sistemas de numeración: binario, octal, hexadecimal y conversiones",
+              "Representación de enteros con signo (Complemento a 2) y flotantes (IEEE 754)",
+              "Álgebra de Boole, tablas de verdad y simplificación por mapas de Karnaugh",
+              "Compuertas lógicas universales (NAND, NOR) y circuitos combinacionales",
+              "Circuitos secuenciales elementales: Flip-Flops, contadores y registros"
+            ],
+            "youtube_queries": [
+              "Logica digital y computacion binaria",
+              "Digital Design from NAND to Tetris",
+              "Complemento a dos y norma IEEE 754"
+            ],
+            "github_repos": [
+              "https://github.com/havivha/Nand2Tetris"
+            ],
+            "prig_desafios": [
+              "conversor_binario_ieee754",
+              "sumador_binario_simulado"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-103-sistemas-de-procesamiento-de-datos.md"
+          },
+          {
+            "codigo": "LPR-104",
+            "nombre": "Matemática Discreta",
+            "slug": "LPR-104-matematica-discreta",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Manejar la formalidad de conjuntos, combinatoria, grafos y relaciones matemáticas indispensables para el análisis de software.",
+            "temas": [
+              "Teoría de conjuntos y principios de conteo combinatorio",
+              "Relaciones de orden y relaciones de equivalencia",
+              "Principio de inducción matemática fuerte y débil",
+              "Teoría de grafos: caminos, circuitos eulerianos y hamiltonianos",
+              "Árboles generadores y propiedades algebraicas de retículos"
+            ],
+            "youtube_queries": [
+              "Matematica discreta universidad completa",
+              "Discrete Math MIT OpenCourseWare",
+              "Teoria de grafos matematica discreta"
+            ],
+            "github_repos": [
+              "https://github.com/jwasham/coding-interview-university"
+            ],
+            "prig_desafios": [
+              "grafo_euleriano_detector",
+              "permutaciones_combinatoria_python"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-104-matematica-discreta.md"
+          },
+          {
+            "codigo": "LPR-105",
+            "nombre": "Algoritmos y Estructuras de Datos I",
+            "slug": "LPR-105-algoritmos-y-estructuras-de-datos-1",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-101"
+            ],
+            "objetivos": "Diseñar e implementar estructuras de datos dinámicas lineales en memoria y dominar algoritmos de búsqueda y ordenamiento eficiente.",
+            "temas": [
+              "Gestión dinámica de memoria y punteros/referencias",
+              "Listas enlazadas simples, dobles y circulares",
+              "Pilas (Stacks) y Colas (Queues) y aplicaciones (evaluación de postfijo)",
+              "Algoritmos de ordenamiento cuadrático: Inserción, Selección, Burbuja",
+              "Algoritmos de ordenamiento eficiente: Mergesort y Quicksort"
+            ],
+            "youtube_queries": [
+              "Data Structures Easy to Advanced William Fiset",
+              "Algoritmos de ordenamiento Quicksort Mergesort",
+              "Listas pilas y colas explicadas"
+            ],
+            "github_repos": [
+              "https://github.com/TheAlgorithms/C-Plus-Plus",
+              "https://github.com/TheAlgorithms/Python"
+            ],
+            "prig_desafios": [
+              "lista_enlazada_punteros",
+              "quicksort_in_place"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-105-algoritmos-y-estructuras-de-datos-1.md"
+          },
+          {
+            "codigo": "LPR-106",
+            "nombre": "Taller de Herramientas de Desarrollo (Git, Linux, Bash)",
+            "slug": "LPR-106-taller-de-herramientas-de-desarrollo-git-linux",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "Ninguna"
+            ],
+            "objetivos": "Operar fluidamente en sistemas operativos Linux, automatizar con Bash y gestionar el código colaborativo con Git.",
+            "temas": [
+              "Terminal Linux, flujo de entrada/salida estándar, pipes y redirecciones",
+              "Control de versiones Git: commit, branch, merge, stash, rebase interactivo",
+              "Resolución de conflictos y flujos Gitflow y Trunk-based development",
+              "Compilación con GCC/Clang, Makefiles y CMake básico",
+              "Configuración de entornos SSH, claves criptográficas y dotfiles"
+            ],
+            "youtube_queries": [
+              "Linux command line tutorial",
+              "Git rebase interactivo y ramas avanzado",
+              "The Missing Semester MIT"
+            ],
+            "github_repos": [
+              "https://github.com/jlevy/the-art-of-command-line"
+            ],
+            "prig_desafios": [
+              "script_bash_backup",
+              "makefile_compilacion_automatica"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_1_algoritmos_y_fundamentos/LPR-106-taller-de-herramientas-de-desarrollo-git-linux.md"
+          }
+        ]
+      },
+      {
+        "numero": 2,
+        "nombre": "Etapa 2: Paradigmas de Programación y Sistemas",
+        "slug": "etapa_2_paradigmas_y_sistemas",
+        "descripcion": "Programación orientada a objetos profunda, arquitectura de procesadores, sistemas operativos y estructuras de datos no lineales.",
+        "materias": [
+          {
+            "codigo": "LPR-201",
+            "nombre": "Programación Orientada a Objetos",
+            "slug": "LPR-201-programacion-orientada-a-objetos",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-105"
+            ],
+            "objetivos": "Diseñar sistemas complejos orientados a objetos con encapsulamiento, polimorfismo, interfaces y pruebas unitarias.",
+            "temas": [
+              "Abstracción, clases, objetos, estado y comportamiento",
+              "Encapsulamiento y modificadores de acceso",
+              "Herencia, clases abstractas, interfaces y despacho dinámico",
+              "Manejo robusto de excepciones y validación de invariantes",
+              "Diseño guiado por contratos y pruebas unitarias exhaustivas"
+            ],
+            "youtube_queries": [
+              "Programacion orientada a objetos Java o C++",
+              "Curso POO polimorfismo interfaces",
+              "SOLID principles explained simply"
+            ],
+            "github_repos": [
+              "https://github.com/iluwatar/java-design-patterns"
+            ],
+            "prig_desafios": [
+              "polimorfismo_sistema_vehiculos",
+              "jerarquia_clases_abstractas"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-201-programacion-orientada-a-objetos.md"
+          },
+          {
+            "codigo": "LPR-202",
+            "nombre": "Arquitectura de Computadoras y Lenguaje Ensamblador",
+            "slug": "LPR-202-arquitectura-de-computadoras-y-assembler",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-103"
+            ],
+            "objetivos": "Comprender la ejecución de código a nivel de máquina, manipulación de registros y llamadas al sistema en Assembler.",
+            "temas": [
+              "Juegos de instrucciones RISC vs CISC (x86_64 y ARM)",
+              "Registros de propósito general, puntero de instrucción y flags",
+              "Pila de llamadas (Call Stack), marcos de pila (Stack Frames) y convenciones de llamada",
+              "Interrupciones de hardware y llamadas al sistema (syscalls)",
+              "Traducción de construcciones de C a código ensamblador"
+            ],
+            "youtube_queries": [
+              "Assembly Language x86_64 tutorial",
+              "Computer Systems A Programmer's Perspective",
+              "Call stack and registers explained"
+            ],
+            "github_repos": [
+              "https://github.com/0xAX/asm"
+            ],
+            "prig_desafios": [
+              "ensamblador_suma_arreglos",
+              "inspeccion_stack_frame_c"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-202-arquitectura-de-computadoras-y-assembler.md"
+          },
+          {
+            "codigo": "LPR-203",
+            "nombre": "Algoritmos y Estructuras de Datos II",
+            "slug": "LPR-203-algoritmos-y-estructuras-de-datos-2",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-105"
+            ],
+            "objetivos": "Implementar árboles autobalanceados, tablas hash avanzadas y algoritmos de recorrido y búsqueda en grafos.",
+            "temas": [
+              "Árboles de búsqueda binaria y rotaciones en árboles AVL",
+              "Árboles Rojo-Negro y árboles B para almacenamiento en disco",
+              "Tablas Hash: funciones de hash criptográficas y no criptográficas, rehashing",
+              "Grafos: representaciones (matriz y lista de adyacencia), recorridos BFS y DFS",
+              "Árboles de expansión mínima y caminos más cortos (Dijkstra)"
+            ],
+            "youtube_queries": [
+              "AVL Trees and Red Black Trees Abdul Bari",
+              "Graph Algorithms BFS DFS Dijkstra",
+              "Hash Table implementation deep dive"
+            ],
+            "github_repos": [
+              "https://github.com/williamfiset/Algorithms"
+            ],
+            "prig_desafios": [
+              "arbol_avl_rotaciones",
+              "grafo_bfs_dfs_camino_minimo"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-203-algoritmos-y-estructuras-de-datos-2.md"
+          },
+          {
+            "codigo": "LPR-204",
+            "nombre": "Sistemas Operativos y Concurrencia",
+            "slug": "LPR-204-sistemas-operativos",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-202"
+            ],
+            "objetivos": "Gestionar procesos, hilos concurrentes, sincronización mediante semáforos/mutex y administración de memoria virtual.",
+            "temas": [
+              "Procesos, cambios de contexto, hilos (threads) a nivel de usuario y kernel",
+              "Planificación de CPU (Round Robin, FCFS, Priority Scheduling)",
+              "Concurrencia, condiciones de carrera, secciones críticas, Mutex y Semáforos",
+              "Interbloqueos (Deadlocks): condiciones de Coffman y algoritmos de prevención",
+              "Memoria virtual: paginación, tablas de páginas, TLB y algoritmos de reemplazo (LRU)"
+            ],
+            "youtube_queries": [
+              "Operating Systems Three Easy Pieces",
+              "Sistemas operativos procesos y memoria virtual",
+              "Multithreading and Concurrency in C++"
+            ],
+            "github_repos": [
+              "https://github.com/remzi-arpacidusseau/ostep-code"
+            ],
+            "prig_desafios": [
+              "problema_filosofos_semaforos",
+              "simulador_planificador_round_robin"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-204-sistemas-operativos.md"
+          },
+          {
+            "codigo": "LPR-205",
+            "nombre": "Bases de Datos y Modelado de Datos",
+            "slug": "LPR-205-bases-de-datos-y-modelado",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-104",
+              "LPR-201"
+            ],
+            "objetivos": "Diseñar bases de datos normalizadas, escribir consultas complejas en SQL y optimizar el rendimiento de lectura y escritura.",
+            "temas": [
+              "Modelo Relacional, álgebra relacional y cálculo relacional",
+              "Normalización hasta Forma Normal de Boyce-Codd (BCNF)",
+              "Lenguaje SQL: agregaciones, subqueries correlacionadas y joins múltiples",
+              "Control de transacciones (ACID), niveles de aislamiento y bloqueos",
+              "Índices B+Tree, Hash y optimización de planes de consulta (EXPLAIN)"
+            ],
+            "youtube_queries": [
+              "Database Systems CMU Andy Pavlo",
+              "Curso SQL avanzado optimizacion indices",
+              "Bases de datos transacciones ACID"
+            ],
+            "github_repos": [
+              "https://github.com/cmu-db/bustub"
+            ],
+            "prig_desafios": [
+              "diseno_schema_bcnf",
+              "optimizacion_explain_analyze"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-205-bases-de-datos-y-modelado.md"
+          },
+          {
+            "codigo": "LPR-206",
+            "nombre": "Paradigmas de Programación (Funcional y Lógico)",
+            "slug": "LPR-206-paradigmas-de-programacion-funcional-y-logico",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-201"
+            ],
+            "objetivos": "Programar en lenguajes declarativos, comprendiendo inmutabilidad, funciones de orden superior, mónadas y deducción lógica.",
+            "temas": [
+              "Paradigma Funcional: inmutabilidad, pureza y transparencia referencial",
+              "Funciones de primera clase y de orden superior (map, filter, reduce)",
+              "Recursión de cola (Tail-call optimization) y evaluación perezosa",
+              "Tipos algebraicos de datos, pattern matching y mónadas",
+              "Paradigma Lógico: hechos, reglas, unificación y backtracking en Prolog"
+            ],
+            "youtube_queries": [
+              "Functional Programming Principles in Scala",
+              "Haskell tutorial for beginners",
+              "Logica y programacion en Prolog"
+            ],
+            "github_repos": [
+              "https://github.com/bitemyapp/bloodhound"
+            ],
+            "prig_desafios": [
+              "map_filter_reduce_funcional",
+              "prolog_arbol_genealogico_reglas"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_2_paradigmas_y_sistemas/LPR-206-paradigmas-de-programacion-funcional-y-logico.md"
+          }
+        ]
+      },
+      {
+        "numero": 3,
+        "nombre": "Etapa 3: Ingeniería de Software, Redes y Aplicaciones Web",
+        "slug": "etapa_3_ingenieria_software_y_redes",
+        "descripcion": "Diseño de arquitecturas limpias, protocolos de redes TCP/IP, desarrollo web moderno, aseguramiento de la calidad (QA) y agilidad.",
+        "materias": [
+          {
+            "codigo": "LPR-301",
+            "nombre": "Ingeniería de Software I: Diseño y Modelado",
+            "slug": "LPR-301-ingenieria-de-software-1-diseno-y-uml",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-201"
+            ],
+            "objetivos": "Capturar requerimientos de software, modelar con UML y estructurar arquitecturas con bajo acoplamiento y alta cohesión.",
+            "temas": [
+              "Ciclos de vida del software e ingeniería de requerimientos (funcionales y no funcionales)",
+              "Modelado con UML: diagramas de casos de uso, secuencia, clases y estados",
+              "Patrones de diseño de la banda de los cuatro (GoF): creacionales, estructurales y de comportamiento",
+              "Principios de Arquitectura Limpia (Clean Architecture) y separación de capas",
+              "Documentación técnica y especificaciones de software"
+            ],
+            "youtube_queries": [
+              "Clean Architecture Robert C Martin",
+              "Patrones de diseno GoF explicados",
+              "UML Diagrams full course"
+            ],
+            "github_repos": [
+              "https://github.com/kamranahmedse/developer-roadmap"
+            ],
+            "prig_desafios": [
+              "diagrama_clases_uml_codigo",
+              "clean_architecture_capas"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-301-ingenieria-de-software-1-diseno-y-uml.md"
+          },
+          {
+            "codigo": "LPR-302",
+            "nombre": "Redes de Computadoras y Protocolos",
+            "slug": "LPR-302-redes-de-computadoras-y-protocolos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-204"
+            ],
+            "objetivos": "Comprender la transmisión de paquetes a través de la pila TCP/IP, enrutamiento, sockets de red y protocolos de aplicación.",
+            "temas": [
+              "Modelos de referencia OSI y TCP/IP, encapsulamiento de datos",
+              "Capa de Red: direccionamiento IPv4/IPv6, subredes, CIDR y enrutamiento (OSPF, BGP)",
+              "Capa de Transporte: protocolo UDP y protocolo TCP (Three-way handshake, control de congestión)",
+              "Capa de Aplicación: DNS, DHCP, HTTP/1.1, HTTP/2, HTTP/3 y WebSockets",
+              "Programación de sockets cliente-servidor en TCP y UDP"
+            ],
+            "youtube_queries": [
+              "Computer Networks Kurose Ross",
+              "Redes de computadoras TCP IP completo",
+              "Network Sockets programming tutorial"
+            ],
+            "github_repos": [
+              "https://github.com/nmap/nmap",
+              "https://github.com/wireshark/wireshark"
+            ],
+            "prig_desafios": [
+              "servidor_sockets_tcp_chat",
+              "calculadora_subredes_cidr"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-302-redes-de-computadoras-y-protocolos.md"
+          },
+          {
+            "codigo": "LPR-303",
+            "nombre": "Desarrollo Web Fullstack (Frontend y Backend)",
+            "slug": "LPR-303-desarrollo-web-fullstack-frontend-backend",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-201",
+              "LPR-205"
+            ],
+            "objetivos": "Crear aplicaciones web modernas completas integrando interfaces responsivas, APIs RESTful y persistencia de datos.",
+            "temas": [
+              "HTML5 semántico, CSS3 moderno (Flexbox, Grid) y diseño responsivo",
+              "JavaScript moderno (ES6+): asincronía, promesas, async/await y DOM",
+              "Desarrollo Frontend con frameworks reactivos (React o Vue)",
+              "Diseño e implementación de APIs RESTful en Backend (Node.js/Express, FastAPI)",
+              "Autenticación segura basada en tokens JWT y cookies HttpOnly"
+            ],
+            "youtube_queries": [
+              "Full Stack Web Development Bootcamp",
+              "Curso React desde cero completo",
+              "Construir REST API con FastAPI o Express"
+            ],
+            "github_repos": [
+              "https://github.com/facebook/react",
+              "https://github.com/tiangolo/fastapi"
+            ],
+            "prig_desafios": [
+              "api_rest_crud_completo",
+              "autenticacion_jwt_tokens"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-303-desarrollo-web-fullstack-frontend-backend.md"
+          },
+          {
+            "codigo": "LPR-304",
+            "nombre": "Bases de Datos Avanzadas y Persistencia Políglota",
+            "slug": "LPR-304-bases-de-datos-avanzadas-y-distribuidas",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-205"
+            ],
+            "objetivos": "Integrar bases de datos documentales, clave-valor y de grafos para casos de uso de alta demanda y baja latencia.",
+            "temas": [
+              "Persistencia políglota y adecuación de modelos al dominio",
+              "Bases orientadas a documentos (MongoDB): modelado y agregaciones",
+              "Caché y estructuras en memoria con Redis: colas pub/sub y TTL",
+              "Bases de datos de grafos (Neo4j) y lenguaje de consulta Cypher",
+              "Estrategias de replicación, sharding y tolerancia a fallos"
+            ],
+            "youtube_queries": [
+              "NoSQL Database types explained",
+              "Redis Crash Course full tutorial",
+              "Neo4j and Cypher query language"
+            ],
+            "github_repos": [
+              "https://github.com/redis/redis",
+              "https://github.com/neo4j/neo4j"
+            ],
+            "prig_desafios": [
+              "redis_cache_consultas_ttl",
+              "grafo_social_neo4j_cypher"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-304-bases-de-datos-avanzadas-y-distribuidas.md"
+          },
+          {
+            "codigo": "LPR-305",
+            "nombre": "Metodologías Ágiles y Gestión de Proyectos",
+            "slug": "LPR-305-metodologias-agiles-y-gestion-de-proyectos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-301"
+            ],
+            "objetivos": "Gestionar proyectos de software mediante marcos de trabajo ágiles (Scrum, Kanban) y estimación colaborativa.",
+            "temas": [
+              "Manifiesto Ágil y valores fundamentales",
+              "Marco Scrum: roles (Product Owner, Scrum Master, Dev Team) y eventos (Sprints, Retros)",
+              "Flujo continuo con Kanban: límites de trabajo en progreso (WIP limits)",
+              "Historias de usuario, criterios de aceptación y estimación con Planning Poker",
+              "Métricas ágiles: Velocity, Burndown charts y Cumulative Flow Diagrams"
+            ],
+            "youtube_queries": [
+              "Scrum en 10 minutos explicado facil",
+              "Kanban board and WIP limits tutorial",
+              "Agile Project Management course"
+            ],
+            "github_repos": [
+              "https://github.com/github/roadmap"
+            ],
+            "prig_desafios": [
+              "redaccion_historias_usuario",
+              "tablero_kanban_metricas"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-305-metodologias-agiles-y-gestion-de-proyectos.md"
+          },
+          {
+            "codigo": "LPR-306",
+            "nombre": "Pruebas de Software y Aseguramiento de Calidad (QA)",
+            "slug": "LPR-306-pruebas-de-software-y-qa-testing",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-201"
+            ],
+            "objetivos": "Implementar pirámides de pruebas automatizadas, pruebas de integración, dobles de prueba (mocks) y TDD.",
+            "temas": [
+              "Pirámide de pruebas: pruebas unitarias, de integración y end-to-end",
+              "Desarrollo guiado por pruebas (TDD: Red, Green, Refactor)",
+              "Dobles de prueba: Stubs, Spies, Fakes y Mocks",
+              "Análisis estático de código, linter y medición de cobertura (Coverage)",
+              "Pruebas de carga y estrés de servicios web con k6 o JMeter"
+            ],
+            "youtube_queries": [
+              "Test Driven Development TDD tutorial",
+              "Unit testing and mocking best practices",
+              "Software QA and testing full course"
+            ],
+            "github_repos": [
+              "https://github.com/pytest-dev/pytest",
+              "https://github.com/grafana/k6"
+            ],
+            "prig_desafios": [
+              "tdd_calculadora_expresiones",
+              "prueba_carga_servidor_k6"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_3_ingenieria_software_y_redes/LPR-306-pruebas-de-software-y-qa-testing.md"
+          }
+        ]
+      },
+      {
+        "numero": 4,
+        "nombre": "Etapa 4: Sistemas Distribuidos, Compiladores y Seguridad",
+        "slug": "etapa_4_distribuidos_compiladores_y_seguridad",
+        "descripcion": "Microservicios escalables, teoría de autómatas y compiladores, ciberseguridad, nube y orquestación con contenedores.",
+        "materias": [
+          {
+            "codigo": "LPR-401",
+            "nombre": "Sistemas Distribuidos y Microservicios",
+            "slug": "LPR-401-sistemas-distribuidos-y-microservicios",
+            "horas": 96,
+            "creditos": 6,
+            "correlatividades": [
+              "LPR-302",
+              "LPR-303"
+            ],
+            "objetivos": "Diseñar arquitecturas de microservicios tolerantes a fallos, mensajería asíncrona y sincronización distribuida.",
+            "temas": [
+              "Teorema CAP, PACELC y modelos de consistencia distribuida",
+              "Comunicación interservicios: gRPC, Protocol Buffers y APIs REST",
+              "Sistemas de mensajería orientados a eventos: RabbitMQ y Apache Kafka",
+              "Algoritmos de consenso distribuido: Paxos y Raft",
+              "Patrones para microservicios: API Gateway, Circuit Breaker, Saga y Outbox"
+            ],
+            "youtube_queries": [
+              "Distributed Systems course Martin Kleppmann",
+              "Microservices architecture patterns tutorial",
+              "Apache Kafka Crash Course"
+            ],
+            "github_repos": [
+              "https://github.com/apache/kafka",
+              "https://github.com/grpc/grpc"
+            ],
+            "prig_desafios": [
+              "simulador_algoritmo_raft",
+              "circuit_breaker_python"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_4_distribuidos_compiladores_y_seguridad/LPR-401-sistemas-distribuidos-y-microservicios.md"
+          },
+          {
+            "codigo": "LPR-402",
+            "nombre": "Teoría de la Computación y Compiladores",
+            "slug": "LPR-402-teoria-de-la-computacion-y-compiladores",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-104",
+              "LPR-203"
+            ],
+            "objetivos": "Diseñar analizadores léxicos, sintácticos, árboles de sintaxis abstracta (AST) e intérpretes o generadores de código.",
+            "temas": [
+              "Autómatas finitos deterministas (AFD) y no deterministas (AFND)",
+              "Gramáticas libres de contexto y Jerarquía de Chomsky",
+              "Análisis Léxico (Scanners) y expresiones regulares",
+              "Análisis Sintáctico (Parsers): LL, LR y generadores (Lex/Yacc)",
+              "Árboles de Sintaxis Abstracta (AST) y recorrido mediante patrón Visitor"
+            ],
+            "youtube_queries": [
+              "Compilers course Alex Aiken Stanford",
+              "Building an interpreter in Python / C",
+              "Teoria de automatas y lenguajes formales"
+            ],
+            "github_repos": [
+              "https://github.com/antlr/antlr4"
+            ],
+            "prig_desafios": [
+              "lexer_tokenizador_lenguaje",
+              "parser_ast_evaluador"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_4_distribuidos_compiladores_y_seguridad/LPR-402-teoria-de-la-computacion-y-compiladores.md"
+          },
+          {
+            "codigo": "LPR-403",
+            "nombre": "Seguridad Informática y Criptografía",
+            "slug": "LPR-403-seguridad-informatica-y-criptografia",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-302"
+            ],
+            "objetivos": "Proteger sistemas contra vulnerabilidades comunes (OWASP Top 10), aplicar criptografía simétrica y asimétrica y hardening.",
+            "temas": [
+              "Principios de seguridad: Confidencialidad, Integridad y Disponibilidad (Tríada CIA)",
+              "Criptografía simétrica (AES, ChaCha20) y asimétrica (RSA, ECC)",
+              "Funciones de hash criptográficas (SHA-256) y firmas digitales",
+              "Top 10 vulnerabilidades de OWASP: Inyección SQL, XSS, CSRF, SSRF",
+              "Gestión de identidades, tokens OAuth 2.0 y OpenID Connect"
+            ],
+            "youtube_queries": [
+              "Cryptography Stanford Dan Boneh",
+              "OWASP Top 10 vulnerabilities explained",
+              "Cybersecurity and ethical hacking basics"
+            ],
+            "github_repos": [
+              "https://github.com/OWASP/CheatSheetSeries"
+            ],
+            "prig_desafios": [
+              "simulador_rsa_claves",
+              "detector_inyeccion_sql"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_4_distribuidos_compiladores_y_seguridad/LPR-403-seguridad-informatica-y-criptografia.md"
+          },
+          {
+            "codigo": "LPR-404",
+            "nombre": "Computación en la Nube y Contenedores (Docker y K8s)",
+            "slug": "LPR-404-computacion-en-la-nube-y-contenedores-docker-k8s",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-204",
+              "LPR-303"
+            ],
+            "objetivos": "Empaquetar aplicaciones en contenedores Docker y orquestar despliegues automatizados en clústeres Kubernetes.",
+            "temas": [
+              "Virtualización basada en contenedores vs máquinas virtuales",
+              "Construcción optimizada de imágenes con Dockerfile multi-stage",
+              "Orquestación con Kubernetes: Pods, Deployments, Services e Ingress",
+              "Infraestructura como código (IaC) con Terraform y manifiestos declarativos",
+              "Observabilidad y monitoreo con Prometheus y Grafana"
+            ],
+            "youtube_queries": [
+              "Docker and Kubernetes full course TechWorld with Nana",
+              "Kubernetes tutorial for beginners",
+              "Terraform Infrastructure as Code course"
+            ],
+            "github_repos": [
+              "https://github.com/kubernetes/kubernetes",
+              "https://github.com/hashicorp/terraform"
+            ],
+            "prig_desafios": [
+              "dockerfile_multistage_optimo",
+              "manifiesto_k8s_deployment"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_4_distribuidos_compiladores_y_seguridad/LPR-404-computacion-en-la-nube-y-contenedores-docker-k8s.md"
+          },
+          {
+            "codigo": "LPR-405",
+            "nombre": "Desarrollo Mobile y Sistemas Embebidos",
+            "slug": "LPR-405-desarrollo-mobile-y-sistemas-embebidos",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-303"
+            ],
+            "objetivos": "Desarrollar aplicaciones móviles multiplataforma y programar controladores embebidos con recursos acotados.",
+            "temas": [
+              "Arquitectura de aplicaciones móviles: ciclo de vida de vistas y servicios",
+              "Desarrollo móvil multiplataforma (React Native o Flutter)",
+              "Persistencia local en dispositivos: SQLite y almacenamiento seguro de claves",
+              "Introducción a sistemas embebidos y microcontroladores (ESP32 / Raspberry Pi)",
+              "Protocolos de comunicación en hardware: UART, I2C, SPI y MQTT para IoT"
+            ],
+            "youtube_queries": [
+              "React Native full course beginners",
+              "Flutter tutorial mobile apps",
+              "Microcontrollers ESP32 and IoT programming"
+            ],
+            "github_repos": [
+              "https://github.com/facebook/react-native",
+              "https://github.com/flutter/flutter"
+            ],
+            "prig_desafios": [
+              "app_mobile_pantallas_navegacion",
+              "simulador_sensor_mqtt"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_4_distribuidos_compiladores_y_seguridad/LPR-405-desarrollo-mobile-y-sistemas-embebidos.md"
+          }
+        ]
+      },
+      {
+        "numero": 5,
+        "nombre": "Etapa 5: Culminación Profesional y Especialización",
+        "slug": "etapa_5_culminacion_profesional",
+        "descripcion": "Arquitectura de software empresarial, integración de IA en aplicaciones, derecho informático y proyecto final de grado.",
+        "materias": [
+          {
+            "codigo": "LPR-501",
+            "nombre": "Arquitectura de Software Empresarial",
+            "slug": "LPR-501-arquitectura-de-software-empresarial",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-301",
+              "LPR-401"
+            ],
+            "objetivos": "Dominar el diseño guiado por el dominio (DDD), arquitecturas hexagonales y patrones de escalabilidad empresarial.",
+            "temas": [
+              "Diseño Guiado por el Dominio (Domain-Driven Design: Bounded Contexts, Aggregates)",
+              "Arquitectura Hexagonal (Ports and Adapters) y Onion Architecture",
+              "Patrón CQRS (Command Query Responsibility Segregation) y Event Sourcing",
+              "Escalabilidad horizontal, particionamiento de bases de datos y balanceo de carga",
+              "Tolerancia a fallos: degradación elegante y failover automático"
+            ],
+            "youtube_queries": [
+              "Domain Driven Design DDD Eric Evans",
+              "Hexagonal Architecture in practice",
+              "CQRS and Event Sourcing explained"
+            ],
+            "github_repos": [
+              "https://github.com/kgrzybek/modular-monolith-with-ddd"
+            ],
+            "prig_desafios": [
+              "arquitectura_hexagonal_puertos",
+              "cqrs_event_sourcing_simulado"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_5_culminacion_profesional/LPR-501-arquitectura-de-software-empresarial.md"
+          },
+          {
+            "codigo": "LPR-502",
+            "nombre": "Introducción al Aprendizaje Automático para Desarrolladores",
+            "slug": "LPR-502-introduccion-al-aprendizaje-automatico-para-devs",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-201",
+              "LPR-205"
+            ],
+            "objetivos": "Integrar capacidades predictivas y modelos de lenguaje de última generación en aplicaciones comerciales existentes.",
+            "temas": [
+              "Visión general de modelos supervisados y no supervisados para programadores",
+              "Consumo e integración de APIs de modelos fundacionales (OpenAI, Anthropic, Gemini)",
+              "Bases de datos vectoriales y búsqueda semántica de información",
+              "Patrón RAG para extender conocimiento empresarial en aplicaciones",
+              "Monitoreo de latencia, costos y cuotas de inferencia en software productivo"
+            ],
+            "youtube_queries": [
+              "Machine Learning for Software Engineers",
+              "Integrating LLMs into existing software",
+              "Vector search and embeddings tutorial"
+            ],
+            "github_repos": [
+              "https://github.com/langchain-ai/langchain"
+            ],
+            "prig_desafios": [
+              "integracion_api_embeddings",
+              "buscador_semantico_sqlite"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_5_culminacion_profesional/LPR-502-introduccion-al-aprendizaje-automatico-para-devs.md"
+          },
+          {
+            "codigo": "LPR-503",
+            "nombre": "Legislación, Ética y Derecho Informático",
+            "slug": "LPR-503-legislacion-etica-y-derecho-informatico",
+            "horas": 64,
+            "creditos": 4,
+            "correlatividades": [
+              "LPR-301"
+            ],
+            "objetivos": "Conocer el marco normativo de la propiedad intelectual del software, protección de datos personales y contratos informáticos.",
+            "temas": [
+              "Régimen legal de protección de software y licencias (Open Source vs Propietarias)",
+              "Leyes de protección de datos personales (GDPR, LPDP nacional) y privacidad",
+              "Delitos informáticos: hacking, fraude electrónico y responsabilidad civil",
+              "Contratos informáticos: SLAs, desarrollo a medida y cláusulas de confidencialidad (NDA)",
+              "Código de ética profesional del programador y deber de diligencia"
+            ],
+            "youtube_queries": [
+              "Derecho informatico y proteccion de datos",
+              "Software licenses explained MIT GPL Apache",
+              "GDPR compliance for developers"
+            ],
+            "github_repos": [
+              "https://github.com/github/choosealicense.com"
+            ],
+            "prig_desafios": [
+              "auditor_licencias_dependencias",
+              "politica_privacidad_gdpr_generador"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_5_culminacion_profesional/LPR-503-legislacion-etica-y-derecho-informatico.md"
+          },
+          {
+            "codigo": "LPR-504",
+            "nombre": "Tesina o Proyecto Final de Grado",
+            "slug": "LPR-504-tesina-o-proyecto-final-de-grado",
+            "horas": 128,
+            "creditos": 8,
+            "correlatividades": [
+              "LPR-401",
+              "LPR-501"
+            ],
+            "objetivos": "Concebir, desarrollar, verificar documentalmente y defender un software innovador y de complejidad profesional ante tribunal evaluador.",
+            "temas": [
+              "Selección del tema, estudio de viabilidad y definición del alcance",
+              "Ingeniería de requisitos y especificación formal de la arquitectura",
+              "Implementación iterativa guiada por pruebas y buenas prácticas de ingeniería",
+              "Verificación, validación y métricas de desempeño del sistema",
+              "Redacción del documento de tesis y presentación oral ante jurado académico"
+            ],
+            "youtube_queries": [
+              "Como hacer una tesis de informatica o programacion",
+              "Computer Science Capstone Project presentation",
+              "Software Engineering thesis tips"
+            ],
+            "github_repos": [
+              "https://github.com/ossu/computer-science"
+            ],
+            "prig_desafios": [
+              "benchmark_arquitectura_tesina",
+              "documento_especificacion_formal"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_5_culminacion_profesional/LPR-504-tesina-o-proyecto-final-de-grado.md"
+          },
+          {
+            "codigo": "LPR-505",
+            "nombre": "Práctica Profesional Supervisada (PPS)",
+            "slug": "LPR-505-practica-profesional-supervisada",
+            "horas": 200,
+            "creditos": 10,
+            "correlatividades": [
+              "LPR-401"
+            ],
+            "objetivos": "Desempeñarse en un equipo de desarrollo profesional de la industria aplicando estándares de calidad corporativos.",
+            "temas": [
+              "Inserción laboral y adaptación a metodologías de trabajo ágiles de la empresa",
+              "Resolución de tickets, refactorización de código legacy y desarrollo de features",
+              "Participación activa en revisiones de código (PR reviews) y testing continuo",
+              "Manejo de tiempos, estimación y comunicación interdisciplinaria",
+              "Confección y entrega de la memoria técnica de pasantía profesional"
+            ],
+            "youtube_queries": [
+              "First Software Engineer Job advice",
+              "How to succeed as a Junior Developer",
+              "Code Review and teamwork in tech companies"
+            ],
+            "github_repos": [
+              "https://github.com/jwasham/coding-interview-university"
+            ],
+            "prig_desafios": [
+              "resolucion_ticket_bugfix_simulado",
+              "informe_practica_profesional"
+            ],
+            "archivo_markdown": "carreras/licenciatura_programacion/etapa_5_culminacion_profesional/LPR-505-practica-profesional-supervisada.md"
+          }
+        ]
+      }
+    ]
+  }
+]

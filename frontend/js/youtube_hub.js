@@ -1967,7 +1967,7 @@ const VIDEOS_CURADOS = [
     }
 
     async function abrirEnNavegadorExterno(url) {
-        if (!url) return;
+        if (!url) return true;
         try {
             const resp = await fetch('/api/youtube/abrir_externo', {
                 method: 'POST',
@@ -1983,7 +1983,9 @@ const VIDEOS_CURADOS = [
         } catch (e) {
             console.warn('[YouTubeHub] Falló apertura por backend:', e);
         }
-        window.open(url, '_blank', 'noopener,noreferrer');
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (_) {}
         return true;
     }
 
@@ -2389,6 +2391,27 @@ const VIDEOS_CURADOS = [
             .yt-tarjeta-desc { font-size:10.5px; color:var(--text-muted, #9399b2); line-height:1.35; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
             .yt-modo-compacto .yt-tarjeta-desc { display:none !important; }
 
+            /* Cabecera Superior del Reproductor */
+            .yt-header { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 18px; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); flex-shrink:0; position:relative; z-index:10; }
+            .yt-header-left { display:flex; align-items:center; gap:12px; min-width:0; flex:1; overflow:hidden; }
+            .yt-header-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+            
+            /* Botón Volver al Catálogo destacado, claro y con buen contraste */
+            .yt-btn-volver-header { display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); border-radius:8px; padding:6px 13px; color:#fff; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0; transition:all 0.18s cubic-bezier(0.4, 0, 0.2, 1); box-shadow:0 1px 4px rgba(0,0,0,0.25); user-select:none; }
+            .yt-btn-volver-header:hover { background:rgba(255,255,255,0.16); border-color:rgba(255,255,255,0.3); color:#fff; transform:translateX(-2px); box-shadow:0 3px 10px rgba(0,0,0,0.35); }
+            .yt-btn-volver-header i { font-size:12px; color:var(--accent-blue, #89b4fa); transition:transform 0.18s ease; }
+            .yt-btn-volver-header:hover i { transform:translateX(-2px); }
+            
+            /* Separador vertical entre botón de volver y el nombre */
+            .yt-header-separador { width:1px; height:24px; background:rgba(255,255,255,0.13); flex-shrink:0; margin:0 2px; }
+            
+            /* Contenedor del nombre y logo del video */
+            .yt-header-titulo-caja { display:flex; align-items:center; gap:9px; min-width:0; flex:1; overflow:hidden; }
+            .yt-header-icono-yt { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:6px; background:rgba(255,0,0,0.14); border:1px solid rgba(255,0,0,0.3); color:#ff3333; font-size:14px; flex-shrink:0; }
+            .yt-header-titulo-texto { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.1px; }
+            .yt-header-canal-badge { font-size:10.5px; font-weight:600; color:var(--text-muted, #a6adc8); background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:2px 7px; white-space:nowrap; flex-shrink:0; }
+            .yt-header-tags { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+
             /* Reproductor */
             .yt-player-layout { display:grid; grid-template-columns:1fr 390px; height:100%; min-height:0; overflow:hidden; }
             @media (max-width: 950px) { .yt-player-layout { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
@@ -2414,9 +2437,9 @@ const VIDEOS_CURADOS = [
             .yt-btn-pct { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--text-muted, #a6adc8); font-size:10px; padding:2px 5px; cursor:pointer; transition:all 0.15s; }
             .yt-btn-pct:hover { color:#fff; background:rgba(255,255,255,0.15); }
 
-            .yt-info-video { display:flex; flex-direction:column; gap:6px; }
+            .yt-info-video { display:flex; flex-direction:column; gap:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color, rgba(255,255,255,0.06)); border-radius:9px; padding:12px 16px; margin-top:2px; }
             .yt-info-video.oculto { display:none !important; }
-            .yt-video-titulo { font-size:15px; font-weight:700; color:#fff; margin:0; }
+            .yt-video-titulo { font-size:16px; font-weight:700; color:#fff; margin:0; line-height:1.35; letter-spacing:0.1px; }
             .yt-acciones-video { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
             /* Panel Lateral */
@@ -3455,14 +3478,30 @@ const VIDEOS_CURADOS = [
         const servidorActual = obtenerServidorEmbed();
         const iframeSrc = construirEmbedUrl(v, prog.segundos);
 
+        const viejoIframe = $('yt-iframe-player');
+        const mantenerIframe = viejoIframe && viejoIframe.dataset && viejoIframe.dataset.videoId === String(v.id) && viejoIframe.dataset.servidor === servidorActual;
+        if (mantenerIframe) {
+            viejoIframe.remove();
+        }
+
         raiz.innerHTML = `
           <div class="yt-raiz">
             <div class="yt-header">
               <div class="yt-header-left">
-                <button class="yt-btn yt-btn-volver-catalogo" id="yt-btn-volver" title="Volver al catálogo de cursos"><i class="fa-solid fa-arrow-left"></i> Catálogo</button>
-                <div class="yt-logo-badge" style="font-size:13px; font-weight:700;"><i class="fa-brands fa-youtube"></i> ${esc(v.titulo)}</div>
-                ${v.universidad ? `<span class="yt-tag-uni"><i class="fa-solid fa-graduation-cap"></i> ${esc(v.universidad)}</span>` : ''}
-                ${v.playlist ? `<span class="yt-tag-playlist"><i class="fa-solid fa-list-ol"></i> Playlist</span>` : ''}
+                <button class="yt-btn-volver-header yt-btn-volver-catalogo" id="yt-btn-volver" title="Volver al catálogo de cursos y videos">
+                  <i class="fa-solid fa-arrow-left"></i>
+                  <span>Volver al Catálogo</span>
+                </button>
+                <div class="yt-header-separador"></div>
+                <div class="yt-header-titulo-caja" title="${esc(v.titulo)}">
+                  <div class="yt-header-icono-yt"><i class="fa-brands fa-youtube"></i></div>
+                  <span class="yt-header-titulo-texto">${esc(v.titulo)}</span>
+                  ${v.canal ? `<span class="yt-header-canal-badge">${esc(v.canal)}</span>` : ''}
+                </div>
+                <div class="yt-header-tags">
+                  ${v.universidad ? `<span class="yt-tag-uni" title="Universidad o institución"><i class="fa-solid fa-graduation-cap"></i> ${esc(v.universidad)}</span>` : ''}
+                  ${v.playlist ? `<span class="yt-tag-playlist" title="Forma parte de una playlist oficial"><i class="fa-solid fa-list-ol"></i> Playlist</span>` : ''}
+                </div>
               </div>
               <div class="yt-header-right">
                 <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video (Modo Cine)"><i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Modo Cine'}</button>
@@ -3499,7 +3538,7 @@ const VIDEOS_CURADOS = [
                 </div>
 
                 <div class="yt-iframe-wrap">
-                  <iframe id="yt-iframe-player" src="${iframeSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                  <iframe id="yt-iframe-player" data-video-id="${esc(v.id)}" data-servidor="${esc(servidorActual)}" src="${iframeSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                 </div>
 
                 <div class="yt-aviso-embed">
@@ -3556,6 +3595,7 @@ const VIDEOS_CURADOS = [
                     ${v.descripcion ? `<p style="margin:4px 0 0; font-size:11.5px; color:var(--text-muted); line-height:1.45;">${esc(v.descripcion)}</p>` : ''}
 
                     <div class="yt-acciones-video" style="margin-top:6px;">
+                      <button class="yt-btn yt-btn-volver-catalogo" id="yt-btn-volver-info" title="Volver al catálogo de cursos y videos"><i class="fa-solid fa-arrow-left"></i> Volver al Catálogo</button>
                       <button class="yt-btn azul" id="yt-btn-ir-objetivos" title="Ver o generar objetivos pedagógicos"><i class="fa-solid fa-bullseye"></i> Objetivos didácticos ${objetivos.length > 0 ? `(${superadosObj}/${objetivos.length})` : ''}</button>
                       <button class="yt-btn verde" id="yt-btn-ir-resumen" title="Ver resumen técnico y snippets"><i class="fa-solid fa-file-lines"></i> Resumen & Cheat-Sheet ${resumen ? '✓' : ''}</button>
                       <button class="yt-btn morado" id="yt-btn-crear-desafio-video" title="Generar un desafío interactivo de código evaluado por Prig con este video"><i class="fa-solid fa-wand-magic-sparkles"></i> Crear desafío en Prig</button>
@@ -4108,6 +4148,14 @@ const VIDEOS_CURADOS = [
               </div>
             </div>
         `;
+
+        if (mantenerIframe) {
+            const wrap = raiz.querySelector('.yt-iframe-wrap');
+            const nuevoIframe = $('yt-iframe-player');
+            if (wrap && nuevoIframe) {
+                wrap.replaceChild(viejoIframe, nuevoIframe);
+            }
+        }
 
         const btnVolver = $('yt-btn-volver') || $('yt-btn-volver-catalogo');
         if (btnVolver) {

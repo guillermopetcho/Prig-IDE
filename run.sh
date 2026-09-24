@@ -121,5 +121,23 @@ EOF
     fi
 done
 
+# Detectar navegador web del sistema para enlaces externos y YouTube
+if [ -z "$BROWSER" ]; then
+    for b in google-chrome google-chrome-stable /usr/bin/google-chrome-stable /opt/google/chrome/google-chrome firefox chromium chromium-browser sensible-browser x-www-browser gnome-www-browser; do
+        if command -v "$b" >/dev/null 2>&1 || [ -x "$b" ]; then
+            if [ "$b" = "firefox" ] || [ "$b" = "/usr/bin/firefox" ]; then
+                if "$b" --version 2>&1 | grep -q "snap install firefox"; then
+                    continue
+                fi
+            fi
+            export BROWSER="$(command -v "$b" 2>/dev/null || echo "$b")"
+            break
+        fi
+    done
+fi
+
+# Blindar QtWebEngine contra bloqueos en decodificación de video en Linux
+export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-accelerated-video-decode --disable-dev-shm-usage ${QTWEBENGINE_CHROMIUM_FLAGS:-}"
+
 echo "✨ Lanzando Prig IDE..."
 python3 main.py

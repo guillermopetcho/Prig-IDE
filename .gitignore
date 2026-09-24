@@ -85,6 +85,8 @@ downloads/
 backend/data/*.json
 backend/data/youtube_cache.json
 data/
+!frontend/data/
+!frontend/data/*.json
 data/cache_transcripciones/
 backend/data/cache_transcripciones/
 

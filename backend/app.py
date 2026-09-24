@@ -4215,6 +4215,42 @@ def export_dataset_file():
     raise HTTPException(status_code=404, detail="Dataset file not found")
 
 # ==========================================
+# CARRERAS UNIVERSITARIAS Y MATERIAS
+# ==========================================
+
+@app.get("/api/carreras")
+def get_carreras():
+    """Devuelve el catálogo de carreras universitarias y materias."""
+    carreras_file = os.path.join(frontend_dir, "data", "carreras.json")
+    if os.path.exists(carreras_file):
+        try:
+            with open(carreras_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error leyendo carreras: {e}")
+    raise HTTPException(status_code=404, detail="Archivo de carreras no encontrado")
+
+
+@app.get("/api/carreras/materia")
+def get_carrera_materia(archivo: str = Query(...)):
+    """Devuelve el contenido Markdown de una materia en carreras/."""
+    base_project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    carreras_root = os.path.join(base_project_dir, "carreras")
+
+    clean_path = os.path.normpath(archivo.strip().lstrip("/"))
+    target_abs = os.path.normpath(os.path.join(base_project_dir, clean_path))
+
+    if not (target_abs.startswith(carreras_root) and os.path.isfile(target_abs)):
+        raise HTTPException(status_code=404, detail="Archivo de materia no encontrado")
+
+    try:
+        with open(target_abs, "r", encoding="utf-8") as f:
+            contenido = f.read()
+        return {"ok": True, "ruta": clean_path, "contenido": contenido}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error leyendo archivo de materia: {e}")
+
+# ==========================================
 # LANZADOR DE VENTANA NATIVA INDEPENDIENTE PARA NOTE
 # ==========================================
 
@@ -6106,10 +6142,68 @@ def youtube_buscar(
     return resultados
 
 
+def _lanzar_navegador_sistema(url: str) -> bool:
+    """ Lanza el navegador web del sistema en un proceso desacoplado en segundo plano. """
+    import shutil
+    import subprocess
+    env_browser = os.environ.get("BROWSER")
+    candidatos = []
+    if env_browser:
+        candidatos.extend(env_browser.split(":"))
+    candidatos.extend([
+        "google-chrome",
+        "google-chrome-stable",
+        "/opt/google/chrome/google-chrome",
+        "chromium",
+        "chromium-browser",
+        "firefox",
+        "sensible-browser",
+        "x-www-browser",
+        "gnome-www-browser",
+        "xdg-open",
+    ])
+    binario = None
+    for cand in candidatos:
+        cand = cand.strip()
+        if not cand:
+            continue
+        ruta = shutil.which(cand) or (cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None)
+        if ruta:
+            if "firefox" in os.path.basename(ruta).lower():
+                try:
+                    res = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=1.5)
+                    if "snap install firefox" in res.stderr or "snap install firefox" in res.stdout:
+                        continue
+                except Exception:
+                    continue
+            binario = ruta
+            break
+
+    if binario:
+        try:
+            subprocess.Popen(
+                [binario, url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+                close_fds=True,
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Error lanzando binario {binario} para {url}: {e}")
+
+    try:
+        import webbrowser
+        return bool(webbrowser.open(url))
+    except Exception as e:
+        logger.error(f"Error fallback webbrowser para {url}: {e}")
+        return False
+
+
 @app.post("/api/youtube/abrir_externo")
 async def youtube_abrir_externo(request: Request):
-    """Abre un enlace de YouTube en el navegador web predeterminado del sistema (Chrome, Firefox, etc.)."""
-    import webbrowser
+    """Abre un enlace de YouTube en el navegador web predeterminado del sistema (Chrome, Firefox, etc.) sin bloquear el servidor."""
     try:
         data = await request.json()
     except Exception:
@@ -6120,7 +6214,8 @@ async def youtube_abrir_externo(request: Request):
     if not (url.startswith("https://www.youtube.com/") or url.startswith("https://youtube.com/") or url.startswith("https://youtu.be/") or url.startswith("https://www.youtube-nocookie.com/")):
         raise HTTPException(status_code=400, detail="Solo se permite abrir enlaces oficiales de YouTube.")
     try:
-        exito = webbrowser.open(url)
+        import anyio
+        exito = await anyio.to_thread.run_sync(_lanzar_navegador_sistema, url)
         return {"ok": True, "abierto": exito, "url": url}
     except Exception as e:
         logger.error(f"Error abriendo navegador externo para {url}: {e}")
