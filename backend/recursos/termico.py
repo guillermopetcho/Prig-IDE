@@ -327,6 +327,14 @@ class Tramo:
         return max(picos) if picos else None
 
 
+def _moe_generando() -> bool:
+    try:
+        from ai_engine import motor_moe
+        return motor_moe.generando()
+    except Exception:
+        return False
+
+
 class Gobernador:
     """ Decide cuándo cortar y cuándo reanudar, y aprende de cada tramo """
 
@@ -350,6 +358,16 @@ class Gobernador:
         # Motor suave (recursos/motor_suave.py): la dosificación dentro del proceso del modelo
         self.controlador = motor_suave.Controlador(self.ritmo, monitor)
         self.motor_suave: Dict[str, Any] = {"ok": False, "motivo": "Sin iniciar."}
+        # Modo frío (recursos/frio.py): pausas por ciclos para los modelos que viven en RAM
+        from . import frio
+        self._ram_cache: Dict[str, Any] = {"t": 0.0, "pids": set()}
+        self._ajustes_frio = (lambda: almacen().frio()) if guardar else (lambda: {"activo": False})
+        self.frio = frio.ControladorFrio(
+            ajustes=self._ajustes_frio,
+            leer_temp=lambda: temp_cpu(self.monitor.lectura(max_edad=1.5)),
+            motores_en_ram=self.motores_en_ram)
+        # Con el modo frío, los modelos en RAM van a los núcleos E (el fijador no los devuelve a todos)
+        self.fijador.ram_en_eficientes = lambda: bool({**frio.POR_DEFECTO, **(self._ajustes_frio() or {})}["activo"])
         # PRIG_SIN_MOTOR_SUAVE=1 (lo fijan las pruebas): no instalar ni arrancar el controlador,
         # que escribiría en el archivo de control de un Prig que esté abierto a la vez.
         if guardar and os.environ.get("PRIG_SIN_MOTOR_SUAVE") != "1":
@@ -363,6 +381,34 @@ class Gobernador:
             pass
         self.aplicar_motor_suave()
         self.controlador.iniciar()
+        from . import frio
+        frio.reanudar_huerfanos()              # un cierre brusco pudo dejar un motor congelado
+        self.frio.iniciar()
+
+    def motores_en_ram(self):
+        """ Motores de Prig cuyo modelo NO cabe entero en la GPU (se revisa cada 3 s). Se fijan a
+        los núcleos E: con el modelo en RAM, 4 hilos ahí rinden como 8 en todos y calientan menos. """
+        from . import frio
+        ahora = time.time()
+        if ahora - self._ram_cache["t"] < 3:
+            return self._ram_cache["pids"]
+        en_gpu = self.fijador._modelos_en_gpu()
+        pids = {m["pid"] for m in frio.motores_de_prig() if m["blob"] and m["blob"] in en_gpu and not en_gpu[m["blob"]]}
+        eficientes = frio.nucleos_eficientes()
+        for pid in pids - self._ram_cache["pids"]:
+            if eficientes:
+                self.fijador.fijar_proceso(pid, eficientes)
+        # El motor MoE también tiene los expertos en RAM, pero sigue en los núcleos P: con él,
+        # los núcleos E rinden la mitad (medido). El modo frío solo lo pausa por ciclos.
+        try:
+            from ai_engine import motor_moe
+            moe = motor_moe.pid_en_marcha()
+        except Exception:
+            moe = None
+        if moe:
+            pids = pids | {moe}
+        self._ram_cache = {"t": ahora, "pids": pids}
+        return pids
 
     def aplicar_motor_suave(self) -> Dict[str, Any]:
         """ Instala o retira el envoltorio del motor según el modo suave esté activo o no """
@@ -473,6 +519,11 @@ class Gobernador:
         # Modo suave: lejos del límite, pero cerca del objetivo o arrancando → pausa corta.
         # Si el motor ya dosifica por dentro (tramos de milisegundos), no se corta la petición.
         if self.dosifica_el_motor():
+            return None
+        # El motor MoE tampoco: es un modelo híbrido (capas SSM) y retomar tras un corte le obliga
+        # a releer casi todo el prompt (medido: 1.606 de 2.237 tokens, 17 s por corte). Lo regula
+        # el modo frío, que lo pausa por ciclos sin perder nada.
+        if _moe_generando():
             return None
         self.ritmo.marcar()
         pausa = self.ritmo.pausa(tramo.segundos, temp)

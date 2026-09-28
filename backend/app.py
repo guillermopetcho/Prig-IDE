@@ -79,6 +79,13 @@ from datetime import datetime
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
+    # Un llama-server del motor MoE que sobrevivió a un cierre brusco de Prig sigue ocupando la VRAM
+    try:
+        from ai_engine import motor_moe
+        if motor_moe.limpiar_huerfanos():
+            print("🧹 Motor MoE: cerrado un servidor que quedó de una sesión anterior")
+    except Exception as e:
+        print(f"⚠️ No se pudo revisar el motor MoE: {e}")
     yield
     cleanup_all_processes()
 
@@ -3573,13 +3580,19 @@ def ai_chat(req: AIChatRequest):
     if citas_contexto:
         prompt = f"{citas_contexto}\n\n{prompt}"
 
+    modelo = req.model or _modelo_desafios(None, "tutor")
+
     gancho_contexto = _formatear_gancho(req.hooked_files)
-    if gancho_contexto:
+    # Motor MoE: los archivos enganchados van en su propio mensaje, antes de la pregunta. El motor
+    # guarda en disco el estado tras leerlos y las preguntas siguientes sobre el mismo proyecto lo
+    # restauran en ~0,1 s en lugar de releerlo (ai_engine/motor_moe.py). Lo que cambia en cada
+    # pregunta (código del editor, citas, web) va con la pregunta.
+    from ai_engine import motor_moe as motor_moe_mod
+    contexto_fijo = gancho_contexto if (gancho_contexto and req.eventos and motor_moe_mod.es_moe(modelo)) else ""
+    if gancho_contexto and not contexto_fijo:
         prompt = f"{gancho_contexto}\n\n{prompt}"
     if req.code_context:
         prompt = f"```\n{req.code_context}\n```\n\n{prompt}"
-
-    modelo = req.model or _modelo_desafios(None, "tutor")
 
     if gemini_motor.es_gemini(modelo):
         if not gemini_motor.clave_actual()[0]:
@@ -3595,7 +3608,9 @@ def ai_chat(req: AIChatRequest):
             return StreamingResponse(_flujo_cancelable(motor_gem.generate_response(prompt, nombre_gem, sys_prompt)), media_type="text/plain")
 
     if req.eventos:
-        return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo)), media_type="application/x-ndjson")
+        return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo,
+                                                                 contexto_fijo=contexto_fijo)),
+                                 media_type="application/x-ndjson")
 
     def event_stream():
         should_web_search = req.use_web or ai_engine.web_search.should_auto_search(req.prompt)
@@ -3609,7 +3624,8 @@ def ai_chat(req: AIChatRequest):
     return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 
-def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None):
+def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None,
+                  contexto_fijo: str = ""):
     mod = modelo or req.model or _modelo_desafios(None, "tutor")
     fuentes = []
     if req.use_web or ai_engine.web_search.should_auto_search(req.prompt):
@@ -3619,7 +3635,10 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
                 prompt = f"{prompt}\n\n{contexto_web}"
         except Exception:
             fuentes = []
-    mensajes = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": prompt}]
+    mensajes = [{"role": "system", "content": sys_prompt}]
+    if contexto_fijo:
+        mensajes.append({"role": "user", "content": contexto_fijo})
+    mensajes.append({"role": "user", "content": prompt})
     if req.continuar:
         mensajes.append({"role": "assistant", "content": req.continuar})
     herramientas = None
@@ -4717,6 +4736,142 @@ def recursos_ritmo_ajustar(req: RitmoRequest):
     else:
         gob.fijador.soltar()
     return {**gob.ritmo.estado(gob.monitor.gpu()), "motor": gob.estado_motor()}
+
+
+# ---------------------------------------------------------------------------
+# Modo frío: modelos en RAM sin calentar la CPU (recursos/frio.py) y energía con root
+# (recursos/energia.py, opcional, siempre con contraseña de administrador)
+# ---------------------------------------------------------------------------
+class FrioRequest(BaseModel):
+    activo: Optional[bool] = None
+    objetivo_c: Optional[float] = None
+
+
+class EnergiaRequest(BaseModel):
+    frio: bool
+    vatios: Optional[int] = None
+
+
+def _frio_estado() -> Dict[str, Any]:
+    from recursos import frio as rfrio, energia as renergia
+    gob = recursos_termico.gobernador()
+    ajustes = {**rfrio.POR_DEFECTO, **recursos_almacen().frio()}
+    try:
+        energia = renergia.estado()
+    except Exception as e:
+        energia = {"error": str(e)}
+    return {"ajustes": ajustes, "control": gob.frio.ultimo or {},
+            "nucleos_eficientes": rfrio.nucleos_eficientes(), "hilos": rfrio.hilos_en_frio(),
+            "energia": energia, "vatios": int(ajustes.get("vatios") or 20)}
+
+
+@app.get("/api/recursos/frio")
+def recursos_frio():
+    return _frio_estado()
+
+
+@app.post("/api/recursos/frio")
+def recursos_frio_ajustar(req: FrioRequest):
+    actual = recursos_almacen().frio()
+    if req.activo is not None:
+        actual["activo"] = bool(req.activo)
+    if req.objetivo_c is not None:
+        actual["objetivo_c"] = max(40.0, min(85.0, float(req.objetivo_c)))
+    recursos_almacen().guardar_frio(actual, "Ajustes del modo frío")
+    recursos_termico.gobernador().frio.paso()
+    return _frio_estado()
+
+
+@app.post("/api/recursos/energia/instalar")
+def recursos_energia_instalar():
+    from recursos import energia as renergia
+    try:
+        renergia.instalar()
+    except renergia.ErrorEnergia as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _frio_estado()
+
+
+@app.post("/api/recursos/energia")
+def recursos_energia(req: EnergiaRequest):
+    from recursos import energia as renergia
+    try:
+        if req.frio:
+            vatios = int(req.vatios or recursos_almacen().frio().get("vatios") or renergia.VATIOS_POR_DEFECTO)
+            renergia.frio(vatios)
+            actual = recursos_almacen().frio()
+            actual["vatios"] = vatios
+            recursos_almacen().guardar_frio(actual, f"Energía fría: turbo apagado, tope {vatios} W")
+        else:
+            renergia.normal()
+            recursos_almacen().evento("frio", "Energía normal restaurada")
+    except renergia.ErrorEnergia as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _frio_estado()
+
+
+class MoeRequest(BaseModel):
+    contexto: Optional[str] = None      # "auto" o un número de tokens
+    hilos: Optional[int] = None
+    calientes: Optional[str] = None     # "auto" o un número de expertos por capa
+    modo: Optional[str] = None          # exacto | equilibrado | rapido
+    mtp: Optional[bool] = None
+    detener: bool = False
+    olvidar_proyectos: bool = False     # borra los proyectos guardados en disco
+
+
+def _moe_estado() -> Dict[str, Any]:
+    from ai_engine import motor_moe as motor_moe_mod
+    cfg = ai_engine.get_config()
+    return {**ai_engine.motor_moe().estado(),
+            "ajustes": {"contexto": cfg.get("moe_contexto"), "hilos": cfg.get("moe_hilos"),
+                        "calientes": cfg.get("moe_calientes"), "modo": cfg.get("moe_modo"),
+                        "mtp": cfg.get("moe_mtp", True)},
+            "modos": list(motor_moe_mod.MODOS)}
+
+
+@app.get("/api/recursos/moe")
+def recursos_moe():
+    return _moe_estado()
+
+
+@app.post("/api/recursos/moe")
+def recursos_moe_ajustar(req: MoeRequest):
+    """ Los ajustes se aplican en el próximo arranque del motor: «detener» lo para ya """
+    cambios: Dict[str, Any] = {}
+    if req.contexto is not None:
+        from ai_engine import motor_moe as motor_moe_mod
+        valor = str(req.contexto).strip().lower()
+        if valor != "auto":
+            try:
+                valor = max(2048, min(motor_moe_mod.CONTEXTO_MAX, int(valor)))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="contexto: «auto» o un número de tokens")
+        cambios["moe_contexto"] = valor
+    if req.hilos is not None:
+        cambios["moe_hilos"] = max(0, min(16, int(req.hilos)))
+    if req.calientes is not None:
+        valor = str(req.calientes).strip().lower()
+        if valor != "auto":
+            try:
+                valor = max(0, min(128, int(valor)))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="calientes: «auto» o un número")
+        cambios["moe_calientes"] = valor
+    if req.modo is not None:
+        from ai_engine import motor_moe as motor_moe_mod
+        if req.modo not in motor_moe_mod.MODOS:
+            raise HTTPException(status_code=400, detail=f"modo: uno de {', '.join(motor_moe_mod.MODOS)}")
+        cambios["moe_modo"] = req.modo
+    if req.mtp is not None:
+        cambios["moe_mtp"] = bool(req.mtp)
+    if cambios:
+        ai_engine.update_config(cambios)
+    if req.detener:
+        ai_engine.motor_moe().detener()
+    if req.olvidar_proyectos:
+        ai_engine.motor_moe().olvidar_proyectos()
+    return _moe_estado()
 
 
 @app.post("/api/recursos/termico")

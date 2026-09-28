@@ -123,6 +123,13 @@ Formato de los archivos: [docs/prig-hub.md](docs/prig-hub.md).
   la generación antes del límite que elijas.
 - **Modo suave**: dosifica al modelo desde dentro del motor para que la máquina trabaje
   continua y sin picos de calor. Ver [más abajo](#modo-suave-modelos-sin-picos-de-calor).
+- **Modo frío** para modelos que no caben en la GPU (32–40B en RAM): la CPU trabaja con un
+  tope que la mantiene cerca de la temperatura que elijas. Opcionalmente, con permiso de
+  administrador, apaga el turbo y baja el tope de potencia. Ver [docs/modo-frio.md](docs/modo-frio.md).
+- **Motor MoE** para Qwen3.6-35B-A3B en una GPU de 6 GB: los expertos más usados de cada capa van a la
+  GPU, la CPU calcula el resto a la vez y la cabeza MTP del modelo propone 2 tokens por paso (llama.cpp
+  modificado). 27 → 53 tok/s sin cambiar el resultado (hasta 68 en modo rápido), con la CPU por debajo de
+  60 °C. Ver [docs/motor-moe.md](docs/motor-moe.md).
 - **Google Gemini** opcional para los desafíos, **apagado por defecto**. Ver
   [Privacidad](#privacidad-qué-sale-de-tu-equipo).
 

@@ -1320,6 +1320,10 @@ class AIChatManager {
             if (stats.generacion_tok_s) partes.push(`${stats.generacion_tok_s} tok/s`);
             partes.push(`${stats.tokens_respuesta} tokens`);
             if (stats.carga_s >= 0.5) partes.push(`carga ${stats.carga_s.toFixed(1)} s`);
+            // Motor MoE: los archivos enganchados se leyeron una vez y se guardaron, o se restauraron
+            const pr = stats.proyecto;
+            if (pr && pr.origen === 'disco') partes.push(`proyecto restaurado (${(pr.tokens || 0).toLocaleString('es')} tokens en ${pr.segundos} s)`);
+            else if (pr && pr.origen === 'leido') partes.push(`proyecto leído y guardado (${(pr.tokens || 0).toLocaleString('es')} tokens en ${pr.segundos} s)`);
             partes.push(`total ${stats.total_s.toFixed(1)} s`);
             const m = document.createElement('span');
             m.title = `Lectura del prompt: ${stats.tokens_prompt} tokens a ${stats.lectura_tok_s || '?'} tok/s · motivo de fin: ${stats.motivo_fin}`;

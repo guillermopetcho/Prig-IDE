@@ -76,7 +76,11 @@
       if (!res.ok) return;
       ultimo = await res.json();
       pintarBarra(ultimo);
-      if (abierto) pintarPanel(ultimo);
+      if (abierto) {
+        try { const f = await fetch('/api/recursos/frio'); if (f.ok) ultimoFrio = await f.json(); } catch (e) { /* sin modo frío */ }
+        try { const m = await fetch('/api/recursos/moe'); if (m.ok) ultimoMoe = await m.json(); } catch (e) { /* sin motor MoE */ }
+        pintarPanel(ultimo);
+      }
     } catch (e) { /* el backend puede estar reiniciando */ }
   }
 
@@ -211,6 +215,8 @@
             <input type="checkbox" id="rit-cpu" ${r.cpu_eficiente ? 'checked' : ''}> Motor del modelo en los ${eficientes} núcleos de eficiencia
             <span style="color:var(--text-muted);">(solo si el modelo cabe entero en la GPU)</span></label>` : ''}
       </div>
+      <div id="frio-seccion"></div>
+      <div id="moe-seccion"></div>
       <div style="margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.08);">
         <div style="font-weight:600; margin-bottom:5px;">Gobernador térmico de la GPU</div>
         <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
@@ -227,7 +233,7 @@
         ${(saltoMedido || g.alcances || g.reposo_c != null) ? `<button id="temp-olvidar" style="margin-top:6px; font-size:10.5px; padding:2px 8px; border-radius:4px;
             cursor:pointer; background:none; color:var(--text-muted); border:1px solid var(--border-color);">Olvidar lo aprendido</button>` : ''}
         <div style="margin-top:6px; font-size:10.5px; color:var(--text-muted);">
-          La CPU no pausa nada${eficientes ? '; con el modo suave el motor usa los núcleos de eficiencia' : ''}. Se avisa a partir de ${u.cpu_aviso} °C.
+          La CPU la regula el modo frío (modelos en RAM)${eficientes ? '; con el modo suave, los que caben en la GPU usan los núcleos de eficiencia' : ''}. Se avisa a partir de ${u.cpu_aviso} °C.
         </div>
       </div>`;
 
@@ -267,6 +273,168 @@
       input.setSelectionRange(input.value.length, input.value.length);
     }
     dibujarGrafica(d.historial || [], u);
+    pintarFrio();
+    pintarMoe();
+  }
+
+  // ------------------------------------------------------------------ motor MoE (expertos en la GPU)
+  let ultimoMoe = null;
+
+  function pintarMoe() {
+    const z = $('moe-seccion');
+    const m = ultimoMoe;
+    if (!z || !m) return;
+    const escrito = {};
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
+    const a = m.ajustes || {};
+    let estado;
+    if (!m.disponible) {
+      estado = `<span style="color:var(--text-muted);">${esc(m.motivo || 'No disponible')}</span>`;
+    } else if (m.en_marcha) {
+      estado = `<span style="color:${VERDE};"><i class="fa-solid fa-microchip"></i> En marcha · ${m.calientes_por_capa} expertos por capa en la GPU ·
+        ${m.mtp ? 'MTP · ' : ''}modo ${esc(m.modo || '')} ·
+        contexto ${Math.round((m.contexto || 0) / 1024)}K${a.contexto === 'auto' ? ' (automático)' : ''} · núcleos P ${esc((m.nucleos || []).join(', '))}${m.activas ? ` · ${m.activas} respuesta${m.activas > 1 ? 's' : ''} en curso` : ''}</span>`;
+    } else {
+      estado = `<span style="color:var(--text-muted);"><i class="fa-solid fa-microchip"></i> Parado: arranca solo con la primera petición a
+        <code>${esc(m.nombre)}</code> (≈10 s) y se para tras ${Math.round((m.keep_alive_s || 300) / 60)} min sin uso.</span>`;
+    }
+    const valor = (id, def) => escrito[id] ?? def;
+    const contextos = ['auto', 16384, 32768, 65536, 131072, 262144].map((c) =>
+      `<option value="${c}" ${String(valor('moe-ctx', a.contexto)) === String(c) ? 'selected' : ''}>${c === 'auto' ? 'automático' : `${c / 1024}K`}</option>`).join('');
+    z.innerHTML = `
+      <div style="margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="font-weight:600; margin-bottom:4px;">Motor MoE · Qwen3.6-35B-A3B con expertos en la GPU</div>
+        <div style="font-size:10.5px; color:var(--text-muted); line-height:1.5; margin-bottom:6px;">
+          Copia a la GPU los expertos más usados de cada capa, la CPU calcula el resto a la vez, y la cabeza MTP del
+          modelo propone 2 tokens por paso: ~53 tok/s exacto, ~60 equilibrado, ~68 rápido (Ollama: ~27), con la CPU
+          por debajo de 60 °C sin turbo. Al arrancar descarga los modelos de Ollama para dejarle la VRAM.</div>
+        <div style="font-size:10.5px; margin-bottom:6px;">${estado}${m.ultimo_error ? ` <span style="color:${ROJO};">${esc(m.ultimo_error)}</span>` : ''}</div>
+        ${m.disponible ? `<div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:11px;">
+          <label for="moe-modo" title="exacto: igual que el modelo original · equilibrado: +0,5 % de perplejidad · rápido: +1,6 %">Modo</label>
+          <select id="moe-modo" style="${estiloCampo}">${(m.modos || ['exacto', 'equilibrado', 'rapido']).map((x) =>
+            `<option value="${x}" ${String(valor('moe-modo', a.modo)) === x ? 'selected' : ''}>${x === 'rapido' ? 'rápido' : x}</option>`).join('')}</select>
+          <label style="display:flex; gap:4px; align-items:center;" title="La cabeza MTP propone 2 tokens por paso; el resultado no cambia">
+            <input type="checkbox" id="moe-mtp" ${a.mtp !== false ? 'checked' : ''}> MTP</label>
+          <label for="moe-ctx">Contexto</label>
+          <select id="moe-ctx" style="${estiloCampo}">${contextos}</select>
+          <label for="moe-calientes" title="auto: los que quepan en la VRAM libre">Expertos por capa</label>
+          <input id="moe-calientes" value="${esc(String(valor('moe-calientes', a.calientes ?? 'auto')))}" style="width:44px; ${estiloCampo}">
+          <label for="moe-hilos" title="0: uno por núcleo P, hasta 4">Hilos</label>
+          <input id="moe-hilos" type="number" min="0" max="16" value="${esc(String(valor('moe-hilos', a.hilos ?? 0)))}" style="width:40px; ${estiloCampo}">
+          <button id="moe-guardar" style="${estiloBoton}">Guardar</button>
+          ${m.en_marcha ? `<button id="moe-parar" style="${estiloBoton}"><i class="fa-solid fa-stop"></i> Parar ahora</button>` : ''}
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:3px;">Los cambios se aplican en el próximo arranque del motor.</div>
+        <div style="font-size:10.5px; margin-top:6px; display:flex; gap:7px; align-items:center; flex-wrap:wrap;">
+          <span title="Archivos enganchados que el motor ya leyó: preguntar de nuevo sobre ellos los restaura del disco en ~0,1 s en lugar de releerlos">
+            <i class="fa-solid fa-box-archive"></i> Proyectos guardados: ${(m.proyectos || {}).archivos || 0}
+            (${(((m.proyectos || {}).mb || 0) / 1000).toFixed(1)} GB)${(m.proyectos || {}).ultimo && m.proyectos.ultimo.origen
+              ? ` · último: ${m.proyectos.ultimo.origen === 'disco' ? 'restaurado' : 'leído'}, ${(m.proyectos.ultimo.tokens || 0).toLocaleString('es')} tokens en ${m.proyectos.ultimo.segundos} s` : ''}</span>
+          ${((m.proyectos || {}).archivos || 0) ? `<button id="moe-olvidar" style="${estiloBoton}"><i class="fa-solid fa-trash-can"></i> Borrar</button>` : ''}
+        </div>` : ''}
+        <div id="moe-msg" style="font-size:10.5px; margin-top:4px;"></div>
+      </div>`;
+    const msg = (t, error) => { const el = $('moe-msg'); if (el) { el.style.color = error ? ROJO : 'var(--text-muted)'; el.textContent = t; } };
+    const enviar = async (cuerpo) => {
+      try {
+        ultimoMoe = await prigFetchJson('/api/recursos/moe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+        ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => { const el = $(id); if (el) delete el.dataset.tocado; });
+        pintarMoe();
+      } catch (err) { msg(err.message, true); }
+    };
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => {
+      const el = $(id);
+      if (el) el.oninput = el.onchange = () => { el.dataset.tocado = '1'; };
+    });
+    Object.keys(escrito).forEach((id) => { if ($(id)) $(id).dataset.tocado = '1'; });
+    if ($('moe-guardar')) $('moe-guardar').onclick = () => enviar({
+      contexto: $('moe-ctx').value, calientes: $('moe-calientes').value.trim() || 'auto',
+      hilos: parseInt($('moe-hilos').value, 10) || 0, modo: $('moe-modo').value, mtp: $('moe-mtp').checked });
+    if ($('moe-parar')) $('moe-parar').onclick = () => enviar({ detener: true });
+    if ($('moe-olvidar')) $('moe-olvidar').onclick = () => {
+      if (confirm('¿Borrar los proyectos guardados? La próxima pregunta sobre cada uno lo volverá a leer.')) enviar({ olvidar_proyectos: true });
+    };
+  }
+
+  // ------------------------------------------------------------------ modo frío (modelos en RAM)
+  let ultimoFrio = null;
+  const estiloCampo = 'padding:3px 5px; background:var(--bg-panel); color:#fff; border:1px solid var(--border-color); border-radius:4px;';
+  const estiloBoton = 'font-size:11px; padding:3px 9px; border-radius:4px; cursor:pointer; background:rgba(137,180,250,0.15); color:var(--accent-blue); border:1px solid rgba(137,180,250,0.4);';
+
+  function pintarFrio() {
+    const z = $('frio-seccion');
+    const f = ultimoFrio;
+    if (!z || !f) return;
+    // Lo que se está escribiendo no se pisa al refrescar
+    const escrito = {};
+    ['fr-objetivo', 'fr-vatios'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
+    const a = f.ajustes || {}, c = f.control || {}, e = f.energia || {};
+    let estado;
+    if (!a.activo) {
+      estado = '<span style="color:var(--text-muted);">Apagado: los modelos en RAM trabajan sin pausas.</span>';
+    } else if (!c.en_ram) {
+      estado = `<span style="color:var(--text-muted);"><i class="fa-solid fa-snowflake"></i> Esperando: ahora no hay ningún modelo en RAM (los que caben en la GPU los regula el modo suave).</span>`;
+    } else if (c.generando) {
+      estado = `<span style="color:${(c.fraccion ?? 1) < 0.98 ? AMARILLO : VERDE};"><i class="fa-solid fa-snowflake"></i> CPU a ${c.temp_media ?? '—'} °C · el modelo trabaja el ${Math.round((c.fraccion ?? 1) * 100)} % de cada ciclo${f.hilos ? ` en ${f.hilos} núcleos de eficiencia` : ''}</span>`;
+    } else {
+      estado = `<span style="color:${VERDE};"><i class="fa-solid fa-snowflake"></i> Modelo en RAM listo · la próxima respuesta arranca al ${Math.round((c.fraccion ?? 0.3) * 100)} % y sube poco a poco</span>`;
+    }
+    const turbo = e.turbo === true ? 'encendido' : e.turbo === false ? 'apagado' : 'desconocido';
+    let energia;
+    if (e.error) energia = `<span style="color:var(--text-muted);">${esc(e.error)}</span>`;
+    else if (!e.instalado) {
+      energia = `<button id="fr-instalar" style="${estiloBoton}"><i class="fa-solid fa-key"></i> Instalar el ayudante de energía</button>
+        <span style="color:var(--text-muted);">pide la contraseña de administrador una vez</span>`;
+    } else if (!e.seguro || !e.al_dia) {
+      energia = `<span style="color:${AMARILLO};">${!e.seguro ? 'El ayudante instalado no es solo de root.' : 'El ayudante instalado es de otra versión de Prig.'}</span>
+        <button id="fr-instalar" style="${estiloBoton} margin-left:6px;">Reinstalar</button>`;
+    } else if (e.modo === 'frio') {
+      energia = `<span style="color:${VERDE};"><i class="fa-solid fa-check"></i> Energía fría activa</span>
+        <button id="fr-normal" style="${estiloBoton} margin-left:6px;">Volver a normal</button>`;
+    } else {
+      energia = `<label for="fr-vatios">Tope de potencia</label>
+        <input id="fr-vatios" type="number" min="10" max="45" step="1" value="${escrito['fr-vatios'] ?? (f.vatios || 20)}" style="width:48px; ${estiloCampo}"> W
+        <button id="fr-aplicar" style="${estiloBoton}"><i class="fa-solid fa-snowflake"></i> Apagar turbo y aplicar</button>`;
+    }
+    z.innerHTML = `
+      <div style="margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+          <label style="font-weight:600; display:flex; gap:6px; align-items:center; cursor:pointer;">
+            <input type="checkbox" id="fr-activo" ${a.activo ? 'checked' : ''}> Modo frío · modelos en RAM</label>
+        </div>
+        <div style="font-size:10.5px; color:var(--text-muted); line-height:1.5; margin-bottom:6px;">
+          Para modelos que no caben en la GPU (32–40B): el motor trabaja solo una parte de cada ciclo de 50 ms,
+          en los núcleos de eficiencia, y la CPU se mantiene cerca de la temperatura objetivo. Mucho más lento,
+          pero sin calentar la máquina.</div>
+        <div style="font-size:10.5px; margin-bottom:6px;">${estado}</div>
+        <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; ${a.activo ? '' : 'opacity:.5;'}">
+          <label for="fr-objetivo">Mantener la CPU cerca de</label>
+          <input id="fr-objetivo" type="number" min="40" max="85" step="1" value="${escrito['fr-objetivo'] ?? Math.round(a.objetivo_c ?? 60)}" style="width:52px; ${estiloCampo}"> °C
+          <button id="fr-guardar" style="${estiloBoton}">Guardar</button>
+        </div>
+        <div style="margin-top:8px; font-size:11px; font-weight:600;">Energía de la CPU <span style="font-weight:400; color:var(--text-muted);">(con permiso de administrador)</span></div>
+        <div style="font-size:10.5px; color:var(--text-muted); margin:2px 0 5px;">
+          Turbo ${turbo} · ${esc(e.gobernador || '—')}${e.preferencia ? ` / ${esc(e.preferencia)}` : ''} · tope ${e.pl1_w ?? '—'} W${e.auto_cpufreq ? ' · con auto-cpufreq' : ''}.
+          Sin turbo cada token cuesta menos calor: a la misma temperatura, el modelo va más rápido.</div>
+        <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:11px;">${energia}</div>
+        <div id="fr-msg" style="font-size:10.5px; margin-top:4px;"></div>
+      </div>`;
+    const msg = (t, error) => { const el = $('fr-msg'); if (el) { el.style.color = error ? ROJO : 'var(--text-muted)'; el.textContent = t; } };
+    const enviar = async (url, cuerpo, espera) => {
+      if (espera) msg(espera);
+      try {
+        ultimoFrio = await prigFetchJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo || {}) });
+        ['fr-objetivo', 'fr-vatios'].forEach((id) => { const el = $(id); if (el) delete el.dataset.tocado; });
+        pintarFrio();
+      } catch (err) { msg(err.message, true); }
+    };
+    ['fr-objetivo', 'fr-vatios'].forEach((id) => { const el = $(id); if (el) el.oninput = () => { el.dataset.tocado = '1'; }; });
+    Object.keys(escrito).forEach((id) => { if ($(id)) $(id).dataset.tocado = '1'; });
+    $('fr-activo').onchange = (ev) => enviar('/api/recursos/frio', { activo: ev.target.checked });
+    $('fr-guardar').onclick = () => enviar('/api/recursos/frio', { objetivo_c: parseFloat($('fr-objetivo').value) });
+    if ($('fr-instalar')) $('fr-instalar').onclick = () => enviar('/api/recursos/energia/instalar', {}, 'Esperando la contraseña de administrador…');
+    if ($('fr-aplicar')) $('fr-aplicar').onclick = () => enviar('/api/recursos/energia', { frio: true, vatios: parseInt($('fr-vatios').value, 10) }, 'Esperando la contraseña de administrador…');
+    if ($('fr-normal')) $('fr-normal').onclick = () => enviar('/api/recursos/energia', { frio: false }, 'Esperando la contraseña de administrador…');
   }
 
   function dibujarGrafica(historial, u) {

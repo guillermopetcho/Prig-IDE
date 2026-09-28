@@ -1,0 +1,150 @@
+#!/bin/bash
+# Prig · ayudante de energía de la CPU.
+#
+# Se instala una sola vez como root en /usr/local/libexec/prig-energia (propiedad de root, no
+# modificable por el usuario) junto con una política de polkit: se ejecuta con pkexec y pide la
+# contraseña de administrador (recordada unos minutos). Corre como root, así que hace lo MÍNIMO
+# y valida todo:
+#
+#   estado          qué hay ahora (turbo, tope de potencia, modo)
+#   frio VATIOS     turbo apagado, CPU en ahorro y tope de potencia sostenida (PL1) en VATIOS
+#   normal          lo deja como estaba antes de «frio»
+#
+# Con auto-cpufreq instalado se le pide a él (--turbo, --force): si se escribiera el turbo por
+# debajo, su demonio lo volvería a encender a los pocos segundos.
+#
+# Pruebas: sin ser root, PRIG_ENERGIA_RAIZ antepone una carpeta falsa a todas las rutas.
+# Ejecutado como root esa variable se ignora (y pkexec limpia el entorno de todos modos).
+
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+umask 022
+
+RAIZ=""
+if [ "$(id -u)" != "0" ] && [ -n "${PRIG_ENERGIA_RAIZ:-}" ]; then
+    RAIZ="$PRIG_ENERGIA_RAIZ"
+fi
+
+ESTADO_DIR="$RAIZ/run/prig-energia"
+NO_TURBO="$RAIZ/sys/devices/system/cpu/intel_pstate/no_turbo"
+BOOST="$RAIZ/sys/devices/system/cpu/cpufreq/boost"
+RAPL="$RAIZ/sys/class/powercap/intel-rapl:0"
+PL1="$RAPL/constraint_0_power_limit_uw"
+PL1_MAX="$RAPL/constraint_0_max_power_uw"
+CPUS="$RAIZ/sys/devices/system/cpu"
+VATIOS_MIN=10
+VATIOS_MAX=65
+
+error() { echo "{\"ok\": false, \"error\": \"$1\"}"; exit 2; }
+
+auto_cpufreq() {
+    local c
+    for c in "$RAIZ/snap/bin/auto-cpufreq" "$RAIZ/usr/local/bin/auto-cpufreq" "$RAIZ/usr/bin/auto-cpufreq"; do
+        if [ -x "$c" ]; then echo "$c"; return 0; fi
+    done
+    return 0
+}
+
+leer() { [ -r "$1" ] && tr -d '\n' < "$1" || echo ""; }
+
+turbo_activo() {
+    if [ -r "$NO_TURBO" ]; then
+        [ "$(leer "$NO_TURBO")" = "0" ] && echo "true" || echo "false"
+    elif [ -r "$BOOST" ]; then
+        [ "$(leer "$BOOST")" = "1" ] && echo "true" || echo "false"
+    else
+        echo "null"
+    fi
+}
+
+poner_turbo() {   # 1 = encendido, 0 = apagado (sin auto-cpufreq)
+    if [ -w "$NO_TURBO" ]; then
+        [ "$1" = "1" ] && echo 0 > "$NO_TURBO" || echo 1 > "$NO_TURBO"
+    elif [ -w "$BOOST" ]; then
+        echo "$1" > "$BOOST"
+    fi
+}
+
+poner_gobernador() {
+    local g
+    for g in "$CPUS"/cpu[0-9]*/cpufreq/scaling_governor; do
+        [ -w "$g" ] && echo "$1" > "$g" || true
+    done
+}
+
+estado() {
+    local pl1 orig modo acf gob
+    pl1="$(leer "$PL1")"
+    orig="$(leer "$ESTADO_DIR/pl1_original")"
+    modo="$(leer "$ESTADO_DIR/modo")"
+    acf="$(auto_cpufreq)"
+    gob="$(leer "$CPUS/cpu0/cpufreq/scaling_governor")"
+    printf '{"ok": true, "turbo": %s, "pl1_w": %s, "pl1_original_w": %s, "gobernador": "%s", "modo": "%s", "auto_cpufreq": %s}\n' \
+        "$(turbo_activo)" \
+        "$([ -n "$pl1" ] && echo $((pl1 / 1000000)) || echo null)" \
+        "$([ -n "$orig" ] && echo $((orig / 1000000)) || echo null)" \
+        "$gob" "${modo:-normal}" \
+        "$([ -n "$acf" ] && echo true || echo false)"
+}
+
+frio() {
+    local vatios="$1" acf maximo
+    [[ "$vatios" =~ ^[0-9]{1,3}$ ]] || error "vatios no válidos"
+    maximo=$VATIOS_MAX
+    if [ -r "$PL1_MAX" ] && [ -n "$(leer "$PL1_MAX")" ] && [ "$(leer "$PL1_MAX")" != "0" ]; then
+        maximo=$(( $(leer "$PL1_MAX") / 1000000 ))
+    fi
+    { [ "$vatios" -ge "$VATIOS_MIN" ] && [ "$vatios" -le "$maximo" ]; } || error "el tope debe estar entre $VATIOS_MIN y $maximo W"
+    mkdir -p "$ESTADO_DIR"
+    chmod 755 "$ESTADO_DIR"
+    # Lo que había antes, una sola vez: «normal» vuelve a esto
+    if [ ! -f "$ESTADO_DIR/pl1_original" ] && [ -r "$PL1" ]; then
+        leer "$PL1" > "$ESTADO_DIR/pl1_original"
+    fi
+    if [ ! -f "$ESTADO_DIR/gobernador_original" ]; then
+        leer "$CPUS/cpu0/cpufreq/scaling_governor" > "$ESTADO_DIR/gobernador_original"
+    fi
+    acf="$(auto_cpufreq)"
+    if [ -n "$acf" ]; then
+        "$acf" --turbo=never >/dev/null 2>&1 || error "auto-cpufreq no aceptó --turbo=never"
+        "$acf" --force=powersave >/dev/null 2>&1 || error "auto-cpufreq no aceptó --force=powersave"
+    else
+        poner_turbo 0
+        poner_gobernador powersave
+    fi
+    if [ -w "$PL1" ]; then
+        echo $((vatios * 1000000)) > "$PL1"
+    fi
+    echo frio > "$ESTADO_DIR/modo"
+    chmod 644 "$ESTADO_DIR"/* 2>/dev/null || true
+    estado
+}
+
+normal() {
+    local acf orig gob
+    acf="$(auto_cpufreq)"
+    if [ -n "$acf" ]; then
+        "$acf" --turbo=auto >/dev/null 2>&1 || true
+        "$acf" --force=reset >/dev/null 2>&1 || true
+    else
+        poner_turbo 1
+        gob="$(leer "$ESTADO_DIR/gobernador_original")"
+        [[ "$gob" =~ ^(performance|powersave|schedutil|ondemand|conservative)$ ]] && poner_gobernador "$gob"
+    fi
+    orig="$(leer "$ESTADO_DIR/pl1_original")"
+    if [[ "$orig" =~ ^[0-9]+$ ]] && [ -w "$PL1" ]; then
+        echo "$orig" > "$PL1"
+    fi
+    rm -f "$ESTADO_DIR/pl1_original" "$ESTADO_DIR/gobernador_original"
+    mkdir -p "$ESTADO_DIR"
+    echo normal > "$ESTADO_DIR/modo"
+    chmod 644 "$ESTADO_DIR/modo" 2>/dev/null || true
+    estado
+}
+
+case "${1:-}" in
+    estado) estado ;;
+    frio)   [ $# -eq 2 ] || error "uso: frio VATIOS"; frio "$2" ;;
+    normal) normal ;;
+    *)      error "orden desconocida (estado | frio VATIOS | normal)" ;;
+esac

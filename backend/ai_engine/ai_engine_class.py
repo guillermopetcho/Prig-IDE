@@ -12,6 +12,7 @@ from typing import Dict, Any, Generator, List, Optional, Callable
 # Import relativo: el absoluto solo funcionaba con backend/ en sys.path y rompía
 # al importar el paquete como backend.ai_engine (p. ej. desde los tests).
 from .web_search_engine import WebSearchEngine
+from . import motor_moe
 
 _PENSAMIENTO_RE = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.S | re.I)
 
@@ -300,7 +301,13 @@ class AIEngine:
             "top_k": 40,
             "top_p": 0.9,
             "repeat_penalty": 1.1,
-            "exec_timeout": 25
+            "exec_timeout": 25,
+            # Motor MoE (Qwen3.6-35B-A3B con expertos calientes en la GPU, ai_engine/motor_moe.py)
+            "moe_contexto": motor_moe.CONTEXTO,
+            "moe_hilos": 0,              # 0 = uno por núcleo P (hasta 4)
+            "moe_calientes": "auto",     # expertos por capa en la GPU; auto = los que quepan
+            "moe_modo": motor_moe.MODO,  # exacto | equilibrado | rapido (omite expertos fríos de poco peso)
+            "moe_mtp": True              # decodificación especulativa con la cabeza MTP del modelo
         }
         self._load_config()
 
@@ -310,6 +317,10 @@ class AIEngine:
             if os.path.exists(self.config_path):
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     saved = json.load(f)
+                # 16K era el contexto por defecto del motor MoE antes de que existieran los modos y el
+                # contexto automático: una configuración de entonces pasa al automático
+                if saved.get("moe_contexto") == 16384 and "moe_modo" not in saved:
+                    saved.pop("moe_contexto")
                 for k, v in saved.items():
                     if k in self.config and v is not None:
                         self.config[k] = v
@@ -558,6 +569,7 @@ class AIEngine:
             res = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if res.status_code == 200:
                 models = [m["name"] for m in res.json().get("models", [])]
+                models += [m["name"] for m in self._modelos_propios()]
                 ver = "?"
                 try:
                     vres = requests.get(f"{self.base_url}/api/version", timeout=2)
@@ -604,10 +616,25 @@ class AIEngine:
                         "modified_at": m.get("modified_at", "")[:10],
                         "available": True
                     })
-                return {"online": True, "models": detailed, "version": ver, "url": self.base_url}
-            return {"online": False, "models": [], "version": ver, "message": f"HTTP {res.status_code}"}
+                return {"online": True, "models": detailed + self._modelos_propios(), "version": ver, "url": self.base_url}
+            return {"online": False, "models": self._modelos_propios(), "version": ver, "message": f"HTTP {res.status_code}"}
         except Exception as e:
-            return {"online": False, "models": [], "version": ver, "message": str(e)}
+            return {"online": False, "models": self._modelos_propios(), "version": ver, "message": str(e)}
+
+    @staticmethod
+    def _modelos_propios() -> List[Dict[str, Any]]:
+        """ Modelos que sirve Prig sin Ollama: el motor MoE, si está compilado y el modelo descargado """
+        disp = motor_moe.Motor.disponible()
+        if not disp["disponible"]:
+            return []
+        try:
+            tam = os.path.getsize(disp["modelo"])
+            fecha = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(motor_moe.SERVIDOR)))
+        except OSError:
+            tam, fecha = 0, ""
+        return [{"name": motor_moe.NOMBRE, "size_gb": round(tam / (1024 ** 3), 2), "quantization": "Q4_K_S",
+                 "family": "qwen35moe", "parameter_size": "35B-A3B", "format": "gguf", "modified_at": fecha,
+                 "available": True, "motor": "moe"}]
 
     def delete_model(self, model_name: str) -> bool:
         try:
@@ -717,6 +744,18 @@ class AIEngine:
         num_thread = int(self.config.get("num_thread", 0) or 0)
         if num_thread > 0:
             options["num_thread"] = num_thread
+        elif getattr(self, "gobernador", None) is not None:
+            # Modo frío: con el modelo en RAM, 4 hilos en los núcleos E rinden como 8 en todos y
+            # calientan menos (recursos/frio.py). Solo si el usuario no fijó los hilos.
+            try:
+                from recursos import frio
+                from recursos.almacen import almacen
+                if {**frio.POR_DEFECTO, **almacen().frio()}["activo"]:
+                    hilos = frio.hilos_en_frio()
+                    if hilos:
+                        options["num_thread"] = hilos
+            except Exception:
+                pass
         num_predict = int(self.config.get("num_predict", 0) or 0)
         if num_predict > 0:
             options["num_predict"] = num_predict
@@ -730,6 +769,10 @@ class AIEngine:
 
         if overrides:
             options.update({k: v for k, v in overrides.items() if v is not None})
+        if motor_moe.es_moe(model):
+            # El contexto del motor MoE se fija al arrancarlo (Temperaturas → Motor MoE): las
+            # métricas («contexto usado») se calculan con ese
+            options["num_ctx"] = self.motor_moe().contexto_deseado()
         return limpiar_para_ollama(options)
 
     def _campos_peticion(self, model: Optional[str], uso: Optional[str]) -> Dict[str, Any]:
@@ -745,6 +788,8 @@ class AIEngine:
     def capacidades(self, model: str) -> List[str]:
         """ completion, tools, thinking, insert, vision, embedding (con caché de 10 min).
         Mandar `think` a un modelo que no piensa da error 400 (medido). """
+        if motor_moe.es_moe(model):
+            return list(motor_moe.CAPACIDADES)
         ahora = time.time()
         guardado = self._caps_cache.get(model)
         if guardado and ahora - guardado[0] < 600:
@@ -780,6 +825,7 @@ class AIEngine:
         """ Lo que Ollama devuelve al terminar, en unidades legibles """
         def seg(ns):
             return round((ns or 0) / 1e9, 3)
+        num_ctx = datos.get("contexto") or num_ctx      # motor MoE: su contexto real
         eval_s = seg(datos.get("eval_duration"))
         prompt_s = seg(datos.get("prompt_eval_duration"))
         m = {
@@ -790,6 +836,7 @@ class AIEngine:
             "lectura_tok_s": round(datos.get("prompt_eval_count", 0) / prompt_s, 1) if prompt_s else None,
             "generacion_tok_s": round(datos.get("eval_count", 0) / eval_s, 1) if eval_s else None,
             "motivo_fin": datos.get("done_reason"),
+            "proyecto": datos.get("proyecto"),     # motor MoE: proyecto leído o restaurado de disco
             "cortada": datos.get("done_reason") == "length",
         }
         if num_ctx:
@@ -805,6 +852,14 @@ class AIEngine:
         except Exception:
             return (getattr(res, "text", "") or "")[:300]
 
+    def motor_moe(self) -> "motor_moe.Motor":
+        """ El motor MoE, con la VRAM que le dejan los modelos de Ollama y los ajustes de IA """
+        return motor_moe.motor(
+            liberar_gpu=self._descargar_ollama,
+            ajustes=lambda: {"contexto": self.config.get("moe_contexto"), "hilos": self.config.get("moe_hilos"),
+                             "calientes": self.config.get("moe_calientes"), "modo": self.config.get("moe_modo"),
+                             "mtp": self.config.get("moe_mtp", True)})
+
     def _post_con_recuperacion(self, url: str, payload: Dict[str, Any], intentos: int = 3):
         """ POST a Ollama que sobrevive a una falta de memoria al cargar.
 
@@ -815,6 +870,12 @@ class AIEngine:
         """
         if payload.get("model"):
             self.__dict__.setdefault("_usados", set()).add(payload["model"])
+        if motor_moe.es_moe(payload.get("model")):
+            # Su propio llama-server: traduce la petición y responde con el formato de Ollama
+            res = self.motor_moe().post(url, payload)
+            with self._streams_lock:
+                self._active_streams.add(res)
+            return res
         for n in range(intentos + 1):
             res = requests.post(url, json=payload, stream=True, timeout=300)
             with self._streams_lock:
@@ -1319,7 +1380,15 @@ class AIEngine:
         return count
 
     def unload_models(self) -> None:
-        """ Libera la memoria VRAM descargando los modelos que Prig tiene cargados.
+        """ Libera la VRAM: los modelos de Ollama que cargó Prig y el motor MoE """
+        self._descargar_ollama()
+        try:
+            self.motor_moe().detener()
+        except Exception:
+            pass
+
+    def _descargar_ollama(self) -> None:
+        """ Libera la memoria VRAM descargando los modelos que Prig tiene cargados en Ollama.
 
         Antes solo se soltaban los de la configuración: uno elegido en el chat seguía
         ocupando la GPU hasta que vencía su keep_alive (30 min), ya con Prig cerrado.
@@ -1341,6 +1410,10 @@ class AIEngine:
     def stop_ai_processes(self) -> None:
         """ Detiene peticiones de análisis activas y procesos de Ollama si Prig los inició """
         self.cancel_active_requests()
+        try:
+            self.motor_moe().detener()
+        except Exception:
+            pass
         if self._ollama_proc and self._ollama_proc.poll() is None:
             try:
                 self._ollama_proc.terminate()

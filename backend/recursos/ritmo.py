@@ -152,6 +152,12 @@ def nucleos_eficientes() -> List[int]:
     return [c for c in eficientes if c in disponibles]
 
 
+# El servidor del motor MoE (ai_engine/motor_moe.py) usa el mismo GGUF que el modelo de Ollama; como
+# no aparece en /api/ps, sin esto se le ponían todos los núcleos y se deshacía su fijación a los P
+# (medido en Prig: 10–12 tok/s en lugar de 45–57).
+MOTOR_MOE = os.path.join("lib", "moe", "llama-server")
+
+
 class FijadorCPU:
     """ Pone el motor del modelo (llama-server) en los núcleos de eficiencia si el modelo
     está entero en la GPU, y lo devuelve a todos si no. Solo toca procesos del usuario. """
@@ -159,6 +165,8 @@ class FijadorCPU:
     def __init__(self, url_ollama: str = "http://localhost:11434"):
         self.url = url_ollama
         self._hechos: Dict[int, str] = {}      # pid → "eficientes" | "todos"
+        # El modo frío (recursos/frio.py) quiere también los modelos en RAM en los núcleos E
+        self.ram_en_eficientes = lambda: False
         self._blobs: Dict[str, Optional[str]] = {}
         self._ultimo = 0.0
 
@@ -207,8 +215,12 @@ class FijadorCPU:
             linea = " ".join(p.info.get("cmdline") or [])
             if "llama-server" not in linea or (yo is not None and p.info.get("uids") and p.info["uids"].real != yo):
                 continue
+            if MOTOR_MOE in linea:
+                continue            # el motor MoE fija sus propios núcleos (P): con los E rinde la mitad
             m = re.search(r"sha256-([0-9a-f]{64})", linea)
             entero = bool(m and en_gpu.get(m.group(1)))
+            if not entero and m and m.group(1) in en_gpu and self.ram_en_eficientes():
+                entero = True                   # modelo en RAM con el modo frío: también a los núcleos E
             destino = "eficientes" if entero else "todos"
             if self._hechos.get(p.pid) == destino and not forzar:
                 continue
@@ -227,6 +239,20 @@ class FijadorCPU:
         vivos: Set[int] = set(psutil.pids())
         self._hechos = {k: v for k, v in self._hechos.items() if k in vivos}
         return {"aplicado": True, "cambiados": cambiados, "eficientes": eficientes}
+
+    @staticmethod
+    def fijar_proceso(pid: int, nucleos) -> bool:
+        """ El proceso y todos sus hilos a esos núcleos """
+        try:
+            os.sched_setaffinity(pid, nucleos)
+            for t in os.listdir(f"/proc/{pid}/task"):
+                try:
+                    os.sched_setaffinity(int(t), nucleos)
+                except OSError:
+                    pass
+            return True
+        except OSError:
+            return False
 
     def soltar(self):
         """ Devuelve todos los núcleos a los procesos que se habían fijado """

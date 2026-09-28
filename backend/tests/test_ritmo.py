@@ -98,6 +98,18 @@ class TestGobernador(unittest.TestCase):
         g.ritmo = rt.Ritmo({"objetivo_c": 60, "rampa_s": 0, "tramo_s": 1.0, "cpu_eficiente": False, **ajustes})
         return g
 
+    def test_el_motor_moe_no_se_corta_por_ritmo(self):
+        """ Retomar le obliga a releer el prompt (modelo híbrido): lo regula el modo frío. El límite sí corta. """
+        with mock.patch.object(termico, "_moe_generando", lambda: True):
+            g = self.gob([58])
+            tramo = g.empezar_tramo()
+            tramo.inicio -= 1.5
+            self.assertIsNone(g.debe_cortar(tramo))
+            g = self.gob([85])
+            tramo = g.empezar_tramo()
+            tramo.inicio -= 1.5
+            self.assertEqual(g.debe_cortar(tramo), "limite")
+
     def test_ritmo_antes_del_limite_y_el_limite_manda(self):
         g = self.gob([58])
         tramo = g.empezar_tramo()
@@ -240,6 +252,23 @@ class TestFijadorCPU(unittest.TestCase):
         self.assertEqual(fijados[101], [8, 9, 10, 11])
         self.assertEqual(fijados[1010], [8, 9, 10, 11])          # también sus hilos
         self.assertEqual(fijados[202], list(range(12)))          # el que no cabe en la GPU, todos los núcleos
+
+    def test_no_toca_el_motor_moe(self):
+        """ El motor MoE usa el mismo GGUF que un modelo de Ollama y fija él sus núcleos P: antes se le
+        ponían todos los núcleos y rendía la mitad """
+        blob = "c" * 64
+        proc = mock.Mock(pid=303, info={"pid": 303, "uids": mock.Mock(real=os.getuid()),
+                                        "cmdline": ["/home/u/Prig/lib/moe/llama-server", "-m", f"/m/blobs/sha256-{blob}"]})
+        f = rt.FijadorCPU()
+        fijados = {}
+        with mock.patch.object(rt, "nucleos_eficientes", return_value=[8, 9, 10, 11]), \
+                mock.patch.object(f, "_modelos_en_gpu", return_value={}), \
+                mock.patch("psutil.process_iter", return_value=[proc]), \
+                mock.patch("psutil.pids", return_value=[303]), \
+                mock.patch.object(rt.os, "sched_getaffinity", return_value=set(range(12))), \
+                mock.patch.object(rt.os, "sched_setaffinity", side_effect=lambda pid, cpus: fijados.__setitem__(pid, list(cpus))):
+            f.aplicar(forzar=True)
+        self.assertEqual(fijados, {})
 
     def test_sin_nucleos_de_eficiencia_no_hace_nada(self):
         with mock.patch.object(rt, "nucleos_eficientes", return_value=[]):

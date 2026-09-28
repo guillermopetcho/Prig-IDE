@@ -261,6 +261,18 @@ class Almacen:
                 self._evento("termico", texto, datos)
             self._guardar()
 
+    def frio(self) -> Dict[str, Any]:
+        """ Modo frío (recursos/frio.py) y energía con root (recursos/energia.py) """
+        with self._cerrojo:
+            return dict(self._datos.get("frio") or {})
+
+    def guardar_frio(self, ajustes: Dict[str, Any], texto: Optional[str] = None):
+        with self._cerrojo:
+            self._datos["frio"] = dict(ajustes)
+            if texto:
+                self._evento("frio", texto)
+            self._guardar()
+
     def ritmo(self) -> Dict[str, Any]:
         with self._cerrojo:
             return dict(self._datos.get("ritmo") or {})

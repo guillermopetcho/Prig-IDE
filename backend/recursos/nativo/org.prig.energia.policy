@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Prig · ayudante de energía. Pide la contraseña de administrador (y la recuerda unos
+     minutos): cambiar el turbo o la potencia es una acción de root y no se hace sin
+     autenticarse. Solo cubre /usr/local/libexec/prig-energia, que es de root y solo apaga el
+     turbo, pasa la CPU a ahorro y pone un tope de potencia acotado (y lo deshace). -->
+<policyconfig>
+  <vendor>Prig IDE</vendor>
+  <action id="org.prig.energia">
+    <description>Ajustar el turbo y la potencia de la CPU para Prig</description>
+    <message>Prig quiere ajustar la energía de la CPU (turbo y tope de potencia)</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/prig-energia</annotate>
+  </action>
+</policyconfig>

@@ -477,12 +477,17 @@ class GlobalConfigManager {
                             ${m.size_gb} GB
                         </td>
                         <td style="padding: 8px 12px;">
-                            ${this.badgeAjuste(m.name)}
+                            ${m.motor === 'moe'
+                                ? `<span style="color: var(--accent-green); background: rgba(166,227,161,0.15); padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 10px;" title="Los expertos más usados van a la GPU y el resto a la RAM (Temperaturas → Motor MoE)">
+                                    <i class="fa-solid fa-microchip"></i> Expertos en GPU</span>`
+                                : this.badgeAjuste(m.name)}
                         </td>
                         <td style="padding: 8px 12px; text-align: right;">
-                            <button onclick="window.globalConfigMgr.deleteModel('${m.name}')" class="ubuntu-btn" style="background: rgba(243,139,168,0.2); border: 1px solid var(--accent-red); color: var(--accent-red); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+                            ${m.motor === 'moe'
+                                ? `<span style="color: var(--text-muted); font-size: 10px;" title="Lo sirve Prig con su propio motor; el modelo base es el de Ollama">Motor de Prig</span>`
+                                : `<button onclick="window.globalConfigMgr.deleteModel('${m.name}')" class="ubuntu-btn" style="background: rgba(243,139,168,0.2); border: 1px solid var(--accent-red); color: var(--accent-red); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
                                 <i class="fa-solid fa-trash-can"></i> Eliminar
-                            </button>
+                            </button>`}
                         </td>
                     </tr>
                 `;

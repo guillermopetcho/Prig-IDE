@@ -1,0 +1,247 @@
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 8a0e5c255..5648bd43d 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -1622,6 +1622,11 @@ static void ggml_compute_forward_mul_mat_id(
+             for (int id = 0; id < n_ids; ++id) {
+                 const int32_t i02 = *(const int32_t *) ((const char *) ids->data + iid1*ids->nb[1] + id*ids->nb[0]);
+ 
++                if (i02 < 0) {
++                    // AIPC: id negativo = fila omitida (experto servido desde la GPU); salida en 0
++                    memset((char *) dst->data + id*nb1 + iid1*nb2, 0, ne0*sizeof(float));
++                    continue;
++                }
+                 assert(i02 >= 0 && i02 < n_as);
+ 
+                 MMID_MATRIX_ROW(i02, matrix_row_counts[i02]) = (struct mmid_row_mapping) {id, iid1};
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index 94990b3e1..e8db47b86 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -1801,8 +1801,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+          ggml_tensor * gate_exps_s,
+          ggml_tensor * down_exps_s,
+      llm_ffn_op_type   type_op,
+-                 int   il) const {
++                 int   il,
++         ggml_tensor * omitir) const {
+     const aipc_moe_split * sp_up = aipc_moe_split_lookup(up_exps);
++    static const bool dbg = std::getenv("AIPC_DEBUG") != nullptr;
++    if (dbg && il == 20) {
++        LLAMA_LOG_INFO("AIPC dbg capa %d: split=%s n_tk=%lld gate=%p up_b=%p s=%p/%p/%p op=%d loras=%d\n", il,
++            sp_up ? "si" : "no", (long long) selected_experts->ne[1], (void *) gate_exps, (void *) up_exps_b,
++            (void *) up_exps_s, (void *) gate_exps_s, (void *) down_exps_s, (int) type_op, loras ? (int) loras->size() : -1);
++    }
+     if (sp_up == nullptr) {
+         return nullptr;
+     }
+@@ -1811,7 +1818,10 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+ 
+     // decode/small batches only: for prefill the original batched path is better
+     // (bulk weight copy) and this avoids covering batch kernels on this path
+-    if (n_tk > 8) {
++    // sin relleno: hasta 4 tokens por paso (1 al generar, 2–4 al verificar un borrador MTP). CUDA
++    // usa ahí MMVQ, que calcula cada par (token, experto) por separado: admite ids repetidos. En
++    // todas las arquitecturas MMVQ cubre al menos 4 tokens para Q4_K/Q5_K/Q6_K (mmvq.cu).
++    if (n_tk > 8 || (sp_up->n_pad == 0 && n_tk > 4)) {
+         return nullptr;
+     }
+     // per-expert scales are not replicated on the hot side -> disable the split
+@@ -1864,15 +1874,46 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+     // k position (iota), preserving the unique-ids-per-token invariant of the
+     // mul_mat_id kernels: sel = iota + (lookup - iota) * mask
+     ggml_tensor * lut_g  = ggml_reshape_2d(ctx0, ggml_get_rows(ctx0, lut2d, sel_flat), n_ku, n_tk);
+-    ggml_tensor * iota_b = ggml_repeat(ctx0, ggml_reshape_2d(ctx0, sp_up->iota, sp_up->n_pad, 1), mask_kT);
+-    ggml_tensor * sel_hot = ggml_cast(ctx0,
+-            ggml_add(ctx0, iota_b, ggml_mul(ctx0, ggml_sub(ctx0, lut_g, iota_b), mask_kT)), GGML_TYPE_I32);
++    ggml_tensor * sel_hot = nullptr;
++    if (sp_up->n_pad == 0) {
++        // sin relleno: lookup ya da 0 para los fríos → espacio 0 (resultado descartado por la máscara)
++        sel_hot = ggml_cast(ctx0, lut_g, GGML_TYPE_I32);
++    } else {
++        ggml_tensor * iota_b = ggml_repeat(ctx0, ggml_reshape_2d(ctx0, sp_up->iota, sp_up->n_pad, 1), mask_kT);
++        sel_hot = ggml_cast(ctx0,
++                ggml_add(ctx0, iota_b, ggml_mul(ctx0, ggml_sub(ctx0, lut_g, iota_b), mask_kT)), GGML_TYPE_I32);
++    }
+ 
+     // cold side: global ids with hot positions clamped to 0 — avoids re-reading
+     // hot experts from RAM (repeated reads of expert 0 stay in cache)
+     ggml_tensor * gid_f = ggml_cast(ctx0, selected_experts, GGML_TYPE_F32);
+-    ggml_tensor * sel_cold = ggml_cast(ctx0,
+-            ggml_sub(ctx0, gid_f, ggml_mul(ctx0, gid_f, mask_kT)), GGML_TYPE_I32);
++    ggml_tensor * sel_cold = nullptr;
++    static const bool cold_fill = [] { const char * e = std::getenv("AIPC_COLD_FILL"); return e && atoi(e) != 0; }();
++    static const bool cold_skip = [] { const char * e = std::getenv("AIPC_COLD_SKIP"); return e && atoi(e) != 0; }();
++    if (cold_skip) {
++        // omitir calientes: id -1 en las posiciones calientes → la CPU no las calcula (salida 0)
++        //   sel = gid - (gid + 1) * mask
++        // (y las frías de poco peso, AIPC_COLD_DROP: su peso ya es 0, no hace falta calcularlas)
++        ggml_tensor * fuera = omitir != nullptr ? ggml_add(ctx0, mask_kT, omitir) : mask_kT;
++        sel_cold = ggml_cast(ctx0,
++                ggml_sub(ctx0, gid_f, ggml_mul(ctx0, ggml_scale_bias(ctx0, gid_f, 1.0f, 1.0f), fuera)), GGML_TYPE_I32);
++    } else if (cold_fill) {
++        // relleno frío: las posiciones calientes usan un experto frío que el token ya lee
++        //   s    = (gid + 1) * (1 - mask)          [k, T]  (0 en posiciones calientes)
++        //   i    = argmax_k s                       [1, T]
++        //   fill = max(s[i] - 1, 0)                 [1, T]  (-1 → 0 si todo es caliente)
++        //   sel  = gid - (gid - fill) * mask
++        ggml_tensor * frio_m = ggml_scale_bias(ctx0, mask_kT, -1.0f, 1.0f);
++        ggml_tensor * s      = ggml_mul(ctx0, ggml_scale_bias(ctx0, gid_f, 1.0f, 1.0f), frio_m);
++        ggml_tensor * idx    = ggml_argsort_top_k(ctx0, s, 1);
++        ggml_tensor * sv     = ggml_get_rows(ctx0, ggml_reshape_3d(ctx0, s, 1, n_ku, n_tk), idx);   // [1, 1, T]
++        ggml_tensor * fill   = ggml_clamp(ctx0, ggml_scale_bias(ctx0, ggml_reshape_2d(ctx0, sv, 1, n_tk), 1.0f, -1.0f), 0.0f, INFINITY);
++        sel_cold = ggml_cast(ctx0,
++                ggml_sub(ctx0, gid_f, ggml_mul(ctx0, ggml_sub(ctx0, gid_f, fill), mask_kT)), GGML_TYPE_I32);
++    } else {
++        sel_cold = ggml_cast(ctx0,
++                ggml_sub(ctx0, gid_f, ggml_mul(ctx0, gid_f, mask_kT)), GGML_TYPE_I32);
++    }
+ 
+     // full chain per side (up/gate/act/down) — a single merge at the end of the
+     // layer, to avoid per-projection CPU<->GPU ping-pong.
+@@ -1885,12 +1926,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+     auto chain = [&](ggml_tensor * t_up,   ggml_tensor * t_up_b,
+                      ggml_tensor * t_gate, ggml_tensor * t_gate_b,
+                      ggml_tensor * t_down, ggml_tensor * t_down_b,
+-                     ggml_tensor * ids) {
+-        ggml_tensor * u = build_lora_mm_id(t_up,   cur, ids, nullptr);
++                     ggml_tensor * ids, ggml_tensor * entrada) {
++        ggml_tensor * u = build_lora_mm_id(t_up,   entrada, ids, nullptr);
+         if (t_up_b) {
+             u = ggml_add_id(ctx0, u, t_up_b, ids);
+         }
+-        ggml_tensor * g = build_lora_mm_id(t_gate, cur, ids, nullptr);
++        ggml_tensor * g = build_lora_mm_id(t_gate, entrada, ids, nullptr);
+         if (t_gate_b) {
+             g = ggml_add_id(ctx0, g, t_gate_b, ids);
+         }
+@@ -1925,8 +1966,22 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+     ggml_tensor * hot_up_b   = is_oai ? sp_up->hot_b   : nullptr;
+     ggml_tensor * hot_gate_b = is_oai ? sp_gate->hot_b : nullptr;
+     ggml_tensor * hot_down_b = is_oai ? sp_down->hot_b : nullptr;
+-    ggml_tensor * e_hot  = chain(sp_up->hot, hot_up_b,   sp_gate->hot, hot_gate_b, sp_down->hot, hot_down_b, sel_hot);  // VRAM
+-    ggml_tensor * e_cold = chain(up_exps,    up_exps_b,  gate_exps,    gate_exps_b, down_exps,   down_exps_b, sel_cold); // RAM/CPU
++    static const bool solapar = [] { const char * e = std::getenv("AIPC_OVERLAP"); return e && atoi(e) != 0; }();
++    ggml_tensor * entrada_fria = cur;
++    if (solapar && backend_cpu != nullptr) {
++        // (1) entrada e ids de la cadena fría a la CPU ya: la copia solo espera al router
++        sel_cold     = ggml_cont(ctx0, sel_cold);
++        entrada_fria = ggml_cont(ctx0, cur);
++        ggml_backend_sched_set_tensor_backend(sched, sel_cold, backend_cpu);
++        ggml_backend_sched_set_tensor_backend(sched, entrada_fria, backend_cpu);
++        ggml_build_forward_expand(gf, sel_cold);
++        ggml_build_forward_expand(gf, entrada_fria);
++    }
++    ggml_tensor * e_hot  = chain(sp_up->hot, hot_up_b,   sp_gate->hot, hot_gate_b, sp_down->hot, hot_down_b, sel_hot, cur);  // VRAM
++    if (solapar && backend_cpu != nullptr) {
++        ggml_build_forward_expand(gf, e_hot);        // (2) la GPU lo encola y sigue
++    }
++    ggml_tensor * e_cold = chain(up_exps,    up_exps_b,  gate_exps,    gate_exps_b, down_exps,   down_exps_b, sel_cold, entrada_fria); // RAM/CPU (3)
+ 
+     // experts = cold + (hot - cold) * mask
+     ggml_tensor * mask_b  = ggml_reshape_3d(ctx0, mask_kT, 1, n_ku, n_tk);
+@@ -2012,6 +2067,16 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+         cb(selection_probs, "ffn_moe_probs_biased", il);
+     }
+ 
++    // AIPC: preferir en la selección los expertos que ya están en la GPU (los pesos no cambian)
++    if (selected_experts_in == nullptr && up_exps != nullptr) {
++        static const float sesgo = [] { const char * e = std::getenv("AIPC_HOT_BIAS"); return e ? (float) atof(e) : 0.0f; }();
++        const aipc_moe_split * sp = sesgo != 0.0f ? aipc_moe_split_lookup(up_exps) : nullptr;
++        if (sp != nullptr) {
++            selection_probs = ggml_add(ctx0, selection_probs, ggml_scale(ctx0, sp->mask, sesgo));
++            cb(selection_probs, "ffn_moe_probs_hot", il);
++        }
++    }
++
+     // llama4 doesn't have exp_probs_b, and sigmoid is only used after top_k
+     // see: https://github.com/meta-llama/llama-models/blob/699a02993512fb36936b1b0741e13c06790bcf98/models/llama4/moe.py#L183-L198
+     if (arch == LLM_ARCH_LLAMA4) {
+@@ -2096,6 +2161,25 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+         cb(weights, "ffn_moe_weights_scaled", il);
+     }
+ 
++    // AIPC_COLD_DROP=τ: los expertos FRÍOS con peso < τ no se calculan (peso 0). Los calientes
++    // se calculan siempre (en la GPU no cuestan). Sin renormalizar: se pierde su pequeño aporte.
++    ggml_tensor * omitir = nullptr;
++    if (up_exps != nullptr) {
++        static const float umbral = [] { const char * e = std::getenv("AIPC_COLD_DROP"); return e ? (float) atof(e) : 0.0f; }();
++        const aipc_moe_split * sp = umbral > 0.0f ? aipc_moe_split_lookup(up_exps) : nullptr;
++        if (sp != nullptr) {
++            ggml_tensor * ids  = ggml_reshape_1d(ctx0, ggml_cont(ctx0, selected_experts), n_expert_used * n_tokens);
++            ggml_tensor * cal  = ggml_reshape_2d(ctx0, ggml_get_rows(ctx0, ggml_reshape_2d(ctx0, sp->mask, 1, sp->mask->ne[0]), ids),
++                                                 n_expert_used, n_tokens);
++            ggml_tensor * w2   = ggml_reshape_2d(ctx0, weights, n_expert_used, n_tokens);
++            ggml_tensor * bajo = ggml_step(ctx0, ggml_scale_bias(ctx0, w2, -1.0f, umbral));      // 1 si w < τ
++            omitir  = ggml_mul(ctx0, bajo, ggml_scale_bias(ctx0, cal, -1.0f, 1.0f));              // … y frío
++            weights = ggml_reshape_3d(ctx0, ggml_mul(ctx0, w2, ggml_scale_bias(ctx0, omitir, -1.0f, 1.0f)),
++                                      1, n_expert_used, n_tokens);
++            cb(weights, "ffn_moe_weights_omitidos", il);
++        }
++    }
++
+     //call early so that topk-moe can be used
+     ggml_build_forward_expand(gf, weights);
+ 
+@@ -2116,7 +2200,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+     // the merged gate_up path leaves gate_exps null so the split bails there.
+     experts = build_moe_ffn_split(cur, selected_experts, up_exps, gate_exps, down_exps,
+             up_exps_b, gate_exps_b, down_exps_b,
+-            up_exps_s, gate_exps_s, down_exps_s, type_op, il);
++            up_exps_s, gate_exps_s, down_exps_s, type_op, il, omitir);
+     if (experts == nullptr) {
+     // (original path; indentation preserved)
+ 
+diff --git a/src/llama-graph.h b/src/llama-graph.h
+index ec395524e..29add4b3e 100644
+--- a/src/llama-graph.h
++++ b/src/llama-graph.h
+@@ -1040,7 +1040,8 @@ struct llm_graph_context {
+              ggml_tensor * gate_exps_s,
+              ggml_tensor * down_exps_s,
+          llm_ffn_op_type   type_op,
+-                     int   il) const;
++                     int   il,
++             ggml_tensor * omitir = nullptr) const;
+ 
+     //
+     // inputs
+diff --git a/src/llama-model.cpp b/src/llama-model.cpp
+index 2997e07f8..ce5fdb0a9 100644
+--- a/src/llama-model.cpp
++++ b/src/llama-model.cpp
+@@ -1755,10 +1755,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                     // n_pad ZEROED dummy slots (one per k position): cold positions on the
+                     // hot side point at unique slots, keeping ids unique per token (the
+                     // CUDA mul_mat_id kernel invariant) with no garbage reads
+-                    const int n_pad = std::max(1, (int) hparams.n_expert_used);
++                    static const bool no_pad = [] { const char * e = std::getenv("AIPC_NO_PAD"); return e && atoi(e) != 0; }();
++                    const int n_pad = no_pad ? 0 : std::max(1, (int) hparams.n_expert_used);
+                     ggml_tensor * lookup = ggml_new_tensor_1d(ctx_hot, GGML_TYPE_F32, n_expert_t);
+                     ggml_tensor * mask   = ggml_new_tensor_1d(ctx_hot, GGML_TYPE_F32, n_expert_t);
+-                    ggml_tensor * iota   = ggml_new_tensor_1d(ctx_hot, GGML_TYPE_F32, n_pad);
++                    ggml_tensor * iota   = ggml_new_tensor_1d(ctx_hot, GGML_TYPE_F32, std::max(1, n_pad));
+                     ggml_format_name(lookup, "aipc_lookup-%d", il);
+                     ggml_format_name(mask,   "aipc_mask-%d",   il);
+                     ggml_format_name(iota,   "aipc_iota-%d",   il);
+@@ -1790,6 +1791,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                     LLAMA_LOG_INFO("%s: AIPC split: no eligible layer (experts not RAM-resident?)\n", __func__);
+                 } else {
+                     ggml_backend_buffer_t buf_hot = ggml_backend_alloc_ctx_tensors_from_buft(ctx_hot, buft_gpu);
++                    if (buf_hot != nullptr) {
++                        // como los pesos del modelo: el planificador fija a la GPU las operaciones
++                        // que los usan (si no, las ubica por sus vecinas y puede llevarlas a la CPU)
++                        ggml_backend_buffer_set_usage(buf_hot, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
++                    }
+                     if (buf_hot == nullptr) {
+                         ggml_free(ctx_hot);
+                         LLAMA_LOG_WARN("%s: AIPC split: failed to allocate GPU buffer - split disabled\n", __func__);
+@@ -1832,7 +1838,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                                     lk[pe.ids[i]] = (float) i;
+                                     mk[pe.ids[i]] = 1.0f;
+                                 }
+-                                std::vector<float> io(pe.n_pad);
++                                std::vector<float> io(std::max(1, pe.n_pad), 0.0f);
+                                 for (int i = 0; i < pe.n_pad; i++) {
+                                     io[i] = (float) (n_hot + i);
+                                 }
