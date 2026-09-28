@@ -307,7 +307,12 @@ class AIEngine:
             "moe_hilos": 0,              # 0 = uno por núcleo P (hasta 4)
             "moe_calientes": "auto",     # expertos por capa en la GPU; auto = los que quepan
             "moe_modo": motor_moe.MODO,  # exacto | equilibrado | rapido (omite expertos fríos de poco peso)
-            "moe_mtp": True              # decodificación especulativa con la cabeza MTP del modelo
+            "moe_mtp": True,             # decodificación especulativa con la cabeza MTP del modelo
+            "moe_nucleo": motor_moe.NUCLEO,  # q8: núcleo en Q8 (más calidad) · q4: el de Ollama (más rápido)
+            # Banco del proyecto: tokens de contexto por pregunta y del mapa; modelo del análisis ("" = automático)
+            "banco_presupuesto": 6000,
+            "banco_mapa": 3000,
+            "banco_modelo": "",
         }
         self._load_config()
 
@@ -858,7 +863,7 @@ class AIEngine:
             liberar_gpu=self._descargar_ollama,
             ajustes=lambda: {"contexto": self.config.get("moe_contexto"), "hilos": self.config.get("moe_hilos"),
                              "calientes": self.config.get("moe_calientes"), "modo": self.config.get("moe_modo"),
-                             "mtp": self.config.get("moe_mtp", True)})
+                             "mtp": self.config.get("moe_mtp", True), "nucleo": self.config.get("moe_nucleo")})
 
     def _post_con_recuperacion(self, url: str, payload: Dict[str, Any], intentos: int = 3):
         """ POST a Ollama que sobrevive a una falta de memoria al cargar.
@@ -1032,8 +1037,12 @@ class AIEngine:
         max_rondas: int = 6,
         cancelar: Optional[threading.Event] = None,
         gobernador=None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """ Chat por eventos: texto, razonamiento, herramientas, confianza y métricas.
+
+        `extra`: campos que se añaden tal cual a la petición (p. ej. el modo «solo código» del
+        motor MoE).
 
           {"t": "texto", "v": "…"}            parte de la respuesta
           {"t": "pensando", "v": "…"}         parte del razonamiento
@@ -1109,7 +1118,7 @@ class AIEngine:
                             asistente_parcial["thinking"] = pensamiento
                         previo = [asistente_parcial]
                     payload: Dict[str, Any] = {"model": model, "messages": msgs + previo, "stream": True,
-                                               "options": opciones, **base}
+                                               "options": opciones, **base, **(extra or {})}
                     if definiciones:
                         payload["tools"] = definiciones
                     if logprobs:

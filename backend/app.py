@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 logger = logging.getLogger("prig")
 
@@ -48,6 +48,8 @@ import ollama_opciones
 from ollama_opciones import ErrorConfig
 from ollama_gestion import GestorModelos, ErrorGestion
 from herramientas_chat import Herramientas, ETIQUETAS as ETIQUETAS_HERRAMIENTAS
+import banco_proyecto
+import memoria_consulta
 import buscador_modelos
 from buscador_modelos import ErrorBuscador
 from descargas_modelos import Descargas
@@ -136,6 +138,59 @@ pack_importer = PackImporter(knowledge_base)
 compilador_contexto = CompiladorContexto(knowledge_base)
 context_assembler = ContextAssembler(knowledge_base, compilador_contexto)
 indice_semantico = IndiceSemantico(knowledge_base)
+
+
+def _gpu_libre_para_banco() -> bool:
+    """ El banco embebe en la GPU solo si no hay ningún generador en ella (motor MoE u Ollama) """
+    try:
+        from ai_engine import motor_moe as _mm
+        if _mm._motor is not None and _mm._motor.en_marcha():
+            return False
+        cargados = requests_lib.get(f"{ai_engine.base_url}/api/ps", timeout=2).json().get("models", [])
+    except Exception:
+        return False
+    return all(any(e in (m.get("name") or "") for e in ("embed", "bge-")) for m in cargados)
+
+
+def _embebedor_en_gpu():
+    # Así el motor MoE (y unload_models) lo descargan antes de ocupar la GPU
+    usados = ai_engine.__dict__.setdefault("_usados", set())
+    usados.update({embebedor_banco.modelo, embebedor_banco.modelo + ":latest"})
+
+
+embebedor_banco = banco_proyecto.Embebedor(ai_engine.base_url, gpu_libre=_gpu_libre_para_banco,
+                                           al_usar_gpu=_embebedor_en_gpu)
+bancos = banco_proyecto.Bancos(embeber=embebedor_banco, embebedor_listo=embebedor_banco.disponible)
+_chats_usuario = [0]                 # respuestas del chat en curso: el analista autónomo les cede el paso
+_chats_lock = threading.Lock()
+
+
+def _guardia_analista() -> Optional[str]:
+    """ Motivo para que el analista autónomo espere, o None si puede trabajar. Nunca compite con el
+    usuario ni lleva los componentes al límite. """
+    if _chats_usuario[0]:
+        return "el chat está respondiendo"
+    try:
+        import psutil
+        libre_gb = psutil.virtual_memory().available / 1024 ** 3
+        if libre_gb < 6:
+            return f"poca RAM libre ({libre_gb:.1f} GB)"
+    except Exception:
+        pass
+    try:
+        gob = recursos_termico.gobernador()
+        gpu = gob.monitor.gpu(max_edad=5)
+        if gpu is not None and gpu >= gob.limite - 3:
+            return f"GPU a {gpu:.0f} °C (límite {gob.limite:.0f})"
+        cpu = recursos_termico.temp_cpu(recursos_termico.leer_sensores())
+        if cpu is not None and cpu >= 85:
+            return f"CPU a {cpu:.0f} °C"
+    except Exception:
+        pass
+    return None
+
+
+bancos.guardia = _guardia_analista
 job_exporter = JobExporter(book_service.books_dir)
 flow_store = FlowStore(file_mgr.base_dir)
 perfil_libro = PerfilLibro(knowledge_base)
@@ -279,6 +334,10 @@ class AIChatRequest(BaseModel):
     herramientas: bool = False
     permitir_codigo: bool = False
     continuar: Optional[str] = None      # respuesta cortada que el modelo debe seguir
+    # Motor MoE: solo código (sin razonar, sin explicar; la salida limitada a bloques de código)
+    solo_codigo: bool = False
+    # Banco del proyecto (banco_proyecto.py): mapa, código relevante, cambios, memoria y herramientas
+    banco: bool = False
 
 class AIInlinePromptRequest(BaseModel):
     prompt: str
@@ -2790,6 +2849,47 @@ def ide_olvidar_recientes():
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Gestión de proyectos y exploración de directorios
+# ---------------------------------------------------------------------------
+
+class SaveProjectRequest(BaseModel):
+    path: str
+    name: Optional[str] = None
+    source: Optional[str] = "biblioteca"
+
+
+class RemoveProjectRequest(BaseModel):
+    path: str
+
+
+@app.get("/api/workspace/projects")
+def workspace_projects():
+    return {
+        "actual": {
+            "path": file_mgr.base_dir,
+            "name": os.path.basename(file_mgr.base_dir) or file_mgr.base_dir
+        },
+        "guardados": ide.proyectos_guardados(),
+        "recientes": ide.recientes()
+    }
+
+
+@app.post("/api/workspace/projects/save")
+def workspace_save_project(req: SaveProjectRequest):
+    return _ide(ide.guardar_proyecto, req.path, req.name, req.source)
+
+
+@app.post("/api/workspace/projects/remove")
+def workspace_remove_project(req: RemoveProjectRequest):
+    return _ide(ide.eliminar_proyecto_guardado, req.path)
+
+
+@app.get("/api/workspace/directories")
+def workspace_directories(ruta: Optional[str] = Query(default=None)):
+    return _ide(ide.listar_directorios, ruta)
+
+
 @app.post("/api/ide/pantalla-completa")
 def ide_pantalla_completa():
     """ La ventana nativa (pywebview) no deja al JavaScript ponerse a pantalla
@@ -3561,13 +3661,95 @@ def _formatear_citas(citas: Optional[List[Dict[str, Any]]] = None, citas_lib: Op
         + "\n\n".join(lineas)
     )
 
+INSTRUCCION_BANCO = (
+    "BANCO DEL PROYECTO: tienes el mapa del proyecto y, con cada pregunta, el código relevante copiado "
+    "literalmente del disco, los cambios desde tu última respuesta y lo que ya se sabe (definiciones, "
+    "decisiones y preguntas resueltas).\n"
+    "Reglas:\n"
+    "1. Responde a partir de ese código y cita archivo:línea.\n"
+    "2. No inventes nombres de funciones, constantes, valores ni fragmentos de código. Si algo no está "
+    "en el banco, búscalo con buscar_proyecto, ver_simbolo, quien_usa o resumen_archivo antes de "
+    "afirmarlo; si tampoco aparece, dilo.\n"
+    "3. Para mostrar código que ya existe, cópialo tal cual del banco; no lo reescribas de memoria.\n"
+    "4. Si descubres algo que valga para futuras preguntas (una definición del dominio, una decisión de "
+    "diseño, teoría que explica el código), guárdalo con anotar."
+)
+
+
+INSTRUCCION_CONSOLA = (
+    "MEMORIA DE CONSULTA: con la herramienta consola ejecutas Python sobre el proyecto entero, que es el "
+    "objeto P. No necesitas tenerlo en tu contexto: consúltalo, crúzalo y cuenta con código, y guarda lo "
+    "intermedio en variables. Para preguntas exactas usa P.hechos o P.sql; para leer mucho texto con "
+    "criterio, recorre trozos con P.llm (map-reduce).\n" + memoria_consulta.AYUDA
+)
+
+SISTEMA_SUBLLAMADA = ("Eres un analista de código dentro de un análisis más grande. Responde breve y preciso, "
+                      "solo con lo que está en el contexto; si no está, dilo. Nombres y líneas exactos.")
+
+
+def _generador_subllamadas(modelo: str):
+    """ P.llm: el mismo modelo lee un trozo con un tope de tokens, sin razonar en voz alta """
+    def generar(pregunta: str, contexto: str, max_tokens: int) -> str:
+        prompt = f"{contexto}\n\n---\n{pregunta}" if contexto else pregunta
+        return "".join(ai_engine.generate_response(prompt, model=modelo, system_prompt=SISTEMA_SUBLLAMADA, think=False,
+                                                   options={"num_predict": int(max_tokens)}, uso="programador")).strip()
+    return generar
+
+
+def _presupuesto_banco(modelo: str) -> Tuple[int, int]:
+    """ (tokens de contexto por pregunta, tokens del mapa). El motor MoE crece el contexto solo;
+    con Ollama se respeta el num_ctx del modelo. """
+    from ai_engine import motor_moe as motor_moe_mod
+    pregunta = int(ai_engine.config.get("banco_presupuesto") or 6000)
+    mapa = int(ai_engine.config.get("banco_mapa") or 3000)
+    if not motor_moe_mod.es_moe(modelo):
+        try:
+            ctx = int(ai_engine._build_options(None, modelo, "tutor").get("num_ctx") or 8192)
+        except Exception:
+            ctx = 8192
+        pregunta = min(pregunta, int(ctx * 0.35))
+        mapa = min(mapa, int(ctx * 0.12))
+    return pregunta, mapa
+
+
+def _preparar_banco(req: "AIChatRequest", modelo: str):
+    """ (banco, info, mapa, contexto) para la carpeta de trabajo; (None, …) si no hay carpeta """
+    raiz = file_mgr.base_dir
+    if not raiz or not os.path.isdir(raiz):
+        return None, None, "", ""
+    try:
+        banco = bancos.para(raiz)
+        sincronia = banco.sincronizar()           # lo que cambió desde el último vistazo del vigilante
+        bancos.vigilar(raiz)
+        presupuesto, presupuesto_mapa = _presupuesto_banco(modelo)
+        enganchados = {str(f.get("path") or "").strip("./") for f in (req.hooked_files or [])}
+        paquete = banco.componer(req.prompt, presupuesto, excluir_rutas=enganchados)
+        mapa = banco.mapa(presupuesto_mapa)
+    except Exception as e:
+        return None, {"error": f"{type(e).__name__}: {e}"}, "", ""
+    info = {k: paquete[k] for k in ("tokens", "fragmentos", "archivos", "cambios", "conocimiento",
+                                   "resoluciones", "vectores", "version", "segundos")}
+    info.update({"mapa_tokens": banco_proyecto.estimar_tokens(mapa), "proyecto": os.path.basename(raiz),
+                 "sincronizados": sincronia["nuevos"] + sincronia["modificados"] + sincronia["borrados"],
+                 "inicial": sincronia["inicial"]})
+    return banco, info, mapa, paquete["texto"]
+
+
 @app.post("/api/ai/chat")
 def ai_chat(req: AIChatRequest):
     sys_prompt = ai_engine.get_tutor_system_prompt(req.mode)
     prompt = req.prompt
+    from ai_engine import motor_moe as motor_moe_mod
+    # Motor MoE: nada automático que el usuario no pidió (citas de libros ni búsqueda web): cada una
+    # añadía miles de tokens a leer, y la web además espera a la red (medido: +2.200 tokens y
+    # «Fuentes: Python docs» en una pregunta sobre el código del proyecto)
+    solo_lo_pedido = motor_moe_mod.es_moe(req.model or "")
+    if req.solo_codigo and solo_lo_pedido:
+        # Solo código: sin el prompt de tutor (pide explicar); el motor además limita la salida
+        sys_prompt = motor_moe_mod.INSTRUCCION_SOLO_CODIGO
 
     citas_contexto = _formatear_citas(req.selected_citations)
-    if not citas_contexto:
+    if not citas_contexto and not solo_lo_pedido:
         try:
             auto_citas = []
             auto_citas.extend(book_service.get_all_citations_for_ai(req.prompt, max_results=4))
@@ -3591,6 +3773,20 @@ def ai_chat(req: AIChatRequest):
     contexto_fijo = gancho_contexto if (gancho_contexto and req.eventos and motor_moe_mod.es_moe(modelo)) else ""
     if gancho_contexto and not contexto_fijo:
         prompt = f"{gancho_contexto}\n\n{prompt}"
+    banco, banco_info = None, None
+    if req.banco:
+        banco, banco_info, mapa, contexto_banco = _preparar_banco(req, modelo)
+        if banco is not None:
+            if contexto_banco:
+                prompt = f"{contexto_banco}\n\n{prompt}"
+            if mapa:
+                if req.eventos and motor_moe_mod.es_moe(modelo):
+                    # El mapa es estable: con el gancho, en el mensaje fijo que el motor reaprovecha
+                    contexto_fijo = f"{mapa}\n\n{contexto_fijo}".strip()
+                else:
+                    prompt = f"{mapa}\n\n{prompt}"
+            if not (req.solo_codigo and solo_lo_pedido):
+                sys_prompt = f"{sys_prompt}\n\n{INSTRUCCION_BANCO}"
     if req.code_context:
         prompt = f"```\n{req.code_context}\n```\n\n{prompt}"
 
@@ -3609,7 +3805,8 @@ def ai_chat(req: AIChatRequest):
 
     if req.eventos:
         return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo,
-                                                                 contexto_fijo=contexto_fijo)),
+                                                                 contexto_fijo=contexto_fijo,
+                                                                 banco=banco, banco_info=banco_info)),
                                  media_type="application/x-ndjson")
 
     def event_stream():
@@ -3625,10 +3822,15 @@ def ai_chat(req: AIChatRequest):
 
 
 def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None,
-                  contexto_fijo: str = ""):
+                  contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None):
     mod = modelo or req.model or _modelo_desafios(None, "tutor")
+    if banco_info:
+        yield json.dumps({"t": "banco", "v": banco_info}, ensure_ascii=False, default=str) + "\n"
     fuentes = []
-    if req.use_web or ai_engine.web_search.should_auto_search(req.prompt):
+    from ai_engine import motor_moe as motor_moe_mod
+    # Motor MoE: la web solo si el usuario la marca (ver ai_chat)
+    automatica = not motor_moe_mod.es_moe(mod) and ai_engine.web_search.should_auto_search(req.prompt)
+    if req.use_web or automatica:
         try:
             contexto_web, fuentes = ai_engine.web_search.get_web_context(req.prompt)
             if contexto_web:
@@ -3641,20 +3843,252 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
     mensajes.append({"role": "user", "content": prompt})
     if req.continuar:
         mensajes.append({"role": "assistant", "content": req.continuar})
+    solo_codigo = bool(req.solo_codigo and motor_moe_mod.es_moe(mod))
     herramientas = None
-    if req.herramientas:
+    consola = None
+    # Con el banco, las herramientas del proyecto van siempre (si el modelo las admite), y con ellas la
+    # memoria de consulta: una consola aislada donde el proyecto entero es el objeto P
+    if (req.herramientas or banco is not None) and not solo_codigo:   # la gramática de solo código no admite llamadas
+        if banco is not None and "tools" in ai_engine.capacidades(mod):
+            consola = memoria_consulta.Consola(banco, generar=_generador_subllamadas(mod))
+            mensajes[0]["content"] = f"{mensajes[0]['content']}\n\n{INSTRUCCION_CONSOLA}"
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
-                                    permitir_codigo=req.permitir_codigo, timeout=_exec_timeout())
-    for evento in ai_engine.chat_eventos(mensajes, mod, "tutor", think=req.think,
-                                         logprobs=max(0, min(int(req.logprobs or 0), 5)),
-                                         herramientas=herramientas,
-                                         gobernador=recursos_termico.gobernador()):
-        if evento.get("t") == "herramienta":
-            evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
-        yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+                                    permitir_codigo=req.permitir_codigo, timeout=_exec_timeout(), banco=banco,
+                                    consola=consola)
+    respuesta = []
+    with _chats_lock:
+        _chats_usuario[0] += 1
+    try:
+        for evento in ai_engine.chat_eventos(mensajes, mod, "tutor", think=False if solo_codigo else req.think,
+                                             logprobs=max(0, min(int(req.logprobs or 0), 5)),
+                                             herramientas=herramientas,
+                                             max_rondas=16 if banco is not None else 6,
+                                             gobernador=recursos_termico.gobernador(),
+                                             extra={motor_moe_mod.SOLO_CODIGO: True} if solo_codigo else None):
+            if evento.get("t") == "herramienta":
+                evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
+            elif evento.get("t") == "texto":
+                respuesta.append(str(evento.get("v") or ""))
+            yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+    finally:
+        with _chats_lock:
+            _chats_usuario[0] -= 1
+        if consola is not None:
+            consola.cerrar()
+    if banco is not None and respuesta:
+        # Historial de resoluciones: la próxima pregunta parecida parte de esta
+        try:
+            banco.registrar_resolucion(req.prompt, (req.continuar or "") + "".join(respuesta), mod,
+                                       rutas=herramientas.rutas_consultadas if herramientas else None)
+        except Exception:
+            pass
     if fuentes:
         texto = "\n\n---\n**Fuentes consultadas:**\n" + "".join(f"- [{f['title']}]({f['url']})\n" for f in fuentes)
         yield json.dumps({"t": "texto", "v": texto}, ensure_ascii=False) + "\n"
+
+# ==========================================
+# ENDPOINTS: BANCO DEL PROYECTO (banco_proyecto.py)
+# ==========================================
+
+class BancoConocimientoRequest(BaseModel):
+    tipo: str = "nota"
+    titulo: str
+    texto: str
+    rutas: Optional[List[str]] = None
+
+
+class BancoAnalizarRequest(BaseModel):
+    modelo: Optional[str] = None
+    limite: Optional[int] = None
+    continuo: bool = False        # analista autónomo: sigue vivo y rehace lo que cambie
+
+
+class BancoAjustesRequest(BaseModel):
+    presupuesto: Optional[int] = None
+    mapa: Optional[int] = None
+
+
+def _banco_actual(crear: bool = True) -> "banco_proyecto.BancoProyecto":
+    raiz = file_mgr.base_dir
+    if not raiz or not os.path.isdir(raiz):
+        raise HTTPException(status_code=400, detail="No hay carpeta de trabajo abierta.")
+    if not crear and not bancos.existe(raiz):
+        raise HTTPException(status_code=404, detail="Este proyecto todavía no tiene banco: actívalo primero.")
+    return bancos.para(raiz)
+
+
+def _modelo_analisis(pedido: Optional[str]) -> str:
+    from ai_engine import motor_moe as motor_moe_mod
+    if pedido:
+        return pedido
+    if ai_engine.config.get("banco_modelo"):
+        return ai_engine.config["banco_modelo"]
+    if motor_moe_mod.Motor.disponible().get("disponible"):
+        return motor_moe_mod.NOMBRE
+    return ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
+
+
+@app.get("/api/banco")
+def banco_estado():
+    raiz = file_mgr.base_dir
+    existe = bool(raiz) and bancos.existe(raiz)
+    presupuesto, mapa = _presupuesto_banco(ai_engine.config.get("agent1_model") or "")
+    datos: Dict[str, Any] = {"raiz": raiz, "existe": existe, "vigilando": bancos.vigilado == os.path.abspath(raiz or "."),
+                             "analisis": {k: v for k, v in bancos.analisis.items() if k != "inicio"},
+                             "embebedor": {"modelo": embebedor_banco.modelo, "disponible": embebedor_banco.disponible()},
+                             "presupuesto": int(ai_engine.config.get("banco_presupuesto") or 6000),
+                             "mapa": int(ai_engine.config.get("banco_mapa") or 3000),
+                             "modelo_analisis": _modelo_analisis(None), "error": bancos.ultimo_error}
+    if existe:
+        datos["banco"] = bancos.para(raiz).estado()
+    return datos
+
+
+@app.post("/api/banco/activar")
+def banco_activar():
+    banco = _banco_actual()
+    r = banco.sincronizar()
+    bancos.vigilar(banco.raiz)
+    return {"sincronizacion": r, "banco": banco.estado()}
+
+
+@app.post("/api/banco/sincronizar")
+def banco_sincronizar(forzar: bool = Query(default=False)):
+    banco = _banco_actual(crear=False)
+    return {"sincronizacion": banco.sincronizar(forzar=forzar), "banco": banco.estado()}
+
+
+@app.post("/api/banco/ajustes")
+def banco_ajustes(req: BancoAjustesRequest):
+    cambios: Dict[str, Any] = {}
+    if req.presupuesto is not None:
+        cambios["banco_presupuesto"] = max(1000, min(int(req.presupuesto), 100000))
+    if req.mapa is not None:
+        cambios["banco_mapa"] = max(0, min(int(req.mapa), 30000))
+    if cambios:
+        ai_engine.update_config(cambios)
+    return {"presupuesto": ai_engine.config.get("banco_presupuesto"), "mapa": ai_engine.config.get("banco_mapa")}
+
+
+@app.get("/api/banco/buscar")
+def banco_buscar(q: str = Query(...), k: int = Query(default=12)):
+    banco = _banco_actual(crear=False)
+    filas = banco.buscar(q, k=max(1, min(k, 50)))
+    return {"resultados": [{c: f[c] for c in ("ruta", "simbolo", "tipo", "ini", "fin", "tokens", "puntos")}
+                           | {"inicio": "\n".join(f["texto"].splitlines()[:8])} for f in filas]}
+
+
+@app.get("/api/banco/contexto")
+def banco_contexto(q: str = Query(...), presupuesto: int = Query(default=6000)):
+    """ Lo que recibiría el modelo con esta pregunta (para ver y ajustar el banco) """
+    banco = _banco_actual(crear=False)
+    return banco.componer(q, max(500, min(presupuesto, 100000)))
+
+
+@app.get("/api/banco/mapa")
+def banco_mapa(presupuesto: int = Query(default=3000)):
+    banco = _banco_actual(crear=False)
+    texto = banco.mapa(max(200, min(presupuesto, 30000)))
+    return {"texto": texto, "tokens": banco_proyecto.estimar_tokens(texto)}
+
+
+@app.get("/api/banco/cambios")
+def banco_cambios(desde: Optional[int] = Query(default=None), limite: int = Query(default=50)):
+    banco = _banco_actual(crear=False)
+    version = max(0, banco.version - 20) if desde is None else desde
+    return {"version": banco.version, "cambios": banco.cambios_desde(version, limite=max(1, min(limite, 500)))}
+
+
+@app.get("/api/banco/conocimiento")
+def banco_conocimiento():
+    return {"conocimiento": _banco_actual(crear=False).listar_conocimiento()}
+
+
+@app.post("/api/banco/conocimiento")
+def banco_anotar(req: BancoConocimientoRequest):
+    try:
+        return _banco_actual().anotar(req.tipo, req.titulo, req.texto, req.rutas or [], origen="usuario")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/banco/conocimiento/{id_conocimiento}")
+def banco_olvidar_conocimiento(id_conocimiento: int):
+    if not _banco_actual(crear=False).olvidar_conocimiento(id_conocimiento):
+        raise HTTPException(status_code=404, detail="No existe.")
+    return {"ok": True}
+
+
+@app.get("/api/banco/resoluciones")
+def banco_resoluciones(limite: int = Query(default=100)):
+    return {"resoluciones": _banco_actual(crear=False).listar_resoluciones(max(1, min(limite, 1000)))}
+
+
+@app.get("/api/banco/resoluciones/{id_resolucion}")
+def banco_resolucion(id_resolucion: int):
+    r = _banco_actual(crear=False).resolucion(id_resolucion)
+    if not r:
+        raise HTTPException(status_code=404, detail="No existe.")
+    return r
+
+
+@app.delete("/api/banco/resoluciones/{id_resolucion}")
+def banco_olvidar_resolucion(id_resolucion: int):
+    if not _banco_actual(crear=False).olvidar_resolucion(id_resolucion):
+        raise HTTPException(status_code=404, detail="No existe.")
+    return {"ok": True}
+
+
+@app.post("/api/banco/analizar")
+def banco_analizar(req: BancoAnalizarRequest):
+    """ Un modelo lee cada archivo que cambió desde el último análisis y deja su resumen y las
+    definiciones del dominio (en segundo plano; se puede cancelar) """
+    banco = _banco_actual(crear=False)
+    modelo = _modelo_analisis(req.modelo)
+
+    def generar(prompt: str) -> str:
+        return "".join(ai_engine.generate_response(prompt, model=modelo, system_prompt="Respondes solo con JSON válido.",
+                                                   think=False, uso="programador"))
+    bancos.vigilar(banco.raiz)
+    return bancos.analizar_en_fondo(banco, generar, modelo, limite=req.limite, continuo=req.continuo)
+
+
+class BancoConsolaRequest(BaseModel):
+    codigo: str
+    reiniciar: bool = False
+
+
+_consola_usuario: Dict[str, Any] = {"raiz": None, "consola": None}
+
+
+@app.post("/api/banco/consola")
+def banco_consola(req: BancoConsolaRequest):
+    """ La memoria de consulta para el usuario: la misma API P que usa el modelo """
+    banco = _banco_actual(crear=False)
+    actual = _consola_usuario.get("consola")
+    if req.reiniciar or actual is None or _consola_usuario.get("raiz") != banco.raiz:
+        if actual is not None:
+            actual.cerrar()
+        actual = memoria_consulta.Consola(banco, generar=_generador_subllamadas(_modelo_analisis(None)))
+        _consola_usuario.update({"raiz": banco.raiz, "consola": actual})
+    if not req.codigo.strip():
+        return {"salida": "", "error": None, "variables": []}
+    return actual.ejecutar(req.codigo)
+
+
+@app.post("/api/banco/analizar/cancelar")
+def banco_cancelar_analisis():
+    bancos.cancelar_analisis()
+    return {"ok": True}
+
+
+@app.delete("/api/banco")
+def banco_borrar():
+    raiz = file_mgr.base_dir
+    if not raiz:
+        raise HTTPException(status_code=400, detail="No hay carpeta de trabajo abierta.")
+    return {"borrado": bancos.borrar(raiz)}
+
 
 # ==========================================
 # ENDPOINTS: SISTEMA DE PLAN DE ESTUDIO (3 AGENTES ESPECIALISTAS)
@@ -4816,6 +5250,7 @@ class MoeRequest(BaseModel):
     calientes: Optional[str] = None     # "auto" o un número de expertos por capa
     modo: Optional[str] = None          # exacto | equilibrado | rapido
     mtp: Optional[bool] = None
+    nucleo: Optional[str] = None        # q8 (más calidad) | q4 (más rápido)
     detener: bool = False
     olvidar_proyectos: bool = False     # borra los proyectos guardados en disco
 
@@ -4826,7 +5261,7 @@ def _moe_estado() -> Dict[str, Any]:
     return {**ai_engine.motor_moe().estado(),
             "ajustes": {"contexto": cfg.get("moe_contexto"), "hilos": cfg.get("moe_hilos"),
                         "calientes": cfg.get("moe_calientes"), "modo": cfg.get("moe_modo"),
-                        "mtp": cfg.get("moe_mtp", True)},
+                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo")},
             "modos": list(motor_moe_mod.MODOS)}
 
 
@@ -4865,6 +5300,11 @@ def recursos_moe_ajustar(req: MoeRequest):
         cambios["moe_modo"] = req.modo
     if req.mtp is not None:
         cambios["moe_mtp"] = bool(req.mtp)
+    if req.nucleo is not None:
+        from ai_engine import motor_moe as motor_moe_mod
+        if req.nucleo not in motor_moe_mod.NUCLEOS:
+            raise HTTPException(status_code=400, detail="nucleo: q8 o q4")
+        cambios["moe_nucleo"] = req.nucleo
     if cambios:
         ai_engine.update_config(cambios)
     if req.detener:
@@ -4934,7 +5374,13 @@ def modelos_catalogo():
 
 @app.get("/api/modelos")
 def modelos_lista():
-    return {"modelos": _modelos(gestor_modelos.instalados), "disco": _modelos(gestor_modelos.uso_disco)}
+    # «propios»: los que sirve Prig sin Ollama (motor MoE), con sus capacidades para que el chat
+    # muestre sus opciones (Pensar, Herramientas). Van aparte: no admiten borrar, copiar ni actualizar.
+    from ai_engine import motor_moe as motor_moe_mod
+    propios = [{"nombre": m["name"], "capacidades": list(motor_moe_mod.CAPACIDADES), "motor": m.get("motor")}
+               for m in ai_engine._modelos_propios()]
+    return {"modelos": _modelos(gestor_modelos.instalados), "disco": _modelos(gestor_modelos.uso_disco),
+            "propios": propios}
 
 
 @app.get("/api/modelos/ficha")

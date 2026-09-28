@@ -50,7 +50,43 @@ DEFINICIONES = {
         {"codigo": {"type": "string", "description": "Código Python a ejecutar"}}, ["codigo"]),
 }
 
+# Con el banco del proyecto activo (banco_proyecto.py): el modelo consulta el proyecto entero sin
+# que quepa en su contexto, y deja anotado lo que aprende para las próximas preguntas
+DEFINICIONES_BANCO = {
+    "consola": _funcion(
+        "consola",
+        "Ejecuta Python sobre la memoria de consulta del proyecto: el objeto P da acceso a TODO el proyecto "
+        "(archivos, líneas, símbolos, grafo de hechos, cambios, memoria, SQL de solo lectura y P.llm para "
+        "leer trozos con otro modelo). Las variables persisten entre llamadas. Devuelve lo impreso y el valor "
+        "de la última expresión. Úsala para preguntas exactas o que abarcan muchos archivos.",
+        {"codigo": {"type": "string", "description": "Código Python que usa P (ver la ayuda en las instrucciones)"}},
+        ["codigo"]),
+    "buscar_proyecto": _funcion(
+        "buscar_proyecto",
+        "Busca en TODO el proyecto (por significado y por palabras) y devuelve los fragmentos más relevantes "
+        "con archivo y líneas.",
+        {"consulta": {"type": "string", "description": "Qué buscar, con tus palabras o con nombres de código"}},
+        ["consulta"]),
+    "ver_simbolo": _funcion(
+        "ver_simbolo",
+        "Devuelve el código completo de una función, método o clase del proyecto, con su ubicación.",
+        {"nombre": {"type": "string", "description": "Nombre (p. ej. calientes_para o Motor.asegurar)"}}, ["nombre"]),
+    "anotar": _funcion(
+        "anotar",
+        "Guarda en la memoria del proyecto algo que valga para futuras preguntas: una definición del dominio, "
+        "teoría que explica el código, una decisión de diseño o contexto. No anotes lo obvio ni lo temporal.",
+        {"tipo": {"type": "string", "enum": ["definicion", "teoria", "decision", "contexto", "nota"]},
+         "titulo": {"type": "string", "description": "Término o tema, corto"},
+         "texto": {"type": "string", "description": "El contenido, en una a cinco frases"},
+         "rutas": {"type": "array", "items": {"type": "string"}, "description": "Archivos a los que se refiere"}},
+        ["tipo", "titulo", "texto"]),
+}
+
 ETIQUETAS = {
+    "consola": "Consultando la memoria del proyecto",
+    "buscar_proyecto": "Buscando en el proyecto",
+    "ver_simbolo": "Leyendo una función",
+    "anotar": "Anotando en la memoria del proyecto",
     "buscar_biblioteca": "Buscando en la biblioteca",
     "listar_archivos": "Listando archivos",
     "leer_archivo": "Leyendo archivo",
@@ -66,19 +102,25 @@ def _recortar(texto: str) -> str:
 
 class Herramientas:
     def __init__(self, knowledge_base=None, file_mgr=None, ide=None, runner=None,
-                 permitir_codigo: bool = False, timeout: int = 25):
+                 permitir_codigo: bool = False, timeout: int = 25, banco=None, consola=None):
         self.kb = knowledge_base
         self.fm = file_mgr
         self.ide = ide
         self.runner = runner
         self.permitir_codigo = permitir_codigo
         self.timeout = timeout
+        self.banco = banco
+        self.consola = consola          # memoria_consulta.Consola: una por respuesta
+        self.rutas_consultadas: List[str] = []      # lo que el modelo miró: va a la resolución
 
     def definiciones(self) -> List[Dict[str, Any]]:
         nombres = [n for n in DEFINICIONES if n != "ejecutar_python" or self.permitir_codigo]
         if not self.kb:
             nombres.remove("buscar_biblioteca")
-        return [DEFINICIONES[n] for n in nombres]
+        definiciones = [DEFINICIONES[n] for n in nombres]
+        if self.banco is not None:
+            definiciones += [d for n, d in DEFINICIONES_BANCO.items() if n != "consola" or self.consola is not None]
+        return definiciones
 
     def ejecutar(self, nombre: str, argumentos: Dict[str, Any]) -> str:
         if isinstance(argumentos, str):
@@ -87,10 +129,16 @@ class Herramientas:
             except ValueError:
                 argumentos = {}
         metodo: Optional[Callable] = getattr(self, f"_h_{nombre}", None)
-        if metodo is None or (nombre == "ejecutar_python" and not self.permitir_codigo):
+        if metodo is None or (nombre == "ejecutar_python" and not self.permitir_codigo) \
+                or (nombre in DEFINICIONES_BANCO and self.banco is None) \
+                or (nombre == "consola" and self.consola is None):
             return f"Herramienta no disponible: {nombre}"
+        ruta = (argumentos or {}).get("ruta") if isinstance(argumentos, dict) else None
+        if ruta and ruta not in self.rutas_consultadas:
+            self.rutas_consultadas.append(str(ruta))
         try:
-            return _recortar(metodo(**(argumentos or {})))
+            resultado = metodo(**(argumentos or {}))
+            return resultado if nombre == "consola" else _recortar(resultado)   # la consola ya recorta
         except TypeError as e:
             return f"Argumentos no válidos para {nombre}: {e}"
         except PermissionError as e:
@@ -157,3 +205,20 @@ class Herramientas:
         if r.get("stderr"):
             partes.append("ERROR:\n" + r["stderr"])
         return "\n".join(partes) or ("(sin salida)" if r.get("success") else "(falló sin mensaje)")
+
+    # ------------------------------------------------------------------ banco del proyecto
+    def _h_buscar_proyecto(self, consulta: str = "") -> str:
+        return self.banco.texto_busqueda(consulta)
+
+    def _h_ver_simbolo(self, nombre: str = "") -> str:
+        return self.banco.ver_simbolo(nombre)
+
+    def _h_consola(self, codigo: str = "") -> str:
+        import memoria_consulta
+        return memoria_consulta.formatear(self.consola.ejecutar(codigo))
+
+    def _h_anotar(self, tipo: str = "nota", titulo: str = "", texto: str = "", rutas=None) -> str:
+        if isinstance(rutas, str):
+            rutas = [rutas]
+        r = self.banco.anotar(tipo, titulo, texto, rutas or [], origen="modelo")
+        return f"{'Actualizado' if r['actualizado'] else 'Guardado'} en la memoria del proyecto: ({r['tipo']}) {r['titulo']}"

@@ -1124,9 +1124,29 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
 #seccion-modelo { min-width: 0; flex-shrink: 0; }
 #seccion-trabajo { min-width: 0; }
 
-/* Un display en línea (display:flex) anula el atributo hidden: sin esto, las opciones
-   del chat que no aplican al modelo elegido seguían viéndose. */
-#ai-chat-opciones-modelo [hidden] { display: none !important; }
+#ai-chat-opciones-modelo [hidden],
+.tutor-cfg-item[hidden] { display: none !important; }
+
+#tutor-config-dropdown-bar {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+#tutor-config-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.tutor-cfg-item {
+  transition: all 0.15s ease;
+}
+
+.tutor-cfg-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
 
 /* =========================================================================
    Menús desplegables (Selects, Options, Optgroups) - Tema Oscuro Garantizado

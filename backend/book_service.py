@@ -36,25 +36,36 @@ CATEGORIES = {
 class BookService:
     def __init__(self, books_dir: str = None):
         if not books_dir:
-            books_dir = os.environ.get("PRIG_BOOKS_DIR", os.path.expanduser("~/.prig_books"))
+            books_dir = os.environ.get("PRIG_BOOKS_DIR")
+            if not books_dir:
+                try:
+                    default_path = os.path.expanduser("~/.prig_books")
+                    os.makedirs(default_path, exist_ok=True)
+                    books_dir = default_path
+                except OSError:
+                    books_dir = os.path.join(os.getcwd(), ".prig_books")
         self.books_dir = os.path.abspath(books_dir)
-        os.makedirs(self.books_dir, exist_ok=True)
-
-        # Crear subdirectorios de categorías del Repository
-        for cat in CATEGORIES.keys():
-            os.makedirs(os.path.join(self.books_dir, cat), exist_ok=True)
+        try:
+            os.makedirs(self.books_dir, exist_ok=True)
+            for cat in CATEGORIES.keys():
+                os.makedirs(os.path.join(self.books_dir, cat), exist_ok=True)
+        except OSError:
+            pass
 
         self.metadata_dir = os.path.join(self.books_dir, "metadata")
-        os.makedirs(self.metadata_dir, exist_ok=True)
-
         self.citas_dir = os.path.join(self.books_dir, "citas")
-        os.makedirs(self.citas_dir, exist_ok=True)
         self.edits_dir = os.path.join(self.citas_dir, "ediciones")
-        os.makedirs(self.edits_dir, exist_ok=True)
+        try:
+            os.makedirs(self.metadata_dir, exist_ok=True)
+            os.makedirs(self.citas_dir, exist_ok=True)
+            os.makedirs(self.edits_dir, exist_ok=True)
+        except OSError:
+            pass
 
         snippets_env = os.environ.get("PRIG_SNIPPETS_FILE")
         self.snippets_file = snippets_env if snippets_env else os.path.join(self.books_dir, "snippets.json")
         self._init_sample_books()
+
 
     def _init_sample_books(self):
         """ Crea la guía de muestra UNA sola vez en la vida de la biblioteca.
@@ -128,6 +139,22 @@ class BookService:
         """ Título legible derivado del nombre de archivo """
         stem = fname.rsplit('.', 1)[0] if '.' in fname else fname
         return stem.replace('_', ' ').replace('-', ' ').strip() or fname
+
+    def get_saved_projects(self) -> List[Dict[str, Any]]:
+        """ Lee los proyectos guardados en la configuración de Prig """
+        config_paths = [
+            os.path.expanduser('~/.prig_config.json'),
+            os.path.join(os.getcwd(), '.prig_config.json')
+        ]
+        for cp in config_paths:
+            if os.path.exists(cp):
+                try:
+                    with open(cp, 'r', encoding='utf-8') as f:
+                        cfg = json.load(f)
+                    return cfg.get("saved_projects") or []
+                except Exception:
+                    pass
+        return []
 
     def list_books(self, category_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         items = []
@@ -203,6 +230,32 @@ class BookService:
                     print(f"Elemento omitido de la biblioteca ({fname}): {e}")
                     continue
 
+        # 2. Añadir proyectos guardados de la biblioteca si se piden todos o PROJECTS
+        if category_filter is None or category_filter.lower() in ("projects", "all"):
+            for sp in self.get_saved_projects():
+                p_path = sp.get("path") if isinstance(sp, dict) else str(sp)
+                if not p_path or p_path in seen_paths or not os.path.isdir(p_path):
+                    continue
+                seen_paths.add(p_path)
+                p_name = (sp.get("name") if isinstance(sp, dict) else None) or os.path.basename(p_path) or p_path
+                meta = self.get_metadata(p_path) or {"title": p_name, "path": p_path, "is_project": True}
+                items.append({
+                    "id": os.path.basename(p_path),
+                    "uid": p_path,
+                    "category": "PROJECTS",
+                    "category_id": "projects",
+                    "title": p_name,
+                    "filename": os.path.basename(p_path),
+                    "path": p_path,
+                    "ext": "project",
+                    "is_project": True,
+                    "size_mb": 0.0,
+                    "indexable": False,
+                    "analyzed": True,
+                    "analysis_failed": False,
+                    "metadata": meta
+                })
+
         return items
 
     def _resolve_item(self, book_id: str) -> Optional[str]:
@@ -228,12 +281,50 @@ class BookService:
                 inside = False
             if inside and os.path.exists(abs_candidate):
                 return abs_candidate
+
+        # Si no está dentro de books_dir, comprobar si coincide con un proyecto guardado
+        for sp in self.get_saved_projects():
+            p_path = sp.get("path") if isinstance(sp, dict) else str(sp)
+            if p_path and os.path.isdir(p_path):
+                if p_path == book_id or os.path.basename(p_path) == book_id:
+                    return p_path
         return None
 
     def get_book_content(self, book_id: str) -> Dict[str, Any]:
         fpath = self._resolve_item(book_id)
         if not fpath:
             return {"error": f"Elemento no encontrado en el Knowledge Repository: {book_id}"}
+
+        # Si es un directorio / proyecto, devolver resumen estructurado sin error
+        if os.path.isdir(fpath):
+            meta = self.get_metadata(os.path.basename(fpath)) or {}
+            files_count, dirs_count = 0, 0
+            sample_files = []
+            try:
+                for root, dirs, files in os.walk(fpath):
+                    dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ('node_modules', '__pycache__', '.git', 'venv', '.venv')]
+                    dirs_count += len(dirs)
+                    files_count += len(files)
+                    if len(sample_files) < 20:
+                        for f in files:
+                            if not f.startswith("."):
+                                sample_files.append(os.path.relpath(os.path.join(root, f), fpath))
+                                if len(sample_files) >= 20:
+                                    break
+            except Exception:
+                pass
+
+            return {
+                "id": os.path.basename(fpath),
+                "type": "project",
+                "is_project": True,
+                "path": fpath,
+                "title": (meta or {}).get("title") or self._fallback_title(os.path.basename(fpath)),
+                "files_count": files_count,
+                "dirs_count": dirs_count,
+                "sample_files": sample_files,
+                "metadata": meta or {"title": self._fallback_title(os.path.basename(fpath)), "path": fpath, "is_project": True}
+            }
 
         ext = os.path.splitext(fpath)[1].lower()
         meta = self.get_metadata(os.path.basename(fpath))
@@ -271,6 +362,7 @@ class BookService:
                 }
             except Exception as e:
                 return {"error": f"Error leyendo elemento: {str(e)}"}
+
 
     def extract_pdf_text(self, pdf_path: str, max_pages: int = 25) -> str:
         if not PYPDF_AVAILABLE:

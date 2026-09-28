@@ -247,6 +247,12 @@ class BookLibraryManager {
         }
 
         const bookObj = this.allBooks.find(b => this.bookKey(b) === this.currentBook);
+        if (bookObj && ((bookObj.category || '').toUpperCase() === 'PROJECTS' || bookObj.is_project)) {
+            const projectPath = bookObj.path || this.currentBook;
+            await this.removeSavedProject(projectPath);
+            return;
+        }
+
         const nombre = (bookObj && (bookObj.title || bookObj.filename)) || this.currentBook;
 
         if (!confirm(`¿Eliminar "${nombre}" de la biblioteca?\n\nSe borrará el archivo, su ficha de IA y su entrada del índice. Esta acción no se puede deshacer.`)) {
@@ -671,6 +677,12 @@ class BookLibraryManager {
             }
 
             this.currentBookData = data;
+
+            if (data.type === 'project' || data.is_project) {
+                this.renderProjectViewer(data);
+                return;
+            }
+
             const ext = (data.path || bookId).split('.').pop().toLowerCase();
 
             if (data.type === 'pdf' || ext === 'pdf') {
@@ -734,6 +746,179 @@ class BookLibraryManager {
         this.pdfReaderMode = mode;
         if (this.currentBook) {
             this.loadBookViewer(this.currentBook);
+        }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    renderProjectViewer(data) {
+        const title = data.title || (data.metadata && data.metadata.title) || data.id || 'Proyecto';
+        const path = data.path || '';
+        const filesCount = data.files_count !== undefined ? data.files_count : '-';
+        const dirsCount = data.dirs_count !== undefined ? data.dirs_count : '-';
+        const sampleFiles = data.sample_files || [];
+        const safePath = path.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        let sampleFilesHtml = '';
+        if (sampleFiles.length > 0) {
+            sampleFilesHtml = `
+                <div style="background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; margin-top: 10px; max-height: 250px; overflow-y: auto;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: bold; margin-bottom: 8px;">
+                        <i class="fa-solid fa-file-code"></i> Archivos destacados del proyecto (${sampleFiles.length}${filesCount > sampleFiles.length ? ` de ${filesCount}` : ''}):
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-family: monospace; font-size: 11.5px; color: var(--accent-yellow);">
+                        ${sampleFiles.map(f => `<div><i class="fa-solid fa-file" style="color: var(--text-muted); margin-right: 6px;"></i>${this.escapeHtml(f)}</div>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        this.viewerContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%; padding: 24px; max-width: 900px; margin: 0 auto; overflow-y: auto; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 18px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <i class="fa-solid fa-folder-tree" style="color: var(--accent-purple); font-size: 1.8rem;"></i>
+                            <h2 style="margin: 0; color: #fff; font-size: 20px;">${this.escapeHtml(title)}</h2>
+                            <span style="background: rgba(203,166,247,0.2); color: var(--accent-purple); padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">PROYECTO GUARDADO</span>
+                        </div>
+                        <div style="font-family: monospace; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-location-dot"></i> <span>${this.escapeHtml(path)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Métricas del proyecto -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Archivos Totales</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--accent-blue); margin-top: 4px;">${filesCount}</div>
+                    </div>
+                    <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Subcarpetas</div>
+                        <div style="font-size: 24px; font-weight: bold; color: var(--accent-green); margin-top: 4px;">${dirsCount}</div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción Primaria -->
+                <div style="background: rgba(137,180,250,0.06); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                    <div>
+                        <div style="font-weight: 600; color: #fff; font-size: 13px;">¿Trabajar en este proyecto ahora?</div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Cargará todo el árbol de archivos en el explorador lateral de Archivos de Prig.</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="tool-btn" style="background: rgba(243,139,168,0.15); border: 1px solid rgba(243,139,168,0.3); color: var(--accent-red); font-size: 12px; padding: 8px 12px;" onclick="window.bookLibraryMgr.removeSavedProject('${safePath}');">
+                            <i class="fa-solid fa-bookmark-slash"></i> Desvincular
+                        </button>
+                        <button class="btn-primary-action" style="padding: 8px 18px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;" onclick="window.bookLibraryMgr.openProjectAsWorkspace('${safePath}');">
+                            <i class="fa-solid fa-folder-open"></i> Abrir en Archivos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Archivos de muestra -->
+                ${sampleFilesHtml}
+            </div>
+        `;
+    }
+
+    async openProjectAsWorkspace(path) {
+        if (!path) return;
+        try {
+            const res = await fetch('/api/workspace/open', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+            const data = await prigJson(res);
+            if (data.success) {
+                this.closeModal();
+                if (window.workArea && window.workArea.verEnModelo) {
+                    window.workArea.verEnModelo('archivos');
+                } else if (window.switchSidebarTab) {
+                    window.switchSidebarTab('files');
+                }
+                if (window.fileTreeMgr) {
+                    await window.fileTreeMgr.loadTree();
+                    await window.fileTreeMgr.syncWorkspaceIndicator();
+                }
+                if (window.terminalMgr) {
+                    window.terminalMgr.appendLine(`[Espacio de trabajo abierto desde Biblioteca: ${data.path}]`, 'info');
+                }
+            } else {
+                alert('No se pudo abrir el proyecto: ' + (data.error || 'Error desconocido'));
+            }
+        } catch (e) {
+            alert('Error abriendo proyecto: ' + e.message);
+        }
+    }
+
+    async promptAddProject() {
+        const ruta = prompt('Ingresa la ruta absoluta de la carpeta a guardar como proyecto:', '~/');
+        if (!ruta) return;
+
+        const parts = ruta.trim().split('/').filter(Boolean);
+        const nombreSugerido = parts.length > 0 ? parts[parts.length - 1] : 'Proyecto';
+        const nombre = prompt('Nombre descriptivo para este proyecto en la Biblioteca:', nombreSugerido);
+        if (!nombre) return;
+
+        try {
+            const res = await fetch('/api/workspace/projects/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: ruta.trim(), nombre: nombre.trim(), origen: 'biblioteca' })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                await this.loadBooks();
+                if (window.fileTreeMgr) {
+                    window.fileTreeMgr.cargarProyectos();
+                    window.fileTreeMgr.syncWorkspaceIndicator();
+                }
+                alert(`Proyecto "${nombre}" guardado con éxito en la Biblioteca.`);
+            } else {
+                alert('No se pudo guardar el proyecto: ' + (data.detail || data.error || 'Error desconocido'));
+            }
+        } catch (e) {
+            alert('Error al guardar proyecto: ' + e.message);
+        }
+    }
+
+    async removeSavedProject(path) {
+        if (!confirm(`¿Desvincular este proyecto de la Biblioteca?\n\n${path}\n\nNota: Los archivos físicos NO se borrarán.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/workspace/projects/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                this.currentBook = null;
+                this.currentBookData = null;
+                if (this.viewerContainer) this.viewerContainer.innerHTML = '';
+                if (this.metadataPane) this.metadataPane.innerHTML = '';
+                await this.loadBooks();
+                if (window.fileTreeMgr) {
+                    window.fileTreeMgr.cargarProyectos();
+                    window.fileTreeMgr.syncWorkspaceIndicator();
+                }
+            } else {
+                alert('No se pudo desvincular: ' + (data.detail || data.error));
+            }
+        } catch (e) {
+            alert('Error al desvincular proyecto: ' + e.message);
         }
     }
 

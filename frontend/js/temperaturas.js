@@ -285,14 +285,14 @@
     const m = ultimoMoe;
     if (!z || !m) return;
     const escrito = {};
-    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
     const a = m.ajustes || {};
     let estado;
     if (!m.disponible) {
       estado = `<span style="color:var(--text-muted);">${esc(m.motivo || 'No disponible')}</span>`;
     } else if (m.en_marcha) {
       estado = `<span style="color:${VERDE};"><i class="fa-solid fa-microchip"></i> En marcha · ${m.calientes_por_capa} expertos por capa en la GPU ·
-        ${m.mtp ? 'MTP · ' : ''}modo ${esc(m.modo || '')} ·
+        ${m.mtp ? 'MTP · ' : ''}núcleo ${esc((m.nucleo || '').toUpperCase())} · modo ${esc(m.modo || '')} ·
         contexto ${Math.round((m.contexto || 0) / 1024)}K${a.contexto === 'auto' ? ' (automático)' : ''} · núcleos P ${esc((m.nucleos || []).join(', '))}${m.activas ? ` · ${m.activas} respuesta${m.activas > 1 ? 's' : ''} en curso` : ''}</span>`;
     } else {
       estado = `<span style="color:var(--text-muted);"><i class="fa-solid fa-microchip"></i> Parado: arranca solo con la primera petición a
@@ -313,6 +313,11 @@
           <label for="moe-modo" title="exacto: igual que el modelo original · equilibrado: +0,5 % de perplejidad · rápido: +1,6 %">Modo</label>
           <select id="moe-modo" style="${estiloCampo}">${(m.modos || ['exacto', 'equilibrado', 'rapido']).map((x) =>
             `<option value="${x}" ${String(valor('moe-modo', a.modo)) === x ? 'selected' : ''}>${x === 'rapido' ? 'rápido' : x}</option>`).join('')}</select>
+          <label for="moe-nucleo" title="Núcleo (atención, SSM, router): en Q8 recupera ~70 % de la calidad que pierde el Q4 (−17 % de velocidad)">Núcleo</label>
+          <select id="moe-nucleo" style="${estiloCampo}" ${m.nucleo_q8_disponible ? '' : 'disabled title="Falta construir el núcleo Q8 (docs/motor-moe.md)"'}>
+            <option value="q8" ${String(valor('moe-nucleo', a.nucleo || 'q8')) === 'q8' ? 'selected' : ''}>Q8 · calidad</option>
+            <option value="q4" ${String(valor('moe-nucleo', a.nucleo || 'q8')) === 'q4' ? 'selected' : ''}>Q4 · velocidad</option>
+          </select>
           <label style="display:flex; gap:4px; align-items:center;" title="La cabeza MTP propone 2 tokens por paso; el resultado no cambia">
             <input type="checkbox" id="moe-mtp" ${a.mtp !== false ? 'checked' : ''}> MTP</label>
           <label for="moe-ctx">Contexto</label>
@@ -342,14 +347,15 @@
         pintarMoe();
       } catch (err) { msg(err.message, true); }
     };
-    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => {
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo'].forEach((id) => {
       const el = $(id);
       if (el) el.oninput = el.onchange = () => { el.dataset.tocado = '1'; };
     });
     Object.keys(escrito).forEach((id) => { if ($(id)) $(id).dataset.tocado = '1'; });
     if ($('moe-guardar')) $('moe-guardar').onclick = () => enviar({
       contexto: $('moe-ctx').value, calientes: $('moe-calientes').value.trim() || 'auto',
-      hilos: parseInt($('moe-hilos').value, 10) || 0, modo: $('moe-modo').value, mtp: $('moe-mtp').checked });
+      hilos: parseInt($('moe-hilos').value, 10) || 0, modo: $('moe-modo').value, mtp: $('moe-mtp').checked,
+      nucleo: $('moe-nucleo').value });
     if ($('moe-parar')) $('moe-parar').onclick = () => enviar({ detener: true });
     if ($('moe-olvidar')) $('moe-olvidar').onclick = () => {
       if (confirm('¿Borrar los proyectos guardados? La próxima pregunta sobre cada uno lo volverá a leer.')) enviar({ olvidar_proyectos: true });

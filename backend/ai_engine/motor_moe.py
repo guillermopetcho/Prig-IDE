@@ -20,6 +20,7 @@ import os
 import shutil
 import signal
 import socket
+import struct
 import subprocess
 import threading
 import time
@@ -39,7 +40,16 @@ REGISTRO = os.path.expanduser("~/.prig_moe.log")
 
 CONTEXTO = "auto"
 MAX_CALIENTES = 56
-MB_POR_CALIENTE = 68.65       # medido: un experto caliente más en cada una de las 40 capas
+MB_POR_CALIENTE = 68.65       # medido: un experto caliente más en cada una de las 40 capas (Q4)
+
+# Núcleo: la parte que no son expertos (atención, SSM, router, experto compartido; 1,3 GB en Q4)
+# está siempre en la GPU. Medido contra una referencia Q8 (docs/motor-moe.md): casi toda la pérdida
+# de calidad del Q4 viene de ahí, no de los expertos. «q8»: GGUF híbrido con el núcleo del Q8_0 de
+# unsloth y los expertos (y el vocabulario recortado) del Q4 (recursos/nativo/moe/construir_nucleo_q8.py).
+# Divergencia KL frente a Q8 en modo equilibrado: 0,083 → 0,041, a cambio de ~0,7 GB de VRAM (−17 %).
+CARPETA_MODELOS = os.path.expanduser("~/.cache/prig-moe/modelos")
+NUCLEOS = {"q4": None, "q8": "nucleo-q8-expertos-q4.gguf"}
+NUCLEO = "q8"
 MARGEN_MB = 250               # medido: +64–130 MB tras leer prompts largos; el resto, holgura
 RESERVA_CUDA_MB = 370         # medido: CUDA deja usar ~5.770 de los 6.141 MB (nvidia-smi da ~6.126 libres)
 
@@ -120,6 +130,32 @@ def prefijo_de(cuerpo: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
     return None
 
 
+def lista_global() -> List[List[int]]:
+    """ La lista caliente global (perfil de 255.000 tokens), por capa del más al menos usado """
+    capas: List[List[int]] = []
+    try:
+        with open(LISTA) as f:
+            for linea in f:
+                partes = linea.split()
+                if partes:
+                    capas.append([int(x) for x in partes[1:]])
+    except (OSError, ValueError):
+        pass
+    return capas
+
+
+def lista_caliente(uso: List[List[int]], global_: List[List[int]]) -> Optional[List[List[int]]]:
+    """ Por capa, los expertos del más al menos usado al leer el proyecto; los empates (y los que
+    no usó) siguen el orden de la lista global. None si no se contó nada. """
+    if not uso or not any(any(c) for c in uso):
+        return None
+    lista = []
+    for i, cuenta in enumerate(uso):
+        orden_global = {e: n for n, e in enumerate(global_[i])} if i < len(global_) else {}
+        lista.append(sorted(range(len(cuenta)), key=lambda e: (-cuenta[e], orden_global.get(e, len(cuenta)))))
+    return lista
+
+
 def proyectos_guardados(carpeta: Optional[str] = None) -> Dict[str, Any]:
     carpeta = carpeta or CARPETA_PROYECTOS
     archivos = glob.glob(os.path.join(carpeta, "*.bin"))
@@ -151,6 +187,10 @@ def podar_proyectos(carpeta: Optional[str] = None, limite_mb: float = PROYECTOS_
             borrados += 1
         except OSError:
             pass
+        try:
+            os.remove(a[:-4] + ".calientes.json")
+        except OSError:
+            pass
     return borrados
 
 
@@ -171,11 +211,92 @@ def cabe_mtp(vram_libre_mb: Optional[float], contexto: int) -> bool:
     return base is not None and (vram_libre_mb is None or vram_libre_mb - RESERVA_CUDA_MB - MARGEN_MB >= base)
 
 
-def calientes_para(vram_libre_mb: Optional[float], contexto: int, mtp: bool = False) -> int:
+def modelo_para(nucleo: Optional[str]) -> Optional[str]:
+    """ El GGUF que carga el motor: el híbrido con núcleo Q8 si existe, si no el Q4 de Ollama """
+    nombre = NUCLEOS.get(nucleo or NUCLEO)
+    if nombre:
+        ruta = os.path.join(CARPETA_MODELOS, nombre)
+        if os.path.isfile(ruta) and not os.path.exists(ruta + ".partes"):
+            return ruta
+    return blob_del_modelo()
+
+
+_tamanos: Dict[str, Tuple[int, int]] = {}
+_BLOQUES = {0: (1, 4), 1: (1, 2), 8: (32, 34), 10: (256, 84), 11: (256, 110), 12: (256, 144),
+            13: (256, 176), 14: (256, 210), 23: (256, 136), 30: (1, 2)}
+
+
+def tamanos_gguf(gguf: Optional[str]) -> Tuple[int, int]:
+    """ (bytes de un experto por capa en las 40 capas, bytes del núcleo en la GPU) según los tipos
+    del GGUF. El núcleo es todo lo que no son expertos, sin token_embd (va en la CPU). """
+    if not gguf:
+        return 0, 0
+    if gguf not in _tamanos:
+        expertos, nucleo = 0, 0
+        try:
+            with open(gguf, "rb") as f:
+                u = lambda fmt: struct.unpack("<" + fmt, f.read(struct.calcsize("<" + fmt)))[0]  # noqa: E731
+                s_ = lambda: f.read(u("Q")).decode("utf-8", "replace")  # noqa: E731
+                tam = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
+                if f.read(4) != b"GGUF":
+                    raise ValueError("no es GGUF")
+                u("I")
+                n_t, n_kv = u("Q"), u("Q")
+                for _ in range(n_kv):
+                    s_()
+                    t = u("I")
+                    if t == 8:
+                        s_()
+                    elif t == 9:
+                        et, n = u("I"), u("Q")
+                        if et == 8:
+                            for _ in range(n):
+                                s_()
+                        else:
+                            f.seek(tam[et] * n, 1)
+                    else:
+                        f.read(tam[t])
+                for _ in range(n_t):
+                    nombre = s_()
+                    ne = [u("Q") for _ in range(u("I"))]
+                    tipo = u("I")
+                    u("Q")
+                    e, b = _BLOQUES[tipo]
+                    elementos = 1
+                    for x in ne:
+                        elementos *= x
+                    bytes_ = elementos // e * b
+                    if "_exps." in nombre:
+                        capa = int(nombre.split(".")[1])
+                        if capa < 40 and len(ne) == 3:
+                            expertos += bytes_ // ne[2]
+                    elif nombre != "token_embd.weight":
+                        nucleo += bytes_
+        except (OSError, ValueError, KeyError, struct.error):
+            expertos, nucleo = 0, 0
+        _tamanos[gguf] = (expertos, nucleo)
+    return _tamanos[gguf]
+
+
+def mb_por_caliente(gguf: Optional[str] = None) -> float:
+    """ MB de un experto caliente más en cada capa (+0,8 % de alineación, medido con el Q4:
+    68,12 calculados, 68,65 reales) """
+    expertos = tamanos_gguf(gguf)[0]
+    return expertos / 1048576 * 1.008 if expertos else MB_POR_CALIENTE
+
+
+def mb_nucleo_extra(gguf: Optional[str]) -> float:
+    """ VRAM de más que ocupa el núcleo de este GGUF frente al Q4 medido (0 si es el mismo) """
+    propio, q4 = tamanos_gguf(gguf)[1], tamanos_gguf(blob_del_modelo())[1]
+    return max(0.0, (propio - q4) / 1048576 * 1.008) if propio and q4 else 0.0
+
+
+def calientes_para(vram_libre_mb: Optional[float], contexto: int, mtp: bool = False,
+                   mb_caliente: float = MB_POR_CALIENTE, extra_mb: float = 0.0) -> int:
     base = base_mb(contexto, mtp)
     if not vram_libre_mb or base is None:
         return 0
-    n = int((vram_libre_mb - RESERVA_CUDA_MB - base - MARGEN_MB) // MB_POR_CALIENTE)
+    n = int((vram_libre_mb - RESERVA_CUDA_MB - base - extra_mb - MARGEN_MB) // mb_caliente)
     return max(0, min(MAX_CALIENTES, n))
 
 
@@ -273,6 +394,25 @@ OPCIONES = {"temperature": "temperature", "top_k": "top_k", "top_p": "top_p", "m
             "presence_penalty": "presence_penalty", "frequency_penalty": "frequency_penalty",
             "seed": "seed", "stop": "stop"}
 
+# Modo «solo código»: campo propio de Prig en la petición (Ollama lo ignoraría; solo lo mira este motor)
+SOLO_CODIGO = "prig_solo_codigo"
+
+# Gramática GBNF: la respuesta solo puede ser uno o varios bloques de código, cada uno con un
+# «### Archivo: ruta» opcional delante (para editar archivos enganchados). Ninguna línea de
+# dentro puede empezar con ``` (eso cierra el bloque). Sin texto fuera de los bloques.
+GRAMATICA_CODIGO = r'''
+root     ::= bloque ("\n" bloque)*
+bloque   ::= archivo? "```" lengua "\n" linea* "```"
+archivo  ::= "### Archivo: " [^\n]+ "\n"
+lengua   ::= [a-zA-Z0-9_+#.-]*
+linea    ::= ([^`\n] [^\n]* | "`" [^`\n] [^\n]* | "``" [^`\n] [^\n]*)? "\n"
+'''.strip()
+
+INSTRUCCION_SOLO_CODIGO = (
+    "Responde SOLO con código: sin explicaciones, sin comentarios y sin docstrings (salvo que el "
+    "usuario los pida). Código completo, correcto y listo para usar, con nombres claros. "
+    "Si modificas archivos enganchados, pon «### Archivo: <ruta>» antes de cada bloque.")
+
 
 def _mensajes(mensajes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """ Mensajes de Ollama → OpenAI: razonamiento, llamadas a herramientas (argumentos como
@@ -328,8 +468,15 @@ def a_openai(ruta: str, pedido: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[st
     tope = opciones.get("num_predict")
     if tope is not None and int(tope) > 0:
         cuerpo["max_tokens"] = int(tope)
-    if pedido.get("think") is not None:
-        cuerpo["chat_template_kwargs"] = {"enable_thinking": bool(pedido["think"])}
+    # Sin razonamiento salvo que se pida: Qwen3.6 razona por defecto, y ese razonamiento son cientos
+    # o miles de tokens antes de la respuesta que el usuario no pidió (y el chat de Prig no mostraba
+    # la opción «Pensar» para este motor)
+    cuerpo["chat_template_kwargs"] = {"enable_thinking": bool(pedido.get("think"))}
+    if pedido.get(SOLO_CODIGO):
+        # Solo código: sin razonar y con la salida limitada por gramática a bloques de código (con
+        # «### Archivo: ruta» opcional): el modelo no puede gastar un token en prosa
+        cuerpo["chat_template_kwargs"] = {"enable_thinking": False}
+        cuerpo["grammar"] = GRAMATICA_CODIGO
     formato = pedido.get("format")
     if formato == "json":
         cuerpo["response_format"] = {"type": "json_object"}
@@ -568,9 +715,11 @@ class Motor:
         self.calientes = 0
         self.mtp = False
         self.modo = MODO
+        self.modelo: Optional[str] = None
         self.contexto = CONTEXTO_INICIAL
         self._contexto_pedido = CONTEXTO_INICIAL    # contexto automático: crece con las peticiones
         self._proyecto_cargado: Optional[str] = None  # clave del proyecto cuyo estado EXACTO tiene el motor
+        self._lista_actual: Optional[str] = None      # de qué proyecto es la lista caliente de la GPU
         self.ultimo_proyecto: Dict[str, Any] = {}
         self.nucleos: List[int] = []
         self._activas = 0
@@ -615,6 +764,8 @@ class Motor:
         return {**self.disponible(), "nombre": NOMBRE, "en_marcha": self.en_marcha(), "pid": self.pid(),
                 "puerto": self._puerto if self.en_marcha() else None, "calientes_por_capa": self.calientes,
                 "mtp": self.mtp, "modo": self.modo,
+                "nucleo": "q8" if self.modelo and self.modelo != blob_del_modelo() else "q4",
+                "nucleo_q8_disponible": modelo_para("q8") != blob_del_modelo(),
                 "contexto": self.contexto, "nucleos": self.nucleos, "activas": self._activas,
                 "keep_alive_s": self._keep_alive_s, "ultimo_error": self.ultimo_error, "version": version,
                 "proyectos": {**proyectos_guardados(), "ultimo": self.ultimo_proyecto}}
@@ -668,7 +819,9 @@ class Motor:
             env.update({"AIPC_MOE_HOT_LIST": LISTA, "AIPC_MOE_HOT_N": str(calientes),
                         "AIPC_NO_PAD": "1", "AIPC_COLD_SKIP": "1",
                         # la CPU calcula los fríos mientras la GPU calcula los calientes
-                        "AIPC_OVERLAP": "1"})
+                        "AIPC_OVERLAP": "1",
+                        # cuenta qué expertos usa cada proyecto al leerlo (su lista caliente)
+                        "AIPC_CONTAR": "1"})
             if MODOS[modo]:
                 env["AIPC_COLD_DROP"] = str(MODOS[modo])
         nucleos = self.nucleos[:hilos] if self.nucleos else None
@@ -693,7 +846,9 @@ class Motor:
                 return False
             try:
                 if requests.get(f"http://127.0.0.1:{self._puerto}/health", timeout=2).status_code == 200:
-                    self.calientes, self.mtp, self.modo = calientes, mtp, modo
+                    self.calientes, self.mtp, self.modo, self.modelo = calientes, mtp, modo, blob
+                    self._lista_actual = None            # servidor nuevo: vuelve la lista global
+                    self._proyecto_cargado = None
                     return True
             except requests.RequestException:
                 pass
@@ -718,17 +873,19 @@ class Motor:
             a = self.ajustes() or {}
             contexto = self.contexto_deseado(a)
             mtp = a.get("mtp", True) is not False
+            modelo = modelo_para(a.get("nucleo"))
             pedido = a.get("calientes")
             automatico = pedido in (None, "", "auto")
             libre = vram_libre_estable() if automatico else None
             intentos: List[Tuple[int, bool]] = []
             for con_mtp in ([True, False] if mtp and cabe_mtp(libre, contexto) else [False]):
-                n = calientes_para(libre, contexto, con_mtp) if automatico else int(pedido)
+                n = (calientes_para(libre, contexto, con_mtp, mb_por_caliente(modelo), mb_nucleo_extra(modelo))
+                     if automatico else int(pedido))
                 # Si no cabe (otro programa ocupó la GPU), menos expertos calientes; si ni así, sin MTP
                 intentos += [(n, con_mtp), (max(0, n - 8), con_mtp)]
             intentos.append((0, False))
             for n, con_mtp in dict.fromkeys(intentos):
-                if self._lanzar(disp["modelo"], n, con_mtp):
+                if self._lanzar(modelo, n, con_mtp):
                     self.ultimo_error = ""
                     self._arrancar_vigia()
                     return time.time() - t0
@@ -758,7 +915,7 @@ class Motor:
                 version = f.read()
         except OSError:
             version = ""
-        huella = hashlib.sha256(f"{version}|{blob_del_modelo()}|{self.modo}|".encode() + texto.encode())
+        huella = hashlib.sha256(f"{version}|{self.modelo}|{self.modo}|".encode() + texto.encode())
         clave = huella.hexdigest()[:32]
         archivo = clave + ".bin"
         ruta = os.path.join(CARPETA_PROYECTOS, archivo)
@@ -771,6 +928,7 @@ class Motor:
                 if r.status_code == 200:
                     os.utime(ruta)               # usado ahora: el último en borrarse
                     self._proyecto_cargado = clave
+                    self._aplicar_calientes(clave)
                     self.ultimo_proyecto = {"origen": "disco", "tokens": r.json().get("n_restored"),
                                             "segundos": round(time.time() - t0, 2)}
                     self._registro(f"proyecto {clave[:8]} restaurado: {self.ultimo_proyecto}")
@@ -782,6 +940,8 @@ class Motor:
             except OSError:
                 pass
         try:
+            if self.calientes:
+                requests.get(base + "/aipc/uso?reset=1", timeout=30)    # contar solo este proyecto
             r = requests.post(base + "/completion", timeout=7200,
                               json={"prompt": texto, "n_predict": 0, "cache_prompt": True})
             if r.status_code != 200:
@@ -794,19 +954,64 @@ class Motor:
             return None
         if g.status_code == 200:
             self._proyecto_cargado = clave
+            self._calientes_del_proyecto(clave)
             podar_proyectos()
         self.ultimo_proyecto = {"origen": "leido", "tokens": leidos, "segundos": round(time.time() - t0, 1),
                                 "guardado": g.status_code == 200}
         self._registro(f"proyecto {clave[:8]} leído: {self.ultimo_proyecto}")
         return {**self.ultimo_proyecto, "leidos": leidos, "lectura_ms": lectura_ms}
 
+    # -- expertos calientes por proyecto --------------------------------------------------------
+    def _calientes_del_proyecto(self, clave: str) -> Optional[List[List[int]]]:
+        """ Tras leer un proyecto: sus expertos más usados por capa pasan a la GPU, y la lista se
+        guarda junto a su estado. Medido: una lista de la propia conversación acierta el 77–79 %
+        frente al 50–66 % de la global. """
+        if not self.calientes:
+            return None
+        try:
+            uso = requests.get(f"http://127.0.0.1:{self._puerto}/aipc/uso?reset=1", timeout=30).json()["capas"]
+        except (requests.RequestException, ValueError, KeyError):
+            return None
+        lista = lista_caliente(uso, lista_global())
+        if lista is None:
+            return None
+        try:
+            with open(os.path.join(CARPETA_PROYECTOS, clave + ".calientes.json"), "w") as f:
+                json.dump(lista, f)
+        except OSError:
+            pass
+        self._enviar_calientes(lista, clave)
+        return lista
+
+    def _aplicar_calientes(self, clave: str):
+        """ Al restaurar un proyecto: su lista caliente guardada, si la hay y no es la que ya está """
+        if not self.calientes or self._lista_actual == clave:
+            return
+        try:
+            with open(os.path.join(CARPETA_PROYECTOS, clave + ".calientes.json")) as f:
+                lista = json.load(f)
+        except (OSError, ValueError):
+            return
+        self._enviar_calientes(lista, clave)
+
+    def _enviar_calientes(self, lista: List[List[int]], clave: str):
+        try:
+            t0 = time.time()
+            r = requests.post(f"http://127.0.0.1:{self._puerto}/aipc/calientes", json={"capas": lista}, timeout=120)
+            if r.status_code == 200:
+                self._lista_actual = clave
+                self._registro(f"calientes del proyecto {clave[:8]}: {r.json().get('capas_cambiadas')} capas "
+                               f"en {time.time() - t0:.2f} s")
+        except requests.RequestException:
+            pass
+
     def olvidar_proyectos(self) -> int:
         """ Borra los proyectos guardados en disco """
         n = 0
-        for a in glob.glob(os.path.join(CARPETA_PROYECTOS, "*.bin")):
+        for a in glob.glob(os.path.join(CARPETA_PROYECTOS, "*.bin")) + glob.glob(os.path.join(CARPETA_PROYECTOS, "*.calientes.json")):
             try:
                 os.remove(a)
-                n += 1
+                n += a.endswith(".bin")
             except OSError:
                 pass
         self._proyecto_cargado = None

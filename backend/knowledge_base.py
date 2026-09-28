@@ -135,7 +135,11 @@ class UnionFind:
 class KnowledgeBase:
     def __init__(self, ruta: Optional[str] = None):
         base = os.path.expanduser("~/.prig_books/.index")
-        os.makedirs(base, exist_ok=True)
+        try:
+            os.makedirs(base, exist_ok=True)
+        except OSError:
+            base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".prig_books", ".index"))
+            os.makedirs(base, exist_ok=True)
         self.ruta = os.path.abspath(ruta or os.path.join(base, "knowledge.db"))
         self._init_tablas()
 

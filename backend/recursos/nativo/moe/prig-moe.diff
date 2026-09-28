@@ -1,11 +1,153 @@
+diff --git a/ggml/include/ggml-backend.h b/ggml/include/ggml-backend.h
+index 2924fdbe9..5db4f236a 100644
+--- a/ggml/include/ggml-backend.h
++++ b/ggml/include/ggml-backend.h
+@@ -241,6 +241,10 @@ extern "C" {
+     GGML_API ggml_backend_dev_t ggml_backend_dev_by_name(const char * name);
+     GGML_API ggml_backend_dev_t ggml_backend_dev_by_type(enum ggml_backend_dev_type type);
+ 
++    // AIPC (Prig): uso de cada experto por capa al leer prompts en lotes (con AIPC_CONTAR=1).
++    // salida: [n_capas * n_expertos]; poner_a_cero: lee y reinicia los contadores
++    GGML_API void ggml_backend_aipc_uso(uint32_t * salida, int n_capas, int n_expertos, bool poner_a_cero);
++
+     // Direct backend (stream) initialization
+     // = ggml_backend_dev_init(ggml_backend_dev_by_name(name), params)
+     GGML_API ggml_backend_t ggml_backend_init_by_name(const char * name, const char * params);
+diff --git a/ggml/include/ggml-cpu.h b/ggml/include/ggml-cpu.h
+index e3e067c91..4d3eddbf7 100644
+--- a/ggml/include/ggml-cpu.h
++++ b/ggml/include/ggml-cpu.h
+@@ -139,6 +139,9 @@ extern "C" {
+ 
+     GGML_BACKEND_API ggml_backend_reg_t ggml_backend_cpu_reg(void);
+ 
++    // AIPC (Prig): posiciones de experto resueltas por la GPU y por la CPU al generar (AIPC_CONTAR=1)
++    GGML_BACKEND_API void ggml_cpu_aipc_aciertos(unsigned long long * calientes, unsigned long long * frias, bool poner_a_cero);
++
+     GGML_BACKEND_API void ggml_cpu_fp32_to_fp32(const float *,       float *, int64_t);
+     GGML_BACKEND_API void ggml_cpu_fp32_to_i32 (const float *,     int32_t *, int64_t);
+     GGML_BACKEND_API void ggml_cpu_fp32_to_fp16(const float *, ggml_fp16_t *, int64_t);
+diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
+index 87615921c..465f164bc 100644
+--- a/ggml/src/ggml-backend.cpp
++++ b/ggml/src/ggml-backend.cpp
+@@ -20,6 +20,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <algorithm>
++#include <atomic>
+ #include <vector>
+ 
+ #ifdef __APPLE__
+@@ -1538,6 +1539,35 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
+     return true;
+ }
+ 
++// AIPC (Prig): uso de cada experto por capa mientras se leen prompts en lotes (AIPC_CONTAR=1).
++// Sirve para elegir los expertos calientes de un proyecto a partir de lo que usó al leerlo.
++#define AIPC_MAX_CAPAS 64
++#define AIPC_MAX_EXPERTOS 512
++static std::atomic<uint32_t> g_aipc_uso[AIPC_MAX_CAPAS][AIPC_MAX_EXPERTOS];
++static const bool g_aipc_contar = [] { const char * e = getenv("AIPC_CONTAR"); return e && atoi(e) != 0; }();
++
++static int aipc_capa_de(const char * nombre) {
++    // «blk.12.ffn_up_exps.weight» → 12
++    if (!g_aipc_contar || strncmp(nombre, "blk.", 4) != 0) {
++        return -1;
++    }
++    return atoi(nombre + 4);
++}
++
++static void aipc_contar(int capa, int32_t experto) {
++    if (capa >= 0 && capa < AIPC_MAX_CAPAS && experto >= 0 && experto < AIPC_MAX_EXPERTOS) {
++        g_aipc_uso[capa][experto].fetch_add(1, std::memory_order_relaxed);
++    }
++}
++
++void ggml_backend_aipc_uso(uint32_t * salida, int n_capas, int n_expertos, bool poner_a_cero) {
++    for (int c = 0; c < n_capas && c < AIPC_MAX_CAPAS; c++) {
++        for (int e = 0; e < n_expertos && e < AIPC_MAX_EXPERTOS; e++) {
++            salida[c * n_expertos + e] = poner_a_cero ? g_aipc_uso[c][e].exchange(0) : g_aipc_uso[c][e].load();
++        }
++    }
++}
++
+ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
+     GGML_ASSERT(sched);
+     struct ggml_backend_sched_split * splits = sched->splits;
+@@ -1574,7 +1604,16 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+                 }
+ 
+                 // when offloading MoE weights, we can reduce the amount of data copied by copying only the experts that are used
+-                ggml_tensor * node = split->graph.nodes[0];
++                ggml_tensor * node = split->graph.n_nodes > 0 ? split->graph.nodes[0] : nullptr;
++                // AIPC: the MUL_MAT_ID that uses this weight may not be the first node of the split
++                // (a whole up/gate/act/down chain streamed to the GPU in one split)
++                for (int j = 0; j < split->graph.n_nodes; j++) {
++                    ggml_tensor * n = split->graph.nodes[j];
++                    if (n->op == GGML_OP_MUL_MAT_ID && n->src[0] == input_cpy) {
++                        node = n;
++                        break;
++                    }
++                }
+                 if (split->graph.n_nodes > 0 &&
+                     ggml_backend_buffer_get_usage(input->buffer) == GGML_BACKEND_BUFFER_USAGE_WEIGHTS &&
+                     ggml_backend_buffer_is_host(input->buffer) && (
+@@ -1609,11 +1648,13 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+                         // find the used experts
+                         used_ids.clear();
+                         used_ids.resize(ggml_bitset_size(n_expert));
++                        const int capa = aipc_capa_de(input->name);   // AIPC: uso por capa y experto
+                         for (int64_t i1 = 0; i1 < ids_tensor->ne[1]; i1++) {
+                             for (int64_t i0 = 0; i0 < ids_tensor->ne[0]; i0++) {
+                                 int32_t id = ids[i1 * ids_tensor->nb[1]/sizeof(int32_t) + i0 * ids_tensor->nb[0]/sizeof(int32_t)];
+                                 GGML_ASSERT(id >= 0 && id < n_expert);
+                                 ggml_bitset_set(used_ids.data(), id);
++                                aipc_contar(capa, id);
+                             }
+                         }
+ 
 diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
-index 8a0e5c255..5648bd43d 100644
+index 8a0e5c255..564df30b8 100644
 --- a/ggml/src/ggml-cpu/ggml-cpu.c
 +++ b/ggml/src/ggml-cpu/ggml-cpu.c
-@@ -1622,6 +1622,11 @@ static void ggml_compute_forward_mul_mat_id(
+@@ -1525,6 +1525,31 @@ static void * incr_ptr_aligned(void ** p, size_t size, size_t align) {
+     return ptr;
+ }
+ 
++// AIPC (Prig): al generar, cuántas posiciones de experto resolvió la GPU (id −1 en la cadena fría)
++// y cuántas calculó la CPU. Con AIPC_CONTAR=1. Mide el acierto de la lista caliente.
++static atomic_ullong g_aipc_calientes = 0, g_aipc_frias = 0;
++static int g_aipc_contar_cpu = -1;
++
++static void aipc_aciertos_contar(bool caliente) {
++    if (g_aipc_contar_cpu < 0) {
++        const char * e = getenv("AIPC_CONTAR");
++        g_aipc_contar_cpu = e && atoi(e) != 0;
++    }
++    if (g_aipc_contar_cpu) {
++        atomic_fetch_add_explicit(caliente ? &g_aipc_calientes : &g_aipc_frias, 1, memory_order_relaxed);
++    }
++}
++
++void ggml_cpu_aipc_aciertos(unsigned long long * calientes, unsigned long long * frias, bool poner_a_cero) {
++    if (poner_a_cero) {
++        *calientes = atomic_exchange(&g_aipc_calientes, 0);
++        *frias = atomic_exchange(&g_aipc_frias, 0);
++    } else {
++        *calientes = atomic_load(&g_aipc_calientes);
++        *frias = atomic_load(&g_aipc_frias);
++    }
++}
++
+ static void ggml_compute_forward_mul_mat_id(
+         const struct ggml_compute_params * params,
+               struct ggml_tensor * dst) {
+@@ -1622,6 +1647,12 @@ static void ggml_compute_forward_mul_mat_id(
              for (int id = 0; id < n_ids; ++id) {
                  const int32_t i02 = *(const int32_t *) ((const char *) ids->data + iid1*ids->nb[1] + id*ids->nb[0]);
  
++                aipc_aciertos_contar(i02 < 0);
 +                if (i02 < 0) {
 +                    // AIPC: id negativo = fila omitida (experto servido desde la GPU); salida en 0
 +                    memset((char *) dst->data + id*nb1 + iid1*nb2, 0, ne0*sizeof(float));
@@ -14,8 +156,39 @@ index 8a0e5c255..5648bd43d 100644
                  assert(i02 >= 0 && i02 < n_as);
  
                  MMID_MATRIX_ROW(i02, matrix_row_counts[i02]) = (struct mmid_row_mapping) {id, iid1};
+diff --git a/include/llama.h b/include/llama.h
+index b89ab758b..afea7cf71 100644
+--- a/include/llama.h
++++ b/include/llama.h
+@@ -567,6 +567,13 @@ extern "C" {
+     LLAMA_API int32_t llama_model_n_embd_out   (const struct llama_model * model);
+     LLAMA_API int32_t llama_model_n_layer      (const struct llama_model * model);
+     LLAMA_API int32_t llama_model_n_layer_nextn(const struct llama_model * model);
++
++    // AIPC (Prig): cambia qué expertos están en los espacios calientes de la VRAM, sin reiniciar.
++    // ids: [n_capas * n_por_capa], por capa del más al menos usado (-1 = vacío). Una capa cuya lista
++    // no llena sus espacios queda como estaba. Llamar solo sin cálculos en curso. Devuelve las capas cambiadas.
++    LLAMA_API int32_t llama_aipc_rehot(struct llama_model * model, const int32_t * ids, int32_t n_capas, int32_t n_por_capa);
++    // Expertos calientes por capa (0 si el reparto no está activo)
++    LLAMA_API int32_t llama_aipc_n_calientes(const struct llama_model * model);
+     LLAMA_API int32_t llama_model_n_head       (const struct llama_model * model);
+     LLAMA_API int32_t llama_model_n_head_kv    (const struct llama_model * model);
+     LLAMA_API int32_t llama_model_n_swa        (const struct llama_model * model);
+diff --git a/src/llama-aipc-moe.h b/src/llama-aipc-moe.h
+index 9b6899f8f..d5d8850a2 100644
+--- a/src/llama-aipc-moe.h
++++ b/src/llama-aipc-moe.h
+@@ -23,6 +23,8 @@ struct aipc_moe_split {
+     ggml_tensor * iota;   // F32 [n_pad]: values n_hot..n_hot+n_pad-1 (per-position dummy slots)
+     int n_hot;
+     int n_pad;            // = the model's n_expert_used
++    const uint8_t * hq_base = nullptr; // AIPC_MOE_HOT_GGUF: expert 0 of this tensor in the mapped
++    size_t          hq_nb2  = 0;       // higher-precision GGUF, and bytes per expert
+ };
+ 
+ const aipc_moe_split * aipc_moe_split_lookup(const ggml_tensor * exps);
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index 94990b3e1..e8db47b86 100644
+index 94990b3e1..bf28c8fb5 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -1801,8 +1801,15 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
@@ -47,7 +220,7 @@ index 94990b3e1..e8db47b86 100644
          return nullptr;
      }
      // per-expert scales are not replicated on the hot side -> disable the split
-@@ -1864,15 +1874,46 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+@@ -1864,15 +1874,47 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
      // k position (iota), preserving the unique-ids-per-token invariant of the
      // mul_mat_id kernels: sel = iota + (lookup - iota) * mask
      ggml_tensor * lut_g  = ggml_reshape_2d(ctx0, ggml_get_rows(ctx0, lut2d, sel_flat), n_ku, n_tk);
@@ -69,6 +242,7 @@ index 94990b3e1..e8db47b86 100644
      ggml_tensor * gid_f = ggml_cast(ctx0, selected_experts, GGML_TYPE_F32);
 -    ggml_tensor * sel_cold = ggml_cast(ctx0,
 -            ggml_sub(ctx0, gid_f, ggml_mul(ctx0, gid_f, mask_kT)), GGML_TYPE_I32);
++
 +    ggml_tensor * sel_cold = nullptr;
 +    static const bool cold_fill = [] { const char * e = std::getenv("AIPC_COLD_FILL"); return e && atoi(e) != 0; }();
 +    static const bool cold_skip = [] { const char * e = std::getenv("AIPC_COLD_SKIP"); return e && atoi(e) != 0; }();
@@ -99,7 +273,7 @@ index 94990b3e1..e8db47b86 100644
  
      // full chain per side (up/gate/act/down) — a single merge at the end of the
      // layer, to avoid per-projection CPU<->GPU ping-pong.
-@@ -1885,12 +1926,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+@@ -1885,12 +1927,12 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
      auto chain = [&](ggml_tensor * t_up,   ggml_tensor * t_up_b,
                       ggml_tensor * t_gate, ggml_tensor * t_gate_b,
                       ggml_tensor * t_down, ggml_tensor * t_down_b,
@@ -115,7 +289,7 @@ index 94990b3e1..e8db47b86 100644
          if (t_gate_b) {
              g = ggml_add_id(ctx0, g, t_gate_b, ids);
          }
-@@ -1925,8 +1966,22 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
+@@ -1925,8 +1967,22 @@ ggml_tensor * llm_graph_context::build_moe_ffn_split(
      ggml_tensor * hot_up_b   = is_oai ? sp_up->hot_b   : nullptr;
      ggml_tensor * hot_gate_b = is_oai ? sp_gate->hot_b : nullptr;
      ggml_tensor * hot_down_b = is_oai ? sp_down->hot_b : nullptr;
@@ -140,7 +314,7 @@ index 94990b3e1..e8db47b86 100644
  
      // experts = cold + (hot - cold) * mask
      ggml_tensor * mask_b  = ggml_reshape_3d(ctx0, mask_kT, 1, n_ku, n_tk);
-@@ -2012,6 +2067,16 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2012,6 +2068,16 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
          cb(selection_probs, "ffn_moe_probs_biased", il);
      }
  
@@ -157,7 +331,7 @@ index 94990b3e1..e8db47b86 100644
      // llama4 doesn't have exp_probs_b, and sigmoid is only used after top_k
      // see: https://github.com/meta-llama/llama-models/blob/699a02993512fb36936b1b0741e13c06790bcf98/models/llama4/moe.py#L183-L198
      if (arch == LLM_ARCH_LLAMA4) {
-@@ -2096,6 +2161,25 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2096,6 +2162,41 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
          cb(weights, "ffn_moe_weights_scaled", il);
      }
  
@@ -165,7 +339,23 @@ index 94990b3e1..e8db47b86 100644
 +    // se calculan siempre (en la GPU no cuestan). Sin renormalizar: se pierde su pequeño aporte.
 +    ggml_tensor * omitir = nullptr;
 +    if (up_exps != nullptr) {
-+        static const float umbral = [] { const char * e = std::getenv("AIPC_COLD_DROP"); return e ? (float) atof(e) : 0.0f; }();
++        static const float umbral_global = [] { const char * e = std::getenv("AIPC_COLD_DROP"); return e ? (float) atof(e) : 0.0f; }();
++        // AIPC_COLD_DROP_CAPAS="u0,u1,…": un umbral por capa (calibrado por sensibilidad); manda sobre el global
++        static const std::vector<float> por_capa = [] {
++            std::vector<float> v;
++            if (const char * e = std::getenv("AIPC_COLD_DROP_CAPAS")) {
++                std::string s(e);
++                size_t i = 0;
++                while (i <= s.size()) {
++                    const size_t j = s.find(',', i);
++                    v.push_back((float) atof(s.substr(i, j == std::string::npos ? std::string::npos : j - i).c_str()));
++                    if (j == std::string::npos) break;
++                    i = j + 1;
++                }
++            }
++            return v;
++        }();
++        const float umbral = (il >= 0 && il < (int) por_capa.size()) ? por_capa[il] : umbral_global;
 +        const aipc_moe_split * sp = umbral > 0.0f ? aipc_moe_split_lookup(up_exps) : nullptr;
 +        if (sp != nullptr) {
 +            ggml_tensor * ids  = ggml_reshape_1d(ctx0, ggml_cont(ctx0, selected_experts), n_expert_used * n_tokens);
@@ -183,7 +373,7 @@ index 94990b3e1..e8db47b86 100644
      //call early so that topk-moe can be used
      ggml_build_forward_expand(gf, weights);
  
-@@ -2116,7 +2200,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
+@@ -2116,7 +2217,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
      // the merged gate_up path leaves gate_exps null so the split bails there.
      experts = build_moe_ffn_split(cur, selected_experts, up_exps, gate_exps, down_exps,
              up_exps_b, gate_exps_b, down_exps_b,
@@ -207,10 +397,153 @@ index ec395524e..29add4b3e 100644
      //
      // inputs
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
-index 2997e07f8..ce5fdb0a9 100644
+index 2997e07f8..bbb9435c9 100644
 --- a/src/llama-model.cpp
 +++ b/src/llama-model.cpp
-@@ -1755,10 +1755,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+@@ -22,6 +22,12 @@
+ #include "ggml-cpp.h"
+ 
+ #include "llama-aipc-moe.h"
++#include "gguf.h"
++
++#include <fcntl.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <unistd.h>
+ 
+ #include <algorithm>
+ #include <cassert>
+@@ -53,6 +59,120 @@ void aipc_moe_split_register(const ggml_tensor * exps, const aipc_moe_split & sp
+     g_aipc_moe_splits[exps] = split;
+ }
+ 
++// AIPC_MOE_HOT_GGUF: the hot experts come from a higher-precision GGUF of the same base model
++// (only the hot copies; the rest of the model stays as loaded). Mapped read-only for the life of
++// the process, so a rehot can read other experts later.
++struct aipc_hq_source {
++    const uint8_t * base = nullptr;
++    size_t          size = 0;
++    gguf_context  * g    = nullptr;
++    ggml_context  * meta = nullptr;
++};
++
++static aipc_hq_source & aipc_hq() {
++    static aipc_hq_source src = [] {
++        aipc_hq_source r;
++        const char * path = std::getenv("AIPC_MOE_HOT_GGUF");
++        if (!path || !*path) {
++            return r;
++        }
++        gguf_init_params params = { /*.no_alloc =*/ true, /*.ctx =*/ &r.meta };
++        r.g = gguf_init_from_file(path, params);
++        const int fd = r.g ? open(path, O_RDONLY) : -1;
++        struct stat st;
++        if (fd >= 0 && fstat(fd, &st) == 0) {
++            void * p = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
++            if (p != MAP_FAILED) {
++                r.base = (const uint8_t *) p;
++                r.size = st.st_size;
++            }
++        }
++        if (fd >= 0) {
++            close(fd);
++        }
++        LLAMA_LOG_INFO("%s: AIPC hot experts from '%s': %s\n", __func__, path, r.base ? "ok" : "FAILED");
++        return r;
++    }();
++    return src;
++}
++
++// expert 0 of tensor `name` in the higher-precision GGUF if its shape matches `like`
++static bool aipc_hq_tensor(const char * name, const ggml_tensor * like, const uint8_t ** base, ggml_type * type, size_t * nb2) {
++    aipc_hq_source & hq = aipc_hq();
++    if (!hq.base) {
++        return false;
++    }
++    const int64_t id = gguf_find_tensor(hq.g, name);
++    const ggml_tensor * t = id >= 0 ? ggml_get_tensor(hq.meta, name) : nullptr;
++    if (!t || t->ne[0] != like->ne[0] || t->ne[1] != like->ne[1] || t->ne[2] != like->ne[2]) {
++        return false;
++    }
++    *type = gguf_get_tensor_type(hq.g, id);
++    *nb2  = ggml_row_size(*type, t->ne[0]) * t->ne[1];
++    *base = hq.base + gguf_get_data_offset(hq.g) + gguf_get_tensor_offset(hq.g, id);
++    return *base + *nb2 * t->ne[2] <= hq.base + hq.size;
++}
++
++int32_t llama_aipc_n_calientes(const struct llama_model * model) {
++    for (const auto & lay : model->layers) {
++        if (lay.ffn_up_exps) {
++            if (const aipc_moe_split * sp = aipc_moe_split_lookup(lay.ffn_up_exps)) {
++                return sp->n_hot;
++            }
++        }
++    }
++    return 0;
++}
++
++int32_t llama_aipc_rehot(struct llama_model * model, const int32_t * ids, int32_t n_capas, int32_t n_por_capa) {
++    int32_t cambiadas = 0;
++    for (int il = 0; il < n_capas && il < (int) model->layers.size(); il++) {
++        auto & lay = model->layers[il];
++        ggml_tensor * srcs[3] = { lay.ffn_up_exps, lay.ffn_gate_exps, lay.ffn_down_exps };
++        if (!srcs[0] || !srcs[1] || !srcs[2]) {
++            continue;
++        }
++        const aipc_moe_split * sp0 = aipc_moe_split_lookup(srcs[0]);
++        if (sp0 == nullptr || sp0->hot_b != nullptr) {
++            continue;                                  // sin reparto en esta capa (o con sesgos: no soportado)
++        }
++        const int n_hot    = sp0->n_hot;
++        const int n_expert = (int) srcs[0]->ne[2];
++        std::vector<int> nuevos;
++        std::vector<bool> visto(n_expert, false);
++        for (int i = 0; i < n_por_capa && (int) nuevos.size() < n_hot; i++) {
++            const int e = ids[(size_t) il * n_por_capa + i];
++            if (e >= 0 && e < n_expert && !visto[e]) {
++                visto[e] = true;
++                nuevos.push_back(e);
++            }
++        }
++        if ((int) nuevos.size() < n_hot) {
++            continue;                                  // la lista no llena los espacios: sin cambios
++        }
++        for (ggml_tensor * s : srcs) {
++            const aipc_moe_split * sp = aipc_moe_split_lookup(s);
++            if (sp == nullptr || s->data == nullptr) {
++                continue;
++            }
++            for (int i = 0; i < n_hot; i++) {
++                const char * desde = sp->hq_base ? (const char *) sp->hq_base + (size_t) nuevos[i] * sp->hq_nb2
++                                                 : (const char *) s->data   + (size_t) nuevos[i] * s->nb[2];
++                ggml_backend_tensor_set(sp->hot, desde, (size_t) i * sp->hot->nb[2], sp->hot->nb[2]);
++            }
++        }
++        std::vector<float> lk(n_expert, 0.0f), mk(n_expert, 0.0f);
++        for (int i = 0; i < n_hot; i++) {
++            lk[nuevos[i]] = (float) i;
++            mk[nuevos[i]] = 1.0f;
++        }
++        ggml_backend_tensor_set(sp0->lookup, lk.data(), 0, lk.size() * sizeof(float));
++        ggml_backend_tensor_set(sp0->mask,   mk.data(), 0, mk.size() * sizeof(float));
++        cambiadas++;
++    }
++    return cambiadas;
++}
++
+ void aipc_moe_split_clear() {
+     std::lock_guard<std::mutex> lock(g_aipc_moe_mutex);
+     g_aipc_moe_splits.clear();
+@@ -1704,6 +1824,8 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                     int n_pad;
+                     bool fill_tables;
+                     std::vector<int> ids;
++                    const uint8_t * hq_base;
++                    size_t hq_nb2;
+                 };
+                 std::vector<aipc_pending> pending;
+ 
+@@ -1755,10 +1877,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                      // n_pad ZEROED dummy slots (one per k position): cold positions on the
                      // hot side point at unique slots, keeping ids unique per token (the
                      // CUDA mul_mat_id kernel invariant) with no garbage reads
@@ -224,7 +557,33 @@ index 2997e07f8..ce5fdb0a9 100644
                      ggml_format_name(lookup, "aipc_lookup-%d", il);
                      ggml_format_name(mask,   "aipc_mask-%d",   il);
                      ggml_format_name(iota,   "aipc_iota-%d",   il);
-@@ -1790,6 +1791,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+@@ -1773,7 +1896,14 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                     }
+                     for (int p = 0; p < 3; p++) {
+                         ggml_tensor * s   = srcs[p];
+-                        ggml_tensor * hot = ggml_new_tensor_3d(ctx_hot, s->type, s->ne[0], s->ne[1], n_hot + n_pad);
++                        const uint8_t * hq_base = nullptr;
++                        ggml_type hq_type = s->type;
++                        size_t hq_nb2 = 0;
++                        if (!aipc_hq_tensor(s->name, s, &hq_base, &hq_type, &hq_nb2) && aipc_hq().base) {
++                            LLAMA_LOG_WARN("%s: AIPC: %s not in the hot GGUF (or other shape): kept at %s\n",
++                                    __func__, s->name, ggml_type_name(s->type));
++                        }
++                        ggml_tensor * hot = ggml_new_tensor_3d(ctx_hot, hq_base ? hq_type : s->type, s->ne[0], s->ne[1], n_hot + n_pad);
+                         ggml_format_name(hot, "aipc_hot__%s", s->name);
+                         ggml_tensor * s_b   = have_bias ? srcs_b[p] : nullptr;
+                         ggml_tensor * hot_b = nullptr;
+@@ -1781,7 +1911,8 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                             hot_b = ggml_new_tensor_2d(ctx_hot, s_b->type, s_b->ne[0], n_hot + n_pad);
+                             ggml_format_name(hot_b, "aipc_hotb__%s", s_b->name);
+                         }
+-                        pending.push_back({ s, s_b, hot, hot_b, lookup, mask, iota, n_pad, p == 0, { ids_ok.begin(), ids_ok.begin() + n_hot } });
++                        pending.push_back({ s, s_b, hot, hot_b, lookup, mask, iota, n_pad, p == 0, { ids_ok.begin(), ids_ok.begin() + n_hot },
++                                            hq_base, hq_nb2 });
+                     }
+                 }
+ 
+@@ -1790,6 +1921,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                      LLAMA_LOG_INFO("%s: AIPC split: no eligible layer (experts not RAM-resident?)\n", __func__);
                  } else {
                      ggml_backend_buffer_t buf_hot = ggml_backend_alloc_ctx_tensors_from_buft(ctx_hot, buft_gpu);
@@ -236,7 +595,20 @@ index 2997e07f8..ce5fdb0a9 100644
                      if (buf_hot == nullptr) {
                          ggml_free(ctx_hot);
                          LLAMA_LOG_WARN("%s: AIPC split: failed to allocate GPU buffer - split disabled\n", __func__);
-@@ -1832,7 +1838,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+@@ -1799,9 +1935,9 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                             const int n_hot = (int) pe.ids.size();
+                             for (int i = 0; i < n_hot; i++) {
+                                 // ids already validated/deduped at parse time
+-                                ggml_backend_tensor_set(pe.hot,
+-                                        (const char *) pe.src->data + (size_t) pe.ids[i] * pe.src->nb[2],
+-                                        (size_t) i * pe.hot->nb[2], pe.src->nb[2]);
++                                const char * desde = pe.hq_base ? (const char *) pe.hq_base + (size_t) pe.ids[i] * pe.hq_nb2
++                                                                : (const char *) pe.src->data + (size_t) pe.ids[i] * pe.src->nb[2];
++                                ggml_backend_tensor_set(pe.hot, desde, (size_t) i * pe.hot->nb[2], pe.hot->nb[2]);
+                             }
+                             // explicitly zero the dummy slots (recycled VRAM = garbage)
+                             zeros.assign(pe.hot->nb[2], 0);
+@@ -1832,7 +1968,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                                      lk[pe.ids[i]] = (float) i;
                                      mk[pe.ids[i]] = 1.0f;
                                  }
@@ -245,3 +617,69 @@ index 2997e07f8..ce5fdb0a9 100644
                                  for (int i = 0; i < pe.n_pad; i++) {
                                      io[i] = (float) (n_hot + i);
                                  }
+@@ -1840,7 +1976,8 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+                                 ggml_backend_tensor_set(pe.mask,   mk.data(), 0, mk.size() * sizeof(float));
+                                 ggml_backend_tensor_set(pe.iota,   io.data(), 0, io.size() * sizeof(float));
+                             }
+-                            aipc_moe_split_register(pe.src, { pe.hot, pe.hot_b, pe.lookup, pe.mask, pe.iota, n_hot, pe.n_pad });
++                            aipc_moe_split_register(pe.src, { pe.hot, pe.hot_b, pe.lookup, pe.mask, pe.iota, n_hot, pe.n_pad,
++                                                              pe.hq_base, pe.hq_nb2 });
+                         }
+                         const size_t vram_mb = ggml_backend_buffer_get_size(buf_hot) / 1024 / 1024;
+                         bool any_bias = false;
+diff --git a/tools/server/server.cpp b/tools/server/server.cpp
+index eafef86ba..15656c9b5 100644
+--- a/tools/server/server.cpp
++++ b/tools/server/server.cpp
+@@ -1,4 +1,5 @@
+ #include "server-context.h"
++#include "ggml-cpu.h"
+ #include "server-http.h"
+ #include "server-models.h"
+ #include "server-cors-proxy.h"
+@@ -202,6 +203,45 @@ int llama_server(int argc, char ** argv) {
+         ctx_http.del ("/models",               ex_wrapper(models_routes->del_router_models));
+     }
+ 
++    // AIPC (Prig): uso de los expertos al leer prompts (para elegir los calientes de un proyecto) y
++    // cambio de la lista caliente sin reiniciar. Prig los llama sin peticiones en curso.
++    ctx_http.get ("/aipc/uso", ex_wrapper([&ctx_server](const server_http_req & req) -> server_http_res_ptr {
++        auto res = std::make_unique<server_http_res>();
++        const llama_model * model = llama_get_model(ctx_server.get_llama_context());
++        const int n_capas = llama_model_n_layer(model);
++        const int n_exp = 256;
++        std::vector<uint32_t> uso((size_t) n_capas * n_exp, 0);
++        const bool a_cero = req.query_string.find("reset=1") != std::string::npos;
++        ggml_backend_aipc_uso(uso.data(), n_capas, n_exp, a_cero);
++        json capas = json::array();
++        for (int c = 0; c < n_capas; c++) {
++            capas.push_back(std::vector<uint32_t>(uso.begin() + (size_t) c * n_exp, uso.begin() + (size_t) (c + 1) * n_exp));
++        }
++        unsigned long long calientes = 0, frias = 0;
++        ggml_cpu_aipc_aciertos(&calientes, &frias, a_cero);
++        res->data = safe_json_to_str({{"capas", capas}, {"calientes_por_capa", llama_aipc_n_calientes(model)},
++                                      {"generando", {{"calientes", calientes}, {"frias", frias}}}});
++        return res;
++    }));
++    ctx_http.post("/aipc/calientes", ex_wrapper([&ctx_server](const server_http_req & req) -> server_http_res_ptr {
++        auto res = std::make_unique<server_http_res>();
++        const json body = json::parse(req.body);
++        const json & capas = body.at("capas");
++        size_t n_por_capa = 0;
++        for (const auto & c : capas) {
++            n_por_capa = std::max(n_por_capa, c.size());
++        }
++        std::vector<int32_t> ids(capas.size() * n_por_capa, -1);
++        for (size_t c = 0; c < capas.size(); c++) {
++            for (size_t i = 0; i < capas[c].size(); i++) {
++                ids[c * n_por_capa + i] = capas[c][i].get<int32_t>();
++            }
++        }
++        llama_model * model = const_cast<llama_model *>(llama_get_model(ctx_server.get_llama_context()));
++        const int32_t cambiadas = llama_aipc_rehot(model, ids.data(), (int32_t) capas.size(), (int32_t) n_por_capa);
++        res->data = safe_json_to_str({{"capas_cambiadas", cambiadas}});
++        return res;
++    }));
+     ctx_http.get ("/health",                   ex_wrapper(routes.get_health)); // public endpoint (no API key check)
+     ctx_http.get ("/v1/health",                ex_wrapper(routes.get_health)); // public endpoint (no API key check)
+     ctx_http.get ("/metrics",                  ex_wrapper(routes.get_metrics));

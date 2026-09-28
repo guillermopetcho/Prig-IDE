@@ -247,13 +247,27 @@ class ServiciosIDE:
             return self.problemas_python(codigo)
         return []
 
-    # ------------------------------------------------------------ recientes
+    # ------------------------------------------------------------ recientes y proyectos
     def _config(self) -> Dict[str, Any]:
         try:
             with open(self.fm.config_path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
+
+    def _guardar_config(self, config: Dict[str, Any]) -> bool:
+        destinos = [self.fm.config_path, os.path.join(os.getcwd(), ".prig_config.json")]
+        for dest in destinos:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
+                tmp = dest + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2, ensure_ascii=False)
+                os.replace(tmp, dest)
+                return True
+            except OSError:
+                continue
+        return False
 
     def recientes(self) -> List[Dict[str, Any]]:
         vistas = self._config().get("recent_workspaces") or []
@@ -269,19 +283,139 @@ class ServiciosIDE:
         lista = [r for r in (config.get("recent_workspaces") or []) if r != ruta]
         config["recent_workspaces"] = [ruta] + lista[:MAX_RECIENTES - 1]
         config["last_workspace"] = config.get("last_workspace") or ruta
-        try:
-            tmp = self.fm.config_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(config, f)
-            os.replace(tmp, self.fm.config_path)
-        except OSError:
-            pass
+        self._guardar_config(config)
 
     def olvidar_recientes(self):
         config = self._config()
         config["recent_workspaces"] = []
-        with open(self.fm.config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f)
+        self._guardar_config(config)
+
+    # ------------------------------------------------------------ proyectos guardados
+    def proyectos_guardados(self) -> List[Dict[str, Any]]:
+        guardados = self._config().get("saved_projects") or []
+        salida = []
+        rutas_vistas = set()
+        for p in guardados:
+            ruta = p.get("path") if isinstance(p, dict) else str(p)
+            if not ruta or ruta in rutas_vistas:
+                continue
+            rutas_vistas.add(ruta)
+            existe = os.path.isdir(ruta)
+            nombre = p.get("name") if isinstance(p, dict) else None
+            nombre = nombre or os.path.basename(ruta) or ruta
+            salida.append({
+                "path": ruta,
+                "name": nombre,
+                "exists": existe,
+                "actual": os.path.abspath(ruta) == os.path.abspath(self.fm.base_dir),
+                "created_at": p.get("created_at") if isinstance(p, dict) else None,
+                "source": p.get("source", "biblioteca") if isinstance(p, dict) else "biblioteca"
+            })
+        # Ordenar: el actual primero, luego los existentes por nombre
+        salida.sort(key=lambda x: (not x["actual"], not x["exists"], x["name"].lower()))
+        return salida
+
+    def guardar_proyecto(self, ruta: str, nombre: Optional[str] = None, origen: str = "biblioteca") -> Dict[str, Any]:
+        abs_ruta = os.path.abspath(os.path.expanduser(ruta))
+        if not os.path.isdir(abs_ruta):
+            raise ErrorIDE(f"No es una carpeta válida en el sistema: {ruta}")
+
+        nombre_final = (nombre or "").strip() or os.path.basename(abs_ruta) or abs_ruta
+        config = self._config()
+        guardados = config.get("saved_projects") or []
+
+        # Actualizar si ya existe o agregar nuevo
+        encontrado = False
+        import datetime
+        ahora = datetime.datetime.now().isoformat()
+        nuevo_item = {
+            "path": abs_ruta,
+            "name": nombre_final,
+            "source": origen,
+            "created_at": ahora,
+            "last_opened": ahora
+        }
+
+        nuevos = []
+        for p in guardados:
+            p_ruta = p.get("path") if isinstance(p, dict) else str(p)
+            if os.path.abspath(p_ruta) == abs_ruta:
+                nuevos.append(nuevo_item)
+                encontrado = True
+            else:
+                nuevos.append(p if isinstance(p, dict) else {"path": p_ruta, "name": os.path.basename(p_ruta)})
+
+        if not encontrado:
+            nuevos.insert(0, nuevo_item)
+
+        config["saved_projects"] = nuevos
+        self._guardar_config(config)
+        return {"success": True, "project": nuevo_item}
+
+    def eliminar_proyecto_guardado(self, ruta: str) -> Dict[str, Any]:
+        abs_ruta = os.path.abspath(os.path.expanduser(ruta))
+        config = self._config()
+        guardados = config.get("saved_projects") or []
+        nuevos = [p for p in guardados if os.path.abspath(p.get("path") if isinstance(p, dict) else str(p)) != abs_ruta]
+        config["saved_projects"] = nuevos
+        self._guardar_config(config)
+        return {"success": True, "path": abs_ruta}
+
+    # ------------------------------------------------------------ explorar directorios
+    def listar_directorios(self, ruta: Optional[str] = None) -> Dict[str, Any]:
+        if not ruta:
+            base = self.fm.base_dir if os.path.isdir(self.fm.base_dir) else os.path.expanduser("~")
+        else:
+            base = os.path.abspath(os.path.expanduser(ruta))
+
+        if not os.path.isdir(base):
+            base = os.path.expanduser("~")
+
+        subcarpetas = []
+        try:
+            with os.scandir(base) as it:
+                for entry in sorted(it, key=lambda e: e.name.lower()):
+                    if entry.is_dir(follow_symlinks=False) and not entry.name.startswith("."):
+                        if entry.name not in ("__pycache__", "node_modules", ".git", ".venv", "venv"):
+                            subcarpetas.append({
+                                "name": entry.name,
+                                "path": entry.path
+                            })
+        except (PermissionError, OSError):
+            pass
+
+        padre = os.path.dirname(base)
+        if padre == base or not os.path.isdir(padre):
+            padre = None
+
+        home = os.path.expanduser("~")
+        atajos = [
+            {"name": "Espacio Actual", "path": self.fm.base_dir, "icon": "fa-folder-open"},
+            {"name": "Carpeta Personal (~)", "path": home, "icon": "fa-house"},
+        ]
+        comunes = [
+            ("Documentos", os.path.join(home, "Documentos"), "fa-folder"),
+            ("Documents", os.path.join(home, "Documents"), "fa-folder"),
+            ("Descargas", os.path.join(home, "Descargas"), "fa-download"),
+            ("Downloads", os.path.join(home, "Downloads"), "fa-download"),
+            ("Escritorio", os.path.join(home, "Escritorio"), "fa-desktop"),
+            ("Desktop", os.path.join(home, "Desktop"), "fa-desktop"),
+            ("Biblioteca Prig", os.path.expanduser("~/.prig_books"), "fa-book-bookmark"),
+        ]
+        for nom, r, ic in comunes:
+            if os.path.isdir(r) and not any(a["path"] == r for a in atajos):
+                atajos.append({"name": nom, "path": r, "icon": ic})
+
+        return {
+            "current": base,
+            "current_path": base,
+            "current_name": os.path.basename(base) or base,
+            "parent": padre,
+            "parent_path": padre,
+            "subdirectories": subcarpetas,
+            "shortcuts": atajos
+        }
+
 
     # ------------------------------------------------------------ sistema
     def mostrar_en_sistema(self, ruta: str) -> Dict[str, Any]:

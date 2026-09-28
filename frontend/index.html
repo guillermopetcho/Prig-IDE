@@ -303,30 +303,87 @@
 
         <!-- AI Input Area -->
         <div id="ai-chat-input-wrapper" style="padding: 12px; background: #1e1e2e; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-purple); font-weight: 600;" title="Responder a partir de los libros y documentos de tu biblioteca, citando página">
-              <input type="checkbox" id="chk-usar-biblioteca" style="accent-color: var(--accent-purple); cursor: pointer;">
-              <i class="fa-solid fa-book-bookmark"></i> Mi biblioteca
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--accent-blue); font-weight: 600;" title="Buscar en fuentes oficiales de Internet (Python Docs, MDN, PyTorch, etc.) para profundizar la respuesta">
-              <input type="checkbox" id="chk-web-search" style="accent-color: var(--accent-blue); cursor: pointer;">
-              <i class="fa-solid fa-globe"></i> Búsqueda Web
-            </label>
-          </div>
-          <!-- Opciones según lo que sabe hacer el modelo elegido -->
-          <div id="ai-chat-opciones-modelo" style="display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--text-muted);">
-            <label id="opc-pensar" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="El modelo razona antes de responder (más lento, mejor en problemas)">
-              <input type="checkbox" id="chk-pensar" checked style="accent-color: var(--accent-yellow);"> <i class="fa-solid fa-lightbulb"></i> Pensar
-            </label>
-            <label id="opc-herramientas" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="El modelo puede buscar en tu biblioteca, leer y buscar en tus archivos">
-              <input type="checkbox" id="chk-herramientas" style="accent-color: var(--accent-blue);"> <i class="fa-solid fa-screwdriver-wrench"></i> Herramientas
-            </label>
-            <label id="opc-permitir-codigo" hidden style="display:flex; align-items:center; gap:5px; cursor:pointer; color: var(--accent-red);" title="Además, puede ejecutar código Python en una sesión aislada">
-              <input type="checkbox" id="chk-permitir-codigo" style="accent-color: var(--accent-red);"> Permitir ejecutar Python
-            </label>
-            <label id="opc-confianza" style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="Guarda la probabilidad de cada palabra para ver dónde dudó el modelo">
-              <input type="checkbox" id="chk-confianza" style="accent-color: var(--accent-green);"> <i class="fa-solid fa-chart-simple"></i> Confianza
-            </label>
+          <!-- Barra Desplegable: Configuración y Capacidades del Tutor Prig -->
+          <div id="tutor-config-dropdown-bar" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; transition: all 0.2s ease;">
+            
+            <!-- Cabecera de la Barra Desplegable -->
+            <button id="tutor-config-toggle-btn" type="button"
+              style="width: 100%; padding: 6px 10px; background: transparent; border: none; color: var(--text-main); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none;"
+              title="Clic para mostrar u ocultar opciones del Tutor (Biblioteca, Web, Herramientas, Confianza)">
+              <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;">
+                <i class="fa-solid fa-sliders" style="color: var(--accent-purple); font-size: 11px;"></i>
+                <span style="font-weight: 600; color: #fff; font-size: 11px; white-space: nowrap;">Configuración del Tutor</span>
+                <!-- Chips de resumen de lo activo -->
+                <div id="tutor-config-active-chips" style="display: flex; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 2px;">
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <span id="tutor-config-badge-activas" style="background: rgba(203,166,247,0.18); color: var(--accent-purple); font-size: 9.5px; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0 activas</span>
+                <i id="tutor-config-chevron" class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted); transition: transform 0.2s ease;"></i>
+              </div>
+            </button>
+
+            <!-- Contenido Desplegable con los Controles / Toggles -->
+            <div id="tutor-config-dropdown-content" style="display: none; padding: 8px 10px; border-top: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.18); flex-direction: column; gap: 6px;">
+              
+              <!-- Fila 1: Mi biblioteca y Búsqueda Web -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <label class="tutor-cfg-item" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 11px; color: var(--accent-purple); font-weight: 600; transition: all 0.15s ease;" title="Responder a partir de los libros y documentos de tu biblioteca, citando página">
+                  <input type="checkbox" id="chk-usar-biblioteca" style="accent-color: var(--accent-purple); cursor: pointer;">
+                  <i class="fa-solid fa-book-bookmark" style="font-size: 11px;"></i>
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Mi biblioteca</span>
+                </label>
+
+                <label class="tutor-cfg-item" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 11px; color: var(--accent-blue); font-weight: 600; transition: all 0.15s ease;" title="Buscar en fuentes oficiales de Internet (Python Docs, MDN, PyTorch, etc.) para profundizar la respuesta">
+                  <input type="checkbox" id="chk-web-search" style="accent-color: var(--accent-blue); cursor: pointer;">
+                  <i class="fa-solid fa-globe" style="font-size: 11px;"></i>
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Búsqueda Web</span>
+                </label>
+              </div>
+
+              <!-- Fila 1b: Banco del proyecto (mapa, código relevante, cambios y memoria del proyecto) -->
+              <div style="display: flex; gap: 6px;">
+                <label class="tutor-cfg-item" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 11px; color: var(--accent-green); font-weight: 600; transition: all 0.15s ease; flex: 1; min-width: 0;" title="El modelo recibe el mapa del proyecto, el código relevante para tu pregunta, los cambios desde su última respuesta y lo ya resuelto; y puede consultar cualquier parte del proyecto. Se actualiza solo al guardar.">
+                  <input type="checkbox" id="chk-banco" style="accent-color: var(--accent-green); cursor: pointer;">
+                  <i class="fa-solid fa-database" style="font-size: 11px;"></i>
+                  <span style="white-space: nowrap;">Banco del proyecto</span>
+                  <span id="banco-resumen" style="margin-left: auto; font-weight: 400; color: var(--text-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                </label>
+                <button id="btn-banco-panel" type="button" class="tutor-cfg-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 9px; color: var(--accent-green); cursor: pointer;" title="Ver y gestionar el banco del proyecto: memoria, resoluciones, cambios y análisis">
+                  <i class="fa-solid fa-sliders" style="font-size: 11px;"></i>
+                </button>
+              </div>
+
+              <!-- Fila 2: Herramientas, Confianza, Pensar, Código (Opciones según modelo) -->
+              <div id="ai-chat-opciones-modelo" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                
+                <label id="opc-herramientas" class="tutor-cfg-item" hidden style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; color: var(--accent-blue); font-weight: 600; flex: 1; min-width: 105px;" title="El modelo puede buscar en tu biblioteca, leer y buscar en tus archivos">
+                  <input type="checkbox" id="chk-herramientas" style="accent-color: var(--accent-blue); cursor: pointer;">
+                  <i class="fa-solid fa-screwdriver-wrench" style="font-size: 11px;"></i>
+                  <span>Herramientas</span>
+                </label>
+
+                <label id="opc-confianza" class="tutor-cfg-item" style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; color: var(--accent-green); font-weight: 600; flex: 1; min-width: 95px;" title="Guarda la probabilidad de cada palabra para ver dónde dudó el modelo">
+                  <input type="checkbox" id="chk-confianza" style="accent-color: var(--accent-green); cursor: pointer;">
+                  <i class="fa-solid fa-chart-simple" style="font-size: 11px;"></i>
+                  <span>Confianza</span>
+                </label>
+
+                <label id="opc-pensar" class="tutor-cfg-item" hidden style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; color: var(--accent-yellow); font-weight: 600; flex: 1; min-width: 80px;" title="El modelo razona antes de responder (más lento, mejor en problemas)">
+                  <input type="checkbox" id="chk-pensar" checked style="accent-color: var(--accent-yellow); cursor: pointer;">
+                  <i class="fa-solid fa-lightbulb" style="font-size: 11px;"></i>
+                  <span>Pensar</span>
+                </label>
+
+                <label id="opc-permitir-codigo" class="tutor-cfg-item" hidden style="display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; color: var(--accent-red); font-weight: 600; flex: 1; min-width: 135px;" title="Además, puede ejecutar código Python en una sesión aislada">
+                  <input type="checkbox" id="chk-permitir-codigo" style="accent-color: var(--accent-red); cursor: pointer;">
+                  <i class="fa-brands fa-python" style="font-size: 11px;"></i>
+                  <span>Ejecutar Python</span>
+                </label>
+
+              </div>
+
+            </div>
           </div>
 
           <!-- Contenedor de Chips de Archivos Enganchados (Gancho) -->
@@ -351,13 +408,13 @@
       <aside id="sidebar-left" class="panel">
         <div class="panel-header" style="position: relative; justify-content: space-between; align-items: center; padding: 6px 10px;">
           <!-- Título Interactivo ARCHIVOS ▾ -->
-          <div style="position: relative;">
+          <div style="position: relative; display: flex; align-items: center; gap: 4px;">
             <button id="btn-archivos-dropdown" onclick="const m = document.getElementById('archivos-header-menu'); m.style.display = m.style.display==='block'?'none':'block';" title="Menú de Acciones de Archivos" style="background: transparent; border: none; color: #fff; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px;">
               <i class="fa-solid fa-folder-tree" style="color: var(--accent-blue);"></i> ARCHIVOS <i class="fa-solid fa-chevron-down" style="font-size: 9px; color: var(--accent-blue);"></i>
             </button>
 
             <!-- Menú Desplegable de Archivos -->
-            <div id="archivos-header-menu" style="display: none; position: absolute; top: 100%; left: 0; background: #232334; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 0; min-width: 230px; box-shadow: 0 10px 24px rgba(0,0,0,0.7); z-index: 99999;">
+            <div id="archivos-header-menu" style="display: none; position: absolute; top: 100%; left: 0; background: #232334; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 0; min-width: 250px; box-shadow: 0 10px 24px rgba(0,0,0,0.7); z-index: 99999;">
               <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('btn-new-file').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
                 <i class="fa-solid fa-file-circle-plus" style="color: var(--accent-purple);"></i> Nuevo Archivo
               </a>
@@ -367,9 +424,19 @@
 
               <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
 
-              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('btn-open-workspace').click();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; justify-content: space-between; font-size: 12px; text-decoration: none;">
-                <span style="display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-folder-open" style="color: var(--accent-yellow);"></i> Rutas Guardadas / Cambiar Carpeta</span>
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('guardados');" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; justify-content: space-between; font-size: 12px; text-decoration: none;">
+                <span style="display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-star" style="color: var(--accent-purple);"></i> Proyectos Guardados (Biblioteca)</span>
               </a>
+
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('explorar');" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; justify-content: space-between; font-size: 12px; text-decoration: none;">
+                <span style="display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-folder-open" style="color: var(--accent-yellow);"></i> Cambiar o Buscar Carpeta...</span>
+              </a>
+
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.guardarCarpetaActualEnBiblioteca();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-bookmark" style="color: var(--accent-green);"></i> Guardar Carpeta Actual en Biblioteca
+              </a>
+
+              <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
 
               <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; window.abrirAprendizajeGuiado();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
                 <i class="fa-solid fa-brain" style="color: var(--accent-blue);"></i> Análisis Inteligente (Plan de Estudio)
@@ -377,7 +444,7 @@
 
               <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
 
-              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.refreshTree();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; if(window.fileTreeMgr) window.fileTreeMgr.loadTree();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
                 <i class="fa-solid fa-rotate-right" style="color: var(--text-muted);"></i> Actualizar Explorador
               </a>
               <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; document.getElementById('sidebar-left').style.display='none';" style="padding: 8px 14px; color: #e01b24; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
@@ -386,10 +453,20 @@
             </div>
           </div>
 
+          <!-- Botones rápidos en la cabecera de Archivos -->
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <button type="button" onclick="if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('guardados');" title="Proyectos Guardados y Cambiar Carpeta" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--accent-yellow); border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer;">
+              <i class="fa-solid fa-folder-open"></i>
+            </button>
+            <button type="button" onclick="if(window.fileTreeMgr) window.fileTreeMgr.guardarCarpetaActualEnBiblioteca();" title="Guardar carpeta actual en la Biblioteca de Proyectos" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--accent-purple); border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer;">
+              <i class="fa-solid fa-bookmark"></i>
+            </button>
+          </div>
+
           <!-- Hidden triggers for existing JS bindings -->
           <div style="display: none;">
             <button id="btn-sidebar-ai-analysis"></button>
-            <button id="btn-sidebar-open-folder"></button>
+            <button id="btn-sidebar-open-folder" onclick="if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('guardados');"></button>
             <button id="btn-new-file"></button>
             <button id="btn-new-folder"></button>
             <button id="btn-refresh-tree"></button>
@@ -397,8 +474,17 @@
           </div>
         </div>
 
+        <!-- Indicador de Carpeta Activa con botón para cambiar -->
+        <div id="workspace-folder-indicator" onclick="if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('guardados');" title="Haz clic para cambiar de carpeta o ver proyectos guardados" style="padding: 5px 8px; margin: 4px 8px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; font-size: 11px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s;">
+          <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <i class="fa-solid fa-folder" style="color: var(--accent-yellow); font-size: 11px;"></i>
+            <span id="workspace-folder-indicator-name" style="color: #eee; font-weight: 600;">Prig</span>
+          </div>
+          <span style="font-size: 9.5px; background: rgba(203,166,247,0.18); color: var(--accent-purple); padding: 1px 5px; border-radius: 3px; font-weight: bold;">CAMBIAR</span>
+        </div>
+
         <!-- Filter / Quick Search Input -->
-        <div class="tree-search-wrapper">
+        <div class="tree-search-wrapper" style="margin-top: 2px;">
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
           <input type="text" id="tree-search-input" placeholder="Buscar archivo o notebook...">
         </div>
@@ -880,6 +966,12 @@
               style="background: rgba(137,180,250,0.15); color: var(--accent-blue); border-color: rgba(137,180,250,0.3);"
               title="Añadir PDF o archivo de código a la biblioteca">
               <i class="fa-solid fa-file-circle-plus"></i> Importar Elemento
+            </button>
+            <button id="btn-save-project-library" class="tool-btn"
+              style="background: rgba(203,166,247,0.18); color: var(--accent-purple); border-color: rgba(203,166,247,0.35);"
+              title="Guardar una ruta de proyecto en la biblioteca"
+              onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.promptAddProject();">
+              <i class="fa-solid fa-folder-plus"></i> Guardar Proyecto
             </button>
             <button id="btn-analyze-book-ai" class="tool-btn btn-primary"
               style="background: rgba(249,226,175,0.2); color: var(--accent-yellow); border-color: rgba(249,226,175,0.4);"
@@ -1849,8 +1941,123 @@
     </div>
   </div>
 
+  <!-- MODAL GESTOR DE CARPETAS Y PROYECTOS GUARDADOS -->
+  <div id="modal-gestor-carpetas" class="modal-overlay" style="display:none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="modal-content modal-lg" style="width: 880px; max-width: 95vw; height: 75vh; max-height: 650px; display:flex; flex-direction:column; background: #1e1e2e; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 16px 36px rgba(0,0,0,0.7); overflow: hidden;">
+      
+      <!-- Modal Header con Tabs -->
+      <div class="modal-header" style="padding: 12px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <h3 style="margin: 0; font-size: 15px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-folder-tree" style="color: var(--accent-purple);"></i>
+            Gestor de Proyectos y Carpetas
+          </h3>
+          <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+            <button id="tab-btn-proyectos-guardados" class="ubuntu-btn active" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; border: none; background: var(--accent-purple); color: #111; font-weight: bold;" onclick="if(window.fileTreeMgr) window.fileTreeMgr.switchFolderModalTab('guardados');">
+              <i class="fa-solid fa-star"></i> Proyectos Guardados (<span id="badge-proyectos-guardados">0</span>)
+            </button>
+            <button id="tab-btn-proyectos-explorar" class="ubuntu-btn" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; border: none; background: transparent; color: var(--text-muted);" onclick="if(window.fileTreeMgr) window.fileTreeMgr.switchFolderModalTab('explorar');">
+              <i class="fa-solid fa-compass"></i> Explorar Disco
+            </button>
+            <button id="tab-btn-proyectos-recientes" class="ubuntu-btn" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; border: none; background: transparent; color: var(--text-muted);" onclick="if(window.fileTreeMgr) window.fileTreeMgr.switchFolderModalTab('recientes');">
+              <i class="fa-solid fa-clock-rotate-left"></i> Recientes
+            </button>
+          </div>
+        </div>
+        <button class="modal-close-btn" title="Cerrar (Esc)" onclick="document.getElementById('modal-gestor-carpetas').style.display='none';" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Barra de estado de carpeta actual -->
+      <div style="padding: 8px 18px; background: rgba(137,180,250,0.08); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 11.5px;">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <span style="color: var(--text-muted);">Espacio activo actual:</span>
+          <span id="gestor-carpetas-actual-badge" style="background: rgba(166,227,161,0.2); color: var(--accent-green); padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: monospace;">-</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="if(window.fileTreeMgr) window.fileTreeMgr.guardarCarpetaActualEnBiblioteca();" style="background: rgba(249,226,175,0.15); border: 1px solid var(--accent-yellow); color: var(--accent-yellow); padding: 3px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; font-weight: 600;" title="Guarda la carpeta actual en la biblioteca de proyectos">
+            <i class="fa-solid fa-bookmark"></i> Guardar actual en Biblioteca
+          </button>
+        </div>
+      </div>
+
+      <!-- Cuerpo del modal -->
+      <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0;">
+        
+        <!-- Pestaña 1: Proyectos Guardados (Biblioteca) -->
+        <div id="vista-tab-proyectos-guardados" style="flex: 1; display: flex; flex-direction: column; padding: 14px 18px; overflow-y: auto; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="position: relative; flex: 1;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 10px; color: var(--text-muted); font-size: 11px;"></i>
+              <input type="text" id="filtro-proyectos-guardados" oninput="if(window.fileTreeMgr) window.fileTreeMgr.filtrarProyectosGuardados(this.value);" placeholder="Filtrar proyectos guardados por nombre o ruta..." style="width: 100%; box-sizing: border-box; padding: 7px 10px 7px 30px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+            </div>
+            <button onclick="if(window.fileTreeMgr) window.fileTreeMgr.promptAnadirProyecto();" class="ubuntu-btn" style="background: var(--accent-purple); color: #111; border: none; border-radius: 6px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              <i class="fa-solid fa-plus"></i> Añadir Proyecto
+            </button>
+          </div>
+          <div id="lista-proyectos-guardados" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
+
+        <!-- Pestaña 2: Explorar Disco -->
+        <div id="vista-tab-proyectos-explorar" style="flex: 1; display: none; flex-direction: row; overflow: hidden;">
+          <!-- Atajos a la izquierda -->
+          <div style="width: 210px; flex-shrink: 0; border-right: 1px solid var(--border-color); padding: 12px 10px; background: rgba(0,0,0,0.15); overflow-y: auto;">
+            <div style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: bold; margin-bottom: 8px; letter-spacing: 0.5px;">Atajos de Sistema</div>
+            <div id="explorador-atajos-lista" style="display: flex; flex-direction: column; gap: 4px;"></div>
+          </div>
+          <!-- Contenido central de navegación -->
+          <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px; gap: 10px;">
+            <!-- Migas de pan y botón subir -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button id="btn-explorar-subir" onclick="if(window.fileTreeMgr) window.fileTreeMgr.explorarSubirNivel();" class="ubuntu-btn" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: #eee; padding: 4px 8px; border-radius: 5px; font-size: 11px; cursor: pointer;" title="Subir nivel">
+                <i class="fa-solid fa-arrow-up"></i> Subir
+              </button>
+              <div id="explorador-migas" style="flex: 1; font-family: monospace; font-size: 12px; color: var(--accent-blue); display: flex; align-items: center; gap: 4px; overflow-x: auto; white-space: nowrap; padding: 4px 0;"></div>
+              <input type="text" id="filtro-subcarpetas" oninput="if(window.fileTreeMgr) window.fileTreeMgr.filtrarSubcarpetas(this.value);" placeholder="🔍 Filtrar carpetas..." style="padding: 4px 8px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 4px; font-size: 11px; width: 150px;">
+            </div>
+            <!-- Lista de subdirectorios en cuadrícula -->
+            <div id="explorador-subcarpetas-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; align-content: flex-start; padding: 4px 0;"></div>
+            <!-- Barra inferior con ruta seleccionada y botones de acción -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 250px;">
+                <input type="text" id="input-ruta-seleccionada" placeholder="Ruta a abrir..." style="width: 100%; box-sizing: border-box; padding: 6px 10px; background: var(--bg-dark); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px; font-family: monospace;">
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="if(window.fileTreeMgr) window.fileTreeMgr.abrirDialogoNativo();" class="ubuntu-btn" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-muted); padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;" title="Abrir selector nativo del sistema operativo">
+                  <i class="fa-solid fa-window-restore"></i> SO
+                </button>
+                <button onclick="if(window.fileTreeMgr) window.fileTreeMgr.abrirCarpetaExplorada(true);" class="ubuntu-btn" style="background: rgba(203,166,247,0.15); border: 1px solid var(--accent-purple); color: var(--accent-purple); padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: bold; cursor: pointer;">
+                  <i class="fa-solid fa-bookmark"></i> Abrir y Guardar
+                </button>
+                <button onclick="if(window.fileTreeMgr) window.fileTreeMgr.abrirCarpetaExplorada(false);" class="ubuntu-btn" style="background: var(--accent-blue); color: #111; border: none; padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                  <i class="fa-solid fa-folder-open"></i> Abrir Carpeta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pestaña 3: Recientes -->
+        <div id="vista-tab-proyectos-recientes" style="flex: 1; display: none; flex-direction: column; padding: 14px 18px; overflow-y: auto; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 12px; color: var(--text-muted);">Historial de carpetas abiertas recientemente:</div>
+            <button onclick="if(window.fileTreeMgr) window.fileTreeMgr.limpiarRecientes();" style="background: transparent; border: 1px solid rgba(243,139,168,0.3); color: var(--accent-red); padding: 3px 8px; border-radius: 4px; font-size: 10.5px; cursor: pointer;">
+              <i class="fa-solid fa-trash-can"></i> Limpiar Recientes
+            </button>
+          </div>
+          <div id="lista-proyectos-recientes" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1;"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE CONFIGURACIÓN GLOBAL CENTRALIZADA -->
   <div id="modal-global-config" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; justify-content: center; align-items: center;">
+
     <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; width: 700px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 48px rgba(0,0,0,0.8); font-family: 'Inter', sans-serif;">
       
       <!-- Modal Header -->
@@ -2659,9 +2866,10 @@
   <script src="/static/js/plan_actual.js?v=7"></script>
   <script src="/static/js/editor.js?v=15"></script>
   <script src="/static/js/notebook.js?v=7"></script>
-  <script src="/static/js/filetree.js?v=8"></script>
+  <script src="/static/js/filetree.js?v=9"></script>
   <script src="/static/js/terminal.js?v=7"></script>
-  <script src="/static/js/ai_chat.js?v=13"></script>
+  <script src="/static/js/ai_chat.js?v=16"></script>
+  <script src="/static/js/banco_proyecto.js?v=2"></script>
   <script src="/static/js/kaggle_lector.js?v=10"></script>
   <script src="/static/js/github_lector.js?v=6"></script>
   <script src="/static/js/github_widget.js?v=1"></script>
@@ -2670,14 +2878,14 @@
   <script src="/static/js/inicio.js?v=7"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
-  <script src="/static/js/book_library.js?v=7"></script>
+  <script src="/static/js/book_library.js?v=8"></script>
   <script src="/static/js/base_conocimiento.js?v=3"></script>
   <script src="/static/js/explorador.js?v=3"></script>
   <script src="/static/js/flujos.js?v=7"></script>
   <script src="/static/js/recursos.js?v=1"></script>
   <script src="/static/js/modelos.js?v=3"></script>
   <script src="/static/js/buscador_modelos.js?v=5"></script>
-  <script src="/static/js/temperaturas.js?v=10"></script>
+  <script src="/static/js/temperaturas.js?v=11"></script>
   <script src="/static/js/aprendizaje_guiado.js?v=8"></script>
   <script src="/static/js/diagramas_ml.js?v=1"></script>
   <script src="/static/js/papers_ml.js?v=2"></script>

@@ -34,6 +34,7 @@ class AIChatManager {
         }
         const herr = document.getElementById('chk-herramientas');
         if (herr) herr.onchange = () => this.pintarOpcionesModelo();
+        this.initTutorConfigBar();
         window.addEventListener('prig:models-updated', () => this.cargarCapacidades());
 
         // Controles de Gancho (archivos y carpetas para el chat)
@@ -959,7 +960,10 @@ class AIChatManager {
 
         // Forzar activación del checkbox de Búsqueda Web
         const chkWeb = document.getElementById('chk-web-search');
-        if (chkWeb) chkWeb.checked = true;
+        if (chkWeb) {
+            chkWeb.checked = true;
+            this.updateTutorConfigBadges();
+        }
 
         const prompt = `Analiza y diagnostica el siguiente ERROR O TRACEBACK de ejecución. Busca la solución oficial en internet, explica por qué ocurrió y proporciona el código corregido:\n\n\`\`\`\n${errorText}\n\`\`\``;
         await this.sendMessage(prompt, "chat");
@@ -1169,6 +1173,12 @@ class AIChatManager {
         const marcado = (id) => { const el = document.getElementById(id); return !!(el && el.checked && !el.closest('[hidden]')); };
         const opciones = {};
         if (caps.includes('thinking')) opciones.think = marcado('chk-pensar');
+        const soloCodigoEl = document.getElementById('opc-solo-codigo');
+        if (soloCodigoEl && !soloCodigoEl.hidden && marcado('chk-solo-codigo')) {
+            opciones.solo_codigo = true;
+            opciones.think = false;
+        }
+        if (marcado('chk-banco')) opciones.banco = true;
         if (marcado('chk-confianza')) opciones.logprobs = 3;
         if (caps.includes('tools') && marcado('chk-herramientas')) {
             opciones.herramientas = true;
@@ -1183,6 +1193,8 @@ class AIChatManager {
             const d = await prigFetchJson('/api/modelos');
             this.capacidades = {};
             d.modelos.forEach(m => { this.capacidades[m.nombre] = m.capacidades; });
+            this.propios = new Set();
+            (d.propios || []).forEach(m => { this.capacidades[m.nombre] = m.capacidades; this.propios.add(m.nombre); });   // motor MoE
         } catch (e) { this.capacidades = this.capacidades || {}; }
         this.pintarOpcionesModelo();
     }
@@ -1193,8 +1205,101 @@ class AIChatManager {
         const mostrar = (id, si) => { const el = document.getElementById(id); if (el) el.hidden = !si; };
         mostrar('opc-pensar', caps.includes('thinking'));
         mostrar('opc-herramientas', caps.includes('tools'));
+        // Motor MoE: «Solo código» (sin razonar ni explicar; la salida limitada a bloques de código)
+        let soloCodigo = document.getElementById('opc-solo-codigo');
+        const pensar = document.getElementById('opc-pensar');
+        if (!soloCodigo && pensar && pensar.parentNode) {
+            soloCodigo = document.createElement('label');
+            soloCodigo.id = 'opc-solo-codigo';
+            soloCodigo.className = pensar.className;
+            soloCodigo.style.cssText = pensar.style.cssText;
+            soloCodigo.title = 'Solo código: el modelo no razona ni explica; responde únicamente con bloques de código. ' +
+                'Las explicaciones, con el modelo de «explicar».';
+            soloCodigo.innerHTML = '<input type="checkbox" id="chk-solo-codigo"> <i class="fa-solid fa-code"></i> Solo código';
+            pensar.parentNode.insertBefore(soloCodigo, pensar.nextSibling);
+        }
+        mostrar('opc-solo-codigo', !!(this.propios && this.propios.has(model)));
         const herr = document.getElementById('chk-herramientas');
         mostrar('opc-permitir-codigo', caps.includes('tools') && herr && herr.checked);
+        this.updateTutorConfigBadges();
+    }
+
+    /** Inicializa la barra desplegable de configuración del Tutor (Biblioteca, Web, Herramientas, Confianza) */
+    initTutorConfigBar() {
+        const toggleBtn = document.getElementById('tutor-config-toggle-btn');
+        const content = document.getElementById('tutor-config-dropdown-content');
+        if (!toggleBtn || !content) return;
+
+        // Recuperar preferencia de apertura guardada (por defecto abierta para fácil acceso)
+        const guardado = localStorage.getItem('prig_tutor_cfg_open');
+        const abiertoInicial = guardado !== null ? guardado === 'true' : true;
+        this.setTutorConfigOpen(abiertoInicial);
+
+        toggleBtn.onclick = (e) => {
+            e.preventDefault();
+            const isOpen = content.style.display === 'flex';
+            this.setTutorConfigOpen(!isOpen);
+        };
+
+        // Escuchar cambios en todos los checkboxes para actualizar insignias e indicadores
+        const ids = ['chk-usar-biblioteca', 'chk-web-search', 'chk-banco', 'chk-herramientas', 'chk-confianza', 'chk-pensar', 'chk-permitir-codigo'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', () => this.updateTutorConfigBadges());
+            }
+        });
+
+        this.updateTutorConfigBadges();
+    }
+
+    /** Abre o cierra el panel desplegable de configuración del tutor */
+    setTutorConfigOpen(abrir) {
+        const content = document.getElementById('tutor-config-dropdown-content');
+        const chevron = document.getElementById('tutor-config-chevron');
+        if (!content) return;
+        content.style.display = abrir ? 'flex' : 'none';
+        if (chevron) {
+            chevron.style.transform = abrir ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+        localStorage.setItem('prig_tutor_cfg_open', abrir ? 'true' : 'false');
+    }
+
+    /** Actualiza la cantidad de configuraciones activas y los chips visuales en la cabecera */
+    updateTutorConfigBadges() {
+        const badgeEl = document.getElementById('tutor-config-badge-activas');
+        const chipsEl = document.getElementById('tutor-config-active-chips');
+        if (!badgeEl) return;
+
+        const opciones = [
+            { id: 'chk-usar-biblioteca', label: 'Biblioteca', icon: 'fa-book-bookmark', color: 'var(--accent-purple)' },
+            { id: 'chk-web-search', label: 'Web', icon: 'fa-globe', color: 'var(--accent-blue)' },
+            { id: 'chk-banco', label: 'Banco', icon: 'fa-database', color: 'var(--accent-green)' },
+            { id: 'chk-herramientas', label: 'Herramientas', icon: 'fa-screwdriver-wrench', color: 'var(--accent-blue)', parentId: 'opc-herramientas' },
+            { id: 'chk-confianza', label: 'Confianza', icon: 'fa-chart-simple', color: 'var(--accent-green)', parentId: 'opc-confianza' },
+            { id: 'chk-pensar', label: 'Pensar', icon: 'fa-lightbulb', color: 'var(--accent-yellow)', parentId: 'opc-pensar' },
+            { id: 'chk-permitir-codigo', label: 'Python', icon: 'fa-brands fa-python', color: 'var(--accent-red)', parentId: 'opc-permitir-codigo' },
+            { id: 'chk-solo-codigo', label: 'Código', icon: 'fa-code', color: '#cdd6f4', parentId: 'opc-solo-codigo' }
+        ];
+
+        let activasCount = 0;
+        let chipsHtml = '';
+
+        opciones.forEach(opt => {
+            const el = document.getElementById(opt.id);
+            const parent = opt.parentId ? document.getElementById(opt.parentId) : null;
+            const esVisible = !parent || !parent.hidden;
+            if (el && el.checked && esVisible) {
+                activasCount++;
+                const iconPrefix = opt.icon.startsWith('fa-brands') ? '' : 'fa-solid';
+                chipsHtml += `<span style="background: rgba(255,255,255,0.06); color: ${opt.color}; padding: 1px 5px; border-radius: 4px; font-size: 9px; display: inline-flex; align-items: center; gap: 3px;" title="${opt.label} activado"><i class="${iconPrefix} ${opt.icon}"></i> ${opt.label}</span>`;
+            }
+        });
+
+        badgeEl.textContent = `${activasCount} ${activasCount === 1 ? 'activa' : 'activas'}`;
+        if (chipsEl) {
+            chipsEl.innerHTML = chipsHtml;
+        }
     }
 
     /**
@@ -1268,6 +1373,24 @@ class AIChatManager {
                         (herramientasEl || asegurar('msg-herramientas', '')).appendChild(det);
                     } else if (ev.t === 'logprobs') { logprobs = logprobs.concat(ev.v); }
                     else if (ev.t === 'stats') { stats = ev.v; }
+                    else if (ev.t === 'banco') {
+                        // Qué le dio el banco del proyecto al modelo con esta pregunta
+                        const b = ev.v || {};
+                        const el = asegurar('msg-banco', '<div style="font-size:11px; color:var(--accent-green); margin:2px 0 6px;"><i class="fa-solid fa-database"></i> <span></span></div>');
+                        if (b.error) {
+                            el.querySelector('span').textContent = `Banco del proyecto no disponible: ${b.error}`;
+                        } else {
+                            const partes = [`${b.fragmentos} fragmentos de ${(b.archivos || []).length} archivos`,
+                                            `${(b.tokens || 0).toLocaleString('es')} tokens`];
+                            if (b.cambios) partes.push(`${b.cambios} archivo(s) cambiado(s) desde la última respuesta`);
+                            if (b.conocimiento) partes.push(`${b.conocimiento} nota(s) de memoria`);
+                            if (b.resoluciones) partes.push(`${b.resoluciones} resolución(es) parecida(s)`);
+                            if (b.inicial) partes.push('proyecto indexado ahora');
+                            el.querySelector('span').textContent = `Banco «${b.proyecto}»: ${partes.join(' · ')}`;
+                            el.title = `Archivos: ${(b.archivos || []).join(', ')}\nMapa: ${b.mapa_tokens} tokens · búsqueda ${b.segundos} s` +
+                                (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)');
+                        }
+                    }
                     else if (ev.t === 'aviso') { avisos.push(ev.v); }
                     else if (ev.t === 'termico') {
                         // Pausa del gobernador térmico: la respuesta sigue sola al enfriarse la GPU

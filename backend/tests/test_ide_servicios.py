@@ -233,5 +233,39 @@ class PruebaMostrarEnSistema(_Base):
         self.assertEqual(popen.call_args.args[0], ["xdg-open", self.ws])
 
 
+
+class PruebaProyectosGuardados(_Base):
+    def test_guardar_listar_y_eliminar_proyectos(self):
+        p1 = os.path.join(self.ws, "proyecto1")
+        p2 = os.path.join(self.ws, "proyecto2")
+        os.makedirs(p1)
+        os.makedirs(p2)
+
+        res = self.ide.guardar_proyecto(p1, "Mi Proyecto 1", origen="biblioteca")
+        self.assertTrue(res["success"])
+        self.assertEqual(res["project"]["name"], "Mi Proyecto 1")
+
+        self.ide.guardar_proyecto(p2, "Mi Proyecto 2", origen="manual")
+
+        guardados = self.ide.proyectos_guardados()
+        rutas = [g["path"] for g in guardados]
+        self.assertIn(p1, rutas)
+        self.assertIn(p2, rutas)
+
+        # Eliminar p1
+        self.ide.eliminar_proyecto_guardado(p1)
+        guardados_despues = self.ide.proyectos_guardados()
+        self.assertNotIn(p1, [g["path"] for g in guardados_despues])
+        self.assertIn(p2, [g["path"] for g in guardados_despues])
+
+    def test_listar_directorios(self):
+        sub = os.path.join(self.ws, "subcarpeta")
+        os.makedirs(sub)
+        res = self.ide.listar_directorios(self.ws)
+        self.assertEqual(res["current_path"], self.ws)
+        self.assertTrue(any(d["name"] == "subcarpeta" for d in res["subdirectories"]))
+
+
 if __name__ == "__main__":
     unittest.main()
+

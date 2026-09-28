@@ -67,7 +67,19 @@ class Traduccion(unittest.TestCase):
         self.assertFalse(cuerpo["stream"])
         self.assertNotIn("max_tokens", cuerpo)
         self.assertEqual(cuerpo["response_format"]["json_schema"]["schema"], esquema)
-        self.assertNotIn("chat_template_kwargs", cuerpo)   # think sin fijar: lo decide el modelo
+        # think sin fijar: sin razonamiento (Qwen3.6 razonaría por defecto: tokens que nadie pidió)
+        self.assertEqual(cuerpo["chat_template_kwargs"], {"enable_thinking": False})
+        cuerpo, _ = motor_moe.a_openai("http://x/api/generate", {"prompt": "p", "think": True})
+        self.assertEqual(cuerpo["chat_template_kwargs"], {"enable_thinking": True})
+
+    def test_solo_codigo(self):
+        cuerpo, _ = motor_moe.a_openai("http://x/api/chat", {
+            "messages": [{"role": "user", "content": "una función"}], "think": True, motor_moe.SOLO_CODIGO: True})
+        self.assertEqual(cuerpo["chat_template_kwargs"], {"enable_thinking": False})   # nunca razona
+        self.assertEqual(cuerpo["grammar"], motor_moe.GRAMATICA_CODIGO)
+        self.assertIn("root", motor_moe.GRAMATICA_CODIGO)
+        cuerpo, _ = motor_moe.a_openai("http://x/api/chat", {"messages": [{"role": "user", "content": "x"}]})
+        self.assertNotIn("grammar", cuerpo)
 
     def test_herramientas_y_continuacion(self):
         cuerpo, prefijos = motor_moe.a_openai("http://x/api/chat", {"messages": [
@@ -193,6 +205,29 @@ class Ajustes(unittest.TestCase):
         self.assertEqual(motor_moe.estimar_tokens(pedido), 10000 + 1000 + 512)
         self.assertEqual(motor_moe.estimar_tokens({"prompt": "x" * 300}), 100 + 4096 + 512)
 
+    def test_nucleo_q8(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_MODELOS", d), \
+                mock.patch.object(motor_moe, "blob_del_modelo", lambda: "/q4.gguf"):
+            self.assertEqual(motor_moe.modelo_para("q8"), "/q4.gguf")          # sin construir: el Q4
+            ruta = os.path.join(d, motor_moe.NUCLEOS["q8"])
+            open(ruta, "wb").close()
+            open(ruta + ".partes", "w").close()
+            self.assertEqual(motor_moe.modelo_para("q8"), "/q4.gguf")          # a medias: el Q4
+            os.remove(ruta + ".partes")
+            self.assertEqual(motor_moe.modelo_para("q8"), ruta)
+            self.assertEqual(motor_moe.modelo_para("q4"), "/q4.gguf")
+            self.assertEqual(motor_moe.mb_por_caliente(ruta), motor_moe.MB_POR_CALIENTE)   # no es GGUF
+            self.assertEqual(motor_moe.mb_nucleo_extra(ruta), 0.0)
+        # un núcleo más grande deja menos sitio para los calientes
+        self.assertLess(motor_moe.calientes_para(6126, 16384, extra_mb=670),
+                        motor_moe.calientes_para(6126, 16384))
+
+    def test_lista_caliente(self):
+        global_ = [[2, 0, 1, 3]]
+        self.assertEqual(motor_moe.lista_caliente([[0, 7, 0, 7]], global_), [[1, 3, 2, 0]])  # empates: orden global
+        self.assertIsNone(motor_moe.lista_caliente([[0, 0, 0, 0]], global_))                # sin datos: nada
+        self.assertEqual(len(motor_moe.lista_global()), 40)
+
     def test_prefijo_de_un_proyecto(self):
         grande = {"role": "user", "content": "x" * motor_moe.PROYECTO_MIN_CARACTERES}
         pregunta = {"role": "user", "content": "¿qué hace?"}
@@ -303,7 +338,12 @@ class ServidorFalso(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    uso = None
+
     def do_GET(self):
+        ServidorFalso.pedidos.append({"_ruta": self.path})
+        if self.path.startswith("/aipc/uso"):
+            return self._json({"capas": ServidorFalso.uso or [], "calientes_por_capa": 2})
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b'{"status":"ok"}')
@@ -324,6 +364,8 @@ class ServidorFalso(BaseHTTPRequestHandler):
             return self._json({"prompt": texto if not cuerpo.get("add_generation_prompt", True) else texto + "<assistant>"})
         if self.path == "/completion":
             return self._json({"tokens_evaluated": len(cuerpo["prompt"]) // 3, "timings": {"prompt_ms": 2000.0}})
+        if self.path == "/aipc/calientes":
+            return self._json({"capas_cambiadas": len(cuerpo["capas"])})
         if self.path.startswith("/slots/0?action="):
             ruta = os.path.join(ServidorFalso.carpeta, cuerpo["filename"])
             if "save" in self.path:
@@ -449,6 +491,31 @@ class DePuntaAPunta(unittest.TestCase):
             self.assertEqual(self.motor.olvidar_proyectos(), 1)
             self.assertEqual(os.listdir(d), [])
 
+    def test_el_proyecto_trae_su_lista_caliente(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
+            ServidorFalso.carpeta = d
+            ServidorFalso.uso = [[0, 5, 1, 9], [3, 0, 0, 1]]
+            self.motor.calientes = 2
+            conversacion = [{"role": "user", "content": "x = 1\n" * 4000}, {"role": "user", "content": "¿qué hace?"}]
+            list(self.ia.chat_eventos(conversacion, motor_moe.NOMBRE, think=False))
+            rutas = [p["_ruta"] for p in ServidorFalso.pedidos]
+            self.assertEqual(rutas[:6], ["/apply-template", "/aipc/uso?reset=1", "/completion",
+                                         "/slots/0?action=save", "/aipc/uso?reset=1", "/aipc/calientes"])
+            enviada = [p for p in ServidorFalso.pedidos if p["_ruta"] == "/aipc/calientes"][0]["capas"]
+            self.assertEqual([c[:2] for c in enviada], [[3, 1], [0, 3]])        # los más usados al leerlo
+            guardadas = [f for f in os.listdir(d) if f.endswith(".calientes.json")]
+            self.assertEqual(len(guardadas), 1)
+            # misma lista ya en la GPU: al restaurar no se vuelve a enviar
+            ServidorFalso.pedidos.clear()
+            list(self.ia.chat_eventos(conversacion, motor_moe.NOMBRE, think=False))
+            self.assertNotIn("/aipc/calientes", [p["_ruta"] for p in ServidorFalso.pedidos])
+            # servidor nuevo (lista global): al restaurar se aplica la del proyecto
+            ServidorFalso.pedidos.clear()
+            self.motor._lista_actual = None
+            list(self.ia.chat_eventos(conversacion, motor_moe.NOMBRE, think=False))
+            self.assertIn("/aipc/calientes", [p["_ruta"] for p in ServidorFalso.pedidos])
+            ServidorFalso.uso = None
+
     def test_sin_proyecto_no_se_guarda_nada(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
             list(self.ia.chat_eventos([{"role": "user", "content": "x" * 50000}], motor_moe.NOMBRE, think=False))
@@ -475,7 +542,7 @@ class Endpoints(unittest.TestCase):
         import app
         self.app = app
         cfg = mock.patch.dict(app.ai_engine.config, {"moe_contexto": 16384, "moe_hilos": 0, "moe_calientes": "auto",
-                                                     "moe_modo": "equilibrado", "moe_mtp": True})
+                                                     "moe_modo": "equilibrado", "moe_mtp": True, "moe_nucleo": "q8"})
         cfg.start()
         self.addCleanup(cfg.stop)
         guardar = mock.patch.object(app.ai_engine, "_save_config", lambda: None)
@@ -485,7 +552,8 @@ class Endpoints(unittest.TestCase):
     def test_estado_y_ajustes(self):
         e = self.app.recursos_moe()
         self.assertEqual(e["nombre"], motor_moe.NOMBRE)
-        self.assertEqual(e["ajustes"], {"contexto": 16384, "hilos": 0, "calientes": "auto", "modo": "equilibrado", "mtp": True})
+        self.assertEqual(e["ajustes"], {"contexto": 16384, "hilos": 0, "calientes": "auto", "modo": "equilibrado", "mtp": True,
+                                        "nucleo": "q8"})
         e = self.app.recursos_moe_ajustar(self.app.MoeRequest(contexto="999999", hilos=3, calientes="40"))
         self.assertEqual({k: e["ajustes"][k] for k in ("contexto", "hilos", "calientes")}, {"contexto": 262144, "hilos": 3, "calientes": 40})
         e = self.app.recursos_moe_ajustar(self.app.MoeRequest(contexto="auto"))
@@ -501,6 +569,9 @@ class Endpoints(unittest.TestCase):
         self.assertEqual(e["modos"], ["exacto", "equilibrado", "rapido"])
         with self.assertRaises(self.app.HTTPException):
             self.app.recursos_moe_ajustar(self.app.MoeRequest(modo="turbo"))
+        self.assertEqual(self.app.recursos_moe_ajustar(self.app.MoeRequest(nucleo="q4"))["ajustes"]["nucleo"], "q4")
+        with self.assertRaises(self.app.HTTPException):
+            self.app.recursos_moe_ajustar(self.app.MoeRequest(nucleo="q2"))
 
     def test_el_chat_manda_el_gancho_en_su_propio_mensaje(self):
         vistos = []
@@ -531,6 +602,38 @@ class Endpoints(unittest.TestCase):
         self.assertIn("¿qué hace?", moe[2]["content"])
         self.assertEqual([m["role"] for m in otro], ["system", "user"])  # otros modelos: como siempre
         self.assertIn("### Archivo: a.py", otro[1]["content"])
+
+    def test_solo_codigo_y_sin_extras_automaticos(self):
+        vistos = []
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            vistos.append((mensajes, kw))
+            return iter([{"t": "texto", "v": "ok"}])
+        buscar_citas = mock.Mock(return_value=[])
+        with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                mock.patch.object(self.app.ai_engine.web_search, "should_auto_search", lambda q: True), \
+                mock.patch.object(self.app.ai_engine.web_search, "get_web_context", lambda q: ("WEB", [])), \
+                mock.patch.object(self.app.book_service, "get_all_citations_for_ai", buscar_citas), \
+                mock.patch.object(self.app.librerias_service, "get_all_library_citations_for_ai", lambda *a, **k: []):
+            import asyncio
+            for solo in (True, False):
+                req = self.app.AIChatRequest(prompt="haz una función", model=motor_moe.NOMBRE, eventos=True,
+                                             think=True, herramientas=True, solo_codigo=solo)
+                respuesta = self.app.ai_chat(req)
+
+                async def consumir():
+                    return [c async for c in respuesta.body_iterator]
+                asyncio.run(consumir())
+        (codigo, kw_codigo), (normal, kw_normal) = vistos
+        self.assertEqual(codigo[0]["content"], motor_moe.INSTRUCCION_SOLO_CODIGO)   # sin prompt de tutor
+        self.assertEqual(kw_codigo["extra"], {motor_moe.SOLO_CODIGO: True})
+        self.assertFalse(kw_codigo["think"])
+        self.assertIsNone(kw_codigo["herramientas"])
+        self.assertIsNone(kw_normal["extra"])
+        self.assertTrue(kw_normal["think"])
+        # con el motor MoE nada automático: ni web ni citas que el usuario no pidió
+        self.assertNotIn("WEB", codigo[-1]["content"] + normal[-1]["content"])
+        buscar_citas.assert_not_called()
 
     def test_detener(self):
         with mock.patch.object(motor_moe.Motor, "detener") as detener:

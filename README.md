@@ -130,6 +130,10 @@ Formato de los archivos: [docs/prig-hub.md](docs/prig-hub.md).
   GPU, la CPU calcula el resto a la vez y la cabeza MTP del modelo propone 2 tokens por paso (llama.cpp
   modificado). 27 → 53 tok/s sin cambiar el resultado (hasta 68 en modo rápido), con la CPU por debajo de
   60 °C. Ver [docs/motor-moe.md](docs/motor-moe.md).
+- **Banco del proyecto**: el proyecto entero indexado (funciones, quién usa a quién, cambios con su diff,
+  definiciones, decisiones y preguntas ya resueltas) y al día cada vez que guardas. Con cada pregunta el
+  modelo recibe el mapa y lo relevante, y consulta el resto con herramientas: el tamaño del proyecto deja
+  de depender de su contexto. Ver [docs/banco-proyecto.md](docs/banco-proyecto.md).
 - **Google Gemini** opcional para los desafíos, **apagado por defecto**. Ver
   [Privacidad](#privacidad-qué-sale-de-tu-equipo).
 

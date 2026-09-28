@@ -24,6 +24,30 @@ abiertos.
 
 La GPU se mantuvo en ~29 W y 57 °C en todas las pruebas.
 
+### Solo lo necesario: sin razonamiento, sin extras, «Solo código»
+
+La velocidad de arriba es por token. Lo que siente el usuario es el tiempo hasta tener la
+respuesta, y ahí pesa más **cuántos tokens escribe el modelo**. Medido con un mismo pedido
+(«función que cargue un CSV, rellene nulos con la mediana y entrene un RandomForest con validación
+cruzada»):
+
+| Cómo responde | Tiempo | Tokens | Qué escribe |
+|---|---|---|---|
+| Razonando (lo que hacía por defecto) | 95,9 s | 3.609 | 10.900 caracteres de razonamiento + explicación + código |
+| Sin razonar | 16,2 s | 809 | explicación + código |
+| **Solo código** | **~3 s** (156 tokens a 66,5 tok/s, sin contar el arranque del motor) | **156** | solo el bloque de código, sin comentarios |
+
+- **Sin razonamiento salvo que se pida.** Qwen3.6 razona por defecto, y el chat de Prig no
+  mostraba la opción «Pensar» para este motor, así que razonaba siempre. Ahora solo razona si se
+  marca «Pensar».
+- **Nada automático que no se pidió:** con este motor no se añaden citas de libros ni búsqueda
+  web automáticas (una pregunta sobre el código del proyecto sumaba ~2.200 tokens de la web).
+- **«Solo código»** (casilla en el chat, solo con este motor): no razona, reemplaza el prompt de
+  tutor por uno que pide solo código sin comentarios ni docstrings, y **limita la salida con una
+  gramática GBNF** a bloques de código, con `### Archivo: ruta` opcional para editar archivos
+  enganchados. El modelo no puede escribir prosa. La gramática cuesta ~4 % de velocidad por token;
+  MTP sigue funcionando (acierta ~71 %). Las explicaciones quedan para el modelo de «explicar».
+
 **Calidad**, frente al modelo original. Divergencia KL por token y coincidencia del token más
 probable, sobre ~9.000 tokens de texto que no se usó para elegir los expertos calientes (código
 de Prig, documentación en español, C++):
@@ -153,6 +177,75 @@ Resultado desde Prig, con el turbo apagado y el modo frío activo: CPU a 41–54
 49.761 tokens restaurado, código a 30 tok/s y explicaciones a 17–19 tok/s. La cabeza MTP acierta
 menos en prosa larga en español (56–72 %) que en código (80–92 %).
 
+### Lista caliente por proyecto (sin reiniciar el motor)
+
+Al leer un proyecto, el motor cuenta qué expertos usa cada capa (`AIPC_CONTAR`, en el planificador
+de ggml, donde ya se leen los ids de cada lote). Con eso arma la lista caliente del proyecto: los más
+usados al leerlo; los empates, en el orden de la lista global. La sube a la GPU sin reiniciar
+(`POST /aipc/calientes`: copia los expertos a los espacios ya reservados y rehace las tablas; 40 capas
+en 0,18 s) y la guarda junto al estado del proyecto. Al restaurar el proyecto se aplica la suya.
+
+Medido directamente, contando en la CPU cuántos expertos elegidos al generar ya estaban en la GPU
+(modo exacto, proyecto de 49.000 tokens, 64K de contexto, 25 calientes por capa, 4 preguntas de
+código):
+
+| Lista | Aciertos en la GPU |
+|---|---|
+| Global | 30,7 % (23–37 %) |
+| **Del proyecto** | **39,0 %** (30–44 %) |
+
+La velocidad sube poco (~5 %, dentro del ruido): con 25 calientes por capa, casi todo el trabajo sigue
+en la CPU. Rinde más cuanto más expertos calientes caben (contextos menores).
+
+### Calidad: el núcleo en Q8 (y por qué no los expertos)
+
+Para medir la calidad contra algo mejor que nuestro Q4, se construyó una **referencia Q8 con el
+vocabulario recortado**: metadatos, vocabulario, embeddings y salida del Q4 recortado, y todo lo
+demás del Q8_0 de unsloth (731 de 753 tensores). El Q8_0 original no sirve directamente: su
+vocabulario tiene 248.320 tokens con otros ids. Todo se midió por el camino de generación (lotes de
+4 tokens, con el reparto caliente/frío activo) sobre ~9.000 tokens.
+
+| Variante | Perplejidad | Divergencia KL | Mismo token |
+|---|---|---|---|
+| Q4 completo | +2,1 % | 0,071 | 91,0 % |
+| 40 calientes en Q4 | +1,6 % | 0,073 | 91,0 % |
+| 40 calientes en Q6 | +0,6 % | 0,072 | 91,5 % |
+| 28 calientes en Q6 (misma VRAM) | +1,0 % | 0,071 | 91,3 % |
+| 20 calientes en Q8 (misma VRAM) | +1,2 % | 0,072 | 91,1 % |
+| **Núcleo Q8 + expertos Q4** | **+0,1 %** | **0,022** | **95,2 %** |
+
+**Poner los expertos calientes en más precisión no mejora nada medible**: los expertos Q4_K_S ya son
+buenos. **La pérdida del Q4 viene casi toda del núcleo** (atención, SSM, router, experto compartido):
+subirlo a Q8 recupera ~70 % de la calidad, y solo cuesta 0,7 GB más de VRAM (1,3 → 2,0 GB).
+
+Con los modos (frente a la referencia Q8, y velocidad con MTP y solapamiento):
+
+| Núcleo + modo | Divergencia KL | Mismo token | Velocidad |
+|---|---|---|---|
+| Q4 + equilibrado (antes, por defecto) | 0,083 | 90,2 % | ~66 tok/s |
+| Q4 + rápido | 0,105 | 88,9 % | ~75 tok/s |
+| Q8 + exacto | 0,026 | 94,8 % | — |
+| **Q8 + equilibrado (ahora, por defecto)** | **0,041** | **92,3 %** | **~55 tok/s** |
+| Q8 + rápido | 0,081 | 90,3 % | ~63 tok/s |
+
+Las velocidades de la tabla son del banco de pruebas (contexto chico: 40 calientes con Q4, 30 con
+Q8). Dentro de Prig el contexto automático arranca en 32K y deja menos VRAM para calientes; medido
+con un pedido de ~1.500 tokens: **Q4 equilibrado 24 calientes/capa, 52–55 tok/s; Q8 equilibrado
+14 calientes/capa, 46–48 tok/s** (5,1 GB de VRAM, GPU 65–70 °C).
+
+El núcleo Q8 + equilibrado tiene **la mitad de pérdida** que el Q4 + equilibrado, a cambio de
+~12–17 % de velocidad. En **Temperaturas → Motor MoE → Núcleo** se elige Q8 (calidad) o Q4
+(velocidad). Para prepararlo: `backend/recursos/nativo/moe/preparar_nucleo_q8.sh` (descarga el
+Q8_0 de 37 GB en paralelo, verifica su SHA-256 y construye el híbrido de 21 GB).
+
+### Umbral de omisión por capa: probado y descartado
+
+Omitir expertos fríos (umbral 0,15) solo en un grupo de 5 capas cambia mucho según la capa: capas
+0–14 → divergencia KL 0,047–0,058; capas 20–29 → 0,018. Pero repartir el umbral según esa
+sensibilidad **no mejoró** a los umbrales fijos: a igual calidad (KL 0,037), 63,8 contra 64,4 tok/s;
+el perfil intermedio (KL 0,057) fue un 11 % más lento que el umbral fijo 0,10 (KL 0,066). Quedan
+los modos con umbral fijo; `AIPC_COLD_DROP_CAPAS` sigue disponible en el motor.
+
 ## Qué se probó y se descartó
 
 | Idea | Resultado |
@@ -164,6 +257,7 @@ menos en prosa larga en español (56–72 %) que en código (80–92 %).
 | 7 o 6 expertos por token | 7: 54,9 tok/s con KL 0,046. Omitir fríos da más velocidad por la misma calidad. |
 | MTP proponiendo 3 tokens, o con corte por confianza | Peor o igual que 2 tokens. |
 | Traer expertos por PCIe token a token (caché LRU) | Descartado: el PCIe (12 GB/s) es más lento que la RAM (21 GB/s) y con una sola GPU dio pérdidas en otras pruebas. |
+| Traer por PCIe el experto frío de más peso de cada token y calcularlo en la GPU mientras la CPU hace el resto | Probado (MTP + solapamiento + equilibrado, pares alternados): **42,8 contra 68,9 tok/s**, y la CPU no trabajó menos (43 contra 37 ms/token). Leer los ids, sincronizar, una copia chica por PCIe y un tramo más de GPU en cada capa cuestan más de lo que ahorran con 1–4 tokens por paso. Haría falta traerlos por anticipado con núcleos CUDA propios. |
 
 ## Cómo se usa
 
