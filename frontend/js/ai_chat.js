@@ -1379,6 +1379,10 @@ class AIChatManager {
                         const el = asegurar('msg-banco', '<div style="font-size:11px; color:var(--accent-green); margin:2px 0 6px;"><i class="fa-solid fa-database"></i> <span></span></div>');
                         if (b.error) {
                             el.querySelector('span').textContent = `Banco del proyecto no disponible: ${b.error}`;
+                        } else if (b.modo === 'unidad') {
+                            // Modo unidad: se restauró la lectura guardada de la parte del proyecto que toca
+                            el.querySelector('span').textContent = `Banco «${b.proyecto}»: lectura de «${b.unidad}» restaurada; el resto del proyecto, con la consola`;
+                            el.title = `El modelo tiene esa unidad leída completa (estado guardado del motor) y consulta lo demás con herramientas.`;
                         } else {
                             const partes = [`${b.fragmentos} fragmentos de ${(b.archivos || []).length} archivos`,
                                             `${(b.tokens || 0).toLocaleString('es')} tokens`];

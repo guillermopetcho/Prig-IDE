@@ -530,6 +530,64 @@ class TestChat(unittest.TestCase):
         self.assertEqual(len(resoluciones), 1)
         self.assertEqual(resoluciones[0]["rutas"], ["motor.py"])
 
+    def test_modo_unidad(self):
+        """ Si el enrutador elige una unidad leída, la conversación usa su prefijo guardado y las
+        herramientas fijas de la lectura """
+        vistos = {}
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            vistos["mensajes"] = mensajes
+            vistos["herramientas"] = kw.get("herramientas")
+            yield {"t": "texto", "v": "Vale 0.3."}
+
+        class LectorFalso:
+            def mensajes(self, u):
+                return [{"role": "system", "content": "LECTOR"}, {"role": "user", "content": "UNIDAD " + u["nombre"]}]
+        unidad = {"orden": 3, "nombre": "nucleo", "cuota": 0.8, "lector": LectorFalso(), "datos": {"nombre": "nucleo"}}
+        req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
+        with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools"]), \
+                mock.patch.object(self.app, "_unidad_para", lambda *a: unidad):
+            res = self.app.ai_chat(req)
+            import asyncio
+
+            async def leer():
+                return [c async for c in res.body_iterator]
+            eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
+                                                       for c in asyncio.run(leer())).splitlines() if x.strip()]
+        self.assertEqual([m["content"] for m in vistos["mensajes"]], ["LECTOR", "UNIDAD nucleo", "¿Cuánto vale X?"])
+        import lectura_unidades
+        self.assertEqual(vistos["herramientas"].solo, list(lectura_unidades.HERRAMIENTAS_UNIDAD))
+        info = [e["v"] for e in eventos if e["t"] == "banco"][0]
+        self.assertEqual(info["modo"], "unidad")
+        self.assertEqual(info["unidad"], "nucleo")
+
+    def test_empujon_si_anuncia_sin_hacer(self):
+        llamadas = []
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            llamadas.append(mensajes)
+            if len(llamadas) == 1:
+                yield {"t": "texto", "v": "La llama crear. Ahora busco qué endpoints llaman a crear."}
+            else:
+                yield {"t": "texto", "v": "Los endpoints son POST /api/crear."}
+        req = self.app.AIChatRequest(prompt="¿Qué endpoints afecta crear?", model="qwen2.5-coder:7b",
+                                     eventos=True, banco=True)
+        with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools"]):
+            res = self.app.ai_chat(req)
+            import asyncio
+
+            async def leer():
+                return [c async for c in res.body_iterator]
+            texto = "".join(json.loads(x)["v"] for x in "".join(
+                (c.decode() if isinstance(c, bytes) else c) for c in asyncio.run(leer())).splitlines()
+                if x.strip() and json.loads(x)["t"] == "texto")
+        self.assertEqual(len(llamadas), 2)
+        self.assertEqual(llamadas[1][-1]["content"], self.app.EMPUJON)
+        self.assertEqual(llamadas[1][-2]["role"], "assistant")
+        self.assertIn("POST /api/crear", texto)
+
     def test_endpoints(self):
         from starlette.testclient import TestClient
         cliente = TestClient(self.app.app)

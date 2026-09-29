@@ -692,6 +692,9 @@ class BancoProyecto:
                 UNION ALL SELECT ruta, 'importa', destino, ruta, 0 FROM importaciones
                 UNION ALL SELECT ruta, 'define', nombre, ruta, ini FROM simbolos;
             CREATE TABLE IF NOT EXISTS trabajo (nombre TEXT PRIMARY KEY, valor TEXT, cuando TEXT);
+            CREATE TABLE IF NOT EXISTS unidades (
+                orden INTEGER PRIMARY KEY, nombre TEXT, tokens INTEGER, rutas TEXT, piezas TEXT,
+                simbolos TEXT, vecinas TEXT, cambios_git INTEGER, version INTEGER, creado TEXT);
             CREATE TABLE IF NOT EXISTS resumenes (
                 nivel TEXT, clave TEXT, texto TEXT, sha_fuente TEXT, modelo TEXT, cuando TEXT,
                 PRIMARY KEY (nivel, clave));
@@ -1880,6 +1883,30 @@ class BancoProyecto:
         with self.conectar() as c:
             c.execute("INSERT OR REPLACE INTO trabajo VALUES (?,?,?)",
                       (nombre, texto, datetime.now().isoformat(timespec="seconds")))
+
+    # ------------------------------------------------------------------ unidades de lectura
+    def guardar_particion(self, unidades: List[Dict[str, Any]], resumen: Dict[str, Any]):
+        """ La partición del proyecto en unidades de lectura (particion_proyecto.py) """
+        ahora = datetime.now().isoformat(timespec="seconds")
+        with self.conectar() as c:
+            c.execute("DELETE FROM unidades")
+            c.executemany("INSERT INTO unidades VALUES (?,?,?,?,?,?,?,?,?,?)", [
+                (u["orden"], u["nombre"], u["tokens"], json.dumps(u["rutas"]), json.dumps(u["piezas"]),
+                 json.dumps(u["simbolos"]), json.dumps(u["vecinas"]), u["cambios_git"], self.version, ahora)
+                for u in unidades])
+            self._guardar_meta("particion", json.dumps({**resumen, "version": self.version, "creado": ahora}), c)
+
+    def unidades(self) -> List[Dict[str, Any]]:
+        with self.conectar() as c:
+            filas = [dict(f) for f in c.execute("SELECT * FROM unidades ORDER BY orden")]
+        for f in filas:
+            for k in ("rutas", "piezas", "simbolos", "vecinas"):
+                f[k] = json.loads(f[k] or "[]")
+        return filas
+
+    def particion(self) -> Optional[Dict[str, Any]]:
+        valor = self._meta("particion")
+        return json.loads(valor) if valor else None
 
     def guardar_resumen(self, nivel: str, clave: str, texto: str, sha_fuente: str, modelo: str = ""):
         with self.conectar() as c:

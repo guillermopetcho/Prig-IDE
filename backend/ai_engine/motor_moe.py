@@ -87,7 +87,7 @@ CACHE_RAM_MB = 16384            # prompts ya leídos que llama-server guarda en 
 # Tiene que ser el estado EXACTO al final del bloque: las capas SSM de este modelo no retroceden.
 CARPETA_PROYECTOS = os.path.expanduser("~/.cache/prig-moe/proyectos")
 PROYECTO_MIN_CARACTERES = 12000     # por debajo, leerlo cuesta menos que guardarlo
-PROYECTOS_MAX_MB = 20480            # se borran los usados hace más tiempo
+PROYECTOS_MAX_MB = 32768            # se borran los usados hace más tiempo; las ~94 unidades de Prig ocupan ~27 GB
 
 
 def contexto_para(tokens: int) -> Optional[int]:
@@ -966,7 +966,7 @@ class Motor:
                     self._proyecto_cargado = clave
                     self._aplicar_calientes(clave)
                     self.ultimo_proyecto = {"origen": "disco", "tokens": r.json().get("n_restored"),
-                                            "segundos": round(time.time() - t0, 2)}
+                                            "segundos": round(time.time() - t0, 2), "clave": clave}
                     self._registro(f"proyecto {clave[:8]} restaurado: {self.ultimo_proyecto}")
                     return dict(self.ultimo_proyecto)
             except requests.RequestException:
@@ -993,7 +993,7 @@ class Motor:
             self._calientes_del_proyecto(clave)
             podar_proyectos()
         self.ultimo_proyecto = {"origen": "leido", "tokens": leidos, "segundos": round(time.time() - t0, 1),
-                                "guardado": g.status_code == 200}
+                                "guardado": g.status_code == 200, "clave": clave}
         self._registro(f"proyecto {clave[:8]} leído: {self.ultimo_proyecto}")
         return {**self.ultimo_proyecto, "leidos": leidos, "lectura_ms": lectura_ms}
 
@@ -1103,6 +1103,25 @@ class Motor:
                     self._parar_proceso()
 
     # -- peticiones ------------------------------------------------------------------------
+    def directo(self, metodo: str, ruta: str, cuerpo: Optional[Dict[str, Any]] = None, timeout: float = 900) -> Any:
+        """ Petición cruda a llama-server (/apply-template, /completion, /slots, /aipc…) para la lectura
+        por unidades (lectura_unidades.py). Cuenta como actividad, así el vigía no lo para en medio, y
+        marca que el slot ya no tiene cargado ningún proyecto (se restaurará si hace falta). """
+        with self._cerrojo:
+            self.asegurar()
+            self._activas += 1
+            self._ultimo_uso = time.time()
+        try:
+            r = requests.request(metodo, f"http://127.0.0.1:{self._puerto}{ruta}", json=cuerpo, timeout=timeout)
+            if r.status_code != 200:
+                raise RuntimeError(f"llama-server {r.status_code} en {ruta}: {r.text[:300]}")
+            return r.json() if r.content else {}
+        finally:
+            with self._cerrojo:
+                self._activas = max(0, self._activas - 1)
+                self._ultimo_uso = time.time()
+            self._proyecto_cargado = None
+
     def post(self, url: str, pedido: Dict[str, Any], timeout: float = 600, _reintento: bool = False) -> Respuesta:
         """ Una petición de Ollama (/api/chat o /api/generate) servida por este motor """
         ruta = url.split("?", 1)[0]

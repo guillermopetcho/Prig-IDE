@@ -50,6 +50,7 @@ from ollama_gestion import GestorModelos, ErrorGestion
 from herramientas_chat import Herramientas, ETIQUETAS as ETIQUETAS_HERRAMIENTAS
 import banco_proyecto
 import memoria_consulta
+import lectura_unidades
 import buscador_modelos
 from buscador_modelos import ErrorBuscador
 from descargas_modelos import Descargas
@@ -3678,6 +3679,22 @@ INSTRUCCION_BANCO = (
 )
 
 
+EMPUJONES_MAX = 2
+EMPUJON = ("Continúa: haz ahora con las herramientas la consulta que anunciaste y termina la respuesta. "
+           "No anuncies lo que vas a hacer: hazlo.")
+_ANUNCIO = re.compile(r"(?:^|[\n.:!?]\s*)(?:ahora|voy a|vamos a|veamos|veo si|busco|buscaré|reviso|revisaré|consulto|"
+                      r"consultaré|compruebo|comprobaré|déjame|a continuación|primero|luego)\b[^\n]{0,220}$", re.I)
+
+
+def anuncia_sin_hacer(texto: str) -> bool:
+    """ ¿La respuesta termina anunciando una consulta en vez de concluir? (el último párrafo es un
+    «voy a…/ahora busco…» corto, sin código ni lista de resultados) """
+    ultimo = (texto or "").strip().rsplit("\n\n", 1)[-1].strip()
+    if not ultimo or len(ultimo) > 300 or "```" in ultimo or ultimo.startswith(("-", "*", "|", "#", "1.")):
+        return False
+    return bool(_ANUNCIO.search(ultimo))
+
+
 INSTRUCCION_CONSOLA = (
     "MEMORIA DE CONSULTA: con la herramienta consola ejecutas Python sobre el proyecto entero, que es el "
     "objeto P. No necesitas tenerlo en tu contexto: consúltalo, crúzalo y cuenta con código, y guarda lo "
@@ -3700,6 +3717,26 @@ def _generador_subllamadas(modelo: str):
                                                    options={"num_predict": int(max_tokens), **MUESTREO_PRECISO},
                                                    uso="programador")).strip()
     return generar
+
+
+def _unidad_para(req: "AIChatRequest", modelo: str, banco) -> Optional[Dict[str, Any]]:
+    """ La unidad ya leída a restaurar para esta pregunta (lectura_unidades.py), o None para el modo
+    general. Solo con el motor MoE, eventos y herramientas, y sin archivos enganchados ni código del
+    editor (cambiarían el prefijo guardado). """
+    from ai_engine import motor_moe as motor_moe_mod
+    if (banco is None or not req.eventos or not motor_moe_mod.es_moe(modelo) or req.solo_codigo
+            or req.hooked_files or req.code_context or req.continuar or req.think):
+        return None
+    try:
+        lector = lectura_unidades.LectorUnidades(banco, ai_engine, modelo=modelo, generar_sub=_generador_subllamadas(modelo))
+        if not lector._unidades:
+            return None
+        eleccion = lector.elegir_unidad(req.prompt)
+        if eleccion.get("orden") is None or not eleccion.get("vigente"):
+            return None
+        return {**eleccion, "lector": lector, "datos": lector._unidades[eleccion["orden"]]}
+    except Exception:
+        return None
 
 
 def _presupuesto_banco(modelo: str) -> Tuple[int, int]:
@@ -3779,9 +3816,13 @@ def ai_chat(req: AIChatRequest):
     contexto_fijo = gancho_contexto if (gancho_contexto and req.eventos and motor_moe_mod.es_moe(modelo)) else ""
     if gancho_contexto and not contexto_fijo:
         prompt = f"{gancho_contexto}\n\n{prompt}"
-    banco, banco_info = None, None
+    banco, banco_info, unidad = None, None, None
     if req.banco:
         banco, banco_info, mapa, contexto_banco = _preparar_banco(req, modelo)
+        unidad = _unidad_para(req, modelo, banco)
+        if unidad is not None and banco_info is not None:
+            banco_info.update({"modo": "unidad", "unidad": unidad["nombre"], "unidad_orden": unidad["orden"],
+                               "unidad_cuota": unidad.get("cuota")})
         if banco is not None:
             if contexto_banco:
                 prompt = f"{contexto_banco}\n\n{prompt}"
@@ -3812,7 +3853,8 @@ def ai_chat(req: AIChatRequest):
     if req.eventos:
         return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo,
                                                                  contexto_fijo=contexto_fijo,
-                                                                 banco=banco, banco_info=banco_info)),
+                                                                 banco=banco, banco_info=banco_info,
+                                                                 unidad=unidad)),
                                  media_type="application/x-ndjson")
 
     def event_stream():
@@ -3828,7 +3870,8 @@ def ai_chat(req: AIChatRequest):
 
 
 def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None,
-                  contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None):
+                  contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None,
+                  unidad: Optional[Dict[str, Any]] = None):
     mod = modelo or req.model or _modelo_desafios(None, "tutor")
     if banco_info:
         yield json.dumps({"t": "banco", "v": banco_info}, ensure_ascii=False, default=str) + "\n"
@@ -3861,6 +3904,12 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
                                     permitir_codigo=req.permitir_codigo, timeout=_exec_timeout(), banco=banco,
                                     consola=consola)
+    if unidad is not None and consola is not None:
+        # Modo unidad: la conversación empieza exactamente con el prefijo de la lectura guardada de esa
+        # unidad (sistema del lector + tarjeta + contexto + código) y sus herramientas fijas; el motor la
+        # restaura en ~0,3 s con sus expertos, y la consola cubre el resto del proyecto
+        mensajes = unidad["lector"].mensajes(unidad["datos"]) + [{"role": "user", "content": req.prompt}]
+        herramientas = Herramientas(banco=banco, consola=consola, solo=list(lectura_unidades.HERRAMIENTAS_UNIDAD))
     extra_moe = None
     if solo_codigo:
         extra_moe = {motor_moe_mod.SOLO_CODIGO: True}
@@ -3871,17 +3920,28 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
     with _chats_lock:
         _chats_usuario[0] += 1
     try:
-        for evento in ai_engine.chat_eventos(mensajes, mod, "tutor", think=False if solo_codigo else req.think,
-                                             logprobs=max(0, min(int(req.logprobs or 0), 5)),
-                                             herramientas=herramientas,
-                                             max_rondas=16 if banco is not None else 6,
-                                             gobernador=recursos_termico.gobernador(),
-                                             extra=extra_moe):
-            if evento.get("t") == "herramienta":
-                evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
-            elif evento.get("t") == "texto":
-                respuesta.append(str(evento.get("v") or ""))
-            yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+        conversacion = mensajes
+        for intento in range(1 + (EMPUJONES_MAX if consola is not None else 0)):
+            for evento in ai_engine.chat_eventos(conversacion, mod, "tutor", think=False if solo_codigo else req.think,
+                                                 logprobs=max(0, min(int(req.logprobs or 0), 5)),
+                                                 herramientas=herramientas,
+                                                 max_rondas=16 if banco is not None else 6,
+                                                 gobernador=recursos_termico.gobernador(),
+                                                 extra=extra_moe):
+                if evento.get("t") == "herramienta":
+                    evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
+                elif evento.get("t") == "texto":
+                    respuesta.append(str(evento.get("v") or ""))
+                yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+            # Con herramientas, el modelo a veces anuncia la próxima consulta («Ahora busco qué
+            # endpoints…») y cierra el turno sin hacerla (visto en el examen del proyecto). Se le pide
+            # que la haga, con lo que ya dijo delante.
+            if consola is None or not anuncia_sin_hacer("".join(respuesta)):
+                break
+            conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
+                                           {"role": "user", "content": EMPUJON}]
+            respuesta.append("\n\n")
+            yield json.dumps({"t": "texto", "v": "\n\n"}, ensure_ascii=False) + "\n"
     finally:
         with _chats_lock:
             _chats_usuario[0] -= 1
