@@ -65,8 +65,12 @@ AYUDA = """P — el proyecto entero, consultable con Python (las variables persi
         define, llama, importa, hereda, lanza, captura, lee_config, lee_entorno, expone ("GET /api/x/*"),
         llama_api ("/api/x/*", fetch del frontend), usa_dom, define_dom, atributo, ejecuta  (% es comodín)
         En las rutas HTTP los parámetros son * en ambos lados: compáralas con ==
-  P.llamadores(nombre) / P.llamados(simbolo)    → quién lo llama / a qué llama
-  P.camino(desde, hasta, relaciones=("llama",)) → cadena más corta en el grafo, o None
+  P.ficha(nombre)                               → TODO sobre un símbolo: ubicación, firma, doc, llamadores, llamadas, hechos, notas
+  P.recorrido(inicio, profundidad=4)            → árbol de llamadas hacia abajo desde una función o un endpoint ("/api/x")
+  P.impacto(nombre)                             → qué se rompe si cambia: llamadores transitivos, endpoints y frontend
+  P.llamadores(nombre) / P.llamados(simbolo)    → quién lo llama / a qué llama (aristas resueltas al símbolo exacto;
+                                                  nombre completo «Clase.metodo» o «ruta:nombre» si hay varios)
+  P.camino(desde, hasta)                        → cadena de llamadas más corta entre dos símbolos, o None
   P.api(ruta_http)                              → quién expone el endpoint y quién lo consume
   P.ast(ruta)                                   → árbol ast de un archivo Python
   P.cambios(desde_version=None) / P.diff(ruta)  → cambios registrados (con diff y funciones tocadas)
@@ -77,7 +81,9 @@ AYUDA = """P — el proyecto entero, consultable con Python (las variables persi
   P.anotar(tipo, titulo, texto, rutas=[])       → memoria: definicion | teoria | decision | contexto | nota
   P.afirmar(s, r, o, ruta=None)                 → añade un hecho al grafo
   P.guardar(nombre, valor) / P.recuperar(nombre)→ resultados que sobreviven a la sesión
-Imprime solo lo necesario (la salida se recorta a 6.000 caracteres): guarda lo grande en variables."""
+Empieza por P.ficha / P.recorrido / P.impacto: responden en una línea lo que costaría escribir un bucle.
+Código corto, sin comentarios ni prints decorativos. Imprime solo lo necesario (se recorta a 6.000
+caracteres): guarda lo grande en variables."""
 
 
 # ======================================================================
@@ -314,35 +320,140 @@ class API:
                 args.append(valor)
         return self._filas(sql + " LIMIT ?", args + [int(limite)])
 
+    # ------------------------------------------------------------------ grafo de llamadas resuelto
+    # Cada arista va de un símbolo exacto (archivo + nombre completo) a otro: la resolución usa el
+    # receptor de la llamada, los import y el tipo de retorno anotado (banco_proyecto._resolver_llamadas).
+    def _nodos(self, nombre: str) -> List[tuple]:
+        """ Símbolos que casan con un nombre: completo («Motor.asegurar»), corto («asegurar») o
+        «ruta:nombre» para desambiguar """
+        if ":" in nombre and not nombre.startswith("/"):
+            ruta, n = nombre.split(":", 1)
+            return [(f["ruta"], f["nombre"]) for f in self._c.execute(
+                "SELECT ruta, nombre FROM simbolos WHERE ruta LIKE ? AND (nombre = ? OR corto = ?)", (f"%{ruta}", n, n))]
+        filas = [(f["ruta"], f["nombre"]) for f in self._c.execute("SELECT ruta, nombre FROM simbolos WHERE nombre = ?", (nombre,))]
+        return filas or [(f["ruta"], f["nombre"]) for f in self._c.execute(
+            "SELECT ruta, nombre FROM simbolos WHERE corto = ?", (nombre.split(".")[-1],))]
+
+    def _ubicacion(self, nodo: tuple) -> str:
+        f = self._c.execute("SELECT ini FROM simbolos WHERE ruta = ? AND nombre = ?", nodo).fetchone()
+        return f"{nodo[0]}:{f['ini']}" if f else nodo[0]
+
+    def _salientes(self, nodo: tuple) -> List[tuple]:
+        return [(f["a_ruta"], f["a_nombre"]) for f in self._c.execute(
+            "SELECT DISTINCT a_ruta, a_nombre FROM llamadas WHERE ruta = ? AND desde = ? ORDER BY linea", nodo)]
+
+    def _entrantes(self, nodo: tuple) -> List[Dict[str, Any]]:
+        return [dict(f) for f in self._c.execute(
+            "SELECT ruta, desde, linea, confianza FROM llamadas WHERE a_ruta = ? AND a_nombre = ? ORDER BY ruta, linea", nodo)]
+
     def llamadores(self, nombre: str) -> List[Dict[str, Any]]:
-        return self.hechos(r="llama", o=nombre.split(".")[-1])
+        return [{"s": f["desde"], "ruta": f["ruta"], "linea": f["linea"], "confianza": f["confianza"], "a": n[1]}
+                for n in self._nodos(nombre) for f in self._entrantes(n)]
 
     def llamados(self, simbolo: str) -> List[Dict[str, Any]]:
-        return self.hechos(s=simbolo, r="llama")
+        return [{"o": d[1], "ruta": d[0]} for n in self._nodos(simbolo) for d in self._salientes(n)]
 
-    def camino(self, desde: str, hasta: str, relaciones=("llama",), maximo: int = 8) -> Optional[List[str]]:
-        """ Búsqueda en anchura sobre el grafo (por nombre corto de símbolo) """
-        marcas = ",".join("?" * len(relaciones))
-        aristas: Dict[str, List[str]] = {}
-        for f in self._c.execute(f"SELECT s, o FROM grafo WHERE r IN ({marcas})", list(relaciones)):
-            aristas.setdefault(f["s"].split(".")[-1], []).append(f["o"].split(".")[-1])
-        origen, destino = desde.split(".")[-1], hasta.split(".")[-1]
-        previo: Dict[str, Optional[str]] = {origen: None}
-        frontera = [origen]
+    def camino(self, desde: str, hasta: str, maximo: int = 10) -> Optional[List[str]]:
+        """ Cadena de llamadas más corta entre dos símbolos (búsqueda en anchura sobre aristas resueltas) """
+        destinos = set(self._nodos(hasta))
+        previo: Dict[tuple, Optional[tuple]] = {n: None for n in self._nodos(desde)}
+        frontera = list(previo)
         for _ in range(maximo):
             nueva = []
             for nodo in frontera:
-                for sig in aristas.get(nodo, []):
-                    if sig not in previo:
-                        previo[sig] = nodo
-                        if sig == destino:
-                            cadena = [sig]
-                            while previo[cadena[-1]] is not None:
-                                cadena.append(previo[cadena[-1]])
-                            return list(reversed(cadena))
-                        nueva.append(sig)
+                for sig in self._salientes(nodo):
+                    if sig in previo:
+                        continue
+                    previo[sig] = nodo
+                    if sig in destinos:
+                        cadena = [sig]
+                        while previo[cadena[-1]] is not None:
+                            cadena.append(previo[cadena[-1]])
+                        return [f"{n[1]} ({self._ubicacion(n)})" for n in reversed(cadena)]
+                    nueva.append(sig)
             frontera = nueva
         return None
+
+    # ------------------------------------------------------------------ primitivas de alto nivel
+    # Cada una evita que el modelo escriba 100-300 tokens de Python: escribir es 20-80 veces más caro
+    # que leer (medido), así que las consultas frecuentes van hechas.
+    def ficha(self, nombre: str) -> Dict[str, Any]:
+        """ Todo lo que se sabe de un símbolo: dónde está, firma, doc, quién lo llama, a qué llama,
+        sus hechos, el resumen de su archivo y las notas de memoria de ese archivo """
+        nodos = self._nodos(nombre)
+        if not nodos:
+            raise KeyError(f"No hay ningún símbolo llamado «{nombre}»")
+        nodo = nodos[0]
+        s = dict(self._c.execute("SELECT ruta, nombre, tipo, firma, doc, ini, fin FROM simbolos WHERE ruta = ? AND nombre = ?", nodo).fetchone())
+        archivo = self._c.execute("SELECT COALESCE(resumen_ia, resumen) r FROM archivos WHERE ruta = ?", (s["ruta"],)).fetchone()
+        return {
+            "simbolo": f"{s['nombre']} ({s['tipo']}) {s['ruta']}:{s['ini']}-{s['fin']}",
+            "firma": s["firma"], "doc": (s["doc"] or "")[:400],
+            "otros_con_ese_nombre": [f"{n[0]}:{n[1]}" for n in nodos[1:8]],
+            "llamado_por": [f"{f['desde']} ({f['ruta']}:{f['linea']})" + ("" if f["confianza"] == "exacta" else " ?")
+                            for f in self._entrantes(nodo)][:40],
+            "llama_a": [f"{d[1]} ({d[0]})" for d in self._salientes(nodo)][:40],
+            "hechos": [f"{h['r']} {h['o']}" for h in self._filas(
+                "SELECT r, o FROM hechos WHERE s = ? AND ruta = ? LIMIT 60", (s["nombre"], s["ruta"]))],
+            "archivo": archivo["r"] if archivo else "",
+            "notas": [f"({f['tipo']}) {f['titulo']}: {f['texto'][:200]}" for f in self._filas(
+                "SELECT tipo, titulo, texto FROM conocimiento WHERE rutas LIKE ? LIMIT 8", (f'%"{s["ruta"]}"%',))],
+        }
+
+    def _inicio(self, inicio: str) -> List[tuple]:
+        """ Un símbolo, o un endpoint («GET /api/x» o «/api/x») resuelto a la función que lo expone """
+        if "/api" in inicio or inicio.startswith("/"):
+            from banco_proyecto import ruta_http_canonica
+            ruta = ruta_http_canonica(inicio.split(" ", 1)[-1])
+            return [(h["ruta"], h["s"]) for h in self._filas("SELECT s, ruta FROM hechos WHERE r = 'expone' AND o LIKE ?", (f"% {ruta}",))]
+        return self._nodos(inicio)[:1]
+
+    def recorrido(self, inicio: str, profundidad: int = 4, maximo: int = 60) -> str:
+        """ Árbol de llamadas hacia abajo, con ubicaciones (solo lo definido en el proyecto) """
+        lineas: List[str] = []
+        vistos = set()
+
+        def bajar(nodo: tuple, nivel: int):
+            if len(lineas) >= maximo:
+                return
+            repetido = nodo in vistos
+            lineas.append(f"{'  ' * nivel}{nodo[1]}  {self._ubicacion(nodo)}" + ("  (ya visto)" if repetido else ""))
+            if repetido or nivel >= profundidad:
+                return
+            vistos.add(nodo)
+            for sig in self._salientes(nodo):
+                bajar(sig, nivel + 1)
+        inicios = self._inicio(inicio)
+        if not inicios:
+            raise KeyError(f"No encontré «{inicio}» (ni como símbolo ni como endpoint)")
+        for nodo in inicios:
+            bajar(nodo, 0)
+        return "\n".join(lineas) + ("\n[… recortado]" if len(lineas) >= maximo else "")
+
+    def impacto(self, nombre: str, profundidad: int = 4) -> Dict[str, Any]:
+        """ Qué se ve afectado si cambia `nombre`: quién lo llama (transitivamente, por aristas
+        resueltas), qué endpoints exponen esos llamadores y qué partes del frontend los consumen """
+        afectados: Dict[tuple, int] = {}
+        frontera = self._nodos(nombre)[:1]
+        for nivel in range(1, profundidad + 1):
+            nueva = []
+            for nodo in frontera:
+                for f in self._entrantes(nodo):
+                    clave = (f["ruta"], f["desde"])
+                    if clave not in afectados:
+                        afectados[clave] = nivel
+                        nueva.append(clave)
+            frontera = nueva
+        todos = list(afectados) + self._nodos(nombre)[:1]
+        endpoints = sorted({h["o"] for r, s in todos for h in self._filas(
+            "SELECT o FROM hechos WHERE r = 'expone' AND s = ? AND ruta = ?", (s, r))})
+        consumidores = sorted({f"{h['s']} ({h['ruta']})" for e in endpoints for h in self._filas(
+            "SELECT s, ruta FROM hechos WHERE r = 'llama_api' AND o = ?", (e.split(" ", 1)[1],))})
+        es_test = lambda r: "/tests/" in r or os.path.basename(r).startswith("test_")
+        orden = sorted(afectados, key=lambda k: (afectados[k], k))
+        return {"llamadores": [f"{n[1]} ({n[0]}) nivel {afectados[n]}" for n in orden if not es_test(n[0])][:80],
+                "tests": sorted({n[1] for n in afectados if es_test(n[0])})[:40],
+                "total": len(afectados), "endpoints": endpoints, "frontend": consumidores}
 
     def api(self, ruta_http: str) -> Dict[str, Any]:
         """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*) """

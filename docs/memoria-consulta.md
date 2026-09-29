@@ -131,6 +131,21 @@ Antes de cada paso consulta una guardia (`_guardia_analista`) y espera si:
    de módulos). La síntesis de carpetas tarda unos 21 s por carpeta (11 carpetas en 233 s) y el
    resumen del proyecto es correcto.
 
+10. **El grafo de llamadas por nombre corto era engañoso.** 280 nombres están definidos en más de un
+    archivo (`__init__` 112 veces, `buscar` 15), y `requests.post(...)` se confundía con
+    `Motor.post`: `P.impacto("calientes_para")` devolvía medio proyecto. Ahora cada llamada guarda su
+    receptor (nada, `self`, un módulo importado u otro objeto) y los alias de import, y una
+    resolución global (0,2 s en Prig) la une al símbolo exacto:
+    1. misma clase y sus bases;
+    2. import;
+    3. tipo de retorno anotado (`-> "Motor"`);
+    4. nombre único del mismo lenguaje que no sea un verbo común de librería.
+
+    Resultado en Prig: 6.522 aristas (5.480 exactas, 282 por nombre único, 760 aproximadas) en lugar
+    de 27.000 ambiguas, sin cruces entre lenguajes. `P.camino("ai_chat", "calientes_para")` da la
+    cadena real de 7 pasos con líneas, y el impacto de `calientes_para` son exactamente sus 6
+    llamadores reales más 2 tests.
+
 ## Próximos pasos
 
 - Afinar el análisis por archivo: título corto para las decisiones y descartar definiciones que son

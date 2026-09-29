@@ -53,7 +53,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-VERSION_ESQUEMA = 3          # 3: rutas HTTP canónicas (parámetros como *) en expone y llama_api
+VERSION_ESQUEMA = 4          # 4: llamadas resueltas al símbolo exacto (receptor + alias de import)
 MAX_ARCHIVOS = 20000
 MAX_BYTES = 1_000_000
 MAX_BYTES_DATOS = 200_000          # json/yaml/csv: más grandes son datos, no código
@@ -205,6 +205,26 @@ def _primera_linea(texto: Optional[str], maximo: int = 200) -> str:
     return ""
 
 
+def alias_python(texto: str) -> List[Tuple[str, str]]:
+    """ Nombres que los import dejan en el archivo: (alias, ruta con puntos). «import a.b» deja «a»;
+    «import a.b as c», «c» → a.b; «from a import b as c», «c» → a.b (módulo o símbolo). """
+    try:
+        arbol = ast.parse(texto)
+    except (SyntaxError, ValueError):
+        return []
+    salida = []
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Import):
+            for a in nodo.names:
+                salida.append((a.asname, a.name) if a.asname else (a.name.split(".")[0], a.name.split(".")[0]))
+        elif isinstance(nodo, ast.ImportFrom):
+            base = "." * (nodo.level or 0) + (nodo.module or "")
+            for a in nodo.names:
+                if a.name != "*":
+                    salida.append((a.asname or a.name, f"{base}.{a.name}" if nodo.module else base + a.name))
+    return salida
+
+
 def simbolos_python(texto: str) -> Tuple[List[Simbolo], List[str], str]:
     """ (símbolos, módulos importados, docstring del módulo) """
     try:
@@ -214,16 +234,27 @@ def simbolos_python(texto: str) -> Tuple[List[Simbolo], List[str], str]:
     simbolos: List[Simbolo] = []
     importados: List[str] = []
 
-    def llamadas(nodo) -> List[Tuple[str, int]]:
-        """ (nombre llamado, línea de la primera llamada) """
-        primeras: Dict[str, int] = {}
+    def llamadas(nodo) -> List[Tuple[str, int, str]]:
+        """ (nombre llamado, línea de la primera llamada, receptor). El receptor distingue
+        calcular(...) (""), self.calcular(...) ("self"), motor.calcular(...) ("motor") y
+        requests.post(...) ("requests"): sin él, cualquier .post() parecía llamar a Motor.post. """
+        primeras: Dict[Tuple[str, str], int] = {}
         for n in ast.walk(nodo):
             if isinstance(n, ast.Call):
                 f = n.func
-                nombre = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else None)
-                if nombre and (nombre not in primeras or n.lineno < primeras[nombre]):
-                    primeras[nombre] = n.lineno
-        return sorted(primeras.items())
+                if isinstance(f, ast.Name):
+                    clave = (f.id, "")
+                elif isinstance(f, ast.Attribute):
+                    try:
+                        receptor = ast.unparse(f.value)
+                    except Exception:
+                        receptor = "?"
+                    clave = (f.attr, receptor[:80])
+                else:
+                    continue
+                if clave not in primeras or n.lineno < primeras[clave]:
+                    primeras[clave] = n.lineno
+        return sorted((nombre, linea, receptor) for (nombre, receptor), linea in primeras.items())
 
     def firma(nodo) -> str:
         if isinstance(nodo, ast.ClassDef):
@@ -300,6 +331,19 @@ PATRONES: Dict[str, List[Tuple[re.Pattern, str]]] = {
         (re.compile(r"^\s*(?:pub\s+)?mod\s+([A-Za-z_]\w*)\s*\{"), "espacio"),
     ],
 }
+# Métodos de librería tan comunes que un nombre único en el proyecto no basta para enlazarlos
+VERBOS_COMUNES = {
+    "get", "post", "put", "delete", "patch", "run", "read", "write", "append", "extend", "update", "items",
+    "keys", "values", "format", "join", "split", "strip", "open", "close", "execute", "send", "start", "stop",
+    "add", "remove", "pop", "copy", "load", "dump", "loads", "dumps", "search", "match", "sub", "find",
+    "replace", "lower", "upper", "encode", "decode", "sort", "index", "count", "insert", "clear", "set",
+    "wait", "acquire", "release", "submit", "result", "json", "text", "exists", "mkdir", "call", "apply",
+    "map", "filter", "reduce", "emit", "on", "then", "catch", "push", "slice", "splice", "forEach", "log",
+    "error", "warn", "info", "debug", "parse", "stringify", "test", "exec", "render", "setdefault", "fetch",
+    "flush", "readline", "readlines", "kill", "terminate", "poll", "communicate", "is_alive", "is_set",
+    "setUp", "tearDown", "__init__", "__enter__", "__exit__", "main", "init", "reset", "next", "iter",
+}
+
 _ES_TEST = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]+$|_test\.\w+$|\.(test|spec)\.\w+$")
 _LLAMADA = re.compile(r"\b([A-Za-z_][\w]*)\s*\(")
 _COMENTARIO_LINEA = re.compile(r"^\s*(//+|#|\*|/\*\*?|--)\s?")
@@ -608,7 +652,14 @@ class BancoProyecto:
             CREATE INDEX IF NOT EXISTS idx_frag_ruta ON fragmentos(ruta);
             CREATE INDEX IF NOT EXISTS idx_frag_sha ON fragmentos(sha);
             CREATE VIRTUAL TABLE IF NOT EXISTS fragmentos_fts USING fts5(ruta, simbolo, terminos);
-            CREATE TABLE IF NOT EXISTS usos (ruta TEXT, nombre TEXT, linea INTEGER, dentro TEXT);
+            CREATE TABLE IF NOT EXISTS usos (ruta TEXT, nombre TEXT, linea INTEGER, dentro TEXT, receptor TEXT);
+            CREATE TABLE IF NOT EXISTS alias (ruta TEXT, nombre TEXT, destino TEXT);
+            CREATE INDEX IF NOT EXISTS idx_alias_ruta ON alias(ruta);
+            CREATE TABLE IF NOT EXISTS llamadas (
+                ruta TEXT, desde TEXT, a_ruta TEXT, a_nombre TEXT, linea INTEGER, confianza TEXT);
+            CREATE INDEX IF NOT EXISTS idx_llam_desde ON llamadas(ruta, desde);
+            CREATE INDEX IF NOT EXISTS idx_llam_a ON llamadas(a_ruta, a_nombre);
+            CREATE INDEX IF NOT EXISTS idx_llam_nombre ON llamadas(a_nombre);
             CREATE INDEX IF NOT EXISTS idx_usos_nombre ON usos(nombre);
             CREATE INDEX IF NOT EXISTS idx_usos_ruta ON usos(ruta);
             CREATE TABLE IF NOT EXISTS importaciones (ruta TEXT, destino TEXT);
@@ -634,9 +685,10 @@ class BancoProyecto:
             CREATE INDEX IF NOT EXISTS idx_hechos_o ON hechos(o);
             CREATE INDEX IF NOT EXISTS idx_hechos_r ON hechos(r);
             CREATE INDEX IF NOT EXISTS idx_hechos_ruta ON hechos(ruta);
-            CREATE VIEW IF NOT EXISTS grafo AS
+            DROP VIEW IF EXISTS grafo;
+            CREATE VIEW grafo AS
                 SELECT s, r, o, ruta, linea FROM hechos
-                UNION ALL SELECT dentro, 'llama', nombre, ruta, linea FROM usos
+                UNION ALL SELECT desde, 'llama', a_nombre, ruta, linea FROM llamadas
                 UNION ALL SELECT ruta, 'importa', destino, ruta, 0 FROM importaciones
                 UNION ALL SELECT ruta, 'define', nombre, ruta, ini FROM simbolos;
             CREATE TABLE IF NOT EXISTS trabajo (nombre TEXT PRIMARY KEY, valor TEXT, cuando TEXT);
@@ -644,6 +696,8 @@ class BancoProyecto:
                 nivel TEXT, clave TEXT, texto TEXT, sha_fuente TEXT, modelo TEXT, cuando TEXT,
                 PRIMARY KEY (nivel, clave));
             """)
+            if "receptor" not in {f[1] for f in c.execute("PRAGMA table_info(usos)")}:
+                c.execute("ALTER TABLE usos ADD COLUMN receptor TEXT")
             previo = c.execute("SELECT valor FROM meta WHERE clave = 'esquema'").fetchone()
             if previo and int(previo[0]) < VERSION_ESQUEMA:
                 # Un banco de una versión anterior: se reindexa todo en la próxima sincronización
@@ -788,6 +842,7 @@ class BancoProyecto:
                     self._guardar_meta("version_vista", version, c)
             if hubo:
                 self._resolver_importaciones()
+                self._resolver_llamadas()
                 self._vectores = None
         self._ultima_sincronizacion = time.time()
         return {"inicial": inicial, "nuevos": len(nuevos) if not inicial else len(tocados),
@@ -805,6 +860,7 @@ class BancoProyecto:
         c.execute("DELETE FROM fragmentos WHERE ruta = ?", (rel,))
         c.execute("DELETE FROM simbolos WHERE ruta = ?", (rel,))
         c.execute("DELETE FROM usos WHERE ruta = ?", (rel,))
+        c.execute("DELETE FROM alias WHERE ruta = ?", (rel,))
         c.execute("DELETE FROM importaciones WHERE ruta = ?", (rel,))
         c.execute("DELETE FROM hechos WHERE ruta = ? AND origen = 'codigo'", (rel,))
         if not conservar_archivo:
@@ -841,8 +897,15 @@ class BancoProyecto:
                       (rel, s["nombre"], s["corto"], s["tipo"], s["firma"], s["doc"], s["ini"], s["fin"],
                        s["padre"], _sha(cuerpo)))
             for uso in s.get("usos") or []:
-                nombre, linea = uso if isinstance(uso, tuple) else (uso, s["ini"])
-                c.execute("INSERT INTO usos VALUES (?,?,?,?)", (rel, nombre, linea, s["nombre"]))
+                if isinstance(uso, tuple):
+                    nombre, linea, receptor = (uso + ("",))[:3] if len(uso) == 2 else uso
+                else:
+                    nombre, linea, receptor = uso, s["ini"], None
+                c.execute("INSERT INTO usos (ruta, nombre, linea, dentro, receptor) VALUES (?,?,?,?,?)",
+                          (rel, nombre, linea, s["nombre"], receptor))
+        if lenguaje in ("python", "cuaderno"):
+            for alias, destino in alias_python(texto):
+                c.execute("INSERT INTO alias VALUES (?,?,?)", (rel, alias, destino))
         for h in extraer_hechos(rel, lenguaje, texto, simbolos):
             c.execute("INSERT INTO hechos (s, r, o, ruta, linea, origen, version) VALUES (?,?,?,?,?,'codigo',?)",
                       (h[0], h[1], h[2], rel, h[3], version))
@@ -1005,6 +1068,150 @@ class BancoProyecto:
                 else:
                     c.execute("DELETE FROM importaciones WHERE rowid = ?", (f["rowid"],))
             c.execute("DELETE FROM importaciones WHERE rowid NOT IN (SELECT MIN(rowid) FROM importaciones GROUP BY ruta, destino)")
+
+    def _resolver_llamadas(self):
+        """ Cada llamada, a su símbolo exacto (archivo + nombre completo). Por orden de confianza:
+          · mismo archivo (función de primer nivel o clase), o método de la misma clase y sus bases
+          · lo que dejaron los import (alias de módulo o de símbolo)
+          · un nombre definido una sola vez en el proyecto, si no es un verbo común de librería
+        Lo demás queda sin enlazar: es preferible a unir cualquier .post() con Motor.post.
+        Se rehace entera tras cada cambio (depende de todos los archivos): ~1 s en Prig. """
+        with self.conectar() as c:
+            simbolos = [dict(f) for f in c.execute(
+                "SELECT ruta, nombre, corto, tipo, padre, firma FROM simbolos WHERE tipo IN ('funcion','metodo','clase')")]
+            rutas = [f["ruta"] for f in c.execute("SELECT ruta FROM archivos")]
+            usos = [dict(f) for f in c.execute("SELECT ruta, nombre, linea, dentro, receptor FROM usos")]
+            alias = [dict(f) for f in c.execute("SELECT ruta, nombre, destino FROM alias")]
+            bases_raw = [dict(f) for f in c.execute("SELECT s, o, ruta FROM hechos WHERE r = 'hereda'")]
+        primer_nivel: Dict[str, Dict[str, str]] = {}          # ruta → corto → nombre
+        metodos: Dict[Tuple[str, str], Dict[str, str]] = {}    # (ruta, clase) → corto → nombre
+        global_: Dict[str, List[Tuple[str, str]]] = {}         # corto → [(ruta, nombre)]
+        clases: Dict[str, List[Tuple[str, str]]] = {}          # nombre corto de clase → [(ruta, nombre)]
+        for x in simbolos:
+            if not x["padre"]:
+                primer_nivel.setdefault(x["ruta"], {})[x["corto"]] = x["nombre"]
+            elif x["tipo"] == "metodo":
+                metodos.setdefault((x["ruta"], x["padre"]), {})[x["corto"]] = x["nombre"]
+            global_.setdefault(x["corto"], []).append((x["ruta"], x["nombre"]))
+            if x["tipo"] == "clase":
+                clases.setdefault(x["corto"], []).append((x["ruta"], x["nombre"]))
+        por_modulo: Dict[str, str] = {}
+        por_nombre: Dict[str, List[str]] = {}
+        for r in rutas:
+            sin_ext = r.rsplit(".", 1)[0]
+            por_modulo[sin_ext.replace("/", ".")] = r
+            if sin_ext.endswith("/__init__"):
+                por_modulo[sin_ext[:-9].replace("/", ".")] = r
+            por_nombre.setdefault(os.path.basename(r), []).append(r)
+        # alias: (ruta, nombre) → (archivo destino, símbolo o None si es un módulo)
+        resueltos: Dict[Tuple[str, str], Tuple[str, Optional[str]]] = {}
+        for a in alias:
+            modulo = self._resolver(a["ruta"], a["destino"], por_modulo, por_nombre)
+            destino_mod = por_modulo.get(a["destino"].lstrip(".").replace("/", "."))
+            if modulo and (modulo == destino_mod or modulo.rsplit(".", 1)[0].replace("/", ".").endswith(a["destino"].lstrip("."))):
+                resueltos[(a["ruta"], a["nombre"])] = (modulo, None)
+            elif "." in a["destino"].lstrip("."):
+                padre, simbolo = a["destino"].rsplit(".", 1)
+                archivo = self._resolver(a["ruta"], padre, por_modulo, por_nombre) if padre.strip(".") else None
+                if archivo and simbolo in primer_nivel.get(archivo, {}):
+                    resueltos[(a["ruta"], a["nombre"])] = (archivo, primer_nivel[archivo][simbolo])
+                elif modulo:
+                    resueltos[(a["ruta"], a["nombre"])] = (modulo, None)
+        bases: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
+        for b in bases_raw:
+            corto = b["o"].split(".")[-1].split("[")[0]
+            cand = [x for x in clases.get(corto, []) if x[0] == b["ruta"]] or clases.get(corto, [])
+            if len(cand) == 1:
+                bases.setdefault((b["ruta"], b["s"]), []).append(cand[0])
+
+        # Tipo de retorno anotado (-> "motor_moe.Motor"): permite seguir self.motor_moe().post(...)
+        retorno: Dict[Tuple[str, str], str] = {}
+        for x in simbolos:
+            m = re.search(r"->\s*['\"]?([\w.]+)['\"]?\s*$", x.get("firma") or "")
+            if m:
+                retorno[(x["ruta"], x["nombre"])] = m.group(1).split(".")[-1]
+
+        def clase_de_llamada(ruta: str, clase: str, receptor: str) -> Optional[Tuple[str, str]]:
+            """ El receptor es una llamada (f(...) o self.f(...)): la clase que devuelve f """
+            base = receptor.split("(", 1)[0]
+            partes = base.split(".")
+            if len(partes) == 2 and partes[0] in ("self", "cls") and clase:
+                fn = metodo_en(ruta, clase, partes[1])
+            elif len(partes) == 1:
+                fn = (ruta, primer_nivel[ruta][partes[0]]) if partes[0] in primer_nivel.get(ruta, {}) else unico(partes[0], ruta)
+            else:
+                return None
+            if fn and fn[1] in {x[1] for x in clases.get(fn[1].split(".")[-1], [])}:
+                return fn                                  # Clase(...).metodo(): una instancia de esa clase
+            tipo = retorno.get(fn) if fn else None
+            cand = clases.get(tipo or "", [])
+            return cand[0] if len(cand) == 1 else None
+
+        def unico(nombre: str, desde: Optional[str] = None) -> Optional[Tuple[str, str]]:
+            """ El único símbolo con ese nombre en el proyecto, del mismo lenguaje que quien llama
+            (un JS no llama a una función de Python aunque se llamen igual) """
+            cand = global_.get(nombre, [])
+            if desde is not None:
+                familia = lenguaje_de(desde)
+                cand = [x for x in cand if lenguaje_de(x[0]) == familia]
+            return cand[0] if len(cand) == 1 and nombre not in VERBOS_COMUNES else None
+
+        def metodo_en(ruta: str, clase: str, nombre: str, profundidad: int = 0) -> Optional[Tuple[str, str]]:
+            if nombre in metodos.get((ruta, clase), {}):
+                return ruta, metodos[(ruta, clase)][nombre]
+            if profundidad < 4:
+                for base in bases.get((ruta, clase), []):
+                    r = metodo_en(base[0], base[1], nombre, profundidad + 1)
+                    if r:
+                        return r
+            return None
+
+        filas = []
+        for u in usos:
+            ruta, n, receptor, dentro = u["ruta"], u["nombre"], u["receptor"], u["dentro"]
+            clase = dentro.rsplit(".", 1)[0] if "." in dentro else ""
+            destino, confianza = None, "exacta"
+            if receptor is None:                                   # JS, C…: sin receptor conocido
+                if n in primer_nivel.get(ruta, {}):
+                    destino = (ruta, primer_nivel[ruta][n])
+                elif clase and metodo_en(ruta, clase, n):
+                    destino = metodo_en(ruta, clase, n)
+                else:
+                    destino, confianza = unico(n, ruta), "unica"
+            elif receptor == "":
+                if n in primer_nivel.get(ruta, {}):
+                    destino = (ruta, primer_nivel[ruta][n])
+                elif (ruta, n) in resueltos:
+                    archivo, simbolo = resueltos[(ruta, n)]
+                    destino = (archivo, simbolo) if simbolo else None
+                else:
+                    destino, confianza = unico(n, ruta), "unica"
+                if destino and destino[1] in {x[1] for x in clases.get(destino[1].split(".")[-1], [])}:
+                    init = metodo_en(destino[0], destino[1], "__init__")
+                    destino = init or destino                      # llamar a una clase es llamar a su __init__
+            elif receptor in ("self", "cls", "super()"):
+                destino = metodo_en(ruta, clase, n) if clase else None
+                if receptor == "super()" and clase:
+                    destino = next((metodo_en(b[0], b[1], n) for b in bases.get((ruta, clase), []) if metodo_en(b[0], b[1], n)), None)
+            elif (ruta, receptor) in resueltos and resueltos[(ruta, receptor)][1] is None:
+                archivo = resueltos[(ruta, receptor)][0]
+                if n in primer_nivel.get(archivo, {}):
+                    destino = (archivo, primer_nivel[archivo][n])
+            elif (ruta, receptor) in resueltos:                    # alias de una clase: Clase.metodo(...)
+                archivo, simbolo = resueltos[(ruta, receptor)]
+                destino = metodo_en(archivo, simbolo, n)
+            elif receptor in clases and len(clases[receptor]) == 1:
+                destino = metodo_en(clases[receptor][0][0], clases[receptor][0][1], n)
+            elif receptor.endswith(")") and clase_de_llamada(ruta, clase, receptor):
+                c_ruta, c_nombre = clase_de_llamada(ruta, clase, receptor)
+                destino = metodo_en(c_ruta, c_nombre, n)
+            else:                                                  # self.banco.anotar(…), obj.metodo(…)
+                destino, confianza = unico(n, ruta), "aproximada"
+            if destino and destino != (ruta, dentro):
+                filas.append((ruta, dentro, destino[0], destino[1], u["linea"], confianza))
+        with self.conectar() as c:
+            c.execute("DELETE FROM llamadas")
+            c.executemany("INSERT INTO llamadas VALUES (?,?,?,?,?,?)", filas)
 
     @staticmethod
     def _resolver(origen: str, modulo: str, por_modulo: Dict[str, str], por_nombre: Dict[str, List[str]]) -> Optional[str]:
@@ -1222,35 +1429,26 @@ class BancoProyecto:
         return salida
 
     def vecinos(self, fragmentos: List[Dict[str, Any]], limite: int = 12) -> List[Dict[str, Any]]:
-        """ Las definiciones que llaman los fragmentos elegidos y quién los llama (1 salto) """
-        simbolos = [f["simbolo"] for f in fragmentos if f.get("simbolo")]
-        if not simbolos:
-            return []
+        """ Las definiciones que llaman los fragmentos elegidos y quién los llama (1 salto, por
+        aristas resueltas al símbolo exacto: no las de cualquier función homónima) """
         ya = {(f["ruta"], f["simbolo"]) for f in fragmentos}
         salida: List[Dict[str, Any]] = []
         with self.conectar() as c:
             for f in fragmentos[:6]:
                 if not f.get("simbolo"):
                     continue
-                llamados = [u["nombre"] for u in c.execute(
-                    "SELECT nombre FROM usos WHERE ruta = ? AND dentro = ?", (f["ruta"], f["simbolo"]))]
-                corto = f["simbolo"].split(".")[-1]
-                if llamados:
-                    marcas = ",".join("?" * len(llamados))
-                    for s in c.execute(f"""SELECT ruta, nombre, firma, doc, ini, fin FROM simbolos
-                                          WHERE corto IN ({marcas}) AND tipo IN ('funcion','metodo','clase')
-                                          LIMIT 20""", llamados):
-                        if (s["ruta"], s["nombre"]) not in ya:
-                            ya.add((s["ruta"], s["nombre"]))
-                            salida.append({**dict(s), "relacion": f"llamada desde {f['simbolo']}"})
-                for u in c.execute("""SELECT DISTINCT u.ruta, u.dentro, s.firma, s.doc, s.ini, s.fin
-                                      FROM usos u LEFT JOIN simbolos s ON s.ruta = u.ruta AND s.nombre = u.dentro
-                                      WHERE u.nombre = ? LIMIT 8""", (corto,)):
-                    if (u["ruta"], u["dentro"]) not in ya and u["firma"]:
-                        ya.add((u["ruta"], u["dentro"]))
-                        salida.append({"ruta": u["ruta"], "nombre": u["dentro"], "firma": u["firma"],
-                                       "doc": u["doc"], "ini": u["ini"], "fin": u["fin"],
-                                       "relacion": f"llama a {corto}"})
+                for s in c.execute("""SELECT DISTINCT s.ruta, s.nombre, s.firma, s.doc, s.ini, s.fin
+                                      FROM llamadas l JOIN simbolos s ON s.ruta = l.a_ruta AND s.nombre = l.a_nombre
+                                      WHERE l.ruta = ? AND l.desde = ? ORDER BY l.linea LIMIT 20""", (f["ruta"], f["simbolo"])):
+                    if (s["ruta"], s["nombre"]) not in ya:
+                        ya.add((s["ruta"], s["nombre"]))
+                        salida.append({**dict(s), "relacion": f"llamada desde {f['simbolo']}"})
+                for u in c.execute("""SELECT DISTINCT s.ruta, s.nombre, s.firma, s.doc, s.ini, s.fin
+                                      FROM llamadas l JOIN simbolos s ON s.ruta = l.ruta AND s.nombre = l.desde
+                                      WHERE l.a_ruta = ? AND l.a_nombre = ? LIMIT 8""", (f["ruta"], f["simbolo"])):
+                    if (u["ruta"], u["nombre"]) not in ya:
+                        ya.add((u["ruta"], u["nombre"]))
+                        salida.append({**dict(u), "relacion": f"llama a {f['simbolo'].split('.')[-1]}"})
         return salida[:limite]
 
     def buscar_conocimiento(self, consulta: str, k: int = 6, vector: Optional[List[float]] = None,
@@ -1802,6 +2000,10 @@ class BancoProyecto:
                 datos = _json_de(salida)
             except Exception:
                 datos = None
+            if isinstance(datos, dict):
+                datos = {"resumen": datos.get("summary") or datos.get("resumen"),
+                         "definiciones": datos.get("definitions") or datos.get("definiciones") or [],
+                         "decisiones": datos.get("decisions") or datos.get("decisiones") or []}
             if not isinstance(datos, dict) or not datos.get("resumen"):
                 errores += 1
                 continue
@@ -1812,16 +2014,27 @@ class BancoProyecto:
                     "SELECT id FROM conocimiento WHERE origen = 'analisis' AND rutas = ?", (json.dumps([rel]),))]
             for i in viejas:
                 self.olvidar_conocimiento(i)
+            modulo = os.path.basename(rel).rsplit(".", 1)[0].lower().replace("_", "")
             for d in (datos.get("definiciones") or [])[:8]:
-                if isinstance(d, dict) and d.get("termino") and d.get("definicion"):
+                if not isinstance(d, dict):
+                    continue
+                termino = str(d.get("term") or d.get("termino") or "").strip()
+                definicion = str(d.get("definition") or d.get("definicion") or "").strip()
+                # Una «definición» que es el nombre del módulo no enseña nada
+                if termino and definicion and termino.lower().replace("_", "").replace(" ", "") != modulo:
                     try:
-                        self.anotar("definicion", str(d["termino"]), str(d["definicion"]), [rel], origen="analisis")
+                        self.anotar("definicion", termino, definicion, [rel], origen="analisis")
                     except ValueError:
                         pass
             for d in (datos.get("decisiones") or [])[:4]:
-                if isinstance(d, str) and len(d) > 15:
+                if isinstance(d, dict):
+                    titulo, texto = str(d.get("title") or d.get("titulo") or "").strip(), str(d.get("text") or d.get("texto") or "").strip()
+                else:
+                    titulo, texto = "", str(d or "").strip()
+                if len(texto) > 15:
+                    titulo = titulo or " ".join(texto.split()[:6])
                     try:
-                        self.anotar("decision", f"{os.path.basename(rel)}: {d[:80]}", d, [rel], origen="analisis")
+                        self.anotar("decision", f"{os.path.basename(rel)}: {titulo[:70]}", texto, [rel], origen="analisis")
                     except ValueError:
                         pass
             hechos += 1
@@ -1872,9 +2085,10 @@ class BancoProyecto:
                     progreso({"archivo": d + "/", "fase": "carpetas"})
                 try:
                     datos = _json_de(generar(PROMPT_CARPETA.format(carpeta=d, contenido=entrada)))
-                    texto = str(datos["resumen"]).strip()
-                    if datos.get("relaciones"):
-                        texto += " " + str(datos["relaciones"]).strip()
+                    texto = str(datos.get("summary") or datos["resumen"]).strip()
+                    relaciones = datos.get("relations") or datos.get("relaciones")
+                    if relaciones:
+                        texto += " " + str(relaciones).strip()
                 except Exception:
                     errores += 1
                     continue
@@ -1898,7 +2112,7 @@ class BancoProyecto:
                 progreso({"archivo": "(proyecto)", "fase": "proyecto"})
             try:
                 datos = _json_de(generar(PROMPT_PROYECTO.format(contenido=entrada, readme=readme)))
-                self.guardar_resumen("proyecto", ".", str(datos["resumen"]).strip()[:1500], sha, modelo)
+                self.guardar_resumen("proyecto", ".", str(datos.get("summary") or datos["resumen"]).strip()[:1500], sha, modelo)
                 hechas += 1
             except Exception:
                 errores += 1
@@ -1928,25 +2142,21 @@ class BancoProyecto:
                 lineas = zlib.decompress(f["contenido"]).decode("utf-8", "replace").splitlines()
                 fin = min(s["fin"], s["ini"] + 400)
                 cuerpo = "\n".join(f"{n:>5}  {lineas[n - 1]}" for n in range(s["ini"], fin + 1) if n <= len(lineas))
-                n_usos = c.execute("SELECT COUNT(*) n FROM usos WHERE nombre = ?", (s["nombre"].split(".")[-1],)).fetchone()["n"]
+                n_usos = c.execute("SELECT COUNT(*) n FROM llamadas WHERE a_ruta = ? AND a_nombre = ?",
+                                   (s["ruta"], s["nombre"])).fetchone()["n"]
                 partes.append(f"{s['ruta']}:{s['ini']}-{s['fin']} ({s['tipo']}, {n_usos} llamadas en el proyecto)\n{cuerpo}"
                               + ("\n[… recortado]" if fin < s["fin"] else ""))
         return "\n\n".join(partes)
 
     def quien_usa(self, nombre: str, maximo: int = 60) -> str:
-        corto = (nombre or "").strip().strip("`").rstrip("()").split(".")[-1]
+        nombre = (nombre or "").strip().strip("`").rstrip("()")
         with self.conectar() as c:
-            filas = c.execute("""SELECT u.ruta, u.dentro, s.ini FROM usos u
-                                 LEFT JOIN simbolos s ON s.ruta = u.ruta AND s.nombre = u.dentro
-                                 WHERE u.nombre = ? ORDER BY u.ruta, s.ini LIMIT ?""", (corto, maximo)).fetchall()
-            importan = c.execute("""SELECT DISTINCT i.ruta FROM importaciones i JOIN simbolos s ON s.ruta = i.destino
-                                    WHERE s.corto = ? LIMIT 30""", (corto,)).fetchall()
-        if not filas and not importan:
-            return f"Nadie llama a «{corto}» en el proyecto (o se usa de forma dinámica)."
-        salida = [f"Llamadas a {corto}:"] + [f"- {f['ruta']}:{f['ini'] or '?'} dentro de {f['dentro']}" for f in filas]
-        if importan:
-            salida.append("Archivos que importan el módulo donde está definido: " + ", ".join(f["ruta"] for f in importan))
-        return "\n".join(salida)
+            filas = c.execute("""SELECT l.ruta, l.desde, l.linea, l.a_nombre FROM llamadas l
+                                 WHERE l.a_nombre = ? OR l.a_nombre LIKE ? ORDER BY l.ruta, l.linea LIMIT ?""",
+                              (nombre, f"%.{nombre.split('.')[-1]}", maximo)).fetchall()
+        if not filas:
+            return f"Nadie llama a «{nombre}» en el proyecto (o se usa de forma dinámica)."
+        return "\n".join([f"Llamadas a {nombre}:"] + [f"- {f['ruta']}:{f['linea']} dentro de {f['desde']} → {f['a_nombre']}" for f in filas])
 
     def resumen_archivo(self, ruta: str) -> str:
         ruta = (ruta or "").strip().strip("./")
@@ -2050,34 +2260,35 @@ class BancoProyecto:
         return datos
 
 
-PROMPT_ANALISIS = """Analiza este archivo de un proyecto de software y responde SOLO con JSON válido:
-{{"resumen": "qué hace el archivo, en una frase de hasta 25 palabras",
-  "definiciones": [{{"termino": "concepto del dominio o del proyecto", "definicion": "qué es y cómo se usa aquí, en una o dos frases"}}],
-  "decisiones": ["decisión de diseño o restricción importante que se ve en el código (por qué se hizo así)"]}}
-Hasta 6 definiciones (solo términos propios del dominio o del proyecto, no de Python ni de la librería estándar) y hasta 3 decisiones. En español.
+# Prompts del analista, en inglés y con salida terse: es el idioma en que el modelo razona mejor
+# y el que menos tokens gasta (medido: el borrador MTP acierta 0,87-0,93 en código y notas técnicas,
+# 0,69-0,72 en prosa castellana). Lo que se le muestra al usuario sigue en castellano.
+PROMPT_ANALISIS = """Analyze this file from a software project. Reply ONLY with valid JSON:
+{{"summary": "what the file does, one sentence, max 25 words",
+  "definitions": [{{"term": "domain or project concept", "definition": "what it is and how it is used here, 1-2 terse sentences"}}],
+  "decisions": [{{"title": "3-8 words", "text": "a design decision or constraint visible in the code, and why"}}]}}
+Up to 6 definitions (only terms specific to this project or its domain; not Python/stdlib/library names,
+not the file or module name itself) and up to 3 decisions. Terse technical English; exact identifiers.
 
-Archivo: {ruta}
+File: {ruta}
 ```
 {codigo}
 ```"""
 
+PROMPT_CARPETA = """Summarize this folder of a software project from its contents. Reply ONLY with valid JSON:
+{{"summary": "purpose and responsibilities of the folder, 2-4 terse sentences with real file/module names",
+  "relations": "what other parts of the project it connects to and how, 1 sentence"}}
 
-PROMPT_CARPETA = """Resume esta carpeta de un proyecto de software a partir de lo que contiene. Responde SOLO con JSON válido:
-{{"resumen": "propósito y responsabilidades de la carpeta, en 2 a 4 frases concretas",
-  "relaciones": "con qué otras partes del proyecto se conecta y cómo, en 1 frase"}}
-En español. Usa los nombres reales de archivos y módulos.
-
-Carpeta: {carpeta}/
+Folder: {carpeta}/
 {contenido}"""
 
-PROMPT_PROYECTO = """Resume este proyecto de software a partir de sus carpetas y archivos principales y del README. Responde SOLO con JSON válido:
-{{"resumen": "qué es el proyecto, sus partes principales y cómo se conectan (backend, frontend, motores…), en 5 a 8 frases concretas con nombres reales"}}
-En español.
+PROMPT_PROYECTO = """Summarize this software project from its top-level folders, root files and README. Reply ONLY with valid JSON:
+{{"summary": "what the project is, its main parts and how they connect (backend, frontend, engines...), 5-8 terse sentences with real names"}}
 
-Contenido de la raíz:
+Root contents:
 {contenido}
 
-README (inicio):
+README (start):
 {readme}"""
 
 

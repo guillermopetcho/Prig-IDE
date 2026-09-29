@@ -92,6 +92,25 @@ class TestControlador(unittest.TestCase):
         self.assertEqual(bajando[-1], frio.MINIMO)                              # nunca se para del todo
         self.assertTrue(all(r["generando"] for r in [self.c.ultimo]))          # con pausas sigue contando como trabajo
 
+    def test_holgura_del_motor_moe_sin_turbo(self):
+        """ El motor MoE con el turbo apagado solo se pausa por encima del objetivo: a 57 °C (objetivo
+        60) trabaja sin pausas; a 66 °C sí se le frena """
+        self.c.holgura = lambda pids: frio.HOLGURA_MOE_SIN_TURBO_C if pids == {111} else 0.0
+        self.turbo_apagado = True
+        self.temps[0] = 57.0
+        self.paso(0)
+        fracciones = [self.paso(4)["fraccion"] for _ in range(4)]
+        self.assertEqual(fracciones, [1.0] * 4)
+        self.assertEqual(self.c.ultimo["objetivo_efectivo_c"], 60 + frio.HOLGURA_MOE_SIN_TURBO_C)
+        self.temps[0] = 66.0
+        frenado = [self.paso(4)["fraccion"] for _ in range(6)]
+        self.assertLess(frenado[-1], 1.0)
+        self.c.holgura = lambda pids: 0.0                     # otro motor en RAM: sin holgura
+        self.temps[0] = 57.0
+        self.paso(0)
+        self.paso(0)
+        self.assertLess(self.paso(4)["fraccion"], 1.0)
+
     def test_sin_turbo_arranca_sin_rampa(self):
         """ Sin turbo no hay salto de temperatura: la respuesta arranca con lo que permite la
         temperatura del momento, no desde el 30 % (con la CPU fresca, sin pausas) """

@@ -61,12 +61,6 @@ DEFINICIONES_BANCO = {
         "de la última expresión. Úsala para preguntas exactas o que abarcan muchos archivos.",
         {"codigo": {"type": "string", "description": "Código Python que usa P (ver la ayuda en las instrucciones)"}},
         ["codigo"]),
-    "buscar_proyecto": _funcion(
-        "buscar_proyecto",
-        "Busca en TODO el proyecto (por significado y por palabras) y devuelve los fragmentos más relevantes "
-        "con archivo y líneas.",
-        {"consulta": {"type": "string", "description": "Qué buscar, con tus palabras o con nombres de código"}},
-        ["consulta"]),
     "ver_simbolo": _funcion(
         "ver_simbolo",
         "Devuelve el código completo de una función, método o clase del proyecto, con su ubicación.",
@@ -84,7 +78,6 @@ DEFINICIONES_BANCO = {
 
 ETIQUETAS = {
     "consola": "Consultando la memoria del proyecto",
-    "buscar_proyecto": "Buscando en el proyecto",
     "ver_simbolo": "Leyendo una función",
     "anotar": "Anotando en la memoria del proyecto",
     "buscar_biblioteca": "Buscando en la biblioteca",
@@ -207,9 +200,6 @@ class Herramientas:
         return "\n".join(partes) or ("(sin salida)" if r.get("success") else "(falló sin mensaje)")
 
     # ------------------------------------------------------------------ banco del proyecto
-    def _h_buscar_proyecto(self, consulta: str = "") -> str:
-        return self.banco.texto_busqueda(consulta)
-
     def _h_ver_simbolo(self, nombre: str = "") -> str:
         return self.banco.ver_simbolo(nombre)
 

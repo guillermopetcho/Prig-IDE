@@ -81,6 +81,18 @@ class Traduccion(unittest.TestCase):
         cuerpo, _ = motor_moe.a_openai("http://x/api/chat", {"messages": [{"role": "user", "content": "x"}]})
         self.assertNotIn("grammar", cuerpo)
 
+    def test_muestreo_segun_el_uso(self):
+        pedir = lambda **kw: motor_moe.a_openai("http://x/api/chat", {"messages": [{"role": "user", "content": "x"}], **kw})[0]
+        self.assertEqual(pedir()["temperature"], 0.7)                                  # charla sin razonar
+        self.assertEqual(pedir()["top_p"], 0.8)
+        self.assertEqual(pedir(think=True)["temperature"], 0.6)                        # razonar
+        self.assertEqual(pedir(**{motor_moe.SOLO_CODIGO: True})["temperature"], 0.6)   # código
+        self.assertEqual(pedir(format="json")["temperature"], 0.3)                     # preciso
+        self.assertEqual(pedir(**{motor_moe.PERFIL: "preciso"})["temperature"], 0.3)
+        # Lo que fija quien pide manda sobre el perfil
+        self.assertEqual(pedir(options={"temperature": 0.1})["temperature"], 0.1)
+        self.assertEqual(pedir(options={"temperature": 0.1})["top_p"], 0.8)
+
     def test_herramientas_y_continuacion(self):
         cuerpo, prefijos = motor_moe.a_openai("http://x/api/chat", {"messages": [
             {"role": "user", "content": "¿clima?"},
@@ -188,7 +200,7 @@ class Ajustes(unittest.TestCase):
         c = motor_moe.calientes_para
         self.assertEqual(c(None, 8192), 0)
         self.assertEqual(c(2000, 8192), 0)             # no cabe ni el núcleo: todo en RAM
-        self.assertEqual(c(6100, 16384), 45)           # 6 GB libres con 16K (lotes de 4096), sin MTP
+        self.assertEqual(c(6100, 16384), 53)           # 6 GB libres con 16K (lotes de 2048), sin MTP
         self.assertLess(c(5800, 32768), c(5800, 8192))  # más contexto, menos expertos calientes
         self.assertEqual(c(24000, 8192), motor_moe.MAX_CALIENTES)
 
@@ -198,7 +210,7 @@ class Ajustes(unittest.TestCase):
         self.assertEqual(motor_moe.contexto_para(200000), 262144)
         self.assertIsNone(motor_moe.contexto_para(300000))
         self.assertEqual([motor_moe.lote_para(c) for c in (16384, 32768, 65536, 131072, 262144)],
-                         [4096, 4096, 2048, 2048, 1024])
+                         [2048, 2048, 2048, 2048, 1024])
         self.assertEqual(motor_moe.base_mb(100000), 3739)               # el medido igual o mayor
         self.assertEqual(motor_moe.base_mb(100000, mtp=True), 4799)
         pedido = {"messages": [{"role": "user", "content": "x" * 30000}], "options": {"num_predict": 1000}}
@@ -250,7 +262,7 @@ class Ajustes(unittest.TestCase):
     def test_mtp_reserva_vram(self):
         c = motor_moe.calientes_para
         self.assertLess(c(6100, 16384, mtp=True), c(6100, 16384))
-        self.assertEqual(c(6126, 16384, mtp=True), 35)
+        self.assertEqual(c(6126, 16384, mtp=True), 42)
         self.assertEqual(c(6126, 131072, mtp=True), 10)                  # medido: con 17 no arrancó
         self.assertFalse(motor_moe.cabe_mtp(6126, 262144))               # con 256K no queda sitio
         self.assertTrue(motor_moe.cabe_mtp(6126, 131072))

@@ -21,12 +21,18 @@ def main():
     salida = sys.argv[3]
     arch = q4.fields[gguf.Keys.General.ARCHITECTURE].contents()
     w = gguf.GGUFWriter(salida, arch)
+    n_vocab = len(q4.fields["tokenizer.ggml.tokens"].data)
     for campo in q4.fields.values():
         if campo.name == gguf.Keys.General.ARCHITECTURE or campo.name.startswith("GGUF."):
             continue
         tipo = campo.types[0]
         sub = campo.types[-1] if tipo == gguf.GGUFValueType.ARRAY else None
-        w.add_key_value(campo.name, campo.contents(), tipo, sub_type=sub)
+        valor = campo.contents()
+        if campo.name == "tokenizer.ggml.bos_token_id" and valor >= n_vocab:
+            # El recorte del vocabulario dejó el BOS en 248044, fuera de rango: llama.cpp lo cambiaba
+            # por el id 11 (un token normal). Es <|endoftext|>, igual que el EOS.
+            valor = q4.fields["tokenizer.ggml.eos_token_id"].contents()
+        w.add_key_value(campo.name, valor, tipo, sub_type=sub)
 
     de_q8 = {t.name: t for t in q8.tensors}
     elegidos, cambiados = [], 0

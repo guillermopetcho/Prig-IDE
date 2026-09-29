@@ -44,6 +44,11 @@ BANDA_C = 8.0                  # por debajo de objetivo − BANDA: sin pausas
 MINIMO = 0.12                  # nunca se para del todo
 INICIO = 0.30                  # tras un rato sin trabajar, la próxima respuesta arranca suave (con turbo)
 ACTIVIDAD = 0.5                # núcleos (descontando las pausas) que cuentan como «generando»
+# Motor MoE con el turbo apagado: las pausas le cuestan casi la mitad de la velocidad y ahorran poco
+# calor. Medido (turbo apagado, código, 3 × 700 tokens): con pausas a 60 °C, 22,8 tok/s de media
+# (13,7 ya caliente) y la CPU a 57-59 °C; sin pausas, 38,4 tok/s estables y la CPU a 57-63 °C. Con
+# esta holgura solo se le pausa como protección, por encima del objetivo.
+HOLGURA_MOE_SIN_TURBO_C = 8.0
 PRIG_RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -264,8 +269,10 @@ class ControladorFrio:
 
     def __init__(self, ajustes: Callable[[], Dict[str, Any]], leer_temp: Callable[[], Optional[float]],
                  motores_en_ram: Callable[[], Set[int]], pausador: Optional[Pausador] = None,
-                 reloj: Callable[[], float] = time.monotonic, sin_turbo: Callable[[], bool] = turbo_apagado):
+                 reloj: Callable[[], float] = time.monotonic, sin_turbo: Callable[[], bool] = turbo_apagado,
+                 holgura: Callable[[Set[int]], float] = lambda pids: 0.0):
         self.ajustes = ajustes
+        self.holgura = holgura         # °C sobre el objetivo según qué motores haya (el MoE sin turbo)
         self.leer_temp = leer_temp
         self.motores_en_ram = motores_en_ram
         self.pausador = pausador or Pausador()
@@ -324,7 +331,8 @@ class ControladorFrio:
             if temp is not None:
                 self.temp_media = temp if self.temp_media is None else \
                     self.SUAVIZADO * temp + (1 - self.SUAVIZADO) * self.temp_media
-        objetivo = self.fraccion_objetivo(self.temp_media, float(a["objetivo_c"]))
+        objetivo_c = float(a["objetivo_c"]) + float(self.holgura(pids) or 0.0)
+        objetivo = self.fraccion_objetivo(self.temp_media, objetivo_c)
         # La rampa desde el 30 % evita el salto del turbo (50 → 90 °C en segundos). Sin turbo no hay
         # salto: cada respuesta arranca con lo que permite la temperatura de ese momento (medido con
         # el motor MoE: la rampa tardaba ~23 s en llegar al 100 % con la CPU a 47 °C).
@@ -341,7 +349,7 @@ class ControladorFrio:
         self.pausador.fijar(pids, self.fraccion)
         self.ultimo = {"activo": True, "en_ram": len(pids), "generando": generando,
                        "temp": temp, "temp_media": round(self.temp_media, 1) if self.temp_media is not None else None,
-                       "fraccion": self.fraccion, "objetivo_c": float(a["objetivo_c"])}
+                       "fraccion": self.fraccion, "objetivo_c": float(a["objetivo_c"]), "objetivo_efectivo_c": objetivo_c}
         return self.ultimo
 
     def iniciar(self):

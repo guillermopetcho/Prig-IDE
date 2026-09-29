@@ -120,7 +120,7 @@ class TestConsola(unittest.TestCase):
         self.assertNotIn("/api/nota/*", self.correr("sorted(eps - usados)")["salida"])
 
     def test_camino_api_y_codigo(self):
-        self.assertIn('"calcular"', self.correr('P.camino("estado", "calcular")')["salida"])
+        self.assertIn("calcular (app.py:", self.correr('P.camino("estado", "calcular")')["salida"])
         salida = self.correr('P.api("/api/estado")')["salida"]
         self.assertIn("pintar", salida)
         self.assertIn('"estado"', salida)
@@ -176,6 +176,85 @@ class TestConsola(unittest.TestCase):
         with self.assertRaises(mc.CodigoNoPermitido):
             mc.revisar("x.__dict__")
         mc.revisar("import re\nre.findall('a', 'aa')")
+
+
+
+class TestResolucion(unittest.TestCase):
+    """ Cada llamada va al símbolo exacto: no a cualquier función que se llame igual """
+
+    ARCHIVOS = {
+        "motor/__init__.py": "",
+        "motor/nucleo.py": '''import requests
+
+
+class Motor:
+    def estado(self):
+        return self.post("x")
+
+    def post(self, url):
+        return requests.post(url)
+
+
+def crear() -> "Motor":
+    return Motor()
+''',
+        "otro.py": '''class Panel:
+    def estado(self):
+        return 1
+
+    def pintar(self):
+        return self.estado()
+''',
+        "cliente.py": '''from motor import nucleo as nc
+from motor.nucleo import crear
+
+
+def usar():
+    m = crear()
+    crear().estado()
+    return nc.crear()
+''',
+        "web/app.js": '''function post(x) { return x; }
+function asegurar() { return post(1); }
+''',
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="prig_resolucion_")
+        raiz = os.path.join(cls.tmp, "p")
+        for rel, texto in cls.ARCHIVOS.items():
+            os.makedirs(os.path.dirname(os.path.join(raiz, rel)), exist_ok=True)
+            with open(os.path.join(raiz, rel), "w") as f:
+                f.write(texto)
+        cls.banco = bp.BancoProyecto(raiz, carpeta=os.path.join(cls.tmp, "banco"))
+        cls.banco.sincronizar()
+        with cls.banco.conectar() as c:
+            cls.aristas = {(f["desde"], f["a_ruta"], f["a_nombre"]) for f in c.execute("SELECT * FROM llamadas")}
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def destinos(self, desde):
+        return {(r, n) for d, r, n in self.aristas if d == desde}
+
+    def test_self_va_a_la_misma_clase(self):
+        self.assertEqual(self.destinos("Motor.estado"), {("motor/nucleo.py", "Motor.post")})
+        self.assertEqual(self.destinos("Panel.pintar"), {("otro.py", "Panel.estado")})
+
+    def test_librerias_no_se_confunden_con_el_proyecto(self):
+        self.assertEqual(self.destinos("Motor.post"), set())          # requests.post no es Motor.post
+
+    def test_alias_de_import_y_tipo_de_retorno(self):
+        d = self.destinos("usar")
+        self.assertIn(("motor/nucleo.py", "crear"), d)                 # from … import crear y nc.crear()
+        self.assertIn(("motor/nucleo.py", "Motor.estado"), d)          # crear() -> "Motor", luego .estado()
+        self.assertNotIn(("otro.py", "Panel.estado"), d)
+
+    def test_no_cruza_lenguajes(self):
+        self.assertEqual(self.destinos("asegurar"), {("web/app.js", "post")})
+        self.assertFalse(any(r.endswith(".py") for d, r, n in self.aristas if d == "asegurar"))
 
 
 if __name__ == "__main__":

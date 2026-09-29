@@ -310,6 +310,73 @@ el motor para respetar su objetivo. Medido con el objetivo en 60 °C, antes de e
 53–57 °C. Se apaga en **Modo frío → Energía de la CPU**. Cada mejora de esta página reduce
 además el trabajo de CPU por token, de 58 a 33–51 ms: menos calor por token.
 
+**Pausas del modo frío con el turbo apagado** (septiembre de 2026, código, 3 × 700 tokens por
+variante, CPU sin otros programas). Aunque el turbo estuviera apagado, el modo frío pausaba el motor
+desde 52 °C (objetivo − 8), y con el motor caliente llegaba a trabajar ~45 % del tiempo:
+
+| Configuración | Calientes | tok/s | CPU media / máx |
+|---|---|---|---|
+| Pausas desde 52 °C (antes) | 14 | 22,8 (36,8 → 18 → 13,7) | 57 / 59 °C |
+| Sin pausas | 14 | 38,4 estable | 57 / 63 °C |
+| Sin pausas + ubatch 2.048 | 24 | 41,7 | 58 / 63 °C |
+| Ídem + borrador MTP de 3 | 24 | 41,5 (aceptación 0,91 → 0,78): descartado | 58 / 63 °C |
+
+Ahora, con el turbo apagado, el motor MoE tiene 8 °C de holgura sobre el objetivo
+(`frio.HOLGURA_MOE_SIN_TURBO_C`): las pausas empiezan en 60 °C y el tope queda en 68 °C. En uso
+real, por el chat, con el modo frío activo y la configuración del usuario: **39,4 tok/s sostenidos**
+en 5 pedidos seguidos, con la CPU a 59 °C de media y 63 °C de máximo.
+
+## Arquitectura leída del GGUF y lo que se midió (septiembre de 2026)
+
+| Dato | Valor | Consecuencia |
+|---|---|---|
+| Capas | 40 (30 SSM Gated DeltaNet, 10 de atención) más 1 MTP | la atención está en las capas 3, 7 … 39 |
+| Atención | 16 Q, 2 KV de 256; RoPE solo en 64 de 256 dimensiones; compuerta de salida | caché KV de ~10,9 KB por token en q8 |
+| SSM | estado 128×128 por cabeza, 32 cabezas | ~66 MB fijos, lea lo que lea |
+| MTP | capa completa con sus propios 256 expertos, en Q4_K | la lista caliente no la cubría: sus expertos van siempre en la CPU |
+| Vocabulario | 145.572; `<|repo_name|>`, `<|file_sep|>` y FIM sobrevivieron al recorte | el formato de repositorio del preentrenamiento está disponible |
+| BOS | apuntaba al id 248044, fuera del vocabulario recortado; llama.cpp usaba el 11 | corregido a 145539 (`<|endoftext|>`), también en `construir_nucleo_q8.py` |
+
+**Muestreo.** El motor aplicaba a todo el del GGUF (temperatura 1,0; top_p 0,95; min_p 0,05), que es
+el preset de razonamiento general. Medido con 3 corridas de código a 0,2, 0,6, 0,7 y 1,0: la
+velocidad (37–41 tok/s) y la aceptación del borrador (0,86–0,93) no cambian, así que el muestreo se
+elige solo por calidad. Ahora va por uso (`muestreo_para`):
+
+| Uso | Temperatura | top_p |
+|---|---|---|
+| charla | 0,7 | 0,8 |
+| código y razonamiento | 0,6 | 0,95 |
+| preciso (banco, analista, JSON) | 0,3 | 0,9 |
+
+**Aceptación del borrador según el contenido:** 0,87–0,93 en código y 0,69–0,72 en prosa castellana.
+
+**Caché KV** (contra f16; 6 fragmentos de 8K de código real de Prig):
+
+| Caché | Divergencia KL | Mismo token | KL p99 |
+|---|---|---|---|
+| q8_0 (la actual) | 0,017 | 97,9 % | 0,094 |
+| q4_0 | 0,034 | 96,9 % | 0,204 |
+
+La q4 queda descartada. La mezcla (K en f16 y V en q8, o al revés) no tiene kernel rápido de flash
+attention en CUDA: la medición estimaba 24 minutos contra 3. Sin compilar
+`GGML_CUDA_FA_ALL_QUANTS` no es práctica.
+
+**VRAM** a 32K con 14 calientes, leyendo un prompt de 20K tokens:
+
+| Ubatch | Tras cargar | Pico | Lectura |
+|---|---|---|---|
+| 4.096 | 5.081 MiB | +194 | 805 tok/s |
+| 2.048 | 4.389 MiB | +122 | 612 tok/s |
+| 1.024 | 4.193 MiB | +86 | 412 tok/s |
+
+CUDA deja usar ~5.770 de los 6.141 MiB, así que los márgenes actuales (370 + 250) dejan el pico a
+~70 MiB del techo: están bien. La única palanca de VRAM es el ubatch. Con 2.048 se liberan ~690 MiB
+(unos 10 calientes más por capa) a cambio de leer un 24 % más lento. Falta medir la generación con
+más calientes para decidir.
+
+**Vigía.** La marca de último uso empezaba en 0 y un arranque sin petición se paraba en ~20 s.
+Corregido.
+
 ## Lo que queda
 
 - **Lista caliente que aprende del uso.** Una lista hecha con la propia conversación acertaba

@@ -67,9 +67,10 @@ MODO = "equilibrado"
 # con lote × contexto. VRAM base medida en una RTX 4050 (núcleo del modelo, caché, búferes, CUDA),
 # sin expertos calientes, sin y con MTP (la cabeza MTP tiene su propia caché y su búfer de lectura):
 CONTEXTOS = {        # contexto: (lote, MB sin MTP, MB con MTP; None = MTP no cabe)
-    8192:   (4096, 2375, 3075),
-    16384:  (4096, 2375, 3075),
-    32768:  (4096, 2673, 3447),
+    8192:   (2048, 1714, 2491),     # 8K y 16K: la fila de 32K menos la caché KV que no ocupan
+    16384:  (2048, 1803, 2580),     # (~10,9 KB por token en q8_0)
+    32768:  (2048, 1981, 2758),     # lote 2048 (antes 4096): −690 MB = +10 calientes/capa; medido:
+                                    # generación 38,4 → 41,7 tok/s, lectura 805 → 612 tok/s
     65536:  (2048, 2689, 3367),
     131072: (2048, 3739, 4799),
     262144: (1024, 5305, None),
@@ -450,6 +451,32 @@ def _mensajes(mensajes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return salida
 
 
+# Perfiles de muestreo. «preciso» es para lo que debe ceñirse a datos (banco, análisis, JSON,
+# subllamadas); los demás, los recomendados por Qwen para Qwen3.6 (sin presence_penalty en código:
+# penaliza repetir identificadores, que en código es lo correcto).
+PERFIL = "prig_perfil"
+MUESTREO = {
+    "razonar": {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0},
+    "charla": {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.0},
+    "codigo": {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0},
+    "preciso": {"temperature": 0.3, "top_p": 0.9, "top_k": 20, "min_p": 0.0},
+}
+
+
+def muestreo_para(pedido: Dict[str, Any]) -> Dict[str, Any]:
+    perfil = pedido.get(PERFIL)
+    if perfil not in MUESTREO:
+        if pedido.get(SOLO_CODIGO):
+            perfil = "codigo"
+        elif pedido.get("format"):
+            perfil = "preciso"
+        elif pedido.get("think"):
+            perfil = "razonar"
+        else:
+            perfil = "charla"
+    return dict(MUESTREO[perfil])
+
+
 def a_openai(ruta: str, pedido: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, str]]:
     """ Petición de Ollama → cuerpo para /v1/chat/completions, y los prefijos que llama-server
     repetirá al continuar un mensaje del asistente (hay que quitarlos de la respuesta). """
@@ -472,6 +499,12 @@ def a_openai(ruta: str, pedido: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[st
     # o miles de tokens antes de la respuesta que el usuario no pidió (y el chat de Prig no mostraba
     # la opción «Pensar» para este motor)
     cuerpo["chat_template_kwargs"] = {"enable_thinking": bool(pedido.get("think"))}
+    # Muestreo según el uso, si quien pide no fijó el suyo. El GGUF trae el de «razonamiento general»
+    # (temperatura 1,0; top_p 0,95; min_p 0,05) y llama-server lo aplicaba a todo. Medido: el
+    # muestreo no cambia la velocidad (la aceptación del borrador MTP va de 0,86 a 0,93 con
+    # cualquiera), así que se elige solo por calidad.
+    for clave, valor in muestreo_para(pedido).items():
+        cuerpo.setdefault(clave, valor)
     if pedido.get(SOLO_CODIGO):
         # Solo código: sin razonar y con la salida limitada por gramática a bloques de código (con
         # «### Archivo: ruta» opcional): el modelo no puede gastar un token en prosa
@@ -887,6 +920,9 @@ class Motor:
             for n, con_mtp in dict.fromkeys(intentos):
                 if self._lanzar(modelo, n, con_mtp):
                     self.ultimo_error = ""
+                    # El keep-alive cuenta desde el arranque: sin esto, un arranque sin petición
+                    # (precalentar) lo paraba el vigía enseguida (la marca seguía en 0)
+                    self._ultimo_uso = time.time()
                     self._arrancar_vigia()
                     return time.time() - t0
                 self._registro(f"no arrancó con {n} calientes/capa{' y MTP' if con_mtp else ''}")

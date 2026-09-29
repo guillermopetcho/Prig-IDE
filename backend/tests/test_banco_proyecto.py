@@ -345,8 +345,8 @@ class TestBusquedaYContexto(BaseBanco):
 
         def generar(prompt):
             pedidos.append(prompt)
-            if "Carpeta:" in prompt:
-                carpeta = prompt.split("Carpeta: ", 1)[1].split("\n", 1)[0]
+            if "Folder:" in prompt:
+                carpeta = prompt.split("Folder: ", 1)[1].split("\n", 1)[0]
                 return json.dumps({"resumen": f"Resumen de {carpeta}", "relaciones": "Se conecta con motor.py."})
             return json.dumps({"resumen": "Proyecto de prueba con motor, web y nativo."})
         r = self.banco.sintetizar(generar)
@@ -365,8 +365,8 @@ class TestBusquedaYContexto(BaseBanco):
         self.banco.sincronizar()
         self.assertEqual(self.banco.trabajo_pendiente()["carpetas"], 1)
         self.banco.sintetizar(generar)
-        self.assertTrue(any("Carpeta: web" in p for p in pedidos))
-        self.assertFalse(any("Carpeta: nativo" in p for p in pedidos))
+        self.assertTrue(any("Folder: web/" in p for p in pedidos))
+        self.assertFalse(any("Folder: nativo/" in p for p in pedidos))
 
     def test_guardia_hace_esperar(self):
         motivos = ["el chat está respondiendo", None]
@@ -391,7 +391,8 @@ class TestHerramientas(BaseBanco):
     def test_herramientas_del_banco(self):
         h = Herramientas(banco=self.banco)
         nombres = {d["function"]["name"] for d in h.definiciones()}
-        self.assertTrue({"buscar_proyecto", "ver_simbolo", "anotar"} <= nombres)
+        self.assertTrue({"ver_simbolo", "anotar"} <= nombres)
+        self.assertNotIn("buscar_proyecto", nombres)            # duplicaba P.buscar
         self.assertNotIn("consola", nombres)                    # sin sesión de consola no se ofrece
         self.assertIn("return max(0", h.ejecutar("ver_simbolo", {"nombre": "calientes_para"}))
         self.assertIn("Guardado", h.ejecutar("anotar", {"tipo": "teoria", "titulo": "MoE",
@@ -401,8 +402,8 @@ class TestHerramientas(BaseBanco):
 
     def test_sin_banco_no_se_ofrecen(self):
         h = Herramientas()
-        self.assertNotIn("buscar_proyecto", {d["function"]["name"] for d in h.definiciones() if d})
-        self.assertIn("no disponible", h.ejecutar("buscar_proyecto", {"consulta": "x"}))
+        self.assertNotIn("ver_simbolo", {d["function"]["name"] for d in h.definiciones() if d})
+        self.assertIn("no disponible", h.ejecutar("ver_simbolo", {"nombre": "x"}))
 
 
 class TestRegistro(unittest.TestCase):

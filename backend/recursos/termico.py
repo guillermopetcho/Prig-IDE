@@ -365,7 +365,8 @@ class Gobernador:
         self.frio = frio.ControladorFrio(
             ajustes=self._ajustes_frio,
             leer_temp=lambda: temp_cpu(self.monitor.lectura(max_edad=1.5)),
-            motores_en_ram=self.motores_en_ram)
+            motores_en_ram=self.motores_en_ram,
+            holgura=self._holgura_frio)
         # Con el modo frío, los modelos en RAM van a los núcleos E (el fijador no los devuelve a todos)
         self.fijador.ram_en_eficientes = lambda: bool({**frio.POR_DEFECTO, **(self._ajustes_frio() or {})}["activo"])
         # PRIG_SIN_MOTOR_SUAVE=1 (lo fijan las pruebas): no instalar ni arrancar el controlador,
@@ -384,6 +385,17 @@ class Gobernador:
         from . import frio
         frio.reanudar_huerfanos()              # un cierre brusco pudo dejar un motor congelado
         self.frio.iniciar()
+
+    @staticmethod
+    def _holgura_frio(pids) -> float:
+        """ El motor MoE solo, con el turbo apagado: se le pausa solo por encima del objetivo (frio.py) """
+        from . import frio
+        try:
+            from ai_engine import motor_moe
+            moe = motor_moe.pid_en_marcha()
+        except Exception:
+            return 0.0
+        return frio.HOLGURA_MOE_SIN_TURBO_C if moe and set(pids) == {moe} and frio.turbo_apagado() else 0.0
 
     def motores_en_ram(self):
         """ Motores de Prig cuyo modelo NO cabe entero en la GPU (se revisa cada 3 s). Se fijan a

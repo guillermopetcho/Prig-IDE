@@ -3668,11 +3668,13 @@ INSTRUCCION_BANCO = (
     "Reglas:\n"
     "1. Responde a partir de ese código y cita archivo:línea.\n"
     "2. No inventes nombres de funciones, constantes, valores ni fragmentos de código. Si algo no está "
-    "en el banco, búscalo con buscar_proyecto, ver_simbolo, quien_usa o resumen_archivo antes de "
+    "en el banco, búscalo con la consola (P.buscar, P.ficha, P.codigo) o ver_simbolo antes de "
     "afirmarlo; si tampoco aparece, dilo.\n"
     "3. Para mostrar código que ya existe, cópialo tal cual del banco; no lo reescribas de memoria.\n"
     "4. Si descubres algo que valga para futuras preguntas (una definición del dominio, una decisión de "
-    "diseño, teoría que explica el código), guárdalo con anotar."
+    "diseño, teoría que explica el código), guárdalo con anotar.\n"
+    "5. Sé breve: lo esencial en 150-400 palabras, salvo que te pidan más detalle. Primero consulta lo que "
+    "necesites y después responde una sola vez; no narres lo que vas a hacer."
 )
 
 
@@ -3683,6 +3685,9 @@ INSTRUCCION_CONSOLA = (
     "criterio, recorre trozos con P.llm (map-reduce).\n" + memoria_consulta.AYUDA
 )
 
+# Lo que debe ceñirse a datos (subllamadas, análisis): el perfil «preciso» del motor MoE
+MUESTREO_PRECISO = {"temperature": 0.3, "top_p": 0.9, "top_k": 20, "min_p": 0.0}
+
 SISTEMA_SUBLLAMADA = ("Eres un analista de código dentro de un análisis más grande. Responde breve y preciso, "
                       "solo con lo que está en el contexto; si no está, dilo. Nombres y líneas exactos.")
 
@@ -3692,7 +3697,8 @@ def _generador_subllamadas(modelo: str):
     def generar(pregunta: str, contexto: str, max_tokens: int) -> str:
         prompt = f"{contexto}\n\n---\n{pregunta}" if contexto else pregunta
         return "".join(ai_engine.generate_response(prompt, model=modelo, system_prompt=SISTEMA_SUBLLAMADA, think=False,
-                                                   options={"num_predict": int(max_tokens)}, uso="programador")).strip()
+                                                   options={"num_predict": int(max_tokens), **MUESTREO_PRECISO},
+                                                   uso="programador")).strip()
     return generar
 
 
@@ -3855,6 +3861,12 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
                                     permitir_codigo=req.permitir_codigo, timeout=_exec_timeout(), banco=banco,
                                     consola=consola)
+    extra_moe = None
+    if solo_codigo:
+        extra_moe = {motor_moe_mod.SOLO_CODIGO: True}
+    elif banco is not None and motor_moe_mod.es_moe(mod) and not req.think:
+        # Con el banco la respuesta debe ceñirse al código: muestreo «preciso» (ai_engine/motor_moe.py)
+        extra_moe = {motor_moe_mod.PERFIL: "preciso"}
     respuesta = []
     with _chats_lock:
         _chats_usuario[0] += 1
@@ -3864,7 +3876,7 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
                                              herramientas=herramientas,
                                              max_rondas=16 if banco is not None else 6,
                                              gobernador=recursos_termico.gobernador(),
-                                             extra={motor_moe_mod.SOLO_CODIGO: True} if solo_codigo else None):
+                                             extra=extra_moe):
             if evento.get("t") == "herramienta":
                 evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
             elif evento.get("t") == "texto":
@@ -4047,8 +4059,8 @@ def banco_analizar(req: BancoAnalizarRequest):
     modelo = _modelo_analisis(req.modelo)
 
     def generar(prompt: str) -> str:
-        return "".join(ai_engine.generate_response(prompt, model=modelo, system_prompt="Respondes solo con JSON válido.",
-                                                   think=False, uso="programador"))
+        return "".join(ai_engine.generate_response(prompt, model=modelo, system_prompt="Respond only with valid JSON.",
+                                                   think=False, options=dict(MUESTREO_PRECISO), uso="programador"))
     bancos.vigilar(banco.raiz)
     return bancos.analizar_en_fondo(banco, generar, modelo, limite=req.limite, continuo=req.continuo)
 
