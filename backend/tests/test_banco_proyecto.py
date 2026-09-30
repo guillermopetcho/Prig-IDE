@@ -565,6 +565,34 @@ class TestChat(unittest.TestCase):
         self.assertEqual(info["modo"], "unidad")
         self.assertEqual(info["unidad"], "nucleo")
 
+    def test_codigo_escrito_se_ejecuta(self):
+        """ Si el modelo escribe la consulta P.… como respuesta, el chat la ejecuta y le pide que
+        responda con el resultado """
+        llamadas = []
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            llamadas.append(mensajes)
+            if len(llamadas) == 1:
+                yield {"t": "texto", "v": 'P.simbolos(nombre="leer_vram")'}
+            else:
+                yield {"t": "texto", "v": "Está en util.py."}
+        req = self.app.AIChatRequest(prompt="¿Dónde está leer_vram?", model="qwen2.5-coder:7b", eventos=True, banco=True)
+        with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools"]):
+            res = self.app.ai_chat(req)
+            import asyncio
+
+            async def leer():
+                return [c async for c in res.body_iterator]
+            eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
+                                                       for c in asyncio.run(leer())).splitlines() if x.strip()]
+        self.assertEqual(len(llamadas), 2)
+        self.assertIn("Resultado de la consola", llamadas[1][-1]["content"])
+        self.assertIn("util.py", llamadas[1][-1]["content"])                  # lo que devolvió la consola
+        self.assertIn("consola", [e.get("nombre") for e in eventos if e["t"] == "herramienta"])
+        banco = self.app.bancos.para(self.raiz)
+        self.assertNotIn("P.simbolos", banco.listar_resoluciones()[0]["resumen"])   # el código no queda como respuesta
+
     def test_empujon_si_anuncia_sin_hacer(self):
         llamadas = []
 

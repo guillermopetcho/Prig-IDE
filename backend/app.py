@@ -3686,6 +3686,19 @@ _ANUNCIO = re.compile(r"(?:^|[\n.:!?]\s*)(?:ahora|voy a|vamos a|veamos|veo si|bu
                       r"consultaré|compruebo|comprobaré|déjame|a continuación|primero|luego)\b[^\n]{0,220}$", re.I)
 
 
+RESPONDE_CON_RESULTADO = "Responde la pregunta con este resultado, en palabras (sin escribir código de P)."
+_LINEA_P = re.compile(r"^\s*(?:[A-Za-z_]\w*\s*=\s*)?(?:P\.\w+\(.*\)|print\(.*\))\s*$")
+
+
+def codigo_de_consola_escrito(texto: str) -> Optional[str]:
+    """ Si la respuesta es SOLO código de la consola (una o más líneas P.…(…)), ese código """
+    limpio = re.sub(r"^```\w*\s*|\s*```$", "", (texto or "").strip())
+    lineas = [l for l in limpio.splitlines() if l.strip()]
+    if not lineas or len(lineas) > 8 or not any("P." in l for l in lineas):
+        return None
+    return "\n".join(lineas) if all(_LINEA_P.match(l) for l in lineas) else None
+
+
 def anuncia_sin_hacer(texto: str) -> bool:
     """ ¿La respuesta termina anunciando una consulta en vez de concluir? (el último párrafo es un
     «voy a…/ahora busco…» corto, sin código ni lista de resultados) """
@@ -3923,6 +3936,7 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
     try:
         conversacion = mensajes
         for intento in range(1 + (EMPUJONES_MAX if consola is not None else 0)):
+            inicio_ronda = len(respuesta)
             for evento in ai_engine.chat_eventos(conversacion, mod, "tutor", think=False if solo_codigo else req.think,
                                                  logprobs=max(0, min(int(req.logprobs or 0), 5)),
                                                  herramientas=herramientas,
@@ -3937,7 +3951,21 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
             # Con herramientas, el modelo a veces anuncia la próxima consulta («Ahora busco qué
             # endpoints…») y cierra el turno sin hacerla (visto en el examen del proyecto). Se le pide
             # que la haga, con lo que ya dijo delante.
-            if consola is None or not anuncia_sin_hacer("".join(respuesta)):
+            if consola is None:
+                break
+            codigo = codigo_de_consola_escrito("".join(respuesta[inicio_ronda:]))
+            if codigo:
+                # Escribió la consulta como respuesta en vez de llamar a la herramienta (visto en modo
+                # unidad): se ejecuta aquí y se le pide que responda con el resultado
+                yield json.dumps({"t": "herramienta", "nombre": "consola", "argumentos": {"codigo": codigo},
+                                  "etiqueta": ETIQUETAS_HERRAMIENTAS.get("consola", "consola")}, ensure_ascii=False) + "\n"
+                resultado = memoria_consulta.formatear(consola.ejecutar(codigo))
+                yield json.dumps({"t": "resultado", "nombre": "consola", "v": resultado}, ensure_ascii=False) + "\n"
+                conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta[inicio_ronda:])},
+                                               {"role": "user", "content": f"Resultado de la consola:\n{resultado}\n\n{RESPONDE_CON_RESULTADO}"}]
+                del respuesta[inicio_ronda:]
+                continue
+            if not anuncia_sin_hacer("".join(respuesta)):
                 break
             conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
                                            {"role": "user", "content": EMPUJON}]

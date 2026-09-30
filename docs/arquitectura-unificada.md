@@ -570,6 +570,72 @@ Empezó al mover la guía de la consola del sistema al mensaje de la pregunta: e
 Después, retomar el examen con
 `ex.correr(banco, "etapa3", preguntar, saltar_de="etapa3-20260930-012218")`.
 
+## 6.4 Cierre de la etapa 3 (30/09/2026): resultados y cómo retomar
+
+Detenido a pedido con resultados parciales. Todo lo necesario para seguir está en el banco
+(`~/.prig_bancos`) y en `~/.cache/prig-moe` (estados por unidad, scripts y logs).
+
+**Estado del sistema al cerrar**
+
+| Pieza | Estado |
+|---|---|
+| Lectura por unidades | 94/94 vigentes (la última relectura fue de 52 unidades en 775 s). Estados en `~/.cache/prig-moe/proyectos`, unos 25–31 GB |
+| Fichas | 274 guardadas, 268 verificadas, 6 con problemas (citan líneas que no contienen lo afirmado). Hechas las unidades del piloto y las 37–41; la unidad 39 dejó 12 símbolos sin respuesta |
+| Examen «final» | 102 de 153 preguntas corridas (corrida `final-20260930-064546`) |
+| Tests | 940; OK salvo `test_motor_suave` (tiempos) y `test_troceado`, que fallan solo bajo la carga de la suite completa y pasan solos |
+
+**Examen «final» (prefijo estable + guía corregida + autoejecución de `P.…` escrito)**
+
+| Tipo | Etapa 3 con regresión (58) | Final (102) |
+|---|---|---|
+| config | 0,824 | 0,980 |
+| constante | 0,882 | 1,000 |
+| entorno | 0,857 | 1,000 |
+| frontend | — | 0,971 |
+| endpoint | 0,588 | 0,706 |
+| impacto | — | 0,779 |
+| **Total** | **0,776** | **0,906** |
+
+- Mediana: 18,6 s por pregunta. Media: 59,9 s, inflada por las preguntas de impacto (de 320 a 480 s cada
+  una). Hubo 2 respuestas con inventos.
+- **La regresión quedó corregida.** Cuando el modelo escribe `P.api(...)` como texto, `_chat_eventos` lo
+  ejecuta y el modelo responde con el resultado; se ve en todas las respuestas de endpoint.
+- **Causa de los 5 ceros de endpoint (ya corregida, falta medir):** `P.api("GET /api/x")` buscaba el
+  patrón `"% GET /api/x"`, que exige un espacio delante, y devolvía vacío. El modelo, con razón, decía
+  que el endpoint no existía. Ahora `P.api` acepta el método delante y filtra lo expuesto por ese
+  método (test en `test_memoria_consulta.test_camino_api_y_codigo`). Se espera que endpoint suba a
+  cerca de 0,94, como en la corrida anterior.
+- **Impacto** es el punto débil que queda: tiene 2 ceros por respuesta vacía o cortada tras más de
+  340 s (tokens 0) y 1 respuesta de 0,25. Recorre `P.ficha` símbolo por símbolo en vez de usar
+  `P.impacto`. Ideas: un tope de rondas o tiempo por pregunta, y una pista en la guía («para impacto,
+  primero `P.impacto(x)`»).
+- Sin correr todavía: llamadores, recorrido y ubicación (51 preguntas).
+
+**Cómo retomar (en orden)**
+
+1. Si cambió el código: `python backend/lectura_unidades.py --pasada`. Es reanudable, vuelve a
+   particionar y solo relee las unidades vencidas. El log va a `~/.cache/prig-moe/pasada.log`.
+2. Terminar el examen, midiendo ya con el arreglo de `P.api`:
+   `ex.correr(banco, "final", preguntar, saltar_de="final-20260930-064546")`. El script de referencia
+   es `~/.cache/prig-moe/examen/final.py`. Para volver a corregir sin modelo:
+   `ex.recorregir(banco, "final")`. Si el código cambió, regenerar el examen antes.
+3. Volver a medir solo endpoint e impacto con `ids=` (los 11 fallos de la corrida final son
+   `0344c590dbf1`, `a6880819ee0e`, `a9272875ff24`, `c25442578c46`, `d74639f85713`, `080e1b22300f`,
+   `0c9f87bee50d`, `89a0681befa6`, `33c608d6d12b`, `e0aacfd8439b` y `99ac6130926e`).
+4. Fichas del resto de las unidades: `Fichas(banco, lector).fichar_unidad(n)` para las 94. Solo hace
+   lo pendiente o vencido; hay que rehacer los 12 sin respuesta de la unidad 39. Después, correr
+   `reverificar()`.
+5. Integrar las fichas en `P.ficha` y en el contexto de la pregunta (todavía no se usan al responder).
+6. Opcionales: expertos calientes de la capa MTP; «sorpresa» (requiere un parche del servidor).
+
+**Cuidados operativos aprendidos**
+
+- Matar siempre el llama-server huérfano al cortar un script: si no, el siguiente sale por falta de
+  memoria (OOM). Hay `atexit` en los scripts.
+- `pgrep -f` se encuentra a sí mismo; usar `ps … | grep "[p]atron"`.
+- Los scripts van en `~/.cache/prig-moe`, no en `/tmp`, que se borra al reiniciar.
+- El equipo no tiene batería: todo proceso largo tiene que ser reanudable.
+
 ## 7. Experimentos pendientes
 
 1. **Examen del proyecto** (etapa 0). Generado del grafo y el código, con corrección automática.

@@ -46,8 +46,9 @@ def guia_consola() -> str:
     import memoria_consulta
     return (
         "Answer from the reading when it contains the answer, directly WITHOUT tools. For anything outside "
-        "this unit, use the tool `consola`: Python over the WHOLE project as the object P (only the methods "
-        "listed below exist; no other imports). One call is enough for most questions:\n"
+        "this unit, CALL the tool `consola` with Python over the WHOLE project as the object P (only the "
+        "methods listed below exist; no other imports). Never write P code as your answer: call the tool, "
+        "read its result, then answer in plain words. One call is enough for most questions:\n"
         "  who calls X → P.llamadores(\"X\") · call chain from A to B → P.camino(\"A\", \"B\")\n"
         "  what breaks if X changes → P.impacto(\"X\") · everything about X → P.ficha(\"X\")\n"
         "  where is X / what to change for X (config key, endpoint, env var, DOM id, data file) → P.donde(\"X\")\n"

@@ -510,10 +510,16 @@ class API:
         return salida
 
     def api(self, ruta_http: str) -> Dict[str, Any]:
-        """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*) """
+        """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*).
+        Acepta el método delante («GET /api/x»): filtra lo expuesto por ese método """
         from banco_proyecto import ruta_http_canonica
-        ruta_http = ruta_http_canonica(ruta_http)
-        expone = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'expone' AND o LIKE ?", (f"% {ruta_http}",))
+        metodo, _, resto = ruta_http.strip().partition(" ")
+        if resto and metodo.isalpha() and metodo.isupper():
+            ruta_http, patron = ruta_http_canonica(resto.strip()), f"{metodo} {ruta_http_canonica(resto.strip())}"
+        else:
+            ruta_http = ruta_http_canonica(ruta_http)
+            patron = f"% {ruta_http}"
+        expone = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'expone' AND o LIKE ?", (patron,))
         consume = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'llama_api' AND o = ?", (ruta_http,))
         return {"expone": expone, "consume": consume}
 

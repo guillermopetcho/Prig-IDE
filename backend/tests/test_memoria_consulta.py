@@ -125,6 +125,8 @@ class TestConsola(unittest.TestCase):
         salida = self.correr('P.api("/api/estado")')["salida"]
         self.assertIn("pintar", salida)
         self.assertIn('"estado"', salida)
+        # Con el método delante, como lo escribe el modelo: antes devolvía vacío
+        self.assertEqual(salida, self.correr('P.api("GET /api/estado")')["salida"])
         self.assertIn("def calcular(x):", self.correr('print(P.codigo("calcular"))')["salida"])
         self.assertIn("app.py", self.correr('[f["ruta"] for f in P.archivos(lenguaje="python")]')["salida"])
         self.assertIn("raise ValueError", self.correr('P.grep(r"raise")[0]["texto"]')["salida"])
