@@ -8,6 +8,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -171,6 +172,47 @@ class TestConsola(unittest.TestCase):
         h = Herramientas(banco=self.banco, consola=self.consola)
         self.assertIn("consola", {d["function"]["name"] for d in h.definiciones()})
         self.assertIn("app.py", h.ejecutar("consola", {"codigo": "P.archivos()[0]['ruta']"}))
+
+    def test_donde(self):
+        r = self.correr('P.donde("limite_gpu")')
+        self.assertIsNone(r["error"])
+        self.assertIn("Servicio.__init__", r["salida"])            # quien la lee
+        self.assertIn("lee_config", r["salida"])
+        r = self.correr('P.donde("/api/estado")')
+        self.assertIn("pintar", r["salida"])                       # quien lo consume
+        self.assertIn('"estado"', r["salida"])                     # quien lo implementa
+        self.assertIn("FACTOR", self.correr('P.donde("FACTOR")')["salida"])
+
+    def test_plazo_real_por_ejecucion(self):
+        """ Una ejecución colgada se corta en su plazo (antes readline() podía esperar sin límite) """
+        import time
+        t0 = time.time()
+        r = self.consola.ejecutar("while True: pass", timeout=2)
+        self.assertLess(time.time() - t0, 10)
+        self.assertIn("reinició", r["error"])
+        self.assertEqual(self.correr("1 + 1")["salida"].strip(), "2")       # se recupera sola
+
+    def test_subllamada_lenta_no_dispara_la_alarma(self):
+        """ La alarma de 30 s mide el cómputo propio, no la espera a Prig """
+        import time
+        lenta = mc.Consola(self.banco, generar=lambda p, c, m: (time.sleep(2), "ok")[1])
+        try:
+            with mock.patch.object(mc, "TIEMPO_POR_EJECUCION", 1):
+                r = lenta.ejecutar('P.llm("x", "y")')
+            self.assertIsNone(r["error"])
+            self.assertIn("ok", r["salida"])
+        finally:
+            lenta.cerrar()
+
+    def test_presupuesto_de_subllamadas_por_respuesta(self):
+        otra = mc.Consola(self.banco, generar=lambda p, c, m: "ok")
+        try:
+            self.assertIsNone(otra.ejecutar('[P.llm("x", "y") for _ in range(12)]')["error"])
+            self.assertIsNone(otra.ejecutar('[P.llm("x", "y") for _ in range(12)]')["error"])
+            r = otra.ejecutar('P.llm("x", "y")')
+            self.assertIn("Se agotaron", r["error"])
+        finally:
+            otra.cerrar()
 
     def test_revisar(self):
         with self.assertRaises(mc.CodigoNoPermitido):

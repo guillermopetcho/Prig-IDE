@@ -30,28 +30,31 @@ import time
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-def _sistema_lector() -> str:
+# El sistema va en el prefijo guardado: corto y fijo. Todo lo que puede cambiar (la guía y la API de
+# la consola, el contexto del grafo) va con cada pregunta; si no, cada mejora obligaría a releer las 94
+# unidades (pasó dos veces).
+SISTEMA_LECTOR = (
+    "You are reading one unit of a large software project, as part of a complete study of the project. "
+    "The unit is given in repository format. Remember exact names, signatures, constants, file paths and "
+    "line numbers: later questions will be answered from this reading. Be precise and never invent "
+    "identifiers. Each question comes with the unit's links to the rest of the project and a guide to "
+    "the `consola` tool."
+)
+
+
+def guia_consola() -> str:
     import memoria_consulta
     return (
-        "You are reading one unit of a large software project, as part of a complete study of the project. "
-        "The unit is given in repository format. Remember exact names, signatures, constants, file paths and "
-        "line numbers: later questions will be answered from this reading. Be precise and never invent "
-        "identifiers.\n"
-        "Answer from this reading when it contains the answer. For anything outside this unit, use the "
-        "tool `consola`: Python over the WHOLE project as the object P (only the methods listed below "
-        "exist; no other imports). If the answer is in this reading, answer directly WITHOUT tools.\n"
-        "One call is enough for most questions:\n"
+        "Answer from the reading when it contains the answer, directly WITHOUT tools. For anything outside "
+        "this unit, use the tool `consola`: Python over the WHOLE project as the object P (only the methods "
+        "listed below exist; no other imports). One call is enough for most questions:\n"
         "  who calls X → P.llamadores(\"X\") · call chain from A to B → P.camino(\"A\", \"B\")\n"
         "  what breaks if X changes → P.impacto(\"X\") · everything about X → P.ficha(\"X\")\n"
+        "  where is X / what to change for X (config key, endpoint, env var, DOM id, data file) → P.donde(\"X\")\n"
         "  who reads config/env key K → P.hechos(r=\"lee_config\", o=\"K\") (or lee_entorno)\n"
         "  endpoint E → P.api(\"E\") · value of a constant elsewhere → P.grep(r\"^NAME\\s*=\")\n"
         "Conclude after at most 3 tool calls.\n\n" + memoria_consulta.AYUDA
     )
-
-
-# El sistema es parte del prefijo guardado: incluye la ayuda de la consola (sin ella, el modelo
-# inventaba métodos de P e intentaba importar módulos: medido en el piloto de la etapa 2)
-SISTEMA_LECTOR = _sistema_lector()
 PEDIDO_RESUMEN = (
     "Write the gist of this unit for later lookup: 5-8 terse bullet lines covering purpose, main entry "
     "points (exact names), key state and data, external effects (files, network, config keys, env vars) "
@@ -87,11 +90,23 @@ class LectorUnidades:
             _crear_tabla(c)
     # ------------------------------------------------------------------ el prefijo
     def tarjeta_global(self) -> str:
-        """ Visión global del proyecto (versión 0: el mapa del banco con los resúmenes de carpetas y
-        proyecto). Es la misma para todas las unidades: si cambia, cambian todas las lecturas. """
+        """ Visión global del proyecto: el mapa del banco con los resúmenes de carpetas y proyecto. Va en
+        el prefijo de TODAS las lecturas, así que se congela en el banco y solo cambia con
+        renovar_tarjeta() (si cambiara sola al agregar un archivo, habría que releer todo). """
         if self._tarjeta is None:
-            self._tarjeta = "PROJECT CARD\n" + self.banco.mapa(TOPE_TARJETA)
+            guardada = self.banco._meta("tarjeta_global")
+            if guardada:
+                self._tarjeta = json.loads(guardada)["texto"]
+            else:
+                self._tarjeta = self.renovar_tarjeta()
         return self._tarjeta
+
+    def renovar_tarjeta(self) -> str:
+        """ Rehace la tarjeta global con el estado actual del proyecto (invalida todas las lecturas) """
+        texto = "PROJECT CARD\n" + self.banco.mapa(TOPE_TARJETA)
+        self.banco._guardar_meta("tarjeta_global", json.dumps({"texto": texto, "creada": datetime.now().isoformat(timespec="seconds")}))
+        self._tarjeta = texto
+        return texto
 
     def contexto_unidad(self, u: Dict[str, Any]) -> str:
         """ Su lugar en el proyecto y las interfaces que cruzan su frontera: qué usa de las vecinas y
@@ -145,8 +160,16 @@ class LectorUnidades:
         return "\n".join(partes)
 
     def mensajes(self, u: Dict[str, Any]) -> List[Dict[str, str]]:
+        """ El prefijo que se guarda: solo lo estable (sistema, tarjeta congelada y el código de la
+        unidad). El contexto que sale del grafo (qué usa de otras unidades, quién la usa) cambia cuando
+        se edita OTRA parte del proyecto: va con cada pregunta (pregunta_con_contexto), no aquí. """
         return [{"role": "system", "content": SISTEMA_LECTOR},
-                {"role": "user", "content": f"{self.tarjeta_global()}\n\n{self.contexto_unidad(u)}\n\n{self.codigo_unidad(u)}"}]
+                {"role": "user", "content": f"{self.tarjeta_global()}\n\n{self.codigo_unidad(u)}"}]
+
+    def pregunta_con_contexto(self, u: Dict[str, Any], texto: str) -> str:
+        """ Lo variable, después del prefijo guardado: el contexto del grafo, la guía de la consola y la
+        pregunta (~1-2K tokens de lectura, ~2 s) """
+        return f"{self.contexto_unidad(u)}\n\n{guia_consola()}\n\nQUESTION: {texto}"
 
     def llave(self, u: Dict[str, Any]) -> Dict[str, Any]:
         """ Todo lo que, si cambia, invalida la lectura guardada """
@@ -173,7 +196,8 @@ class LectorUnidades:
         salida, usadas, stats, avisos = "", [], {}, []
         t0 = time.time()
         try:
-            for ev in self.ai.chat_eventos(self.mensajes(u) + [{"role": "user", "content": texto}], self.modelo, "tutor",
+            for ev in self.ai.chat_eventos(self.mensajes(u) + [{"role": "user", "content": self.pregunta_con_contexto(u, texto)}],
+                                           self.modelo, "tutor",
                                            think=False, herramientas=herramientas, max_rondas=max_rondas,
                                            extra={motor_moe.PERFIL: "preciso"}):
                 if ev.get("t") == "texto":
@@ -203,6 +227,14 @@ class LectorUnidades:
         from ai_engine import motor_moe
         u = self._unidades[orden]
         llave = self.llave(u)
+        # La misma unidad leída con otro número (la partición se recalcula y los números se corren):
+        # se reusa su lectura, sin llamar al modelo
+        previa = self._lectura_por_llave(llave)
+        if previa and previa["orden"] != orden:
+            with self.banco.conectar() as c:
+                c.execute("INSERT OR REPLACE INTO lecturas SELECT ?, archivo, sha, llave, tokens, segundos, bytes, expertos, "
+                          "resumen, aceptacion, tok_s, creado FROM lecturas WHERE orden = ?", (orden, previa["orden"]))
+            return {**previa, "orden": orden, "origen": "reusada", "segundos": 0.0}
         r = self._conversar(orden, PEDIDO_RESUMEN + " Do not call tools.", max_rondas=2)
         clave = r["clave"] or ""
         archivo = f"{clave}.bin" if clave else ""
@@ -249,6 +281,17 @@ class LectorUnidades:
         d = dict(f)
         d["llave"], d["expertos"] = json.loads(d["llave"]), json.loads(d["expertos"])
         return d
+
+    def _lectura_por_llave(self, llave: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        from ai_engine import motor_moe
+        with self.banco.conectar() as c:
+            _crear_tabla(c)
+            for f in c.execute("SELECT * FROM lecturas WHERE llave = ?", (json.dumps(llave),)):
+                d = dict(f)
+                if d["archivo"] and os.path.exists(os.path.join(motor_moe.CARPETA_PROYECTOS, d["archivo"])):
+                    d["llave"], d["expertos"] = json.loads(d["llave"]), json.loads(d["expertos"])
+                    return d
+        return None
 
     def vigente(self, orden: int) -> bool:
         """ Leída, con la misma llave y con su estado todavía en disco (el motor poda los viejos) """
@@ -326,8 +369,9 @@ def main():
     atexit.register(ai.unload_models)
     banco = bp.BancoProyecto(args.raiz)
     banco.sincronizar()
-    if not banco.unidades():
-        pp.particionar(banco)
+    # Siempre: las líneas se corren al editar. Una unidad cuyo contenido no cambió se reusa aunque
+    # cambie de número (leer() la reconoce por su llave)
+    pp.particionar(banco)
 
     def sub(pregunta: str, contexto: str, max_tokens: int) -> str:
         return "".join(ai.generate_response(f"{contexto}\n\n---\n{pregunta}", model=lector.modelo,

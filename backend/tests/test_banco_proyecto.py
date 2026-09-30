@@ -543,6 +543,9 @@ class TestChat(unittest.TestCase):
         class LectorFalso:
             def mensajes(self, u):
                 return [{"role": "system", "content": "LECTOR"}, {"role": "user", "content": "UNIDAD " + u["nombre"]}]
+
+            def pregunta_con_contexto(self, u, texto):
+                return "CONTEXTO\n\n" + texto
         unidad = {"orden": 3, "nombre": "nucleo", "cuota": 0.8, "lector": LectorFalso(), "datos": {"nombre": "nucleo"}}
         req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
         with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
@@ -555,7 +558,7 @@ class TestChat(unittest.TestCase):
                 return [c async for c in res.body_iterator]
             eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
                                                        for c in asyncio.run(leer())).splitlines() if x.strip()]
-        self.assertEqual([m["content"] for m in vistos["mensajes"]], ["LECTOR", "UNIDAD nucleo", "¿Cuánto vale X?"])
+        self.assertEqual([m["content"] for m in vistos["mensajes"]], ["LECTOR", "UNIDAD nucleo", "CONTEXTO\n\n¿Cuánto vale X?"])
         import lectura_unidades
         self.assertEqual(vistos["herramientas"].solo, list(lectura_unidades.HERRAMIENTAS_UNIDAD))
         info = [e["v"] for e in eventos if e["t"] == "banco"][0]

@@ -40,6 +40,8 @@ MAX_SALIDA = 6000
 TIEMPO_POR_EJECUCION = 30
 MEMORIA_MB = 2048
 MAX_LLM_POR_EJECUCION = 12
+MAX_LLM_POR_RESPUESTA = 24          # medido: sin tope por respuesta, una pregunta tardó 30 min en subllamadas
+TIEMPO_TOTAL_POR_EJECUCION = 180    # s, incluido lo que tarden las subllamadas a P.llm
 MODULOS_PERMITIDOS = {"re", "math", "json", "collections", "itertools", "functools", "statistics", "difflib",
                       "ast", "textwrap", "heapq", "bisect", "operator", "string", "fnmatch", "datetime"}
 NOMBRES_PROHIBIDOS = {"eval", "exec", "compile", "open", "__import__", "globals", "locals", "vars", "getattr",
@@ -68,6 +70,9 @@ AYUDA = """P — el proyecto entero, consultable con Python (las variables persi
   P.ficha(nombre)                               → TODO sobre un símbolo: ubicación, firma, doc, llamadores, llamadas, hechos, notas
   P.recorrido(inicio, profundidad=4)            → árbol de llamadas hacia abajo desde una función o un endpoint ("/api/x")
   P.impacto(nombre)                             → qué se rompe si cambia: llamadores transitivos, endpoints y frontend
+  P.donde(x)                                    → dónde está y dónde se toca x (clave de config, endpoint, variable de entorno,
+                                                  id del DOM, archivo de datos o símbolo): hechos, implementación, consumidores
+                                                  y apariciones literales en el código
   P.llamadores(nombre) / P.llamados(simbolo)    → quién lo llama / a qué llama (aristas resueltas al símbolo exacto;
                                                   nombre completo «Clase.metodo» o «ruta:nombre» si hay varios)
   P.camino(desde, hasta)                        → cadena de llamadas más corta entre dos símbolos, o None
@@ -132,11 +137,27 @@ def _worker(ruta_db: str, raiz: str):
     entrada = sys.stdin
     salida_real = sys.stdout
 
+    numero = [0]
+
     def pedir(tipo: str, datos: Dict[str, Any]) -> Any:
-        """ Lo que el proceso aislado no puede hacer solo: escribir, llamar a un modelo """
-        salida_real.write(json.dumps({"peticion": tipo, "datos": datos}, ensure_ascii=False, default=str) + "\n")
-        salida_real.flush()
-        respuesta = json.loads(entrada.readline())
+        """ Lo que el proceso aislado no puede hacer solo: escribir, llamar a un modelo. La alarma de
+        30 s se pausa mientras tanto (mide el cómputo propio, no la espera a Prig) y cada petición
+        lleva un número: una respuesta vieja se descarta en vez de tomarse por la de otra petición. """
+        numero[0] += 1
+        restante = signal.alarm(0)
+        try:
+            salida_real.write(json.dumps({"peticion": tipo, "id": numero[0], "datos": datos}, ensure_ascii=False, default=str) + "\n")
+            salida_real.flush()
+            while True:
+                linea = entrada.readline()
+                if not linea:
+                    raise RuntimeError("Prig cerró la consola")
+                respuesta = json.loads(linea)
+                if respuesta.get("id") == numero[0]:
+                    break
+        finally:
+            if restante:
+                signal.alarm(restante)
         if respuesta.get("error"):
             raise RuntimeError(respuesta["error"])
         return respuesta.get("valor")
@@ -157,8 +178,10 @@ def _worker(ruta_db: str, raiz: str):
     seguros["__import__"] = importar
     espacio: Dict[str, Any] = {"__builtins__": seguros, "P": P, "ayuda": lambda: print(AYUDA)}
 
+    alarma = int(os.environ.get("PRIG_CONSOLA_ALARMA") or TIEMPO_POR_EJECUCION)
+
     def tiempo_agotado(*_):
-        raise TimeoutError(f"La ejecución pasó de {TIEMPO_POR_EJECUCION} s: divide el trabajo o usa P.sql.")
+        raise TimeoutError(f"La ejecución pasó de {alarma} s: divide el trabajo o usa P.sql.")
     signal.signal(signal.SIGALRM, tiempo_agotado)
 
     for linea in entrada:
@@ -178,7 +201,7 @@ def _worker(ruta_db: str, raiz: str):
             ultimo = None
             if arbol.body and isinstance(arbol.body[-1], ast.Expr):
                 ultimo = ast.Expression(arbol.body.pop().value)
-            signal.alarm(TIEMPO_POR_EJECUCION)
+            signal.alarm(alarma)
             with contextlib.redirect_stdout(buffer):
                 exec(compile(arbol, "<consola>", "exec"), espacio)
                 if ultimo is not None:
@@ -455,6 +478,37 @@ class API:
                 "tests": sorted({n[1] for n in afectados if es_test(n[0])})[:40],
                 "total": len(afectados), "endpoints": endpoints, "frontend": consumidores}
 
+    def donde(self, x: str, maximo: int = 40) -> Dict[str, Any]:
+        """ Dónde está y dónde se toca `x`, sea una clave de configuración, un endpoint, una variable de
+        entorno, un id del DOM, un archivo de datos o un símbolo: los hechos del grafo agrupados por
+        relación, la función que implementa el endpoint y quién lo consume, y dónde aparece como texto
+        literal en el código (defaults, formularios, rutas de archivos). """
+        x = (x or "").strip().strip("`")
+        salida: Dict[str, Any] = {"x": x}
+        if x.startswith("/") or re.match(r"^(GET|POST|PUT|DELETE|PATCH) /", x):
+            salida["endpoint"] = self.api(x.split(" ", 1)[-1])
+        por_relacion: Dict[str, List[str]] = {}
+        for h in self._filas("SELECT s, r, o, ruta, linea FROM hechos WHERE o = ? OR o LIKE ? LIMIT 400", (x, f"% {x}")):
+            por_relacion.setdefault(h["r"], []).append(f"{h['s']} ({h['ruta']}:{h['linea']})")
+        if por_relacion:
+            salida["hechos"] = {r: v[:maximo] for r, v in por_relacion.items()}
+        simbolos = self._filas("SELECT ruta, nombre, tipo, ini FROM simbolos WHERE nombre = ? OR corto = ? LIMIT 10", (x, x.split(".")[-1]))
+        if simbolos:
+            salida["simbolos"] = [f"{s['nombre']} ({s['tipo']}) {s['ruta']}:{s['ini']}" for s in simbolos]
+        literal = re.compile(r"""["'`]""" + re.escape(x) + r"""["'`/]""")
+        apariciones = []
+        for f in self._c.execute("SELECT ruta FROM archivos ORDER BY ruta"):
+            for n, linea in enumerate(self.lineas(f["ruta"]), 1):
+                if literal.search(linea):
+                    apariciones.append(f"{f['ruta']}:{n}: {linea.strip()[:160]}")
+                    if len(apariciones) >= maximo:
+                        break
+            if len(apariciones) >= maximo:
+                break
+        if apariciones:
+            salida["como_texto"] = apariciones
+        return salida
+
     def api(self, ruta_http: str) -> Dict[str, Any]:
         """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*) """
         from banco_proyecto import ruta_http_canonica
@@ -563,7 +617,8 @@ class Consola:
         if self._proc is not None and self._proc.poll() is None:
             return
         entorno = {"PATH": "/usr/bin:/bin", "PYTHONPATH": os.path.dirname(os.path.abspath(__file__)),
-                   "PYTHONDONTWRITEBYTECODE": "1", "LANG": "C.UTF-8"}
+                   "PYTHONDONTWRITEBYTECODE": "1", "LANG": "C.UTF-8",
+                   "PRIG_CONSOLA_ALARMA": str(int(TIEMPO_POR_EJECUCION))}
         self._proc = subprocess.Popen(
             [sys.executable, "-I", "-c",
              "import sys; sys.path.insert(0, sys.argv[1]); import memoria_consulta as m; m._worker(sys.argv[2], sys.argv[3])",
@@ -571,7 +626,8 @@ class Consola:
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1,
             env=entorno, cwd="/", start_new_session=True)
 
-    def ejecutar(self, codigo: str, timeout: float = TIEMPO_POR_EJECUCION + 600) -> Dict[str, Any]:
+    def ejecutar(self, codigo: str, timeout: float = TIEMPO_TOTAL_POR_EJECUCION) -> Dict[str, Any]:
+        import select
         with self._lock:
             self._arrancar()
             self.ejecuciones += 1
@@ -580,9 +636,12 @@ class Consola:
             proc.stdin.flush()
             limite = time.time() + timeout
             while True:
-                if time.time() > limite:
+                # Esperar con plazo real: readline() solo se bloquearía sin límite
+                listo, _, _ = select.select([proc.stdout], [], [], max(0.0, limite - time.time()))
+                if not listo:
                     self.cerrar()
-                    return {"salida": "", "error": "La consola no respondió a tiempo y se reinició (se perdieron las variables).",
+                    return {"salida": "", "error": f"La ejecución pasó de {timeout:.0f} s (subllamadas incluidas) y la "
+                                                   f"consola se reinició (se perdieron las variables). Divide el trabajo.",
                             "variables": []}
                 linea = proc.stdout.readline()
                 if not linea:
@@ -598,9 +657,9 @@ class Consola:
                 if "peticion" in mensaje:
                     try:
                         valor = self._atender(mensaje["peticion"], mensaje.get("datos") or {})
-                        respuesta = {"valor": valor}
+                        respuesta = {"id": mensaje.get("id"), "valor": valor}
                     except Exception as e:       # vuelve al código del modelo como excepción
-                        respuesta = {"error": f"{type(e).__name__}: {e}"}
+                        respuesta = {"id": mensaje.get("id"), "error": f"{type(e).__name__}: {e}"}
                     proc.stdin.write(json.dumps(respuesta, ensure_ascii=False, default=str) + "\n")
                     proc.stdin.flush()
 
@@ -624,6 +683,9 @@ class Consola:
         if tipo == "llm":
             if self.generar is None:
                 raise RuntimeError("No hay un modelo disponible para P.llm en esta sesión.")
+            if self.llamadas_llm >= MAX_LLM_POR_RESPUESTA:
+                raise RuntimeError(f"Se agotaron las {MAX_LLM_POR_RESPUESTA} llamadas a P.llm de esta respuesta: "
+                                   f"responde con lo que ya tienes o usa P.hechos / P.sql / P.grep.")
             self.llamadas_llm += 1
             if self.al_llamar_llm:
                 self.al_llamar_llm({"pregunta": d["pregunta"][:200], "tokens_contexto": len(d["contexto"]) // 4})

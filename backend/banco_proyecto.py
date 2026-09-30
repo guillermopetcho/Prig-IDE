@@ -53,7 +53,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-VERSION_ESQUEMA = 4          # 4: llamadas resueltas al símbolo exacto (receptor + alias de import)
+VERSION_ESQUEMA = 5          # 5: funciones anidadas como símbolos (endpoints de APIRouter, clausuras)
 MAX_ARCHIVOS = 20000
 MAX_BYTES = 1_000_000
 MAX_BYTES_DATOS = 200_000          # json/yaml/csv: más grandes son datos, no código
@@ -225,6 +225,40 @@ def alias_python(texto: str) -> List[Tuple[str, str]]:
     return salida
 
 
+def _anidada(anidadas: Dict[Tuple[str, str], Dict[str, str]], ruta: str, dentro: str, nombre: str) -> Optional[Tuple[str, str]]:
+    """ Una función anidada visible desde `dentro`: la definida en ella o en alguna que la contiene """
+    partes = dentro.split(".")
+    for k in range(len(partes), 0, -1):
+        tabla = anidadas.get((ruta, ".".join(partes[:k])))
+        if tabla and nombre in tabla:
+            return ruta, tabla[nombre]
+    return None
+
+
+def _definiciones_directas(cuerpo):
+    """ Las definiciones de este cuerpo, también las que están dentro de if/with/try/for (sin entrar
+    en otras funciones o clases) """
+    for nodo in cuerpo:
+        if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            yield nodo
+        else:
+            for campo in ("body", "orelse", "finalbody", "handlers"):
+                hijos = getattr(nodo, campo, None)
+                if isinstance(hijos, list):
+                    yield from _definiciones_directas(h for h in hijos if isinstance(h, ast.AST))
+
+
+def _recorrer_sin_anidadas(nodo):
+    """ ast.walk sin entrar en funciones ni clases anidadas: sus llamadas son de ellas """
+    pendientes = [nodo]
+    while pendientes:
+        n = pendientes.pop()
+        yield n
+        for hijo in ast.iter_child_nodes(n):
+            if not isinstance(hijo, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                pendientes.append(hijo)
+
+
 def simbolos_python(texto: str) -> Tuple[List[Simbolo], List[str], str]:
     """ (símbolos, módulos importados, docstring del módulo) """
     try:
@@ -239,7 +273,7 @@ def simbolos_python(texto: str) -> Tuple[List[Simbolo], List[str], str]:
         calcular(...) (""), self.calcular(...) ("self"), motor.calcular(...) ("motor") y
         requests.post(...) ("requests"): sin él, cualquier .post() parecía llamar a Motor.post. """
         primeras: Dict[Tuple[str, str], int] = {}
-        for n in ast.walk(nodo):
+        for n in _recorrer_sin_anidadas(nodo):
             if isinstance(n, ast.Call):
                 f = n.func
                 if isinstance(f, ast.Name):
@@ -268,18 +302,24 @@ def simbolos_python(texto: str) -> Tuple[List[Simbolo], List[str], str]:
         pre = "async def" if isinstance(nodo, ast.AsyncFunctionDef) else "def"
         return f"{pre} {nodo.name}({args}){ret}"
 
-    def visitar(cuerpo, padre: str = ""):
-        for nodo in cuerpo:
+    def visitar(cuerpo, padre: str = "", padre_es_funcion: bool = False):
+        for nodo in _definiciones_directas(cuerpo):
             if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 ini = min([nodo.lineno] + [d.lineno for d in nodo.decorator_list])
                 nombre = f"{padre}.{nodo.name}" if padre else nodo.name
-                tipo = "clase" if isinstance(nodo, ast.ClassDef) else ("metodo" if padre else "funcion")
+                # Una función dentro de otra (los endpoints de un APIRouter, las clausuras) es «anidada»:
+                # antes no existía como símbolo y sus llamadas y endpoints se le atribuían a la de afuera
+                if isinstance(nodo, ast.ClassDef):
+                    tipo = "clase"
+                elif padre_es_funcion:
+                    tipo = "anidada"
+                else:
+                    tipo = "metodo" if padre else "funcion"
                 simbolos.append(Simbolo(nombre=nombre, corto=nodo.name, tipo=tipo, firma=firma(nodo),
                                         doc=(ast.get_docstring(nodo) or "")[:600], ini=ini,
                                         fin=getattr(nodo, "end_lineno", nodo.lineno), padre=padre,
                                         usos=[] if tipo == "clase" else llamadas(nodo)))
-                if isinstance(nodo, ast.ClassDef):
-                    visitar(nodo.body, nombre)
+                visitar(nodo.body, nombre, not isinstance(nodo, ast.ClassDef))
     visitar(arbol.body)
     for nodo in ast.walk(arbol):
         if isinstance(nodo, ast.Import):
@@ -977,7 +1017,7 @@ class BancoProyecto:
                 return
             fragmentos.append({"ini": ini, "fin": fin, "simbolo": simbolo, "tipo": tipo, "texto": texto})
 
-        hojas = [s for s in simbolos if s["tipo"] not in ("clase", "espacio")]
+        hojas = [s for s in simbolos if s["tipo"] not in ("clase", "espacio", "anidada")]
         for s in simbolos:
             if s["tipo"] in ("clase", "espacio"):
                 hijos = [h for h in simbolos if h["padre"] == s["nombre"]]
@@ -1081,7 +1121,7 @@ class BancoProyecto:
         Se rehace entera tras cada cambio (depende de todos los archivos): ~1 s en Prig. """
         with self.conectar() as c:
             simbolos = [dict(f) for f in c.execute(
-                "SELECT ruta, nombre, corto, tipo, padre, firma FROM simbolos WHERE tipo IN ('funcion','metodo','clase')")]
+                "SELECT ruta, nombre, corto, tipo, padre, firma FROM simbolos WHERE tipo IN ('funcion','metodo','clase','anidada')")]
             rutas = [f["ruta"] for f in c.execute("SELECT ruta FROM archivos")]
             usos = [dict(f) for f in c.execute("SELECT ruta, nombre, linea, dentro, receptor FROM usos")]
             alias = [dict(f) for f in c.execute("SELECT ruta, nombre, destino FROM alias")]
@@ -1090,7 +1130,11 @@ class BancoProyecto:
         metodos: Dict[Tuple[str, str], Dict[str, str]] = {}    # (ruta, clase) → corto → nombre
         global_: Dict[str, List[Tuple[str, str]]] = {}         # corto → [(ruta, nombre)]
         clases: Dict[str, List[Tuple[str, str]]] = {}          # nombre corto de clase → [(ruta, nombre)]
+        anidadas: Dict[Tuple[str, str], Dict[str, str]] = {}    # (ruta, función) → corto → nombre
         for x in simbolos:
+            if x["tipo"] == "anidada":
+                anidadas.setdefault((x["ruta"], x["padre"]), {})[x["corto"]] = x["nombre"]
+                continue
             if not x["padre"]:
                 primer_nivel.setdefault(x["ruta"], {})[x["corto"]] = x["nombre"]
             elif x["tipo"] == "metodo":
@@ -1181,6 +1225,8 @@ class BancoProyecto:
                     destino = metodo_en(ruta, clase, n)
                 else:
                     destino, confianza = unico(n, ruta), "unica"
+            elif receptor == "" and _anidada(anidadas, ruta, dentro, n):
+                destino = _anidada(anidadas, ruta, dentro, n)
             elif receptor == "":
                 if n in primer_nivel.get(ruta, {}):
                     destino = (ruta, primer_nivel[ruta][n])

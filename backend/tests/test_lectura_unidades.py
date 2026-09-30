@@ -75,17 +75,40 @@ class TestLectura(unittest.TestCase):
         self.parche.stop()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def test_prefijo_por_capas(self):
+    def test_prefijo_estable_y_contexto_con_la_pregunta(self):
         unidades = self.banco.unidades()
         u = [x for x in unidades if "app.py" in x["rutas"]][0]
         mensajes = self.lector.mensajes(u)
         texto = mensajes[1]["content"]
         self.assertEqual(mensajes[0]["content"], lu.SISTEMA_LECTOR)
-        self.assertLess(texto.index("PROJECT CARD"), texto.index("UNIT "))
-        self.assertLess(texto.index("UNIT "), texto.index("<|file_sep|>app.py"))
+        self.assertLess(texto.index("PROJECT CARD"), texto.index("<|file_sep|>app.py"))
         self.assertIn("<|repo_name|>p", texto)
-        self.assertIn("Uses from other units:", texto)               # usa util de la otra unidad
-        self.assertIn("nucleo/base.py", texto)
+        self.assertNotIn("Uses from other units", texto)             # lo del grafo no va en el prefijo
+        pregunta = self.lector.pregunta_con_contexto(u, "¿Qué hace usar?")
+        self.assertIn("Uses from other units:", pregunta)
+        self.assertIn("nucleo/base.py", pregunta)
+        self.assertTrue(pregunta.endswith("¿Qué hace usar?"))
+
+    def test_tarjeta_congelada(self):
+        tarjeta = self.lector.tarjeta_global()
+        with open(os.path.join(self.banco.raiz, "nuevo.py"), "w") as f:
+            f.write("def nuevo():\n    return 2\n")
+        self.banco.sincronizar()
+        otro = lu.LectorUnidades(self.banco, self.ai)
+        self.assertEqual(otro.tarjeta_global(), tarjeta)             # agregar un archivo no la cambia
+        self.assertIn("nuevo.py", otro.renovar_tarjeta())
+        self.assertIn("nuevo.py", lu.LectorUnidades(self.banco, self.ai).tarjeta_global())
+
+    def test_unidad_renumerada_se_reusa(self):
+        self.lector.leer(0)
+        n = len(self.ai.llamadas)
+        with self.banco.conectar() as c:                             # simula que la unidad cambió de número
+            c.execute("UPDATE unidades SET orden = 50 WHERE orden = 0")
+        lector = lu.LectorUnidades(self.banco, self.ai)
+        r = lector.leer(50)
+        self.assertEqual(r["origen"], "reusada")
+        self.assertEqual(len(self.ai.llamadas), n)                  # sin llamar al modelo
+        self.assertTrue(lector.vigente(50))
 
     def test_leer_guarda_estado_expertos_y_resumen(self):
         r = self.lector.leer(0)

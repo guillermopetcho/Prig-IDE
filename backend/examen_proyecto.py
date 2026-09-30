@@ -108,7 +108,8 @@ def generar(banco, por_tipo: int = 17, semilla: int = 7, guardar: bool = True) -
             consumidores[h["o"]].add(h["s"])
     candidatos = [(k, sorted(v)) for k, v in consumidores.items() if 1 <= len(v) <= 4]
     for ruta, quienes in elegir(candidatos, por_tipo):
-        agregar("frontend", f"¿Qué funciones del frontend llaman al endpoint `{ruta}`?", quienes)
+        agregar("frontend", f"¿Dentro de qué funciones del frontend se llama al endpoint `{ruta}`? Nombra la función "
+                            f"con nombre que contiene la llamada (no el manejador anónimo).", quienes)
 
     # llamadores exactos
     entrantes: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
@@ -338,9 +339,19 @@ def corregir(pregunta: Dict[str, Any], respuesta: str, conocidos: Optional[Set[s
 
 def correr(banco, variante: str, preguntar: Callable[[str], Tuple[str, Dict[str, Any]]],
            tipos: Optional[List[str]] = None, por_tipo: Optional[int] = None,
-           progreso: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
-    """ `preguntar(texto) -> (respuesta, {"tokens": …})`. Guarda cada resultado y devuelve el resumen. """
+           progreso: Optional[Callable[[Dict[str, Any]], None]] = None,
+           ids: Optional[List[str]] = None, saltar_de: Optional[str] = None) -> Dict[str, Any]:
+    """ `preguntar(texto) -> (respuesta, {"tokens": …})`. Guarda cada resultado y devuelve el resumen.
+    `ids`: solo esas preguntas. `saltar_de`: una corrida anterior cuyas preguntas ya respondidas se
+    saltan (para continuar un examen interrumpido). """
     preguntas = cargar(banco) or generar(banco)
+    if ids is not None:
+        preguntas = [p for p in preguntas if p["id"] in set(ids)]
+    if saltar_de:
+        with banco.conectar() as c:
+            _crear_tablas(c)
+            hechas = {f["id"] for f in c.execute("SELECT id FROM examen_resultados WHERE corrida = ?", (saltar_de,))}
+        preguntas = [p for p in preguntas if p["id"] not in hechas]
     if tipos:
         preguntas = [p for p in preguntas if p["tipo"] in tipos]
     if por_tipo:

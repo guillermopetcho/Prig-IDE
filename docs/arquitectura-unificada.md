@@ -341,7 +341,7 @@ Con aprobación del usuario al principio.
 |---|---|---|---|---|
 | 0 | **Examen del proyecto** (`examen_proyecto.py`, **hecho**): 153 preguntas de 9 tipos generadas del banco, corrección automática con aciertos e inventos, guardado en el banco | nulo | existe y es reproducible | cumplido |
 | 1 | **Partición y orden** (`particion_proyecto.py`, **hecho**) | nulo | 100 % del código de producción, unidades ≤16K | cumplido: 94 unidades, 0,2 s |
-| 2 | **Pasada por unidades con captura múltiple** (`lectura_unidades.py`): **hecha** (94 unidades, 26 GB), con enrutador y modo unidad en el chat; examen parcial 95,9 % | bajo | «detalle exacto» ≥ 90 %; < 2 s por pregunta | cumplido en aciertos; falta bajar el tiempo medio |
+| 2 | **Pasada por unidades con captura múltiple** (`lectura_unidades.py`): **hecha** (94 unidades, 26 GB), con enrutador y modo unidad en el chat; **examen completo 97,7 %** | bajo | «detalle exacto» ≥ 90 %; < 2 s por pregunta | aciertos cumplidos; tiempo: mediana 16,6 s (4 s en ubicación, pero la mayoría de los tipos llevan una consulta) |
 | 3 | **Fichas, verificación y mapa de conceptos**; puente de fichas entre ramas | bajo-medio | afirmaciones verificadas ≥ 95 %; «ubicación» e «impacto» ≥ 90 % | ~1,5 h para Prig |
 | 4 | **Tronco sin parche** (en cadena hasta 262K) + **curva de recuerdo** del SSM + repaso espaciado | medio | recuerdo útil fuera de la ventana | ~1 h |
 | 5 | **Enrutador con estados ocultos** (producto 4) | medio | mejor elección de rama que `bge-m3` | parche liviano |
@@ -446,25 +446,129 @@ en `~/.cache/prig-moe/pasada.log`.
   código del editor, la conversación usa el prefijo de la unidad (el motor la restaura con sus
   expertos) y las herramientas fijas. Si no hay unidad clara, se usa el modo general.
 
-**Examen completo en modo unidad** (detenido a pedido del usuario en 98 de 153 preguntas):
+**Examen completo en modo unidad (153 preguntas, 29/09/2026).** Se completó en tres corridas: 98
+preguntas, 55 restantes y las 2 que se habían colgado, repetidas tras corregir la consola.
 
-| Medida | Valor |
-|---|---|
-| Aciertos | **95,9 %** en 98 preguntas |
-| Por tipo | config 1,0 · constante 1,0 · entorno 1,0 · endpoint 0,94 · impacto 0,92 · frontend 0,88 |
-| Respuestas con inventos | 3 de 98 |
-| Tiempo medio | 43,8 s |
+| Tipo | Aciertos | Tiempo medio | Mediana |
+|---|---|---|---|
+| config | 1,000 | 32,2 s | 21,6 s |
+| constante | 1,000 | 15,5 s | 13,8 s |
+| endpoint | 0,941 | 18,6 s | 17,7 s |
+| entorno | 1,000 | 18,2 s | 15,6 s |
+| frontend | 0,882 | 23,3 s | 19,8 s |
+| impacto | 1,000 | 48,2 s | 26,4 s |
+| llamadores | 1,000 | 10,2 s | 8,0 s |
+| recorrido | 0,971 | 51,5 s | 36,4 s |
+| ubicacion | 1,000 | 4,1 s | 4,0 s |
+| **Total** | **0,977** | **24,7 s** | **16,6 s** |
 
-Faltaron llamadores, recorrido y ubicación.
+- 3 respuestas de 153 con inventos.
+- El enrutador eligió unidad en el 68 % de las preguntas de la continuación (39 de 57); el resto fue
+  por el modo general.
+- Comparación con el piloto de 27 preguntas: sin banco 14,8 %; banco general 96,3 %.
+
+**El «tiempo alto» no era el enrutador** (mide 0,2–0,25 s, incluida la verificación de vigencia).
+Eran dos preguntas colgadas, una de **30 minutos**, por tres fallas de la consola, ya corregidas en
+`memoria_consulta.py`:
+
+1. **Espera sin límite.** Prig esperaba con `readline()` bloqueante y el tope de 630 s nunca se
+   aplicaba. Ahora espera con `select` y tiene un tope real de 180 s por ejecución, subllamadas
+   incluidas; si lo pasa, la consola se reinicia.
+2. **Respuestas desordenadas.** La alarma de 30 s corría mientras la consola esperaba una subllamada
+   `P.llm`; al saltar, la respuesta tardía se tomaba como la de la ejecución siguiente. Ahora la
+   alarma se pausa durante la espera y cada petición lleva un número.
+3. **Sin tope por respuesta.** No había límite de `P.llm` por respuesta, solo 12 por ejecución.
+   Ahora son 24 por respuesta.
+
+Repetidas, las dos preguntas tardan 28 s y aciertan.
 
 **Pendientes:**
 
-- **Tiempo:** 43,8 s de media contra 28 s del modo general en el piloto. Sospecha a medir: el
-  enrutador reconstruye en cada pregunta el prefijo de las unidades (`vigente` → `mensajes`:
-  contexto con el grafo, código y tarjeta). Solución probable: cachear los prefijos por versión del
-  banco.
-- Terminar el examen (las 55 preguntas restantes) y compararlo con el modo general completo.
 - Tras cada edición, releer las unidades tocadas: `--pasada` lo hace solo.
+
+## 6.3 Etapa 3 (en curso): datos más finos, prefijo estable y mapa de «dónde está»
+
+**Lo que mostraron las fallas del examen completo:**
+
+- **Funciones anidadas.** Los endpoints de un `APIRouter` son funciones dentro de otra
+  (`crear_router`). No eran símbolos: el endpoint quedaba atribuido a la función de afuera y las
+  cadenas de llamadas que pasaban por ellas se perdían («no hay camino», cuando sí lo había).
+  Esquema 5 del banco: 231 funciones anidadas en Prig, 31 endpoints ahora atribuidos a la función
+  que los implementa, y las llamadas se resuelven hacia ellas.
+- **Preguntas de frontend ambiguas.** La llamada vive en un manejador anónimo dentro de una función
+  con nombre. La pregunta ahora pide explícitamente la función con nombre que la contiene.
+
+**Falla de diseño corregida: el prefijo guardado tenía partes volátiles.** Cada unidad guardaba en
+su prefijo:
+
+- su contexto del grafo («qué usa de otras unidades, quién la usa»);
+- la ayuda de la consola.
+
+Una mejora del grafo o una línea nueva en la ayuda invalidaba las 94 lecturas; peor, **editar OTRA
+unidad** cambiaba el «quién la usa» de esta, y las invalidaciones se propagaban en cascada. Pasó dos
+veces. Ahora:
+
+| Parte | Dónde va | Cambia cuando… |
+|---|---|---|
+| Sistema del lector (corto, fijo) | prefijo guardado | nunca |
+| Tarjeta global | prefijo guardado, **congelada en el banco** (`renovar_tarjeta()` a pedido) | el usuario la renueva |
+| Código de la unidad | prefijo guardado | se edita esa unidad |
+| Contexto del grafo, guía y API de la consola, pregunta | **mensaje de cada pregunta** (~1–2K tokens, ~2 s de lectura) | siempre fresco |
+
+Además, la partición se recalcula antes de cada pasada (las líneas se corren al editar). Una unidad
+cuyo contenido no cambió se reconoce por su llave y se reusa sin llamar al modelo, aunque cambie de
+número.
+
+**Mapa de «dónde está cada cosa»: `P.donde(x)`** (sin modelo, < 0,2 s). Para una clave de
+configuración, un endpoint, una variable de entorno, un id del DOM, un archivo de datos o un símbolo,
+junta en un llamado:
+
+- los hechos del grafo por relación (quién lo lee, lo expone o lo consume);
+- la función que implementa el endpoint y quién la llama;
+- dónde aparece como texto literal (defaults, formularios, rutas).
+
+Por ejemplo, `P.donde("moe_modo")` devuelve el valor por defecto, los dos lectores y el endpoint que
+lo escribe.
+
+**Fichas por símbolo** (`backend/fichas_simbolos.py`), piloto sobre las 5 unidades del motor y la
+térmica (30/09/2026):
+
+- 246 fichas, a ~6 s por símbolo, en inglés terso: qué hace, contrato, efectos, riesgos y dónde
+  cambiarlo.
+- **240 verificadas sin problemas (97,6 %).** La verificación sin modelo comprueba que:
+  - el símbolo exista;
+  - cada nombre citado exista en el código;
+  - cada línea citada caiga en el símbolo, o contenga lo que la ficha cita (la constante o el
+    default que usa).
+- Las 6 marcadas citan líneas que no contienen lo afirmado (por ejemplo, `RESERVA_CUDA_MB` en
+  l.68-69, cuando está en la 54).
+- Con tandas de 20 símbolos, 2 tandas no devolvieron JSON válido (40 símbolos). Ahora las tandas son
+  de 12; esos 40 quedan pendientes (se rehacen con `fichar_unidad`, que solo toma lo que falta).
+
+**Examen completo con el prefijo estable: pausado a pedido en 58 de 153, con una REGRESIÓN.**
+
+| Tipo | Antes (corrida anterior) | Ahora |
+|---|---|---|
+| config | 1,000 | 0,824 |
+| constante | 1,000 | 0,882 |
+| endpoint | 0,941 | 0,588 |
+| entorno | 1,000 | 0,857 |
+| **Total (58 preguntas)** | — | **0,776** |
+
+**Causa encontrada:** en modo unidad, el modelo escribe la consulta como texto de su respuesta (por
+ejemplo `P.api("DELETE /api/banco/resoluciones/*")`) en vez de llamar a la herramienta `consola`.
+Empezó al mover la guía de la consola del sistema al mensaje de la pregunta: el modelo la toma como
+«responde con este código».
+
+**Arreglos previstos:**
+
+1. En `guia_consola()`: «llama a la herramienta `consola` con ese código; nunca escribas código de P
+   como respuesta».
+2. En `_chat_eventos`: si la respuesta es solo código `P.…`, ejecutarlo en la consola y pedirle al
+   modelo que responda con el resultado (como el empujón).
+
+Después, retomar el examen con
+`ex.correr(banco, "etapa3", preguntar, saltar_de="etapa3-20260930-012218")`.
 
 ## 7. Experimentos pendientes
 

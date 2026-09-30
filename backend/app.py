@@ -3908,7 +3908,8 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
         # Modo unidad: la conversación empieza exactamente con el prefijo de la lectura guardada de esa
         # unidad (sistema del lector + tarjeta + contexto + código) y sus herramientas fijas; el motor la
         # restaura en ~0,3 s con sus expertos, y la consola cubre el resto del proyecto
-        mensajes = unidad["lector"].mensajes(unidad["datos"]) + [{"role": "user", "content": req.prompt}]
+        mensajes = unidad["lector"].mensajes(unidad["datos"]) + [
+            {"role": "user", "content": unidad["lector"].pregunta_con_contexto(unidad["datos"], req.prompt)}]
         herramientas = Herramientas(banco=banco, consola=consola, solo=list(lectura_unidades.HERRAMIENTAS_UNIDAD))
     extra_moe = None
     if solo_codigo:
