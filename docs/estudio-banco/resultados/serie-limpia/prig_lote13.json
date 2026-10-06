@@ -1,0 +1,236 @@
+{
+ "lote": 13,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 60
+  }
+ },
+ "media": 1.0,
+ "segundos": 254,
+ "modos": {
+  "unidad": 6,
+  "general": 6
+ },
+ "por_tipo": {
+  "ubicacion": 1.0,
+  "constante": 1.0,
+  "recorrido": 1.0,
+  "config": 1.0,
+  "impacto": 1.0,
+  "endpoint": 1.0,
+  "entorno": 1.0,
+  "llamadores": 1.0,
+  "frontend": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "5799ad0b24e4",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.5,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "f16f03ae1e94",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 25.6,
+   "modo": "general",
+   "herramientas": 3
+  },
+  {
+   "id": "e6e96179448d",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 16.5,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "f9ef560378db",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 24.1,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "4c5f77790bf2",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 25.7,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "9b0f1fa81ec1",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "b38691457c2a",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 29.2,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "cb1e7cf38a86",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 20.4,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "a225ae94c042",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 17.8,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "1be5e71bac9f",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 19.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "609ee246f14e",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 15.8,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "4ec84bff5311",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 6.2,
+   "modo": "unidad",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "5799ad0b24e4": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_config\\\", o=\\\"moe_calientes\\\")\\nfor h in hechos:\\n    print(f\\\"{h['s']} en {h['ruta']}:{h['linea']}\\\")\"}",
+    "resultado_caracteres": 120
+   }
+  ],
+  "f16f03ae1e94": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"modelo\\\", limite=500)\"}",
+    "resultado_caracteres": 237
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"IndiceSemantico.embeber\"}",
+    "resultado_caracteres": 1092
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"IndiceSemantico.estado\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "e6e96179448d": [],
+  "f9ef560378db": [],
+  "4c5f77790bf2": [],
+  "9b0f1fa81ec1": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/banco/cambios\\\")\"}",
+    "resultado_caracteres": 273
+   }
+  ],
+  "b38691457c2a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar hechos de lee_entorno para PRIG_MODELOS_ARCHIVO\\nhechos = P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_MODELOS_ARCHIVO\\\")\\nprint(\\\"Hechos:\\\", hechos)\\n\"}",
+    "resultado_caracteres": 344
+   }
+  ],
+  "cb1e7cf38a86": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar quién llama a /api/github/preguntar desde el frontend\\nconsumidores = P.hechos(r=\\\"llama_api\\\", o=\\\"%/api/github/preguntar%\\\")\\nprint(\\\"Hechos de llama_api hacia /api/github/preguntar:\\\")\\nfor c in consumidores:\\n    print(f\\\"  {c['s']} en {c['ruta']}:{c['linea']}\\\")\\n\\n# También verificar con la API de banco_proyecto\\napi_info = P.api(\\\"/api/github/preguntar\\\")\\nprint(\\\"\\\\nRe",
+    "resultado_caracteres": 415
+   }
+  ],
+  "a225ae94c042": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"mis_datos\\\")\"}",
+    "resultado_caracteres": 271
+   }
+  ],
+  "1be5e71bac9f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"variables_usadas\\\")\"}",
+    "resultado_caracteres": 535
+   }
+  ],
+  "609ee246f14e": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.camino(\\\"open_workspace\\\", \\\"LearningTelemetry._init_tables\\\"))\"}",
+    "resultado_caracteres": 215
+   }
+  ],
+  "4ec84bff5311": []
+ },
+ "respuestas": {
+  "5799ad0b24e4": "Para encontrar qué funciones o métodos leen la clave de configuración `moe_calientes`, consulto el grafo de hechos del proyecto, que registra explícitamente las relaciones de `lee_config`.\n\nLas funciones que leen la clave `moe_calientes` son:\n\n1.  **`AIEngine.motor_moe`** en `backend/ai_engine/ai_engine_class.py:865`\n2.  **`_moe_estado`** en `backend/app.py:5529`\n\nAmbas obtienen el valor actual desde el diccionario de configuración (`self.config.get(\"moe_calientes\")`) para pasarlo al motor o exponerlo vía API.",
+  "f16f03ae1e94": "Las funciones que leen la clave de configuración `modelo` son:\n\n- **`IndiceSemantico.embeber`** (`backend/indice_semantico.py:98`): accede a `ajustes[\"modelo\"]` para pasarlo como `model` en la petición al API de embeddings de Ollama.\n- **`IndiceSemantico.estado`** (`backend/indice_semantico.py:263`): lee `ajustes[\"modelo\"]` para informar en el panel del banco qué modelo se está usando (y compararlo con el que se usó para indexar, detectando si necesita reindexar).\n\nAmbas obtienen el valor a través del método privado `_ajustes()` de `IndiceSemantico`, que lee la configuración global de Prig.",
+  "e6e96179448d": "El valor de la constante `HOLGURA_MOE_SIN_TURBO_C` es **8.0**.\n\nSe define en `backend/recursos/frio.py:34` y se usa en `backend/recursos/termico.py:389-398` (`Gobernador._holgura_frio`) para dar al motor MoE una holgura térmica de 8 °C sobre el objetivo cuando el turbo está apagado, ya que en ese escenario las pausas le cuestan casi la mitad de velocidad y ahorran poco calor.",
+  "f9ef560378db": "La constante `VERSION_ESQUEMA` en `backend/banco_proyecto.py` vale **6**.",
+  "4c5f77790bf2": "La función que implementa el endpoint `POST /api/github/exportar` es `github_exportar`, y está definida en **backend/app.py**, líneas **2613-2617**:\n\n```python\n@app.post(\"/api/github/exportar\")\ndef github_exportar(req: GithubRefRequest):\n    \"\"\" nota=\"md\": la explicación en Markdown; nota=\"pdf\": el código explicado en PDF \"\"\"\n    fn = github_lector.exportar_pdf if (req.nota or \"pdf\") == \"pdf\" else github_lector.exportar_markdown\n    return _github(fn, req.ref, file_mgr.base_dir)\n```\n\nEsta función actúa como un adaptador: dependiendo del valor de `req.nota`, invoca a `github_lector.exportar_pdf` (para generar un PDF) o a `github_lector.exportar_markdown` (para generar un archivo Markdown), pasando la referencia del repositorio (`req.ref`) y el directorio base del gestor de archivos (`file_mgr.base_dir`) como argumentos.",
+  "9b0f1fa81ec1": "P.api(\"GET /api/banco/cambios\")La función que implementa el endpoint `GET /api/banco/cambios` es **`banco_cambios`** y está en el archivo **`backend/app.py`** (línea 4259).",
+  "b38691457c2a": "Voy a buscar qué funciones leen la variable de entorno `PRIG_MODELOS_ARCHIVO`.\n\nPerfecto. Según el grafo de hechos del proyecto, hay **dos funciones** que leen la variable de entorno `PRIG_MODELOS_ARCHIVO`:\n\n1. **`ruta_por_defecto`** en `backend/ollama_opciones.py:279` — Esta es la función principal que proporciona la ruta por defecto para el archivo de modelos.\n\n2. **`PruebaCapas.test_persistencia_y_limpieza_de_configuraciones_viejas`** en `backend/tests/test_ollama_modelos.py:101` — Esta es una prueba unitaria que verifica la persistencia y limpieza de configuraciones.\n\nLa función principal es `ruta_por_defecto()`, que usa esta variable como fallback antes de devolver la ruta por defecto (`~/.prig_modelos.json`).",
+  "cb1e7cf38a86": "Para responder con precisión, necesito consultar el grafo de hechos del proyecto para saber qué funciones del frontend llaman al endpoint `/api/github/preguntar`.\n\nLa función del frontend que llama al endpoint `/api/github/preguntar` es:\n\n**`vistaBuscar`** en `frontend/js/github_lector.js:905`\n\nEsta es la única función que consume dicho endpoint según el grafo de hechos del proyecto.",
+  "a225ae94c042": "P.llamadores(\"mis_datos\")El único llamador de `mis_datos` que no es una prueba unitaria es `kaggle_mis_datos` en `backend/app.py` (línea 2428). Ese símbolo es un endpoint HTTP del backend.\n\nPor tanto, cambiar el comportamiento de `mis_datos` afecta directamente al endpoint:\n\n- **`GET /api/kaggle/mis_datos`** (expuesto por `kaggle_mis_datos` en `app.py`)\n\nNo hay otros endpoints HTTP intermedios ni cadenas de llamadas adicionales hacia el backend; solo las pruebas unitarias lo invocan directamente.",
+  "1be5e71bac9f": "Las funciones/métodos que llaman a `variables_usadas` son:\n\n1. **`validar_flujo`** (`backend/agent_flows.py`, línea 548) — valida la estructura de un flujo de agentes.\n2. **`FlowEngine._render`** (`backend/agent_flows.py`, línea 697) — renderiza los prompts sustituyendo variables.\n3. **`FlowEngine.ejecutar`** (`backend/agent_flows.py`, línea 860) — ejecuta el flujo paso a paso.\n4. **`PruebaUtilidades.test_detecta_las_variables_de_un_prompt`** (`backend/tests/test_flujos.py`, línea 317) — prueba unitaria.",
+  "609ee246f14e": "El flujo de ejecución es:\n\n1. **`open_workspace`** (`backend/app.py:2873`) — El endpoint que se dispara cuando el usuario abre un workspace.\n2. **`rebind_workspace`** (`backend/app.py:281`) — Función interna llamada por `open_workspace` para reconfigurar todos los componentes con el nuevo directorio.\n3. **`LearningTelemetry.__init__`** (`backend/learning_telemetry.py:27`) — Constructor de la clase `LearningTelemetry`, que se inicializa dentro de `rebind_workspace`.\n4. **`LearningTelemetry._init_tables`** (`backend/learning_telemetry.py:39`) — Método llamado por el constructor para crear las tablas de la base de datos SQLite si no existen.\n\nLa cadena corta es: **`open_workspace` → `rebind_workspace` → `LearningTelemetry.__init__` → `LearningTelemetry._init_tables`**.",
+  "4ec84bff5311": "`Maquina.calibrada` está definida en **`backend/recursos/calculadora.py`**, como una propiedad de la clase `Maquina`."
+ }
+}

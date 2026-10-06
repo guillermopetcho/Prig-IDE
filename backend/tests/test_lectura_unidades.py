@@ -110,6 +110,56 @@ class TestLectura(unittest.TestCase):
         self.assertEqual(len(self.ai.llamadas), n)                  # sin llamar al modelo
         self.assertTrue(lector.vigente(50))
 
+    def test_pasada_tras_renumerar_no_pisa_registros(self):
+        # Dos unidades leídas que intercambian su número al reparticionar: la pasada leía en orden y el
+        # registro de una pisaba el de la otra (INSERT OR REPLACE por número) → se volvía a llamar al modelo
+        self.lector.pasada()
+        n = len(self.ai.llamadas)
+        with self.banco.conectar() as c:
+            c.execute("UPDATE unidades SET orden = 99 WHERE orden = 0")
+            c.execute("UPDATE unidades SET orden = 0 WHERE orden = 1")
+            c.execute("UPDATE unidades SET orden = 1 WHERE orden = 99")
+        lector = lu.LectorUnidades(self.banco, self.ai)
+        self.assertEqual(lector.pasada(), [])                         # todo se reasigna, nada se relee
+        self.assertEqual(len(self.ai.llamadas), n)
+        self.assertTrue(lector.vigente(0) and lector.vigente(1))
+
+    def test_reasignar_borra_los_estados_que_ya_no_sirven(self):
+        self.lector.pasada()
+        viejo = self.lector.lectura(0)["archivo"]
+        self.assertTrue(os.path.exists(os.path.join(self.estados, viejo)))
+        with open(os.path.join(self.banco.raiz, "app.py"), "a") as f:     # cambia el código de una unidad
+            f.write("\n\ndef otra():\n    return 3\n")
+        self.banco.sincronizar(); pp.particionar(self.banco, tope=20)
+        lector = lu.LectorUnidades(self.banco, self.ai)
+        vigentes_antes = {lector.lectura(o)["archivo"] for o in lector._unidades if lector.lectura(o)}
+        lector.reasignar()
+        en_disco = set(os.listdir(self.estados))
+        usados = {lector.lectura(o)["archivo"] for o in lector._unidades if lector.lectura(o)}
+        self.assertTrue(usados <= en_disco)                                  # lo que sirve sigue
+        self.assertEqual({a for a in en_disco if a.endswith(".bin")} - usados, set())   # lo viejo se borró
+
+    def test_reasignar_no_borra_estados_que_usa_otro_banco(self):
+        # Dos carpetas con el mismo nombre y el mismo código comparten los estados del motor (mismo prefijo). Que una
+        # cambie no puede borrarle a la otra una lectura válida
+        self.lector.pasada()
+        otra = os.path.join(self.tmp, "copia", "p")                 # mismo nombre de carpeta: mismo prefijo
+        shutil.copytree(self.banco.raiz, otra)
+        banco2 = bp.BancoProyecto(otra, carpeta=os.path.join(self.tmp, "banco2"))
+        banco2.sincronizar(); pp.particionar(banco2, tope=20)
+        lector2 = lu.LectorUnidades(banco2, self.ai)
+        lector2.pasada()
+        compartidos = {lector2.lectura(o)["archivo"] for o in lector2._unidades}
+        self.assertEqual(compartidos, {self.lector.lectura(o)["archivo"] for o in self.lector._unidades})
+        with open(os.path.join(otra, "app.py"), "a") as f:          # cambia SOLO la copia
+            f.write("\n\ndef otra():\n    return 3\n")
+        banco2.sincronizar(); pp.particionar(banco2, tope=20)
+        lu.LectorUnidades(banco2, self.ai).reasignar()
+        for archivo in compartidos:                                   # el primer banco los sigue usando
+            self.assertTrue(os.path.exists(os.path.join(self.estados, archivo)), archivo)
+        original = lu.LectorUnidades(self.banco, self.ai)
+        self.assertTrue(all(original.vigente(o) for o in original._unidades))
+
     def test_leer_guarda_estado_expertos_y_resumen(self):
         r = self.lector.leer(0)
         self.assertEqual(r["tokens"], 1234)

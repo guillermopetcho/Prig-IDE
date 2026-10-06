@@ -299,6 +299,15 @@ class TestBusquedaYContexto(BaseBanco):
         self.assertIn("motor.py:", texto)
         self.assertIn("calientes_para", texto)
 
+    def test_componer_sin_memoria_de_resoluciones(self):
+        # Para medir: la corrida N no debe ver las respuestas de la N−1 (docs/estudio-banco.md, E1)
+        self.banco.registrar_resolucion("¿cuántos expertos calientes caben en la VRAM?", "Lo decide calientes_para.", "m")
+        con = self.banco.componer("¿cuántos expertos calientes caben en la VRAM?", presupuesto=3000)
+        sin = self.banco.componer("¿cuántos expertos calientes caben en la VRAM?", presupuesto=3000, usar_resoluciones=False)
+        self.assertIn("Preguntas parecidas ya resueltas", con["texto"])
+        self.assertNotIn("Preguntas parecidas ya resueltas", sin["texto"])
+        self.assertEqual(sin["resoluciones"], 0)
+
     def test_registrar_resolucion_marca_lo_visto(self):
         escribir(self.raiz, "util.py", UTIL + "\n# x\n")
         self.banco.sincronizar()
@@ -642,3 +651,50 @@ class TestChat(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHechosCorregidos(unittest.TestCase):
+    """ Los errores de extracción medidos en docs/estudio-banco.md (E2) """
+
+    def test_prefijo_de_router_y_metodos_de_route(self):
+        t = ('from fastapi import APIRouter\nfrom flask import Blueprint\n'
+             'r = APIRouter(prefix="/api/hub")\nbp = Blueprint("x", __name__, url_prefix="/auth/")\n'
+             '@r.get("/estado")\ndef estado(): pass\n'
+             '@bp.route("/login", methods=["GET", "POST"])\ndef login(): pass\n'
+             '@app.route("/salud")\ndef salud(): pass\n')
+        expone = {(s, o) for s, r, o, _ in bp.hechos_python("api.py", t, []) if r == "expone"}
+        self.assertEqual(expone, {("estado", "GET /api/hub/estado"), ("login", "GET /auth/login"),
+                                  ("login", "POST /auth/login"), ("salud", "GET /salud")})
+
+    def test_lee_config_sin_escrituras_ni_diccionarios_cualquiera_ni_tests(self):
+        t = ('def f(self, loop_config, opciones):\n'
+             '    config["escrita"] = 1\n'
+             '    a = cfg.get("leida")\n'
+             '    b = self.config["leida_2"]\n'
+             '    c = loop_config.get("no_es_config")\n'
+             '    d = opciones.get("tampoco")\n'
+             '    del config["borrada"]\n')
+        claves = {o for _, r, o, _ in bp.hechos_python("m.py", t, []) if r == "lee_config"}
+        self.assertEqual(claves, {"leida", "leida_2"})
+        self.assertEqual([h for h in bp.hechos_python("tests/test_m.py", t, []) if h[1] == "lee_config"], [])
+
+    def test_llama_api_cualquier_cadena_y_consulta_opcional(self):
+        js = ('async function comprobar(id) { return json(`/api/desafios/${id}/comprobar`, {method: "POST"}); }\n'
+              'const URL = "/api/buscador/seguidos";\n'
+              'function maquina(fresca) { return fetch(`/api/recursos/maquina${fresca ? "?fresca=1" : ""}`); }\n')
+        rutas = {o for _, r, o, _ in bp.hechos_texto("web/a.js", "js", js, []) if r == "llama_api"}
+        self.assertEqual(rutas, {"/api/desafios/*/comprobar", "/api/buscador/seguidos", "/api/recursos/maquina"})
+
+    def test_ruta_canonica(self):
+        self.assertEqual(bp.ruta_http_canonica("/api/x/{id}?q=1"), "/api/x/*")
+        self.assertEqual(bp.ruta_http_canonica("/api/kaggle/${f.tipo === 'd' ? 'a' : 'b'}/x"), "/api/kaggle/*/x")
+
+
+class TestEndpointPorSufijo(unittest.TestCase):
+    def test_prefijo_puesto_en_otro_archivo(self):
+        expuestas = {"/items", "/items/*", "/login/access-token", "/", "/v1/items"}
+        self.assertEqual(bp.endpoint_de("/api/v1/items", expuestas), "/v1/items")      # la más larga
+        self.assertEqual(bp.endpoint_de("/api/v2/items/*", expuestas), "/items/*")
+        self.assertEqual(bp.endpoint_de("/items", expuestas), "/items")                 # exacta
+        self.assertIsNone(bp.endpoint_de("/api/v1/myitems", expuestas))                # límite de segmento
+        self.assertIsNone(bp.endpoint_de("/otra", expuestas))                          # «/» no atrapa todo

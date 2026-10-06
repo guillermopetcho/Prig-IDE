@@ -1922,7 +1922,8 @@ Debes devolver ÚNICAMENTE un objeto JSON válido con este formato:
             for s in sources:
                 yield f"- [{s['title']}]({s['url']}) (`{s['domain']}`)\n"
 
-    def explain_seguimiento_block(self, goal: str, block: dict, model: str = "qwen2.5-coder:7b", use_web: bool = True):
+    def explain_seguimiento_block(self, goal: str, block: dict, model: str = "qwen2.5-coder:7b", use_web: bool = True,
+                                  contexto_extra: str = ""):
         web_context = ""
         sources = []
         if use_web:
@@ -1941,7 +1942,7 @@ REGLAS PEDAGÓGICAS PARA TU RESPUESTA:
 4. Si el contexto incluye enlaces o recursos oficiales, cítalos explícitamente.
 5. Tu respuesta debe estar formateada en Markdown (títulos ##, ###, bloques de código ```).
 """
-        prompt = f"Meta del Alumno: {goal}\n\nBloque a Explicar:\n- Título: {block.get('title')}\n- Temas: {', '.join(block.get('topics', []))}\n- Objetivo: {block.get('learning_objective')}\n- Validación: {block.get('validation_check')}\n\n{web_context}\n¡Por favor, dame la clase!"
+        prompt = f"Meta del Alumno: {goal}\n\nBloque a Explicar:\n- Título: {block.get('title')}\n- Temas: {', '.join(block.get('topics', []))}\n- Objetivo: {block.get('learning_objective')}\n- Validación: {block.get('validation_check')}\n\n{web_context}\n{contexto_extra}\n¡Por favor, dame la clase!"
         
         for chunk in self.generate_response(prompt, model=model, system_prompt=sys_prompt):
             yield chunk

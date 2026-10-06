@@ -1,0 +1,86 @@
+[
+ {
+  "id": "f46b5c0819d3",
+  "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "tipo": "impacto",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "f16f03ae1e94",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `modelo`?",
+  "tipo": "config",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "92462378c98c",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `vatios`?",
+  "tipo": "config",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "e6e96179448d",
+  "pregunta": "¿Cuánto vale la constante `HOLGURA_MOE_SIN_TURBO_C` en `backend/recursos/frio.py`?",
+  "tipo": "constante",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "1b87f0942be0",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `cpu_eficiente`?",
+  "tipo": "config",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "ace7c95ae520",
+  "pregunta": "Si cambio el comportamiento de `explain_seguimiento_block.generator` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "tipo": "impacto",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "8a7b6ca9de4d",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `BROWSER`?",
+  "tipo": "entorno",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "981d5099abea",
+  "pregunta": "¿Qué función implementa el endpoint `GET /api/buscador/buscar` y en qué archivo está?",
+  "tipo": "endpoint",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "cada06cbd275",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `salto_c`?",
+  "tipo": "config",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "78aa8aa2cf71",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `PRIG_HUB_DIR`?",
+  "tipo": "entorno",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "b38691457c2a",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `PRIG_MODELOS_ARCHIVO`?",
+  "tipo": "entorno",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ },
+ {
+  "id": "d9002a638337",
+  "pregunta": "¿Dentro de qué funciones del frontend se llama al endpoint `/api/ai/ollama/launch-terminal-update`? Nombra la función con nombre que contiene la llamada (no el manejador anónimo).",
+  "tipo": "frontend",
+  "modo_e7": "general",
+  "puntaje_e7": 1.0
+ }
+]

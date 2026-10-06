@@ -53,6 +53,12 @@ def _crear_tablas(c):
         corrida TEXT, id TEXT, variante TEXT, puntaje REAL, inventos TEXT, segundos REAL, tokens INTEGER,
         respuesta TEXT, cuando TEXT);
     """)
+    # El examen se regenera cuando cambia el código y las corridas guardaban solo el id: comparar corridas
+    # mezclaba preguntas distintas (docs/estudio-banco.md, E6). Ahora cada resultado lleva su pregunta.
+    columnas = {f[1] for f in c.execute("PRAGMA table_info(examen_resultados)")}
+    for col in ("tipo", "pregunta", "esperado"):
+        if col not in columnas:
+            c.execute(f"ALTER TABLE examen_resultados ADD COLUMN {col} TEXT")
 
 
 # ======================================================================
@@ -101,12 +107,15 @@ def generar(banco, por_tipo: int = 17, semilla: int = 7, guardar: bool = True) -
                 [h["s"], h["ruta"]], "todos")
 
     # frontend: quién lo llama
+    from banco_proyecto import endpoint_de
     expuestos = {h["o"].split(" ", 1)[1] for h in expone}
     consumidores: Dict[str, Set[str]] = defaultdict(set)
+    forma: Dict[str, str] = {}          # cómo la escribe el frontend (con el prefijo que el backend pone en otro archivo)
     for h in hechos:
-        if h["r"] == "llama_api" and h["o"] in expuestos and h["s"] != h["ruta"]:
-            consumidores[h["o"]].add(h["s"])
-    candidatos = [(k, sorted(v)) for k, v in consumidores.items() if 1 <= len(v) <= 4]
+        e = endpoint_de(h["o"], expuestos) if h["r"] == "llama_api" else None
+        if e and h["s"] != h["ruta"]:
+            consumidores[e].add(h["s"]); forma.setdefault(e, h["o"])
+    candidatos = [(forma[k], sorted(v)) for k, v in consumidores.items() if 1 <= len(v) <= 4]
     for ruta, quienes in elegir(candidatos, por_tipo):
         agregar("frontend", f"¿Dentro de qué funciones del frontend se llama al endpoint `{ruta}`? Nombra la función "
                             f"con nombre que contiene la llamada (no el manejador anónimo).", quienes)
@@ -377,9 +386,11 @@ def correr(banco, variante: str, preguntar: Callable[[str], Tuple[str, Dict[str,
         resultados.append({**nota, "id": p["id"], "tipo": p["tipo"], "segundos": segundos})
         with banco.conectar() as c:
             _crear_tablas(c)
-            c.execute("INSERT INTO examen_resultados VALUES (?,?,?,?,?,?,?,?,?)",
+            c.execute("INSERT INTO examen_resultados (corrida, id, variante, puntaje, inventos, segundos, tokens, respuesta, "
+                      "cuando, tipo, pregunta, esperado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                       (corrida, p["id"], variante, nota["puntaje"], json.dumps(nota["inventos"]), segundos,
-                       int(meta.get("tokens") or 0), respuesta, datetime.now().isoformat(timespec="seconds")))
+                       int(meta.get("tokens") or 0), respuesta, datetime.now().isoformat(timespec="seconds"),
+                       p["tipo"], p["pregunta"], json.dumps(p["esperado"], ensure_ascii=False)))
         if progreso:
             progreso({"n": n + 1, "total": len(preguntas), "tipo": p["tipo"], "puntaje": nota["puntaje"]})
     return resumir(resultados, corrida)

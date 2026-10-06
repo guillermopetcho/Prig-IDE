@@ -17,19 +17,18 @@ const VIDEOS_CURADOS = [
                 "titulo": "Harvard CS50P – Introduction to Programming with Python",
                 "canal": "freeCodeCamp / Harvard (David J. Malan)",
                 "categoria": "python",
-                "duracion": "15:56:00",
+                "duracion": "15:57:48",
                 "nivel": "Principiante / Universidad",
                 "idioma": "en",
                 "descripcion": "El curso universitario completo de Harvard sobre Python: funciones, variables, bucles, excepciones, librerías, pruebas unitarias con pytest, POO y expresiones regulares.",
-                "universidad": "Harvard",
-                "playlist": "PLhQjrBD2T3817j24-GogXmWAmO55JDXv7"
+                "universidad": "Harvard"
         },
         {
-                "id": "rfscVS0vtbw",
-                "titulo": "Aprende Python – Curso Completo de Python desde Cero",
-                "canal": "freeCodeCamp Español (Estefania)",
+                "id": "DLikpfc64cA",
+                "titulo": "Aprende Python - Curso de Python desde Cero",
+                "canal": "freeCodeCamp Español",
                 "categoria": "python",
-                "duracion": "4:26:00",
+                "duracion": "4:36:43",
                 "nivel": "Principiante",
                 "idioma": "es",
                 "descripcion": "Fundamentos exhaustivos de Python 3 en español: tipos de datos, listas, tuplas, diccionarios, bucles for/while, funciones y proyectos prácticos paso a paso."
@@ -69,37 +68,37 @@ const VIDEOS_CURADOS = [
                 "titulo": "Curso Python para Principiantes",
                 "canal": "Fazt Code",
                 "categoria": "python",
-                "duracion": "3:55:00",
+                "duracion": "3:15:35",
                 "nivel": "Principiante",
                 "idioma": "es",
                 "descripcion": "Tutorial integral paso a paso de Python para crear aplicaciones, scripts de automatización y backend estructurado."
         },
         {
                 "id": "ZDa-Z5JzLYM",
-                "titulo": "Python OOP Masterclass: Classes, Inheritance & Dunders",
+                "titulo": "Python OOP Tutorial 1: Classes and Instances",
                 "canal": "Corey Schafer",
                 "categoria": "python",
-                "duracion": "45:00",
-                "nivel": "Intermedio / Senior",
+                "duracion": "15:24",
+                "nivel": "Intermedio",
                 "idioma": "en",
-                "descripcion": "Explicación magistral sobre programación orientada a objetos: métodos de clase, estáticos, herencia, métodos mágicos dunder y property decorators."
+                "descripcion": "Primera clase de la serie de POO de Corey Schafer: qué son las clases y las instancias, el método __init__ y los atributos de instancia."
         },
         {
-                "id": "am_hzAG0dWI",
-                "titulo": "Python Data Structures and Algorithms Masterclass",
-                "canal": "freeCodeCamp / Jovian",
+                "id": "pkYVOmU3MgA",
+                "titulo": "Data Structures and Algorithms in Python – Full Course for Beginners",
+                "canal": "freeCodeCamp / Jovian (Aakash N S)",
                 "categoria": "python",
-                "duracion": "1:33",
+                "duracion": "12:30:50",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
-                "descripcion": "Implementación de algoritmos y estructuras de datos en Python: árboles binarios de búsqueda, grafos, Dijkstra y programación dinámica."
+                "descripcion": "El curso de Jovian publicado por freeCodeCamp: búsqueda binaria, análisis de complejidad, listas enlazadas, árboles binarios de búsqueda, tablas hash, ordenamiento, recursión y programación dinámica, con programación en vivo en Python."
         },
         {
                 "id": "8jLOx1hD3_o",
                 "titulo": "C++ Programming Course – Beginner to Advanced (C++20)",
                 "canal": "freeCodeCamp (Daniel Gakwaya)",
                 "categoria": "cpp",
-                "duracion": "31:20:00",
+                "duracion": "31:07:29",
                 "nivel": "Principiante / Senior",
                 "idioma": "en",
                 "descripcion": "El curso definitivo de C++ moderno (C++20) de 31 horas: punteros, gestión del heap, RAII, conceptos (concepts), templates y la STL completa."
@@ -109,7 +108,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "C++ Tutorial for Beginners – Full Course",
                 "canal": "freeCodeCamp (Mike Dane)",
                 "categoria": "cpp",
-                "duracion": "4:01:00",
+                "duracion": "4:01:18",
                 "nivel": "Principiante",
                 "idioma": "en",
                 "descripcion": "Fundamentos sólidos de C++: tipos primitivos, condicionales, punteros, direcciones de memoria, constructores y clases."
@@ -126,40 +125,40 @@ const VIDEOS_CURADOS = [
         },
         {
                 "id": "SfGuIVzE_Os",
-                "titulo": "How C++ Works: Compilation, Linking and Executables",
+                "titulo": "How C++ Works",
                 "canal": "The Cherno",
                 "categoria": "cpp",
-                "duracion": "21:00",
+                "duracion": "20:20",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "Arquitectura interna de C++: preprocesador, generación de código máquina .obj y enlazado estático/dinámico de ejecutables."
         },
         {
                 "id": "DTxHyVn0ODg",
-                "titulo": "Pointers in C++: Memory Addresses & Lifetimes",
+                "titulo": "Pointers in C++",
                 "canal": "The Cherno",
                 "categoria": "cpp",
-                "duracion": "16:00",
+                "duracion": "16:58",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "El modelo de memoria en C++: direcciones de memoria, desreferenciación, punteros void*, punteros inteligentes y ciclo de vida en el heap."
         },
         {
                 "id": "18c3MTX0PK0",
-                "titulo": "Welcome to C++ Series / C++ Philosophy and Architecture",
+                "titulo": "Welcome to C++",
                 "canal": "The Cherno",
                 "categoria": "cpp",
-                "duracion": "7:05",
+                "duracion": "7:04",
                 "nivel": "Fundamentos",
                 "idioma": "en",
                 "descripcion": "Por qué C++ es el estándar en motores gráficos, sistemas operativos y motores de inferencia de Inteligencia Artificial."
         },
         {
-                "id": "yBHfWx6_oXQ",
-                "titulo": "Curso Completo de C++ para Principiantes",
-                "canal": "ATL Academy",
+                "id": "jS6wb263CIM",
+                "titulo": "Curso de C++ desde CERO para PRINCIPIANTES (Completo)",
+                "canal": "Sinergia Cursos",
                 "categoria": "cpp",
-                "duracion": "3:30:00",
+                "duracion": "9:29:09",
                 "nivel": "Principiante",
                 "idioma": "es",
                 "descripcion": "Fundamentos de C++ en español: algoritmos, memoria, estructuras de control, funciones y programación orientada a objetos con ejercicios."
@@ -193,7 +192,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Machine Learning for Everybody – Full Course",
                 "canal": "freeCodeCamp (Kylie Ying)",
                 "categoria": "ml",
-                "duracion": "3:53:00",
+                "duracion": "3:53:53",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
                 "descripcion": "Data Science y ML práctico con Python y Scikit-Learn: regresión lineal/logística, KNN, naive bayes, árboles de decisión y métricas de validación."
@@ -203,17 +202,17 @@ const VIDEOS_CURADOS = [
                 "titulo": "Machine Learning Course for Beginners – Complete End-to-End",
                 "canal": "freeCodeCamp (Ayush Singh)",
                 "categoria": "ml",
-                "duracion": "9:52:00",
+                "duracion": "9:52:19",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "Curso integral de 10 horas: álgebra matricial, feature engineering, Decision Trees, Random Forest, Gradient Boosting y reducción con PCA."
         },
         {
-                "id": "vVg7WrelMeA",
-                "titulo": "Machine Learning From Scratch in Python with NumPy",
+                "id": "rLOyrWV8gmA",
+                "titulo": "Machine Learning From Scratch in Python – 12 algoritmos (Full Course)",
                 "canal": "Patrick Loeber",
                 "categoria": "ml",
-                "duracion": "8:12",
+                "duracion": "4:55:23",
                 "nivel": "Senior",
                 "idioma": "en",
                 "descripcion": "Construcción pura de algoritmos desde cero en Python y NumPy sin Scikit-Learn: Linear/Logistic Regression, KNN, Naive Bayes, SVM, Árboles y PCA."
@@ -233,7 +232,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "The Essence of Linear Algebra: Vectors, Spans, Basis & Transformations",
                 "canal": "3Blue1Brown (Grant Sanderson)",
                 "categoria": "matematicas",
-                "duracion": "10:00",
+                "duracion": "9:51",
                 "nivel": "Fundamentos",
                 "idioma": "en",
                 "descripcion": "Geometría e intuición visual del álgebra lineal: transformaciones lineales, determinantes, producto escalar, autovalores y autovectores.",
@@ -241,7 +240,7 @@ const VIDEOS_CURADOS = [
         },
         {
                 "id": "nLmhmB6NzcM",
-                "titulo": "0/1 Knapsack Problem – Dynamic Programming Formulation",
+                "titulo": "0/1 Knapsack – Two Methods – Dynamic Programming",
                 "canal": "Abdul Bari",
                 "categoria": "algoritmos",
                 "duracion": "28:24",
@@ -250,9 +249,9 @@ const VIDEOS_CURADOS = [
                 "descripcion": "Optimización algorítmica clásica: programación dinámica matricial bottom-up y resolución analítica paso a paso."
         },
         {
-                "id": "UZZD9d9YqnQ",
-                "titulo": "MIT 6.S191: Introduction to Deep Learning",
-                "canal": "MIT OpenCourseWare (Dr. Alexander Amini)",
+                "id": "alfdI7S6wCY",
+                "titulo": "MIT Introduction to Deep Learning (2025) | 6.S191",
+                "canal": "MIT (Alexander Amini & Ava Amini)",
                 "categoria": "dl",
                 "duracion": "10 Clases (~12 Horas)",
                 "nivel": "Avanzado / Senior",
@@ -276,37 +275,37 @@ const VIDEOS_CURADOS = [
                 "titulo": "Building micrograd: Neural networks and backpropagation from scratch",
                 "canal": "Andrej Karpathy",
                 "categoria": "dl",
-                "duracion": "2:25:00",
+                "duracion": "2:25:52",
                 "nivel": "Senior",
                 "idioma": "en",
                 "descripcion": "Creación paso a paso de un motor de autograd escalar en Python y entrenamiento de una red neuronal multicapa sin librerías externas."
         },
         {
-                "id": "kCc8FmEb1nY",
-                "titulo": "Building makemore: Language Modeling from Bigram to Multilayer Perceptron",
+                "id": "PaCmpygFfXo",
+                "titulo": "Building makemore: The spelled-out intro to language modeling",
                 "canal": "Andrej Karpathy",
                 "categoria": "dl",
-                "duracion": "1:57:00",
+                "duracion": "1:57:45",
                 "nivel": "Senior",
                 "idioma": "en",
-                "descripcion": "Modelado de lenguaje desde bigramas estadísticos hasta redes neuronales densas (Bengio et al. 2003) con embeddings y función Negative Log-Likelihood."
+                "descripcion": "Primera parte de makemore: a partir de un conjunto de nombres, un modelo de lenguaje de bigramas a nivel de caracteres, primero por conteo y luego como red neuronal, entrenado maximizando la verosimilitud (Negative Log-Likelihood)."
         },
         {
                 "id": "zduSFxRajkE",
                 "titulo": "Let's build the GPT Tokenizer (BPE)",
                 "canal": "Andrej Karpathy",
                 "categoria": "dl",
-                "duracion": "2:13:35",
+                "duracion": "2:13:34",
                 "nivel": "Senior",
                 "idioma": "en",
                 "descripcion": "Implementación del algoritmo Byte Pair Encoding (BPE) a nivel de bytes UTF-8 para tokenización en modelos de lenguaje como GPT-2 y GPT-4."
         },
         {
                 "id": "Z_ikDlimN6A",
-                "titulo": "PyTorch for Deep Learning & Machine Learning – Full Course",
-                "canal": "freeCodeCamp (Daniel Bourke)",
+                "titulo": "Learn PyTorch for Deep Learning in a Day (Full Course)",
+                "canal": "Daniel Bourke",
                 "categoria": "dl",
-                "duracion": "26:15:00",
+                "duracion": "25:36:57",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "La formación de PyTorch más completa: tensores, visión computacional con CNNs, Transfer Learning, model deployment y tracking experimental."
@@ -326,7 +325,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "TensorFlow 2.0 Complete Course – Neural Networks for Beginners",
                 "canal": "freeCodeCamp (Tech With Tim)",
                 "categoria": "dl",
-                "duracion": "6:52:00",
+                "duracion": "6:52:08",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
                 "descripcion": "Ecosistema TensorFlow 2 y Keras: construcción de modelos convolucionales (Conv2D), procesamiento de lenguaje natural y redes recurrentes."
@@ -336,7 +335,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Stanford CS231n: Convolutional Neural Networks for Visual Recognition",
                 "canal": "Stanford University (Fei-Fei Li & Andrej Karpathy)",
                 "categoria": "dl",
-                "duracion": "57:57",
+                "duracion": "57:56",
                 "nivel": "Senior / Avanzado",
                 "idioma": "en",
                 "descripcion": "El curso clásico de Stanford sobre visión computacional: capas convolucionales, pooling, normalización, AlexNet, VGG y ResNet.",
@@ -344,23 +343,23 @@ const VIDEOS_CURADOS = [
                 "playlist": "PL3FW7Lu3i5JvHM8ljYj-zLfQRF3EO8sYv"
         },
         {
-                "id": "fVYxOy505_4",
-                "titulo": "Stanford CS224N: Natural Language Processing with Deep Learning",
-                "canal": "Stanford University (Prof. Christopher Manning)",
+                "id": "DzpHeXVSC5I",
+                "titulo": "Stanford CS224N: NLP with Deep Learning | Spring 2024 | Lecture 1 - Intro and Word Vectors",
+                "canal": "Stanford Online (Prof. Christopher Manning)",
                 "categoria": "dl",
-                "duracion": "2:30",
+                "duracion": "1:20:17",
                 "nivel": "Senior / Avanzado",
                 "idioma": "en",
                 "descripcion": "Representación semántica vectorial (Word2Vec, GloVe), redes secuenciales recurrentes, atención y arquitecturas de Transformers para NLP.",
                 "universidad": "Stanford",
-                "playlist": "PLoROMvodv4rOSH4v6133s9LFPRHjEmbmJ"
+                "playlist": "PLoROMvodv4rOaMFbaqxPDoLWjDaRAdP9D"
         },
         {
                 "id": "8SF_h3xF3cE",
                 "titulo": "Practical Deep Learning for Coders (Lesson 1)",
                 "canal": "fast.ai (Jeremy Howard)",
                 "categoria": "dl",
-                "duracion": "1:22:56",
+                "duracion": "1:22:55",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "Metodología top-down de fast.ai: entrenar modelos de visión y NLP con estado del arte en pocas líneas de código antes de descender a las matemáticas."
@@ -370,7 +369,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "But what is a neural network? | Deep learning, chapter 1",
                 "canal": "3Blue1Brown (Grant Sanderson)",
                 "categoria": "dl",
-                "duracion": "19:00",
+                "duracion": "18:40",
                 "nivel": "Fundamentos",
                 "idioma": "en",
                 "descripcion": "La mejor explicación visual de cómo una red neuronal clasifica patrones mediante combinaciones lineales, pesos, sesgos y activaciones.",
@@ -381,7 +380,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Tu primera red neuronal en Python y Tensorflow",
                 "canal": "Ringa Tech",
                 "categoria": "dl",
-                "duracion": "16:25",
+                "duracion": "16:24",
                 "nivel": "Principiante",
                 "idioma": "es",
                 "descripcion": "Tutorial práctico en español creando y entrenando una red neuronal en Python usando TensorFlow/Keras para conversión de grados Celsius a Fahrenheit."
@@ -391,7 +390,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "¿Qué es una Red Neuronal? La Neurona y el Perceptrón",
                 "canal": "DotCSV (Carlos Santana)",
                 "categoria": "dl",
-                "duracion": "13:00",
+                "duracion": "9:14",
                 "nivel": "Fundamentos",
                 "idioma": "es",
                 "descripcion": "Explicación didáctica y rigurosa en español de la neurona artificial, entradas, pesos sinápticos, sesgo y funciones de activación."
@@ -401,7 +400,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Algorithms and Data Structures for Beginners – Full Course",
                 "canal": "NeetCode / freeCodeCamp",
                 "categoria": "algoritmos",
-                "duracion": "5:20:00",
+                "duracion": "5:22:08",
                 "nivel": "Senior",
                 "idioma": "en",
                 "descripcion": "Estructuras de datos esenciales: Arrays estáticos y dinámicos, Listas enlazadas, Árboles BST, Heaps, Grafos y QuickSort."
@@ -411,7 +410,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "MIT 6.006: Introduction to Algorithms – Peak Finding & Complexity",
                 "canal": "MIT OpenCourseWare (Erik Demaine)",
                 "categoria": "algoritmos",
-                "duracion": "50:00",
+                "duracion": "45:38",
                 "nivel": "Avanzado / Universidad",
                 "idioma": "en",
                 "descripcion": "Fundamentos de análisis asintótico, cotas Big-O y búsqueda de picos en tiempo logarítmico con división y conquista.",
@@ -420,13 +419,13 @@ const VIDEOS_CURADOS = [
         },
         {
                 "id": "i53Gi_K3o7I",
-                "titulo": "System Design Interview: How to Scale a System to Millions of Users",
-                "canal": "ByteByteGo (Alex Xu)",
+                "titulo": "20 System Design Concepts Explained in 10 Minutes",
+                "canal": "NeetCode",
                 "categoria": "system_design",
-                "duracion": "16:00",
+                "duracion": "11:40",
                 "nivel": "Senior",
                 "idioma": "en",
-                "descripcion": "Arquitectura escalable: balanceadores de carga, CDN, particionado de bases de datos, colas asíncronas y caché con Redis."
+                "descripcion": "Repaso rápido de 20 conceptos de diseño de sistemas: balanceadores de carga, caché, CDN, particionado y replicación de bases de datos, colas y consistencia."
         },
         {
                 "id": "k6U-i4gXkLM",
@@ -446,8 +445,8 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. John Guttag & Eric Grimson)",
                 "universidad": "MIT",
                 "categoria": "python",
-                "playlist": "PLUl4u3cNGP619EG1wp0kT-7rDE_wKMaW-",
-                "duracion": "40:57",
+                "playlist": "PLUl4u3cNGP619EG1wp0kT-7rDE_Az5TNd",
+                "duracion": "40:56",
                 "nivel": "Intermedio / Universidad",
                 "idioma": "en",
                 "descripcion": "La continuación del MIT en Python orientada a ciencia de datos: optimización de mochilas y grafos, pensamiento estocástico, simulaciones de Monte Carlo, modelado estadístico y clustering de datos."
@@ -458,7 +457,7 @@ const VIDEOS_CURADOS = [
                 "canal": "Univ. of Michigan (Dr. Charles Severance / freeCodeCamp)",
                 "universidad": "Univ. of Michigan",
                 "categoria": "python",
-                "playlist": "PLlRFEj9H3Oj7Bp8-DfGpfWx4ahuPBvee",
+                "playlist": "PLhXpQdrgC0gafOlNB6gIv18vl3u2YyfS8",
                 "duracion": "13:40:10",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
@@ -470,8 +469,7 @@ const VIDEOS_CURADOS = [
                 "canal": "Harvard University (Brian Yu & David J. Malan)",
                 "universidad": "Harvard",
                 "categoria": "python",
-                "playlist": "PL_mM4cC3R5MXs9J4smEUhKfRrqMNqgQeK",
-                "duracion": "12 Horas",
+                "duracion": "1:49:29",
                 "nivel": "Intermedio / Universidad",
                 "idioma": "en",
                 "descripcion": "El curso de inteligencia artificial con Python de Harvard: algoritmos de búsqueda (Minimax, A*), representación de conocimiento, probabilidad bayesiana, optimización, aprendizaje automático y redes neuronales."
@@ -495,7 +493,7 @@ const VIDEOS_CURADOS = [
                 "universidad": "Univ. of Bonn",
                 "categoria": "cpp",
                 "playlist": "PLgnQpQtFTOGRM59sr3nSL8BmeMZR9GCIA",
-                "duracion": "1:02:55",
+                "duracion": "1:02:54",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "Formación de vanguardia de la Universidad de Bonn: C++ moderno (C++17/C++20), CMake, gestión de memoria RAII, smart pointers, lambdas, polimorfismo y librerías de alto rendimiento para visión y robótica."
@@ -506,7 +504,6 @@ const VIDEOS_CURADOS = [
                 "canal": "Carnegie Mellon University (Prof. Andy Pavlo)",
                 "universidad": "CMU",
                 "categoria": "cpp",
-                "playlist": "PLSE8ODhjZXjaKScG3l0nuOiDTT31UknW1",
                 "duracion": "1:23:29",
                 "nivel": "Senior / Universidad",
                 "idioma": "en",
@@ -518,8 +515,8 @@ const VIDEOS_CURADOS = [
                 "canal": "Stanford University (Prof. Kayvon Fatahalian)",
                 "universidad": "Stanford",
                 "categoria": "cpp",
-                "playlist": "PLo6lM83QnS3S5dE-Qe7V1P7XpB_6tqW8D",
-                "duracion": "1:12:22",
+                "playlist": "PLoROMvodv4rMp7MTFr4hQsDEcX7Bx6Odp",
+                "duracion": "1:12:21",
                 "nivel": "Senior / Universidad",
                 "idioma": "en",
                 "descripcion": "Arquitectura y optimización de software de alto rendimiento en Stanford: paralelismo a nivel de hilos e instrucciones en C++, coherencia de caché, OpenMP, shaders y programación de GPUs con CUDA."
@@ -530,7 +527,7 @@ const VIDEOS_CURADOS = [
                 "canal": "The University of Edinburgh (Bjarne Stroustrup)",
                 "universidad": "Univ. of Edinburgh",
                 "categoria": "cpp",
-                "duracion": "1:39:11",
+                "duracion": "1:39:10",
                 "nivel": "Senior / Arquitectura",
                 "idioma": "en",
                 "descripcion": "Clase magistral dictada en la Universidad de Edimburgo por Bjarne Stroustrup, el creador de C++: filosofía del lenguaje, diseño de tipos, abstracción de costo cero (zero-overhead) y evolución de los estándares ISO."
@@ -553,7 +550,6 @@ const VIDEOS_CURADOS = [
                 "canal": "Cornell University (Prof. Kilian Weinberger)",
                 "universidad": "Cornell",
                 "categoria": "ml",
-                "playlist": "PLl8OlHZGYOQ7bkVbuS1t8hPXG5N42wgK6",
                 "duracion": "51:00",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
@@ -565,7 +561,7 @@ const VIDEOS_CURADOS = [
                 "canal": "Caltech (Prof. Yaser Abu-Mostafa)",
                 "universidad": "Caltech",
                 "categoria": "ml",
-                "playlist": "PLD63A284B76153189",
+                "playlist": "PLqOnAyzonz1bM12BorDmScDXsmh7xv2QD",
                 "duracion": "18 Clases (~20 Horas)",
                 "nivel": "Fundamentos / Universidad",
                 "idioma": "en",
@@ -577,8 +573,8 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. Tamara Broderick)",
                 "universidad": "MIT",
                 "categoria": "ml",
-                "playlist": "PLUl4u3cNGP60eZ_1i3f49hC5q9G_o-pS_",
-                "duracion": "1:20:57",
+                "playlist": "PLxC_ffO4q_rW0bqQB80_vcQB09HOA3ClV",
+                "duracion": "1:20:56",
                 "nivel": "Intermedio / Universidad",
                 "idioma": "en",
                 "descripcion": "El curso troncal de pregrado en Machine Learning del MIT: clasificadores lineales, funciones de pérdida, descenso de gradiente estocástico, regresión logística, redes neuronales y algoritmos de clustering."
@@ -589,8 +585,8 @@ const VIDEOS_CURADOS = [
                 "canal": "Stanford University (Prof. Jure Leskovec)",
                 "universidad": "Stanford",
                 "categoria": "ml",
-                "playlist": "PLoROMvodv4rPLKxIpqhZXsQWmThkJYXV9",
-                "duracion": "11:55",
+                "playlist": "PLoROMvodv4rPLKxIpqhjhPgdQy7imNkDn",
+                "duracion": "11:54",
                 "nivel": "Avanzado / Senior",
                 "idioma": "en",
                 "descripcion": "El curso de vanguardia de Stanford sobre grafos y aprendizaje relacional: embeddings de nodos (Node2Vec, DeepWalk), Graph Neural Networks (GCN, GraphSAGE, GAT) y aplicaciones biomédicas y de redes."
@@ -697,8 +693,8 @@ const VIDEOS_CURADOS = [
                 "canal": "Google DeepMind & UCL (DeepMind Research Team)",
                 "universidad": "UCL / DeepMind",
                 "categoria": "dl",
-                "playlist": "PLqYmG7hTX2B-0L1V_mN1bO8D98r94a0S2",
-                "duracion": "1:25:18",
+                "playlist": "PLqYmG7hTraZCDxZ44o4p3N5Anz3lLRVZF",
+                "duracion": "1:25:17",
                 "nivel": "Intermedio / Senior",
                 "idioma": "en",
                 "descripcion": "Serie conjunta de 12 clases magistrales entre DeepMind y University College London: redes neuronales profundas, optimización de segundo orden, visión computacional avanzada, atención y modelos generativos."
@@ -721,7 +717,7 @@ const VIDEOS_CURADOS = [
                 "canal": "UC Berkeley (Prof. Pieter Abbeel)",
                 "universidad": "UC Berkeley",
                 "categoria": "dl",
-                "playlist": "PL_iJu012NOxdq9-y-vRk4O6_z42xZ29Vj",
+                "playlist": "PL-myaKI4DslUBtYFZS062m_as2xsTJuLc",
                 "duracion": "14 Clases (~18 Horas)",
                 "nivel": "Senior / Cutting-Edge",
                 "idioma": "en",
@@ -804,8 +800,8 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. David Jerison)",
                 "universidad": "MIT",
                 "categoria": "matematicas",
-                "playlist": "PL590CCC2BC5AF3EF8",
-                "duracion": "51:33",
+                "playlist": "PL590CCC2BC5AF3BC1",
+                "duracion": "51:32",
                 "nivel": "Universidad",
                 "idioma": "en",
                 "descripcion": "Cálculo diferencial e integral de una variable del MIT: límites y continuidad, diferenciación analítica y geométrica, aproximaciones lineales, optimización, teorema del valor medio, integración de Riemann y cálculo fundamental."
@@ -828,7 +824,7 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. Arthur Mattuck)",
                 "universidad": "MIT",
                 "categoria": "matematicas",
-                "playlist": "PLB5173151D835F531",
+                "playlist": "PLEC88901EBADDD980",
                 "duracion": "33 Clases (~33 Horas)",
                 "nivel": "Universidad",
                 "idioma": "en",
@@ -840,7 +836,6 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. Gilbert Strang)",
                 "universidad": "MIT",
                 "categoria": "matematicas",
-                "playlist": "PLE7DDD91010BC53F8",
                 "duracion": "49:32",
                 "nivel": "Avanzado / Universidad",
                 "idioma": "en",
@@ -852,7 +847,7 @@ const VIDEOS_CURADOS = [
                 "canal": "MIT OpenCourseWare (Prof. Philippe Rigollet)",
                 "universidad": "MIT",
                 "categoria": "matematicas",
-                "duracion": "24 Clases (~22 Horas)",
+                "duracion": "1:18:02",
                 "nivel": "Avanzado / Universidad",
                 "idioma": "en",
                 "descripcion": "Estadística matemática rigurosa para Machine Learning y ciencia de datos del MIT: estimación por máxima verosimilitud (MLE), intervalos de confianza, test de hipótesis estadísticas, modelos lineales generalizados, bondad de ajuste y PCA."
@@ -881,8 +876,8 @@ const VIDEOS_CURADOS = [
                 "descripcion": "La referencia mundial en optimización convexa de Stephen Boyd: conjuntos convexos, funciones convexas, problemas de optimización lineal y cuadrática, dualidad de Lagrange, condiciones KKT y métodos de punto interior para aprendizaje automático."
         },
         {
-                "id": "AqDxrj8K480",
-                "titulo": "Oxford 1st Year Mathematics: Introductory Calculus",
+                "id": "I3GWzXRectE",
+                "titulo": "Introductory Calculus: Oxford Mathematics 1st Year Student Lecture",
                 "canal": "Oxford Mathematics",
                 "universidad": "Oxford",
                 "categoria": "matematicas",
@@ -890,7 +885,7 @@ const VIDEOS_CURADOS = [
                 "duracion": "Clase Magistral (~1 Hora)",
                 "nivel": "Universidad",
                 "idioma": "en",
-                "descripcion": "Clase magistral universitaria de primer año en la Universidad de Oxford: rigor matemático de límites, derivadas, cálculo analítico y fundamentos del análisis matemático universitario."
+                "descripcion": "Primera clase de Introductory Calculus en Oxford: organización del curso (16 clases), ejemplos de ecuaciones diferenciales de las ciencias físicas y, hacia el final, integración."
         },
         {
                 "id": "MieZJ0bxv7k",
@@ -923,7 +918,7 @@ const VIDEOS_CURADOS = [
                 "universidad": "Imperial College London",
                 "categoria": "matematicas",
                 "playlist": "PLiiljHvN6z193BBzS0Ln8NnqQmzimTW23",
-                "duracion": "1:50",
+                "duracion": "1:49",
                 "nivel": "Intermedio / Universidad",
                 "idioma": "en",
                 "descripcion": "Cálculo multivariable aplicado al entrenamiento de redes neuronales: cálculo de gradientes multidimensionales, derivadas direccionales, aproximación de funciones, regresión no lineal y descenso de gradiente."
@@ -933,7 +928,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "3Blue1Brown: Differential Equations & Dynamical Systems",
                 "canal": "3Blue1Brown (Grant Sanderson)",
                 "categoria": "matematicas",
-                "playlist": "PLZHQObOWTQDNPOjrT6KVlfJuKtYTftqHs",
+                "playlist": "PLZHQObOWTQDNPOjrT6KVlfJuKtYTftqH6",
                 "duracion": "5 Capítulos (~2 Horas)",
                 "nivel": "Intermedio",
                 "idioma": "en",
@@ -941,21 +936,21 @@ const VIDEOS_CURADOS = [
         },
         {
                 "id": "qBigTkBLU6g",
-                "titulo": "StatQuest: Statistics Fundamentals Clearly Explained",
+                "titulo": "StatQuest: Histograms, Clearly Explained",
                 "canal": "StatQuest with Josh Starmer",
                 "categoria": "matematicas",
-                "playlist": "PLblh5JKnVLUL4svJmxvEpjP-3PSpG5n-F",
+                "playlist": "PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9",
                 "duracion": "3:42",
-                "nivel": "Principiante / Intermedio",
+                "nivel": "Principiante",
                 "idioma": "en",
-                "descripcion": "Las ideas clave de la estadística explicadas paso a paso sin jerga innecesaria: distribución normal, desviación estándar, p-values, intervalos de confianza, test t de Student y regresión lineal."
+                "descripcion": "StatQuest explica los histogramas paso a paso: cómo se construyen, cómo elegir el ancho de las clases y qué dicen de una distribución."
         },
         {
                 "id": "JnTa9XtvmfI",
                 "titulo": "Linear Algebra – Full College Course",
                 "canal": "freeCodeCamp (Dr. Jim Hefferon)",
                 "categoria": "matematicas",
-                "duracion": "20:00:00",
+                "duracion": "11:39:44",
                 "nivel": "Principiante / Universidad",
                 "idioma": "en",
                 "descripcion": "Un curso universitario completo de 20 horas de álgebra lineal: sistemas lineales, geometría vectorial, espacios de Hilbert, transformaciones lineales, ortogonalidad, determinantes y formas canónicas."
@@ -965,7 +960,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Calculus 1 – Full College Course",
                 "canal": "freeCodeCamp (Dr. Linda Green)",
                 "categoria": "matematicas",
-                "duracion": "11:53:48",
+                "duracion": "11:53:47",
                 "nivel": "Principiante / Universidad",
                 "idioma": "en",
                 "descripcion": "Cálculo 1 universitario exhaustivo de 12 horas: límites infinitos, definición épsilon-delta, derivadas de funciones trigonométricas y exponenciales, regla de la cadena, optimización y sumas de Riemann."
@@ -995,7 +990,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "College Algebra – Full Course",
                 "canal": "freeCodeCamp.org",
                 "categoria": "matematicas",
-                "duracion": "6:43:47",
+                "duracion": "6:43:46",
                 "nivel": "Principiante",
                 "idioma": "en",
                 "descripcion": "Repaso exhaustivo de álgebra superior: operaciones con polinomios, factorización, ecuaciones cuadráticas, funciones racionales, logaritmos, exponentes y sistemas no lineales."
@@ -1005,60 +1000,59 @@ const VIDEOS_CURADOS = [
                 "titulo": "Discrete Mathematics Course for Beginners",
                 "canal": "freeCodeCamp.org",
                 "categoria": "matematicas",
-                "duracion": "9:05:36",
+                "duracion": "9:05:35",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
                 "descripcion": "Matemáticas discretas para ciencias computacionales: teoría de conjuntos, lógica proposicional, tablas de verdad, relaciones de equivalencia, funciones y algoritmos de grafos."
         },
         {
                 "id": "tyDKR4FG3Yw",
-                "titulo": "Discrete Math I – Entire Course (Rosen)",
-                "canal": "Kimberly Brehm",
+                "titulo": "Introduction to Set Theory – Discrete Mathematics",
+                "canal": "TrevTutor",
                 "categoria": "matematicas",
-                "duracion": "10:20",
+                "duracion": "16:38",
                 "nivel": "Principiante / Universidad",
                 "idioma": "en",
-                "descripcion": "El aclamado curso universitario de matemáticas discretas basado en el libro de Kenneth Rosen: lógica, reglas de inferencia, teoría de conjuntos, inducción matemática y combinatoria."
+                "descripcion": "Introducción a la teoría de conjuntos para matemáticas discretas: notación, pertenencia, subconjuntos, conjunto potencia y operaciones entre conjuntos."
         },
         {
-                "id": "Ro4HeaD41m0",
-                "titulo": "Curso Completo de Matrices y Álgebra Lineal",
+                "id": "RJ96S2Pt3qU",
+                "titulo": "Matrices (Curso COMPLETO)",
                 "canal": "Matemáticas profe Alex",
                 "categoria": "matematicas",
-                "playlist": "PLeySRPnY35dG2sJk4Z42Z8G7Z4zV9g1aM",
-                "duracion": "40+ Videos (~8 Horas)",
+                "playlist": "PLeySRPnY35dEr2XewNdOjOl7Ft0tLIlKI",
+                "duracion": "36 lecciones",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "es",
                 "descripcion": "Curso completo paso a paso en español: suma y multiplicación de matrices, matriz inversa por método de Gauss-Jordan y adjunta, determinantes por cofactores y regla de Cramer."
         },
         {
-                "id": "vnzkcGD2qD4",
-                "titulo": "OpenFING: Cálculo Diferencial e Integral en Una Variable (CDIVV)",
-                "canal": "OpenFING (Facultad de Ingeniería, UdelaR)",
+                "id": "Hr1QzzBl-uo",
+                "titulo": "OpenFING: Cálculo Diferencial e Integral en una Variable – Número real",
+                "canal": "OpenFING",
                 "universidad": "UdelaR",
                 "categoria": "matematicas",
-                "playlist": "PLD6R49T-tN5z8fJdY55a15qO3j22650vA",
-                "duracion": "40 Clases (~40 Horas)",
+                "duracion": "1:44:30",
                 "nivel": "Universidad",
                 "idioma": "es",
-                "descripcion": "Cátedra universitaria completa de Cálculo en una variable de la Universidad de la República (Uruguay): axioma de completitud de los reales, sucesiones, límites, funciones continuas, cálculo diferencial e integral de Riemann."
+                "descripcion": "Clase de la cátedra de Cálculo Diferencial e Integral en una Variable (Facultad de Ingeniería, UdelaR) sobre el número real: por qué los racionales no alcanzan (√2 no es racional) y la construcción de los reales."
         },
         {
                 "id": "TLh_6G7i4_w",
-                "titulo": "Derivadas y Cálculo desde Cero – Clase Magistral",
+                "titulo": "Análisis Matemático para pensar (Lic. María Inés Baragatti)",
                 "canal": "El Traductor de Ingeniería (Damián Pedraza)",
                 "categoria": "matematicas",
                 "duracion": "47:23",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "es",
-                "descripcion": "Explicación conceptual profunda y sin fórmulas de memoria: la verdadera definición de la derivada, la recta tangente, la tasa instantánea de cambio y las reglas de derivación demostradas de forma lógica."
+                "descripcion": "Charla de la Lic. María Inés Baragatti sobre el análisis matemático y su enseñanza."
         },
         {
                 "id": "B5oxL1AQpLo",
                 "titulo": "100 Derivadas Resueltas desde Cero – Curso Completo",
                 "canal": "Matemáticas con Juan",
                 "categoria": "matematicas",
-                "duracion": "5:08:37",
+                "duracion": "5:08:36",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "es",
                 "descripcion": "Taller integral práctico de cálculo diferencial: 100 derivadas explicadas minuciosamente de menor a mayor complejidad, aplicando reglas de potencias, productos, cocientes y regla de la cadena."
@@ -1076,11 +1070,10 @@ const VIDEOS_CURADOS = [
         {
                 "id": "L6YqHxYHa7A",
                 "titulo": "MIT 6.S081: Operating System Engineering (xv6 RISC-V)",
-                "canal": "MIT PDOS (Prof. Frans Kaashoek & Robert Morris)",
+                "canal": "MIT 6.S081 (Prof. Frans Kaashoek, subido por David Morejon)",
                 "universidad": "MIT",
                 "categoria": "arquitectura_so",
-                "playlist": "PL2zRqk16zX5xP9V3eY71Q_sM5Z-mN4o-1",
-                "duracion": "24 Clases (~26 Horas)",
+                "duracion": "1:19:57",
                 "nivel": "Avanzado / Universidad",
                 "idioma": "en",
                 "descripcion": "El curso troncal de ingeniería de sistemas operativos del MIT basado en xv6 sobre arquitectura RISC-V: llamadas al sistema, aislamiento de memoria, tablas de páginas multinivel, traps, interrupciones hardware, bloqueos con semáforos y sistemas de archivos con journaling."
@@ -1091,7 +1084,7 @@ const VIDEOS_CURADOS = [
                 "canal": "UC Berkeley (Prof. John Kubiatowicz)",
                 "universidad": "UC Berkeley",
                 "categoria": "arquitectura_so",
-                "duracion": "1:23:03",
+                "duracion": "1:23:02",
                 "nivel": "Avanzado / Universidad",
                 "idioma": "en",
                 "descripcion": "Cátedra universitaria de Berkeley sobre sistemas operativos: procesos e hilos, primitivas de sincronización (mutex, semáforos, variables de condición), algoritmos de planificación de CPU, memoria virtual y paginación, entrada/salida y sistemas de archivos."
@@ -1102,7 +1095,7 @@ const VIDEOS_CURADOS = [
                 "canal": "ETH Zürich / CMU (Prof. Onur Mutlu)",
                 "universidad": "ETH Zürich",
                 "categoria": "arquitectura_so",
-                "duracion": "35 Clases (~40 Horas)",
+                "duracion": "2:33:53",
                 "nivel": "Universidad / Exhaustivo",
                 "idioma": "en",
                 "descripcion": "La referencia mundial en arquitectura de computadoras del Prof. Onur Mutlu: diseño de procesadores, ejecución fuera de orden (Out-of-Order Execution), predicción de saltos, jerarquías y coherencia de memoria caché, GPUs y computación en memoria (PIM)."
@@ -1125,29 +1118,29 @@ const VIDEOS_CURADOS = [
                 "canal": "ACM (John Hennessy & David Patterson)",
                 "universidad": "UC Berkeley",
                 "categoria": "arquitectura_so",
-                "duracion": "1:45:00",
+                "duracion": "1:19:38",
                 "nivel": "Conferencia Magistral",
                 "idioma": "en",
                 "descripcion": "La conferencia magistral de los galardonados con el Premio Turing John Hennessy (Stanford) y David Patterson (Berkeley): el fin de la ley de Moore y la escala de Dennard, el auge de RISC-V y las arquitecturas específicas de dominio (DSAs) para aceleración de IA."
         },
         {
                 "id": "9PPrrSyubG0",
-                "titulo": "Building an 8-bit Breadboard Computer from Scratch",
+                "titulo": "Programming my 8-bit Breadboard Computer",
                 "canal": "Ben Eater",
                 "categoria": "arquitectura_so",
                 "playlist": "PLUOaI24LpvQN2Y53vWepO2LMabKPIplar",
-                "duracion": "15:23",
+                "duracion": "15:22",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
-                "descripcion": "Construcción paso a paso de una computadora programable de 8 bits en protoboards: módulo de reloj con 555, registros A/B, bus de datos, ALU con sumadores, memoria RAM, microcódigo EEPROM y decodificador de instrucciones."
+                "descripcion": "Ben Eater escribe un programa simple para su computadora de 8 bits hecha en protoboards y lo ejecuta, repasando antes la arquitectura: el bus central de 8 bits, sus módulos y la lógica de control."
         },
         {
-                "id": "mXw9ruZaxzQ",
-                "titulo": "Operating Systems – Full University Course",
+                "id": "vBURTt97EkA",
+                "titulo": "Operating Systems – curso completo (Neso Academy)",
                 "canal": "Neso Academy",
                 "categoria": "arquitectura_so",
-                "playlist": "PLBlnK6fEyqRiVpkKlSXDRA-G9x0H_n1gG",
-                "duracion": "77 Lecciones (~15 Horas)",
+                "playlist": "PLBlnK6fEyqRiVhbXDGLXDk_OQAeuVcp2O",
+                "duracion": "77 lecciones",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
                 "descripcion": "Cátedra enciclopédica de sistemas operativos: gestión de procesos, bloque de control de procesos (PCB), planificación de CPU (FCFS, SJF, Round Robin), concurrencia, interbloqueos (Deadlocks), algoritmo del banquero y memoria virtual."
@@ -1157,8 +1150,8 @@ const VIDEOS_CURADOS = [
                 "titulo": "Computer Organization and Architecture (COA) – Full Course",
                 "canal": "Neso Academy",
                 "categoria": "arquitectura_so",
-                "playlist": "PLBlnK6fEyqRj8D3G3P71c7xYn4gS1wZlD",
-                "duracion": "7:01",
+                "playlist": "PLBlnK6fEyqRgLLlzdgiTUKULKJPYc0A4q",
+                "duracion": "7:00",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
                 "descripcion": "Organización y microarquitectura de computadoras: ciclo de instrucción fetch-decode-execute, modos de direccionamiento, arquitecturas RISC vs CISC, pipelines con resolución de riesgos (hazards) y mapas de memoria caché."
@@ -1169,7 +1162,7 @@ const VIDEOS_CURADOS = [
                 "canal": "Prof. Remzi Arpaci-Dusseau (UW-Madison)",
                 "universidad": "Univ. of Wisconsin",
                 "categoria": "arquitectura_so",
-                "duracion": "15:00",
+                "duracion": "14:59",
                 "nivel": "Intermedio / Universidad",
                 "idioma": "en",
                 "descripcion": "Los 4 pilares fundamentales de los sistemas operativos por el autor de OSTEP: virtualización de CPU (procesos y scheduling), virtualización de memoria (páginas y TLBs), concurrencia (locks y semáforos) y persistencia (archivos y discos)."
@@ -1179,7 +1172,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Exploring How Computers Work – From Logic to CPU",
                 "canal": "Sebastian Lague",
                 "categoria": "arquitectura_so",
-                "playlist": "PLFt_AvWsXl0dPhqDfL1CNnOvGYgFP9b3J",
+                "playlist": "PLD0P-oVoDCNbYKzfUj8rlZrWhfKmYjtqQ",
                 "duracion": "18:12",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "en",
@@ -1190,8 +1183,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "The Central Processing Unit (CPU) – Microarchitecture",
                 "canal": "CrashCourse (Carrie Anne Philbin)",
                 "categoria": "arquitectura_so",
-                "playlist": "PL1mtdjDVOoOqJzeaJAV15Tq0tZ1vKj7ZV",
-                "duracion": "11:38",
+                "duracion": "11:37",
                 "nivel": "Principiante",
                 "idioma": "en",
                 "descripcion": "Cómo funciona un procesador por dentro: la unidad aritmético-lógica (ALU), registros de control, buses internos de datos y el ciclo de reloj de instrucciones."
@@ -1201,8 +1193,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Operating Systems – Evolution & Architecture",
                 "canal": "CrashCourse (Carrie Anne Philbin)",
                 "categoria": "arquitectura_so",
-                "playlist": "PL1mtdjDVOoOqJzeaJAV15Tq0tZ1vKj7ZV",
-                "duracion": "13:00",
+                "duracion": "13:35",
                 "nivel": "Principiante",
                 "idioma": "en",
                 "descripcion": "La arquitectura de los sistemas operativos: el kernel como intermediario entre hardware y software, multiprocesamiento, controladores de dispositivos y sistemas de archivos."
@@ -1222,7 +1213,7 @@ const VIDEOS_CURADOS = [
                 "titulo": "Linux Operating System – Crash Course for Beginners",
                 "canal": "freeCodeCamp.org",
                 "categoria": "arquitectura_so",
-                "duracion": "2:47:56",
+                "duracion": "2:47:55",
                 "nivel": "Principiante",
                 "idioma": "en",
                 "descripcion": "El sistema operativo Linux a fondo: arquitectura del kernel Linux, jerarquía de archivos FHS, permisos POSIX, gestión de procesos en segundo plano y comandos del sistema."
@@ -1232,20 +1223,20 @@ const VIDEOS_CURADOS = [
                 "titulo": "Assembly Language Programming with ARM",
                 "canal": "freeCodeCamp.org",
                 "categoria": "arquitectura_so",
-                "duracion": "2:29:32",
+                "duracion": "2:29:31",
                 "nivel": "Intermedio",
                 "idioma": "en",
                 "descripcion": "Programación en lenguaje ensamblador de bajo nivel para arquitectura ARM: registros de CPU, instrucciones de carga y almacenamiento (load/store), saltos condicionales y manejo de la pila."
         },
         {
                 "id": "fsuroRYmagw",
-                "titulo": "¿Cómo Funciona un Sistema Operativo por Dentro?",
-                "canal": "BettaTech",
+                "titulo": "Sistemas Operativos: ¿qué son y cómo funcionan? Tipos de sistemas",
+                "canal": "El Salón de Informática",
                 "categoria": "arquitectura_so",
                 "duracion": "8:37",
                 "nivel": "Principiante / Intermedio",
                 "idioma": "es",
-                "descripcion": "Explicación técnica y didáctica en español: qué sucede desde que enciendes el ordenador hasta que carga el kernel, cómo interactúan la BIOS/UEFI, los drivers, la CPU y la memoria RAM."
+                "descripcion": "Introducción en español a los sistemas operativos: qué son, qué funciones cumplen (procesos, memoria, archivos, dispositivos) y los tipos que existen."
         }
 ];
 
@@ -1320,6 +1311,7 @@ const VIDEOS_CURADOS = [
                 descripcion: video.descripcion || '',
                 miniatura: video.miniatura || '',
                 playlist: video.playlist || (video.es_playlist ? video.id : ''),
+                video_inicial_id: video.video_inicial_id || '',
                 categoria: 'personalizado',
                 nivel: video.es_playlist ? 'Playlist / Curso' : 'Curso YouTube',
                 idioma: 'AUTO',
@@ -1409,10 +1401,11 @@ const VIDEOS_CURADOS = [
         infoPalabraRegistrada: null,
         busquedaYtCargando: false,
         busquedaYtError: null,
+        avisoBusquedaYt: null, // el servidor avisa si ningún resultado cumple los filtros
         filtroTipoYt: 'todos', // 'todos' | 'video' | 'playlist'
         filtroIdiomaYt: 'todos', // 'todos' | 'es' | 'en'
         filtroDuracionYt: 'todas', // 'todas' | 'cortos' | 'clases' | 'cursos' | 'playlists'
-        ordenYt: 'educativo', // 'educativo' | 'duracion' | 'vistas'
+        ordenYt: 'educativo', // 'educativo' | 'duracion' | 'vistas' | 'recientes'
         sugerenciasActivas: [],
         sugerenciasAbiertas: false,
         servidorEmbed: localStorage.getItem('prig_yt_embed_server') || 'www.youtube.com' // 'www.youtube.com' | 'www.youtube-nocookie.com'
@@ -1799,7 +1792,7 @@ const VIDEOS_CURADOS = [
     const _precargasEnProgreso = new Set();
     function precargarTranscripcion(videoId, idioma = 'es') {
         if (!videoId || String(videoId).startsWith('pl_')) return;
-        const cacheClave = `prig_yt_trans_${videoId}_${idioma}`;
+        const cacheClave = `prig_yt_trans2_${videoId}_${idioma}`;
         if (localStorage.getItem(cacheClave)) return;
         const claveProgreso = `${videoId}_${idioma}`;
         if (_precargasEnProgreso.has(claveProgreso)) return;
@@ -1823,7 +1816,7 @@ const VIDEOS_CURADOS = [
     async function cargarTranscripcion(videoId, idioma = 'es', forzarRefresco = false) {
         if (!videoId) return;
 
-        const cacheClave = `prig_yt_trans_${videoId}_${idioma}`;
+        const cacheClave = `prig_yt_trans2_${videoId}_${idioma}`;
         let cargadoDesdeCache = false;
 
         // Si no se fuerza refresco y no tenemos datos ya en memoria para este video, cargar instantáneamente de caché
@@ -1963,7 +1956,8 @@ const VIDEOS_CURADOS = [
         }
 
         const startParam = Number(startSegundos) > 0 ? `&start=${Math.floor(startSegundos)}` : '';
-        return `https://${servidor}/embed/${encodeURIComponent(video.id)}?enablejsapi=1&autoplay=1&rel=0${ccParam}${startParam}${originParam}`;
+        const listParam = video.playlist ? `&list=${encodeURIComponent(video.playlist)}` : '';
+        return `https://${servidor}/embed/${encodeURIComponent(video.id)}?enablejsapi=1&autoplay=1&rel=0${listParam}${ccParam}${startParam}${originParam}`;
     }
 
     async function abrirEnNavegadorExterno(url) {
@@ -2174,8 +2168,9 @@ const VIDEOS_CURADOS = [
             });
 
             if (r) {
+                // fuente: 'transcripcion' | 'texto_usuario' | 'solo_metadatos' (sin subtítulos: se avisa en el panel)
                 if (r.resumen) {
-                    guardarResumen(v.id, r.resumen);
+                    guardarResumen(v.id, Object.assign({}, r.resumen, { fuente: r.fuente || '' }));
                 }
                 if (r.objetivos && Array.isArray(r.objetivos)) {
                     // Conservar estados previos de superado si ya existían
@@ -2183,6 +2178,7 @@ const VIDEOS_CURADOS = [
                     const superadosSet = new Set(previos.filter(p => p.superado).map(p => p.id));
                     r.objetivos.forEach(o => {
                         if (superadosSet.has(o.id)) o.superado = true;
+                        o.fuente = r.fuente || '';
                     });
                     guardarObjetivos(v.id, r.objetivos);
                 }
@@ -2408,8 +2404,8 @@ const VIDEOS_CURADOS = [
             /* Contenedor del nombre y logo del video */
             .yt-header-titulo-caja { display:flex; align-items:center; gap:9px; min-width:0; flex:1; overflow:hidden; }
             .yt-header-icono-yt { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:6px; background:rgba(255,0,0,0.14); border:1px solid rgba(255,0,0,0.3); color:#ff3333; font-size:14px; flex-shrink:0; }
-            .yt-header-titulo-texto { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.1px; }
-            .yt-header-canal-badge { font-size:10.5px; font-weight:600; color:var(--text-muted, #a6adc8); background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:2px 7px; white-space:nowrap; flex-shrink:0; }
+            .yt-header-titulo-texto { flex:1 1 auto; min-width:140px; font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.1px; }
+            .yt-header-canal-badge { font-size:10.5px; font-weight:600; color:var(--text-muted, #a6adc8); background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:2px 7px; white-space:nowrap; flex:0 1 auto; max-width:180px; min-width:0; overflow:hidden; text-overflow:ellipsis; }
             .yt-header-tags { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 
             /* Reproductor */
@@ -2444,8 +2440,9 @@ const VIDEOS_CURADOS = [
 
             /* Panel Lateral */
             .yt-lateral { border-left:1px solid var(--border-color, rgba(255,255,255,0.08)); background:var(--bg-panel, #181825); display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
-            .yt-lateral-tabs { display:flex; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:rgba(0,0,0,0.18); flex-shrink:0; overflow-x:auto; scrollbar-width:none; }
-            .yt-lateral-tab { flex:1; min-width:68px; padding:9px 4px; font-size:10.5px; font-weight:700; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.15s; }
+            .yt-lateral-tabs { display:flex; flex-wrap:wrap; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.08)); background:rgba(0,0,0,0.18); flex-shrink:0; }
+            .yt-lateral-tab { flex:1 1 auto; padding:9px 6px; font-size:10.5px; font-weight:700; text-align:center; cursor:pointer; color:var(--text-muted, #a6adc8); border-bottom:2px solid transparent; white-space:nowrap; transition:all 0.15s; }
+            .yt-aviso-busqueda { margin:8px 0; padding:8px 11px; font-size:11.5px; line-height:1.4; color:#f9e2af; background:rgba(249,226,175,0.07); border:1px solid rgba(249,226,175,0.25); border-radius:8px; }
             .yt-lateral-tab:hover { color:#fff; background:rgba(255,255,255,0.04); }
             .yt-lateral-tab.activo { color:#fff; border-bottom-color:#ff0000; background:rgba(255,255,255,0.05); }
             .yt-lateral-cuerpo { flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
@@ -2635,6 +2632,7 @@ const VIDEOS_CURADOS = [
         if (tipo) estado.filtroTipoYt = tipo;
         estado.busquedaYtCargando = true;
         estado.busquedaYtError = null;
+        estado.avisoBusquedaYt = null;
         estado.sugerenciasAbiertas = false;
         agregarAHistorial(q);
         pintar();
@@ -2657,6 +2655,7 @@ const VIDEOS_CURADOS = [
             const data = await resp.json();
             estado.resultadosBusquedaYt = data.resultados || [];
             estado.infoPalabraRegistrada = data.palabra_registrada || null;
+            estado.avisoBusquedaYt = data.aviso || null;
             if (data.error && (!estado.resultadosBusquedaYt || estado.resultadosBusquedaYt.length === 0)) {
                 estado.busquedaYtError = data.error;
             }
@@ -2788,6 +2787,7 @@ const VIDEOS_CURADOS = [
                       <option value="educativo" ${estado.ordenYt === 'educativo' ? 'selected' : ''}>⭐ Más didáctico (Score IA)</option>
                       <option value="duracion" ${estado.ordenYt === 'duracion' ? 'selected' : ''}>⏳ Mayor duración</option>
                       <option value="vistas" ${estado.ordenYt === 'vistas' ? 'selected' : ''}>🔥 Más vistos</option>
+                      <option value="recientes" ${estado.ordenYt === 'recientes' ? 'selected' : ''}>🆕 Más recientes</option>
                     </select>
                   </div>
 
@@ -2921,7 +2921,7 @@ const VIDEOS_CURADOS = [
                     <div style="text-align:center; padding:40px; color:var(--text-muted);">
                       <i class="fa-brands fa-youtube" style="font-size:44px; opacity:0.3; margin-bottom:12px; display:block;"></i>
                       <p style="margin:0; font-size:13.5px; color:#fff; font-weight:600;">No se encontraron resultados para "${esc(estado.busqueda)}".</p>
-                      <p style="margin:6px 0 16px; font-size:11.5px;">Prueba seleccionando una de las palabras clave registradas o cambiando los filtros.</p>
+                      <p style="margin:6px 0 16px; font-size:11.5px;">${esc(estado.avisoBusquedaYt || 'Prueba seleccionando una de las palabras clave registradas o cambiando los filtros.')}</p>
                       <button class="yt-btn yt-btn-volver-catalogo" data-action="volver-catalogo"><i class="fa-solid fa-arrow-left"></i> Volver al Catálogo Curado</button>
                     </div>
                   ` : `
@@ -3038,7 +3038,9 @@ const VIDEOS_CURADOS = [
                             `;
                         }).join('')}
                       </div>
-                    ` : ''}
+                    ` : (estado.avisoBusquedaYt ? `
+                      <p class="yt-aviso-busqueda"><i class="fa-solid fa-circle-info"></i> ${esc(estado.avisoBusquedaYt)}</p>
+                    ` : '')}
                   `}
                 `}
               </div>
@@ -3272,6 +3274,8 @@ const VIDEOS_CURADOS = [
                     reproducir({
                         id: item.id,
                         playlist: item.es_playlist ? item.id : '',
+                        es_playlist: !!item.es_playlist,
+                        video_inicial_id: item.video_inicial_id || '',
                         titulo: item.titulo,
                         canal: item.canal,
                         duracion: item.duracion,
@@ -3292,6 +3296,8 @@ const VIDEOS_CURADOS = [
                     reproducir({
                         id: item.id,
                         playlist: item.playlist || (item.es_playlist ? item.id : ''),
+                        es_playlist: !!item.es_playlist,
+                        video_inicial_id: item.video_inicial_id || '',
                         titulo: item.titulo,
                         canal: item.canal,
                         duracion: item.duracion,
@@ -3363,8 +3369,22 @@ const VIDEOS_CURADOS = [
         ejecutarBusquedaYt(textoLimpio, estado.filtroTipoYt || 'todos');
     }
 
+    // Una lista de la búsqueda llega con el id de la lista (PL…) como id: el reproductor necesita un id de video
+    // (el primero de la lista, que manda YouTube) y la lista aparte; si no hay primero, el marcador pl_ la
+    // reproduce entera. Antes se incrustaba /embed/PL… (video no disponible) y se pedía su transcripción.
+    function normalizarVideo(v) {
+        if (!v) return v;
+        const esLista = v.es_playlist || (v.playlist && v.id === v.playlist);
+        if (!esLista) return v;
+        const pl = v.playlist || v.id;
+        const curado = VIDEOS_CURADOS.find(c => c.playlist === pl && c.id && c.id !== pl && !String(c.id).startsWith('pl_'));
+        const inicial = v.video_inicial_id || (curado ? curado.id : '');
+        return Object.assign({}, v, { id: inicial || ('pl_' + pl), playlist: pl, es_playlist: false });
+    }
+
     function reproducir(video) {
         if (!video) return;
+        video = normalizarVideo(video);
         estado.videoActual = video;
         estado.vista = 'reproductor';
         estado.pestanaLateral = 'traduccion';
@@ -3373,7 +3393,7 @@ const VIDEOS_CURADOS = [
 
         const vidId = video.id;
         const idm = estado.idiomaSubtitulos || 'es';
-        const cacheClave = `prig_yt_trans_${vidId}_${idm}`;
+        const cacheClave = `prig_yt_trans2_${vidId}_${idm}`;
 
         // Cargar inmediatamente desde caché si existe ANTES de pintar para mostrar traducción en 0ms
         if (vidId && !String(vidId).startsWith('pl_')) {
@@ -3994,6 +4014,7 @@ const VIDEOS_CURADOS = [
                         </div>
                       ` : `
                         <div class="yt-objetivos-contenedor">
+                          ${objetivos[0] && objetivos[0].fuente === 'solo_metadatos' ? `<p class="yt-aviso-busqueda"><i class="fa-solid fa-circle-info"></i> Este video no tiene subtítulos: el análisis se basa solo en el título, la descripción y tus apuntes. Pega la transcripción con «Pegar texto/transcripción» para un análisis fiel.</p>` : ''}
                           <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">
                             Completados: <b style="color:var(--accent-green);">${superadosObj}</b> de <b>${objetivos.length}</b> (${objetivos.length > 0 ? Math.round((superadosObj / objetivos.length) * 100) : 0}%)
                           </div>
@@ -4050,6 +4071,7 @@ const VIDEOS_CURADOS = [
                         </div>
                       ` : `
                         <div class="yt-resumen-contenedor">
+                          ${resumen.fuente === 'solo_metadatos' ? `<p class="yt-aviso-busqueda"><i class="fa-solid fa-circle-info"></i> Este video no tiene subtítulos: el análisis se basa solo en el título, la descripción y tus apuntes. Pega la transcripción con «Pegar texto/transcripción» para un análisis fiel.</p>` : ''}
                           <!-- Resumen Ejecutivo -->
                           <div class="yt-resumen-caja">
                             <div class="yt-resumen-subtitulo"><i class="fa-solid fa-compass" style="color:#89b4fa;"></i> Resumen Ejecutivo</div>
@@ -5264,6 +5286,10 @@ const VIDEOS_CURADOS = [
     configurarPasteGlobal();
     configurarClickFueraSugerencias();
     inicializarCursosPersonalizados();
+    // Transcripciones guardadas con el formato anterior (intervalos solapados, ahora prig_yt_trans2_): se liberan
+    try {
+        Object.keys(localStorage).filter(k => k.startsWith('prig_yt_trans_')).forEach(k => localStorage.removeItem(k));
+    } catch (e) { /* sin almacenamiento */ }
 
     window.YouTubeHub = {
         abrir,

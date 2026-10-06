@@ -1052,12 +1052,15 @@ class AIChatManager {
     /** Tarjetas de fuente: título del libro, página y acceso al lector */
     renderFuentes(ev) {
         const esc = (t) => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        // Lecturas del catálogo de referencias de ML, además de los fragmentos de la biblioteca propia
+        const lecturas = (window.ReferenciasML && ev.referencias && ev.referencias.length)
+            ? window.ReferenciasML.chipsHtml(ev.referencias) : '';
 
         if (!ev.found || !ev.chunks || ev.chunks.length === 0) {
             return `<div style="background: rgba(249,226,175,0.10); border:1px solid rgba(249,226,175,0.3); border-radius:6px; padding:8px 10px; font-size:11px; color: var(--accent-yellow); margin-bottom:10px;">
                 <i class="fa-solid fa-circle-info"></i> No encontré nada sobre esto en tu biblioteca.
                 Comprueba que el material esté indexado en <strong>Biblioteca</strong>.
-            </div>`;
+            </div>${lecturas}`;
         }
 
         const tarjetas = ev.chunks.map(ch => `
@@ -1075,6 +1078,7 @@ class AIChatManager {
                 FUENTES DE TU BIBLIOTECA · ${t.estimated_tokens || 0}/${t.token_budget || 0} tokens
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:5px;">${tarjetas}</div>
+            ${lecturas}
         </div>`;
     }
 
@@ -1393,6 +1397,13 @@ class AIChatManager {
                             el.querySelector('span').textContent = `Banco «${b.proyecto}»: ${partes.join(' · ')}`;
                             el.title = `Archivos: ${(b.archivos || []).join(', ')}\nMapa: ${b.mapa_tokens} tokens · búsqueda ${b.segundos} s` +
                                 (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)');
+                        }
+                    }
+                    else if (ev.t === 'referencias') {
+                        // Libros, papers y formularios del catálogo relacionados con la pregunta (Biblioteca →
+                        // Referencias ML): van debajo de la respuesta, como bibliografía, y abren la ficha
+                        if (window.ReferenciasML && !msgEl.querySelector('.msg-referencias')) {
+                            contentEl.insertAdjacentHTML('afterend', window.ReferenciasML.chipsHtml(ev.v || []));
                         }
                     }
                     else if (ev.t === 'aviso') { avisos.push(ev.v); }

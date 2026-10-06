@@ -1,0 +1,302 @@
+{
+ "lote": 12,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 59
+  }
+ },
+ "media": 0.917,
+ "segundos": 301,
+ "modos": {
+  "general": 3,
+  "unidad": 9
+ },
+ "por_tipo": {
+  "constante": 1.0,
+  "impacto": 1.0,
+  "ejecucion": 1.0,
+  "frontend": 0.0,
+  "config": 1.0,
+  "ubicacion": 1.0,
+  "recorrido": 1.0,
+  "llamadores": 1.0,
+  "entorno": 1.0,
+  "endpoint": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "1b87f0942be0",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.9,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "c635c555b740",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 6.1,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "bc531763e955",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "948395ae89c7",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 34.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "690398982a25",
+   "tipo": "frontend",
+   "puntaje": 0.0,
+   "segundos": 20.9,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "2ac86d2ab2a1",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 20.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "a3e28bc3e641",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 14.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "3008f99680fb",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 40.4,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "75f12652872f",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 81.4,
+   "modo": "general",
+   "herramientas": 15
+  },
+  {
+   "id": "86babe9b4bf2",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 7.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "bedbef93caaa",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 7.0,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_11",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 14.6,
+   "modo": "unidad",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "1b87f0942be0": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_config\\\", o=\\\"cpu_eficiente\\\", limite=50)\\nprint(f\\\"Encontrados: {len(hechos)}\\\")\\nfor h in hechos:\\n    print(f\\\"{h['ruta']}:{h['linea']} - {h['s']}\\\")\\n\"}",
+    "resultado_caracteres": 141
+   }
+  ],
+  "c635c555b740": [],
+  "bc531763e955": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/kb/concept\\\")\"}",
+    "resultado_caracteres": 270
+   }
+  ],
+  "948395ae89c7": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\nP.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_RECURSOS_ARCHIVO\\\", limite=500)\\n\"}",
+    "resultado_caracteres": 127
+   }
+  ],
+  "690398982a25": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/flujos\\\")\"}",
+    "resultado_caracteres": 352
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Flujos\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "2ac86d2ab2a1": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.impacto(\\\"reiniciar_servidor\\\")\"}",
+    "resultado_caracteres": 443
+   }
+  ],
+  "a3e28bc3e641": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"importaciones_genericas\\\")\"}",
+    "resultado_caracteres": 145
+   }
+  ],
+  "3008f99680fb": [
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/referencias_ml.py\", \"desde_linea\": 233, \"hasta_linea\": 320}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "75f12652872f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar la función recursos_energia_instalar en app.py\\nimport re\\nwith open('/home/user/prig/backend/app.py') as f:\\n    contenido = f.read()\\n    \\n# Buscar la función\\nmatch = re.search(r'def recursos_energia_instalar.*?(?=\\\\ndef |\\\\Z)', contenido, re.DOTALL)\\nif match:\\n    print(\\\"ENCONTRADA:\\\")\\n    print(match.group(0)[:500])\\nelse:\\n    print(\\\"NO ENCONTRADA\\\")\\n\"}",
+    "resultado_caracteres": 30
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.grep(\\\"recursos_energia_instalar\\\", maximo=10)\\n\"}",
+    "resultado_caracteres": 86
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/app.py\", \"desde_linea\": 5486, \"hasta_linea\": 5530}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/recursos/energia.py\", \"desde_linea\": 1, \"hasta_linea\": 80}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/recursos/energia.py\", \"desde_linea\": 80, \"hasta_linea\": 142}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.grep(\\\"def gobernador\\\", maximo=10)\\n\"}",
+    "resultado_caracteres": 97
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/recursos/termico.py\", \"desde_linea\": 700, \"hasta_linea\": 750}",
+    "resultado_caracteres": 572
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/recursos/termico.py\", \"desde_linea\": 302, \"hasta_linea\": 400}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.recorrido(\\\"backend/recursos/energia.py:instalar\\\", profundidad=5)\\n\"}",
+    "resultado_caracteres": 463
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver si hay alguna conexión entre energia y termico\\nP.grep(\\\"termico\\\", rutas=[\\\"backend/recursos/energia.py\\\"], maximo=10)\\nP.grep(\\\"gobernador\\\", rutas=[\\\"backend/recursos/energia.py\\\"], maximo=10)\\n\"}",
+    "resultado_caracteres": 300
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver en app.py si recursos_energia_instalar llama a algo del termico\\nP.grep(\\\"recursos_energia_instalar\\\", maximo=20)\\n\"}",
+    "resultado_caracteres": 86
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/app.py\", \"desde_linea\": 5478, \"hasta_linea\": 5493}",
+    "resultado_caracteres": 691
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver qué llama a recursos_termico.gobernador()\\nP.grep(\\\"gobernador\\\\(\\\\)\\\", maximo=30)\\n\"}",
+    "resultado_caracteres": 1567
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.grep(\\\"_frio_estado\\\", maximo=10)\\n\"}",
+    "resultado_caracteres": 395
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/app.py\", \"desde_linea\": 5455, \"hasta_linea\": 5460}",
+    "resultado_caracteres": 331
+   }
+  ],
+  "86babe9b4bf2": [],
+  "bedbef93caaa": [],
+  "ind_11": []
+ },
+ "respuestas": {
+  "1b87f0942be0": "Buscaré quién lee `cpu_eficiente` en el grafo de hechos del proyecto.\n\nLas funciones que leen la clave de configuración `cpu_eficiente` son:\n\n1. **`recursos_ritmo_ajustar`** en `backend/app.py:5434` — Endpoint `/api/recursos/ritmo` que ajusta el modo suave y aplica configuración eficiente.\n2. **`Gobernador.empezar_tramo`** en `backend/recursos/termico.py:506` — Método que inicia cada tramo de ejecución y verifica si se debe aplicar el modo eficiente.",
+  "c635c555b740": "En el archivo `backend/hub/git.py`, la constante `MAX_MB` vale **30**.\n\nEsta constante se define en la línea 18 del archivo y limita el tamaño máximo de un repositorio de Prig Hub a 30 MB, ya que se trata de texto plano.",
+  "bc531763e955": "P.api(\"GET /api/kb/concept\")El endpoint `GET /api/kb/concept` está implementado por la función `kb_concept`, que se encuentra en el archivo `backend/app.py` (línea 1350).",
+  "948395ae89c7": "La única función que lee la variable de entorno `PRIG_RECURSOS_ARCHIVO` es `ruta_por_defecto()` en `backend/recursos/almacen.py` (línea 44). Esta función es llamada por `Almacen.__init__()` para determinar la ruta del archivo de almacenamiento de recursos.",
+  "690398982a25": "P.api(\"/api/flujos\")\n\nLa función del frontend que llama al endpoint `/api/flujos` es **`cargarFlujos`**, definida en `frontend/js/flujos.js` (línea 86).",
+  "2ac86d2ab2a1": "Cambiar el comportamiento de `reiniciar_servidor` afecta directamente al endpoint HTTP:\n\n- **POST /api/recursos/servidor** (expuesto en `backend/app.py` como `recursos_servidor_aplicar`)\n\nEste endpoint llama a `aplicar()` en `servidor.py`, que a su vez llama a `reiniciar_servidor()`. No hay otros endpoints HTTP que invoquen `reiniciar_servidor` de forma directa o indirecta.\n\nEn el frontend, los consumidores son `cambiarServidor` (`frontend/js/recursos.js`) y `servidor` (`frontend/js/modelos.js`), pero ambos se comunican a través del mismo endpoint POST.",
+  "a3e28bc3e641": "P.llamadores(\"importaciones_genericas\")La función `importaciones_genericas` es llamada por el método `BancoProyecto._indexar_archivo` (línea 968 de `backend/banco_proyecto.py`).",
+  "3008f99680fb": "Para entender el flujo desde `knowledge_ask` hasta `_normalizar`, analicemos el código relevante.\n\nEl endpoint `knowledge_ask` en `backend/app.py` (líneas 1171-1230) realiza lo siguiente:\n1.  Llama a `referencias_ml.bloque_para_prompt(req.query)` (línea 1192).\n2.  `referencias_ml` es un módulo importado en `app.py`. Debemos ver su implementación.\n\nVeamos el archivo `backend/referencias_ml.py` para ver qué hace `bloque_para_prompt` y si llama a `_normalizar`.\n\nAhora veo que `bloque_para_prompt` llama a `relacionadas` (línea 251). Veamos la función `relacionadas` (líneas 191-232 del banco) para ver si llama a `_normalizar`.\n\nEn el banco, `relacionadas` (líneas 191-232) empieza con:\n```python\ndef relacionadas(texto: str, maximo: int = 5) -> List[Dict[str, Any]]:\n    t = _normalizar(texto)\n```\n\nSí, `relacionadas` llama directamente a `_normalizar`.\n\nPor lo tanto, la cadena de llamadas es:\n1.  `knowledge_ask` (en `backend/app.py`) llama a `referencias_ml.bloque_para_prompt`.\n2.  `bloque_para_prompt` (en `backend/referencias_ml.py`) llama a `relacionadas`.\n3.  `relacionadas` (en `backend/referencias_ml.py`) llama a `_normalizar`.\n\nLas funciones intermedias son `bloque_para_prompt` y `relacionadas`.\n\nLa ejecución pasa por estas funciones en orden:\n1.  **`bloque_para_prompt`**: Se invoca desde `knowledge_ask` para obtener el bloque de texto de referencias.\n2.  **`relacionadas`**: Es llamada por `bloque_para_prompt` para filtrar las referencias relevantes.\n3.  **`_normalizar`**: Es llamada por `relacionadas` para normalizar la consulta y las referencias antes de comparar.\n\nCita:\n*   `knowledge_ask` llama a `referencias_ml.bloque_para_prompt` en `backend/app.py:1192`.\n*   `bloque_para_prompt` llama a `relacionadas` en `backend/referencias_ml.py:251`.\n*   `relacionadas` llama a `_normalizar` en `backend/referencias_ml.py:194`.",
+  "75f12652872f": "Voy a rastrear la ejecución desde el endpoint hasta `Gobernador.__init__`.\n\nVeo que `recursos_energia_instalar` llama a `renergia.instalar()` pero no veo conexión directa con `Gobernador.__init__`. Déjame verificar si el gobernador se crea en otro lado y cómo se relaciona.\n\nAhora veo que `Gobernador.__init__` recibe un `Monitor`. Y `gobernador()` (función factory) crea el `Monitor` primero y luego el `Gobernador`. Pero la pregunta es sobre `recursos_energia_instalar` → ... → `Gobernador.__init__`. Déjame ver si `recursos_energia_instalar` afecta al gobernador.\n\nVeo que `recursos_energia_instalar` NO llama directamente a `Gobernador.__init__`. La ejecución pasa por `renergia.instalar()` → `estado()` que lee archivos del sistema, pero no toca el termico. \n\nSin embargo, la pregunta es sobre el endpoint `recursos_energia_instalar`. Veo que al final retorna `_frio_estado()`. Veamos eso:\n\n¡Ahí está! `recursos_energia_instalar` retorna `_frio_estado()`, que a su vez llama a `recursos_termico.gobernador()`, que es la función factory que crea `Gobernador` si no existe.\n\nEl camino es:\n\n1. **`recursos_energia_instalar`** (`backend/app.py:5486`) — endpoint\n2. **`renergia.instalar()`** (`backend/recursos/energia.py:105`) — instala el ayudante de energía\n3. **`_frio_estado()`** (`backend/app.py:5455`) — retorna el estado del modo frío\n4. **`recursos_termico.gobernador()`** (`backend/recursos/termico.py:711`) — función factory\n5. **`monitor()`** (`backend/recursos/termico.py:703`) — crea Monitor si no existe\n6. **`Gobernador.__init__`** (`backend/recursos/termico.py:341`) — inicializa el gobernador con el monitor\n\nLas funciones intermedias en orden son:\n\n1. `renergia.instalar()` → `estado()` (lee `/sys` para verificar la instalación)\n2. `_frio_estado()` → llama a `recursos_termico.gobernador()`\n3. `gobernador()` → llama a `monitor()` y luego a `Gobernador(monitor)`",
+  "86babe9b4bf2": "`Controlador` está definida en `backend/recursos/motor_suave.py`.",
+  "bedbef93caaa": "`FileManager.read_notebook_structured` está definida en **`backend/file_manager.py`**.\n\nSegún el fragmento de código proporcionado, el método comienza en la **línea 170** dentro de la clase `FileManager`.",
+  "ind_11": "La función `es_moe` en `backend/ai_engine/motor_moe.py` (línea 188) tiene esta implementación:\n\n```python\ndef es_moe(modelo: Optional[str]) -> bool:\n    return (modelo or \"\").strip() == NOMBRE\n```\n\nDonde `NOMBRE = \"qwen3.6-35b-moe:prig\"` (línea 33).\n\nPara `es_moe(\" qwen3.6-35b-moe:prig \")`:\n1. `modelo` es `\" qwen3.6-35b-moe:prig \"` (no es None ni vacío, así que `(modelo or \"\")` es `\" qwen3.6-35b-moe:prig \"`)\n2. `.strip()` elimina los espacios: `\"qwen3.6-35b-moe:prig\"`\n3. Compara con `NOMBRE` que es `\"qwen3.6-35b-moe:prig\"`\n4. Son iguales → devuelve `True`\n\n**Respuesta: `True`**"
+ }
+}

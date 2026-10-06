@@ -996,8 +996,10 @@
         </div>
 
         <!-- Body del Modal -->
+        <!-- flex-direction: row explícito: .modal-body es columna por defecto (style.css) y el panel derecho
+             (ficha, lector, librerías, referencias) quedaba debajo, con 2 px de alto -->
         <div class="modal-body"
-          style="padding: 12px; display: flex; gap: 12px; height: calc(100% - 48px); background: var(--bg-dark);">
+          style="padding: 12px; display: flex; flex-direction: row; gap: 12px; height: calc(100% - 48px); background: var(--bg-dark); overflow: hidden;">
 
           <!-- Panel Izquierdo: Categorías Repository, Lista & Filtro -->
           <div
@@ -1095,6 +1097,9 @@
               <button class="cat-pill" data-cat="librerias"
                 style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(166,227,161,0.15); color: var(--accent-green); border: 1px solid rgba(166,227,161,0.3); cursor: pointer;"
                 title="LIBRERÍAS DE ML/DL (NumPy, Matplotlib, PyTorch...)">📦 LIBRERÍAS</button>
+              <button class="cat-pill" data-cat="referencias"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(137,180,250,0.15); color: var(--accent-blue); border: 1px solid rgba(137,180,250,0.3); cursor: pointer;"
+                title="Libros, papers, formularios y documentación de todos los modelos de ML, con enlaces verificados">🔗 REFERENCIAS ML</button>
             </div>
 
             <div id="book-list-items"
@@ -1130,6 +1135,11 @@
                 <button id="tab-btn-book-librerias" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('librerias');">
                   <i class="fa-solid fa-boxes-stacked" style="color: var(--accent-green);"></i> Analista de Librerías
+                </button>
+                <button id="tab-btn-book-referencias" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
+                  title="Leer los libros, papers y formularios de ML del catálogo"
+                  onclick="if(window.ReferenciasML) window.ReferenciasML.abrirPestana();">
+                  <i class="fa-solid fa-link" style="color: var(--accent-blue);"></i> Referencias ML
                 </button>
                 <button id="tab-btn-book-flujos" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   title="Encadenar varios modelos pequeños, cada uno con una tarea, para analizar en profundidad"
@@ -1172,6 +1182,11 @@
                   <p style="font-size: 13px; max-width: 500px; margin: 0 auto;">Selecciona una librería (NumPy, Matplotlib, Pandas, PyTorch...) para consultar su documentación oficial, analizar funciones con IA y guardar citas técnicas en <code>&lt;libreria&gt;.json</code>.</p>
                 </div>
               </div>
+            </div>
+
+            <!-- Contenido Pestaña 4: Referencias de ML (js/referencias_ml.js) -->
+            <div id="pane-book-referencias" style="flex: 1; overflow: hidden; display: none; background: var(--bg-dark);">
+              <div id="referencias-viewer-content" style="height: 100%; overflow-y: auto; padding: 16px;"></div>
             </div>
 
           </div>
@@ -1408,7 +1423,7 @@
   <!-- Modal Ejercicio: enunciado, editor y comprobación por ejecución -->
   <!-- Desafíos: enunciado, caja de razonamiento, plan, páginas de código y pruebas (js/desafios.js) -->
   <div id="modal-desafios" class="modal-overlay" style="display:none;">
-    <div class="modal-content modal-lg" style="max-width: 1400px; height: 90vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
+    <div class="modal-content modal-lg" style="width: 96vw; max-width: 1600px; height: 92vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
       <div class="modal-header">
 
         <div class="modal-title">
@@ -2065,16 +2080,27 @@
         <div style="font-weight: bold; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 8px;">
           <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> Configuración Global de Prig IDE
         </div>
-        <button onclick="window.closeGlobalConfigModal();" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div id="cfg-modal-top-perfil-container" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 8px; font-size: 11px;">
+            <i class="fa-solid fa-address-card" style="color: var(--accent-purple);"></i>
+            <span style="color: var(--text-muted);">Perfil:</span>
+            <select id="cfg-top-perfil-select" onchange="window.globalConfigMgr.onTopPerfilChange(this.value)" style="background: var(--bg-panel); border: 1px solid var(--accent-purple); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer; font-weight: 600;">
+            </select>
+          </div>
+          <button onclick="window.closeGlobalConfigModal();" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
 
       <!-- Tab Navigation Bar -->
-      <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap;">
         <button class="config-tab-btn active" data-tab="ai" onclick="window.globalConfigMgr.switchTab('ai');" style="padding: 8px 14px; background: rgba(137, 180, 250, 0.15); border: 1px solid var(--accent-blue); border-bottom: none; border-radius: 6px 6px 0 0; color: var(--accent-blue); font-size: 12px; font-weight: 600; cursor: pointer;">
           <i class="fa-solid fa-robot"></i> Modelos IA
         </button>
+          <button class="config-tab-btn" data-tab="perfiles" onclick="window.globalConfigMgr.switchTab('perfiles')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+            <i class="fa-solid fa-address-card"></i> Perfiles
+          </button>
           <button class="config-tab-btn" data-tab="apariencia" onclick="window.globalConfigMgr.switchTab('apariencia')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
-            <i class="fa-solid fa-palette"></i> Apariencia
+            <i class="fa-solid fa-palette"></i> Colores y Fondos
           </button>
           <button class="config-tab-btn" data-tab="accesibilidad" onclick="window.globalConfigMgr.switchTab('accesibilidad')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
             <i class="fa-solid fa-universal-access"></i> Accesibilidad
@@ -2096,52 +2122,13 @@
       <!-- Tab Content Area -->
       <div style="flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-dark); font-size: 12px;">
         
+        <!-- Tab Perfiles: Gestor Completo de Perfiles de Configuración -->
+        <div id="config-tab-perfiles" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+        </div>
+
         <!-- Tab 1: Modelos IA & Gestor de Cuantizaciones -->
-        <!-- Apariencia: transparencia de la interfaz -->
-        <div id="config-tab-apariencia" class="config-tab-content" style="display: none; flex-direction: column; gap: 16px;">
-          <div>
-            <label style="font-weight: bold; color: var(--accent-purple); margin-bottom: 6px; display: block;">Opacidad de la interfaz</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <input type="range" id="ap-opacidad" min="0.35" max="1" step="0.01" value="0.92"
-                style="flex: 1; accent-color: var(--accent-purple);">
-              <span id="ap-opacidad-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-purple); min-width: 44px; text-align: right;">92%</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Cuanto más baja, más se ve lo que hay detrás de Prig. Con <b>Ctrl+Alt+↑</b> y <b>Ctrl+Alt+↓</b> se ajusta sin abrir esta ventana.
-            </div>
-          </div>
-
-          <div>
-            <label style="font-weight: bold; color: var(--accent-blue); margin-bottom: 6px; display: block;">Desenfoque del fondo</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <input type="range" id="ap-desenfoque" min="0" max="30" step="1" value="10"
-                style="flex: 1; accent-color: var(--accent-blue);">
-              <span id="ap-desenfoque-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-blue); min-width: 44px; text-align: right;">10px</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Suaviza lo que se transparenta para que el texto siga leyéndose.
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-              <label style="font-weight: bold; color: var(--accent-green); margin-bottom: 6px; display: block;">Color de acento</label>
-              <input type="color" id="ap-acento" value="#89b4fa"
-                style="width: 100%; height: 34px; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;">
-            </div>
-            <div>
-              <label style="font-weight: bold; color: var(--accent-yellow); margin-bottom: 6px; display: block;">Densidad</label>
-              <select id="ap-densidad" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
-                <option value="compacta">Compacta</option>
-                <option value="normal" selected>Normal</option>
-                <option value="amplia">Amplia</option>
-              </select>
-            </div>
-          </div>
-
-          <button id="ap-restablecer" class="tool-btn" style="align-self: flex-start; background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px;">
-            <i class="fa-solid fa-rotate-left"></i> Restablecer apariencia
-          </button>
+        <!-- Apariencia: personalización de colores, fondos por sección y efectos -->
+        <div id="config-tab-apariencia" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
         </div>
 
         <!-- Accesibilidad: Opciones visuales y Atajos de teclado reasignables con control estricto de colisiones -->
@@ -2857,9 +2844,11 @@
   <!-- Scripts -->
 
   <script src="/static/js/prig_net.js?v=7"></script>
-  <script src="/static/js/apariencia.js?v=7"></script>
+  <script src="/static/js/motor_movimiento.js?v=2"></script>
+  <script src="/static/js/apariencia.js?v=12"></script>
+  <script src="/static/js/sintaxis_personalizada.js?v=1"></script>
   <script src="/static/js/shortcuts.js?v=10"></script>
-  <script src="/static/js/commands.js?v=25"></script>
+  <script src="/static/js/commands.js?v=26"></script>
   <script src="/static/js/menubar.js?v=10"></script>
   <script src="/static/js/layout.js?v=8"></script>
   <script src="/static/js/workarea.js?v=17"></script>
@@ -2868,17 +2857,18 @@
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=9"></script>
   <script src="/static/js/terminal.js?v=7"></script>
-  <script src="/static/js/ai_chat.js?v=17"></script>
+  <script src="/static/js/ai_chat.js?v=18"></script>
   <script src="/static/js/banco_proyecto.js?v=2"></script>
   <script src="/static/js/kaggle_lector.js?v=10"></script>
-  <script src="/static/js/github_lector.js?v=6"></script>
+  <script src="/static/js/github_lector.js?v=7"></script>
   <script src="/static/js/github_widget.js?v=1"></script>
-  <script src="/static/js/youtube_hub.js?v=17"></script>
+  <script src="/static/js/youtube_hub.js?v=18"></script>
   <script src="/static/js/prig_hub.js?v=5"></script>
   <script src="/static/js/inicio.js?v=7"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
-  <script src="/static/js/book_library.js?v=8"></script>
+  <script src="/static/js/book_library.js?v=9"></script>
+  <script src="/static/js/referencias_ml.js?v=1"></script>
   <script src="/static/js/base_conocimiento.js?v=3"></script>
   <script src="/static/js/explorador.js?v=3"></script>
   <script src="/static/js/flujos.js?v=7"></script>
@@ -2892,9 +2882,10 @@
   <script src="/static/js/progreso.js?v=2"></script>
   <script src="/static/js/perfil.js?v=10"></script>
   <script src="/static/js/note_window.js?v=6"></script>
-  <script src="/static/js/global_config.js?v=13"></script>
+  <script src="/static/js/perfiles_config.js?v=1"></script>
+  <script src="/static/js/global_config.js?v=19"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>
-  <script src="/static/js/desafios.js?v=9"></script>
+  <script src="/static/js/desafios.js?v=11"></script>
   <script src="/static/js/ide.js?v=4"></script>
   <script src="/static/js/app.js?v=8"></script>
 

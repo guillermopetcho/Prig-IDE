@@ -1,0 +1,252 @@
+{
+ "lote": 6,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 59
+  }
+ },
+ "media": 1.0,
+ "segundos": 292,
+ "modos": {
+  "general": 2,
+  "unidad": 10
+ },
+ "por_tipo": {
+  "ubicacion": 1.0,
+  "diseno": null,
+  "entorno": 1.0,
+  "impacto": 1.0,
+  "recorrido": 1.0,
+  "frontend": 1.0,
+  "constante": 1.0,
+  "ejecucion": 1.0,
+  "endpoint": 1.0,
+  "config": 1.0,
+  "llamadores": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "resultados": [
+  {
+   "id": "f1f5ee627914",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 29.8,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "3fe51ca1c35e",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 21.4,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "c029dfbd4817",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "da28ac8f2d8e",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 17.6,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ae2a7dfcab33",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 21.2,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "2022a2c40f5d",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 85.3,
+   "modo": "unidad",
+   "herramientas": 5
+  },
+  {
+   "id": "8a5faedaaa73",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 12.4,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "a319bc224766",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 20.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "dc7e5fd1b6e6",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 17.8,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "df93be484452",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 21.6,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_22",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 12.8,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_03",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 19.9,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "f1f5ee627914": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"recent_workspaces\\\")\"}",
+    "resultado_caracteres": 132
+   }
+  ],
+  "3fe51ca1c35e": [],
+  "c029dfbd4817": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/ai/status\\\")\"}",
+    "resultado_caracteres": 415
+   }
+  ],
+  "da28ac8f2d8e": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.hechos(r=\\\"lee_entorno\\\", o=\\\"KAGGLE_USERNAME\\\"))\"}",
+    "resultado_caracteres": 116
+   }
+  ],
+  "ae2a7dfcab33": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/guided/quiz\\\")\"}",
+    "resultado_caracteres": 307
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"AprendizajeGuiadoManager.startQuiz\"}",
+    "resultado_caracteres": 1789
+   }
+  ],
+  "2022a2c40f5d": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\nprint(P.llamadores(\\\"contexto_para_modelo\\\"))\\n\"}",
+    "resultado_caracteres": 282
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\nprint(P.ficha(\\\"progreso_analisis\\\"))\\n\"}",
+    "resultado_caracteres": 609
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\nprint(P.api(\\\"/api/progreso/analisis\\\"))\\n\"}",
+    "resultado_caracteres": 438
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Verificar si hay otros llamadores transitivos de progreso_analisis\\nprint(P.llamadores(\\\"progreso_analisis\\\"))\\nprint(P.llamadores(\\\"progreso_analisis_guardado\\\"))\\n\"}",
+    "resultado_caracteres": 5
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Verificar el endpoint GET que también lee contexto\\nprint(P.ficha(\\\"progreso_analisis_guardado\\\"))\\n\"}",
+    "resultado_caracteres": 312
+   }
+  ],
+  "8a5faedaaa73": [],
+  "a319bc224766": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"guardados\\\"))\"}",
+    "resultado_caracteres": 854
+   }
+  ],
+  "dc7e5fd1b6e6": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.camino(\\\"kaggle_preguntar\\\", \\\"dataset\\\"))\"}",
+    "resultado_caracteres": 206
+   }
+  ],
+  "df93be484452": [],
+  "ind_22": [],
+  "ind_03": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"estimar_tokens\"}",
+    "resultado_caracteres": 1122
+   }
+  ]
+ },
+ "respuestas": {
+  "f1f5ee627914": "P.hechos(r=\"lee_config\", o=\"recent_workspaces\")Según el grafo de hechos del proyecto, la función o método que lee la clave de configuración `recent_workspaces` es:\n\n- **`ServiciosIDE.anotar_reciente`** (ubicada en `backend/ide_servicios.py`, línea 283)\n\nEsta función accede al valor de `recent_workspaces` dentro de la configuración guardada en el archivo de configuración de Prig (`~/.prig_config.json`), ya que su responsabilidad es actualizar la lista de espacios de trabajo recientes.",
+  "3fe51ca1c35e": "En `backend/recursos/calibracion.py:103`:\n\n```python\nCITAS_MINIMAS = 2\n```\n\nValores **2**.",
+  "c029dfbd4817": "P.api(\"GET /api/ai/status\")El endpoint `GET /api/ai/status` está implementado por la función `get_ai_status` en el archivo `backend/app.py` (línea 3128).",
+  "da28ac8f2d8e": "La única función del proyecto que lee la variable de entorno `KAGGLE_USERNAME` es **`credenciales`**, definida en `backend/kaggle_lector.py` (línea 95). Esta función forma parte del mecanismo de autenticación de Kaggle que busca credenciales en múltiples fuentes, incluyendo esta variable de entorno.",
+  "ae2a7dfcab33": "La función del frontend que llama al endpoint `/api/guided/quiz` es:\n\n**`AprendizajeGuiadoManager.startQuiz`** (en `frontend/js/aprendizaje_guiado.js`, línea 934).\n\nEs un método asíncrono de la clase `AprendizajeGuiadoManager` que recibe un `blockId`, busca el bloque correspondiente y realiza una petición `POST` al endpoint para generar un quiz de autoevaluación.",
+  "2022a2c40f5d": "Basado en el análisis del grafo de llamadas:\n\n**El único endpoint HTTP del backend que se ve afectado directamente es:**\n\n- **`POST /api/progreso/analisis`** (función `progreso_analisis` en `backend/app.py:6402`)\n\n**Razón:** `contexto_para_modelo` es llamada exclusivamente por `progreso_analisis` (además de su test). Esta función construye el texto compacto de avance del alumno que se envía al modelo de IA para que proponga próximos pasos. Si cambias el comportamiento de `contexto_para_modelo`, el contenido del análisis que se genera para el modelo cambiará, afectando directamente las respuestas que obtenga el usuario al llamar a este endpoint.\n\nEl endpoint GET `GET /api/progreso/analisis` no se ve afectado porque solo lee el análisis ya guardado en disco (`analisis_guardado`), no genera contexto nuevo.",
+  "8a5faedaaa73": "Based on the provided reading of `frontend/js/youtube_hub.js` (lines 984-2193), the function `parsearTimestamp` is defined at line 2090.\n\nAccording to the \"Used by other units\" section in the prompt, the functions that call `parsearTimestamp` are:\n1.  **`pintarReproductor`**\n\nLooking at the code within the provided lines, `parsearTimestamp` is called inside the `extraerTimestampsDeTexto` function (line 2108), and `extraerTimestampsDeTexto` is called by `pintarReproductor`. Additionally, `parsearTimestamp` is used directly within `extraerTimestampsDeTexto`.\n\nSo, the direct callers visible in the logic flow are:\n*   `extraerTimestampsDeTexto` (internal usage)\n*   `pintarReproductor` (via `extraerTimestampsDeTexto` and potentially direct calls if present in the full file, though the \"Used by\" list points to `pintarReproductor`).\n\nThe primary external caller listed is **`pintarReproductor`**.",
+  "a319bc224766": "La función `guardados` de `backend/kaggle_colecciones.py` es llamada por:\n\n1. **`kaggle_colecciones_listar`** en `backend/app.py` (línea 2346) — el endpoint de la API.\n2. **`TestColecciones.test_ciclo_completo`** en `backend/tests/test_kaggle_colecciones_pdf.py` (línea 129) — una prueba unitaria.\n\nLas otras entradas que muestra el grafo (`github_repo`, `github_guardados`, `guardar`, `quitar`, `TestGuardarYDescargar.test_guardados`) apuntan a una función llamada `guardados` en otros módulos (como `backend/github_lector.py`), no a la de `kaggle_colecciones.py`.",
+  "dc7e5fd1b6e6": "Let me trace the execution path from `kaggle_preguntar` to `dataset`.\n\nLa ejecución pasa por estas funciones, en orden:\n\n1. **`kaggle_preguntar`** (endpoint en `backend/app.py:2853`)\n2. **`_obtener_contexto_datos`** (`backend/app.py:2810`)\n3. **`obtener_contexto_datasets_notebook`** (`backend/kaggle_explorar.py:626`)\n4. **`dataset`** (`backend/kaggle_explorar.py:157`)",
+  "df93be484452": "Está definida en **backend/banco_proyecto.py**, línea **1764**.",
+  "ind_22": "Porque `mensajes` genera el **prefijo guardado** que se congela en el banco de proyectos y se reutiliza entre sesiones. \n\nEl contexto del grafo (qué usa la unidad de otras, quién la usa) y la guía de la consola son **variables**: cambian cuando se edita otra parte del proyecto o cuando mejora la guía. Si estuvieran en `mensajes`, se guardarían en la llave de la lectura y cada cambio obligaría a releer todas las unidades.\n\nEn su lugar:\n- `mensajes()` incluye solo lo estable: `SISTEMA_LECTOR`, la tarjeta global y el código de la unidad.\n- `pregunta_con_contexto()` añade lo variable: `contexto_unidad()`, `guia_consola()` y la pregunta real.\n\nAsí, las lecturas vigentes se reusan (costo ~0,1 s) y solo se lee el contexto variable (~1-2K tokens, ~2 s) cuando se hace una pregunta.",
+  "ind_03": "La función `estimar_tokens` en `backend/banco_proyecto.py` es:\n\n```python\ndef estimar_tokens(texto: str) -> int:\n    return int(len(texto or \"\") / CARACTERES_POR_TOKEN) + 1\n```\n\nY `CARACTERES_POR_TOKEN` está definido como `3.5`.\n\nPara `\"abcd\" * 30` → `\"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd\"` → longitud = 4 × 30 = 120 caracteres.\n\nCálculo: `int(120 / 3.5) + 1 = int(34.285...) + 1 = 34 + 1 = 35`.\n\n**Devuelve `35`.**"
+ }
+}

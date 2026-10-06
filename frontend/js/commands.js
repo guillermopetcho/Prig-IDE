@@ -395,7 +395,7 @@
           run: () => window.openGlobalConfigModal('accesibilidad') },
         { id: 'config.general', menu: 'Configuración', label: 'Configuración global…', accel: 'Ctrl+,',
           run: () => window.openGlobalConfigModal('ai') },
-        { id: 'config.apariencia', menu: 'Configuración', label: 'Apariencia y transparencia…', accel: 'Ctrl+Shift+A',
+        { id: 'config.apariencia', menu: 'Configuración', label: 'Personalización, colores y fondos…', accel: 'Ctrl+Shift+A',
           run: () => window.openGlobalConfigModal('apariencia') },
         { id: 'config.modelos', menu: 'Configuración', label: 'Modelos: ajustes, prueba y servidor…', accel: 'Ctrl+9', separadorAntes: true,
           run: () => window.Modelos && window.Modelos.abrir() },

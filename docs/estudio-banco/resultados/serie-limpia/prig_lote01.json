@@ -1,0 +1,257 @@
+{
+ "lote": 1,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 45
+  },
+  "repeticion": false,
+  "ollama_escuchando": true,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 60
+  }
+ },
+ "media": 0.909,
+ "segundos": 305,
+ "modos": {
+  "general": 5,
+  "unidad": 7
+ },
+ "por_tipo": {
+  "endpoint": 1.0,
+  "config": 1.0,
+  "ejecucion": 1.0,
+  "llamadores": 1.0,
+  "diseno": null,
+  "endpoint_real": 1.0,
+  "impacto": 1.0,
+  "frontend": 1.0,
+  "constante": 1.0,
+  "entorno": 1.0,
+  "recorrido": 1.0,
+  "llamadores_independiente": 0.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "resultados": [
+  {
+   "id": "e252db732b26",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.6,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "030d5853d930",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 24.7,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "7449f8478667",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 34.6,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "58e007fc5c3f",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 17.7,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "5774c0764d5f",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 11.3,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "9728342dc751",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 42.3,
+   "modo": "unidad",
+   "herramientas": 3
+  },
+  {
+   "id": "1a874fefb6d9",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 17.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "851ee7b0111a",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 33.4,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_23",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 25.2,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_07",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 23.2,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "ind_18",
+   "tipo": "endpoint_real",
+   "puntaje": 1.0,
+   "segundos": 21.8,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "ind_15",
+   "tipo": "llamadores_independiente",
+   "puntaje": 0.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "e252db732b26": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar hechos donde se lee la configuración 'moe_modo'\\nhechos_modo = P.hechos(o=\\\"moe_modo\\\", r=\\\"lee_config\\\")\\nfor h in hechos_modo:\\n    print(f\\\"{h['ruta']}:{h['linea']} -> {h['s']}\\\")\\n\"}",
+    "resultado_caracteres": 125
+   }
+  ],
+  "030d5853d930": [],
+  "7449f8478667": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/hub/ajustes\\\")\"}",
+    "resultado_caracteres": 276
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"crear_router.ajustes\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "58e007fc5c3f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_OLLAMA_LIB\\\")\"}",
+    "resultado_caracteres": 119
+   }
+  ],
+  "5774c0764d5f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/books/analyze\\\")\"}",
+    "resultado_caracteres": 279
+   }
+  ],
+  "9728342dc751": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"siguientes\\\")\"}",
+    "resultado_caracteres": 103
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"resumen\\\"))\"}",
+    "resultado_caracteres": 1316
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.ficha(\\\"inicio_resumen\\\"))\\nprint(\\\"---\\\")\\nprint(P.ficha(\\\"progreso_analisis\\\"))\"}",
+    "resultado_caracteres": 987
+   }
+  ],
+  "1a874fefb6d9": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"StudyPlanState\\\"))\"}",
+    "resultado_caracteres": 142
+   }
+  ],
+  "851ee7b0111a": [],
+  "ind_23": [],
+  "ind_07": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"from backend.particion_proyecto import _carpeta\\nprint(_carpeta(\\\"backend/ai_engine/motor_moe.py\\\", 1))\"}",
+    "resultado_caracteres": 207
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Reimplementación de _carpeta para verificar\\ndef _carpeta(ruta: str, niveles: int = 2) -> str:\\n    partes = ruta.split(\\\"/\\\")[:-1]\\n    return \\\"/\\\".join(partes[:niveles])\\n\\nprint(_carpeta(\\\"backend/ai_engine/motor_moe.py\\\", 1))\"}",
+    "resultado_caracteres": 7
+   }
+  ],
+  "ind_18": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"expone\\\", o=\\\"% /api/hub/estado\\\", limite=10)\"}",
+    "resultado_caracteres": 115
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"crear_router.estado\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "ind_15": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"BookService.delete_item\\\")\"}",
+    "resultado_caracteres": 2
+   }
+  ]
+ },
+ "respuestas": {
+  "e252db732b26": "Para determinar qué funciones leen la clave `moe_modo`, consulto el grafo de hechos del proyecto específicamente las relaciones `lee_config`.\n\nLas funciones que leen la clave de configuración `moe_modo` son:\n\n1.  **`AIEngine.motor_moe`** (`backend/ai_engine/ai_engine_class.py:865`): Obtiene el valor de `moe_modo` desde `self.config` para pasarlo al motor MoE.\n2.  **`_moe_estado`** (`backend/app.py:5529`): Lee `moe_modo` para devolver el estado actual de los ajustes del motor en la API.",
+  "030d5853d930": "En el archivo `backend/recursos/almacen.py`, la constante `MAX_HUELLAS` vale **5**.",
+  "7449f8478667": "La función que implementa el endpoint `POST /api/hub/ajustes` está en `backend/hub/api.py`.\n\nVamos a verificarlo usando las herramientas del proyecto para asegurarnos de la ubicación exacta y la firma de la función.\n\nEl endpoint `POST /api/hub/ajustes` es expuesto por la función `ajustes` dentro del router creado en `backend/hub/api.py`.\n\nVamos a ver el código de esa función para confirmar su implementación:\n\nEl endpoint `POST /api/hub/ajustes` está implementado en el archivo **`backend/hub/api.py`**, en la línea **323**.\n\nLa función es una función anidada llamada `ajustes` dentro de `crear_router`:\n\n```python\n@r.post(\"/ajustes\")\ndef ajustes(req: Ajustes):\n    return h(servicio().ajustes, req.model_dump(exclude_none=True))\n```\n\nEsta función delega la lógica real al método `ajustes` del servicio de Hub, que se encuentra en **`backend/hub/servicio.py`** (líneas 735-741), donde se actualiza el estado del usuario (por ejemplo, el ajuste `publicar_resumen`) y se guarda en el almacenamiento persistente.",
+  "58e007fc5c3f": "P.hechos(r=\"lee_entorno\", o=\"PRIG_OLLAMA_LIB\")La función `dir_ollama()` en `backend/recursos/motor_suave.py` es la única que lee la variable de entorno `PRIG_OLLAMA_LIB`. La usa para obtener la ruta de la carpeta de Ollama de Prig (por defecto `lib/ollama` dentro del directorio raíz del proyecto).",
+  "5774c0764d5f": "Consola to find callers of the `/api/books/analyze` endpoint.\n\nLa función del frontend que llama al endpoint `/api/books/analyze` es **`analyzeCurrentDocument`** en el archivo `frontend/js/book_library.js` (línea 629).",
+  "9728342dc751": "P.llamadores(\"siguientes\")El único llamador directo de `siguientes` es la función `resumen` (también en `backend/progreso.py`). Ahora bien, la pregunta es qué **endpoints HTTP** se ven afectados. Para eso necesito ver quién llama a `resumen` y si ese camino llega a un endpoint.\n\nLos llamadores backend son `inicio_resumen` y `progreso_analisis` en `app.py`. Veo qué endpoints exponen estas funciones:\n\nLos hechos del grafo dicen:\n\n- `inicio_resumen` expone **`GET /api/inicio`**\n- `progreso_analisis` expone **`POST /api/progreso/analisis`**\n\nAmbas llaman a `resumen`, que a su vez llama a `siguientes`. Por tanto, cambiar el comportamiento de `siguientes` afecta directamente a estos dos endpoints.\n\n**Respuesta:** Los endpoints HTTP afectados son **`GET /api/inicio`** y **`POST /api/progreso/analisis`**.",
+  "1a874fefb6d9": "La única función/método que llama directamente a `StudyPlanState` (es decir, que instancia o construye un objeto de esa clase) es:\n\n- **`StudyPlanEngine.create_new_plan`** en `backend/study_plan_engine.py` (línea 837), donde crea un `StudyPlanState(user_goal=user_goal, status=PlanStatusEnum.DRAFT)`.\n\nAdemás, aunque no aparecen como \"llamadores\" directos en el grafo de instanciación, hay varios lugares donde se **lee/valida/carga** un `StudyPlanState` desde JSON mediante `model_validate`, como en `StudyPlanRepository.load_state`, pero la instancia directa desde código Python solo se hace en `create_new_plan`.",
+  "851ee7b0111a": "La ejecución pasa por estas funciones en este orden:\n\n1. **`kaggle_explicar_datos`** (`backend/app.py:2447`): El endpoint recibe la petición. Llama a `_kaggle_ficha` para validar la referencia y a `_motor_desafios`/`_modelo_desafios` para configurar el modelo.\n\n2. **`_kaggle_ficha`** (`backend/app.py:2273`): Esta función auxiliar procesa la referencia (`tipo` y `ref`) para devolver un diccionario estandarizado. Aunque no se ve el código completo en el banco, su nombre y uso indican que prepara los datos para el explorador.\n\n3. **`kaggle_explorar.explicacion_datos`** o **`kaggle_explorar.explicar_datos`** (`backend/kaggle_explorar.py`): Dependiendo de si hay una explicación guardada en caché (`req.regenerar`), se llama a una u otra.\n   - Si hay caché: `explicacion_datos` lee el archivo.\n   - Si no: `explicar_datos` llama al modelo (vía `motor` y `nombre`) para generar la explicación.\n\n4. **`kaggle_explorar._ruta_explicacion_datos`** o **`kaggle_explorar._registrar`** (`backend/kaggle_explorar.py:541` o `330`): Ambas funciones necesitan saber dónde guardar los datos en el sistema de archivos.\n\n5. **`carpeta`** (`backend/kaggle_lector.py:43`): Finalmente, `_ruta_explicacion_datos` y `_registrar` llaman a `carpeta()` para obtener el directorio base (`~/.prig_kaggle` o el definido en la variable de entorno) y construir la ruta completa.\n\n**Resumen del flujo:**\n`app.py` → `_kaggle_ficha` → `kaggle_explorar.py` (explicar/explicacion_datos) → `kaggle_explorar.py` (_ruta_explicacion_datos/_registrar) → `kaggle_lector.py` (`carpeta`).",
+  "ind_23": "Porque las capas **SSM (State Space Models)** del Qwen3.6-35B-A3B no son autoregresivas con caché KV tradicional, sino que funcionan como un filtro recursivo (similar a un convolucional o recurrente) donde la salida de cada token depende del **estado interno acumulado** hasta ese punto exacto.\n\nEn los transformers estándar (como los de Ollama por defecto), la caché KV permite \"olvidar\" el pasado y solo recordar las claves y valores de atención. Si cambias el estado por uno \"parecido\", la atención se desincroniza porque las posiciones relativas de los tokens ya no coinciden.\n\nEn los SSM (como Mamba o las variantes de Qwen3.6 que usan esta arquitectura híbrida):\n1.  **El estado es acumulativo y no reversible:** No puedes \"replay\" ni ajustar el estado pasado. El estado final es la única representación válida de todo lo leído.\n2.  **Sensibilidad a la secuencia exacta:** Cualquier desviación en el prompt o en el estado interno provoca que el modelo \"alucine\" o pierda coherencia, porque la dinámica interna (los pesos de transición del estado) se ha actualizado con una secuencia específica de tokens.\n\nPor eso, el motor lee el proyecto completo (`n_predict: 0`) y guarda el **estado binario exacto** (`slots/0?action=save`). Al restaurarlo, el modelo \"recuerda\" exactamente dónde terminó la lectura anterior, permitiendo continuar la conversación sin releer el código y sin perder precisión. Si se usara un estado \"aproximado\", la coherencia del código y la lógica del proyecto se perderían inmediatamente.",
+  "ind_07": "La función `_carpeta` toma la ruta, la divide por `/`, quita el último elemento (el nombre del archivo) con `[:-1]`, y luego une los primeros `niveles` elementos con `/`.\n\nPara `\"backend/ai_engine/motor_moe.py\"` con `niveles=1`:\n1. `partes = [\"backend\", \"ai_engine\", \"motor_moe.py\"]`\n2. `partes[:-1] = [\"backend\", \"ai_engine\"]`\n3. `\"/\".join([\"backend\"]) = \"backend\"`\n\nDevuelve `\"backend\"`.\n\nLa función divide la ruta en partes (`[\"backend\", \"ai_engine\", \"motor_moe.py\"]`), elimina el nombre del archivo con `[:-1]` (`[\"backend\", \"ai_engine\"]`), y luego une solo los primeros `niveles=1` elementos, resultando en `\"backend\"`.",
+  "ind_18": "Busco directamente en el grafo quién expone ese endpoint.\n\nLa función es `crear_router.estado`, definida en `backend/hub/api.py:162`.\n\nLa función que implementa `GET /api/hub/estado` es `crear_router.estado`, una función anidada en **`backend/hub/api.py:162`**.\n\nCódigo literal:\n\n```python\n@r.get(\"/estado\")\ndef estado():\n    t = gl.token()\n    s = servicio()\n    e = s._estado()\n    return {\"git\": git.disponible(), \"token\": bool(t), \"origen_token\": (t or {}).get(\"origen\"),\n            \"github\": e.get(\"github\"), \"ajustes\": e[\"ajustes\"], \"carpeta\": s.base}\n```",
+  "ind_15": "P.llamadores(\"BookService.delete_item\")Ninguna función o método fuera de los tests llama a `delete_item`. La consola devuelve una lista vacía `[]`, lo que indica que este método no está siendo invocado actualmente por ningún otro código en la aplicación (backend o frontend)."
+ }
+}

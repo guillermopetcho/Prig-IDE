@@ -1,0 +1,273 @@
+{
+ "lote": 2,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": true,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 58
+  }
+ },
+ "media": 0.886,
+ "segundos": 340,
+ "modos": {
+  "general": 4,
+  "unidad": 8
+ },
+ "por_tipo": {
+  "impacto": 0.0,
+  "diseno": null,
+  "endpoint_real": 1.0,
+  "llamadores_independiente": 0.75,
+  "ejecucion": 1.0,
+  "constante": 1.0,
+  "endpoint": 1.0,
+  "frontend": 1.0,
+  "llamadores": 1.0,
+  "config": 1.0,
+  "ubicacion": 1.0,
+  "entorno": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "resultados": [
+  {
+   "id": "cada06cbd275",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.4,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "20caa4e10134",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 5.5,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "0c5d47251067",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "78aa8aa2cf71",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 25.3,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "5075162f5a7c",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 13.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8b544b1c6e67",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 113.0,
+   "modo": "unidad",
+   "herramientas": 4
+  },
+  {
+   "id": "859644286e75",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 16.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "d6403322781f",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 8.4,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_25",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 11.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_12",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 28.9,
+   "modo": "general",
+   "herramientas": 0,
+   "puntaje_original": 0.0
+  },
+  {
+   "id": "ind_20",
+   "tipo": "endpoint_real",
+   "puntaje": 1.0,
+   "segundos": 49.8,
+   "modo": "general",
+   "herramientas": 6
+  },
+  {
+   "id": "ind_14",
+   "tipo": "llamadores_independiente",
+   "puntaje": 0.75,
+   "segundos": 14.3,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "cada06cbd275": [],
+  "20caa4e10134": [],
+  "0c5d47251067": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/github/widget/preview\\\")\"}",
+    "resultado_caracteres": 301
+   }
+  ],
+  "78aa8aa2cf71": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_HUB_DIR\\\")\"}",
+    "resultado_caracteres": 107
+   }
+  ],
+  "5075162f5a7c": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/kaggle/colecciones\\\")\"}",
+    "resultado_caracteres": 688
+   }
+  ],
+  "8b544b1c6e67": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"_ndjson.emitir\\\")\"}",
+    "resultado_caracteres": 346
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.ficha(\\\"_ndjson_en_hilo\\\"))\"}",
+    "resultado_caracteres": 1595
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Obtener los endpoints HTTP para cada función que llama a _ndjson_en_hilo\\nfunciones = [\\n    \\\"kaggle_descargar\\\",\\n    \\\"kaggle_explicar_datos\\\", \\n    \\\"_github_con_cache\\\",\\n    \\\"github_preguntar\\\",\\n    \\\"github_descargar\\\",\\n    \\\"_kaggle_con_cache\\\",\\n    \\\"kaggle_preguntar\\\",\\n    \\\"recursos_probar\\\",\\n    \\\"recursos_calibrar\\\",\\n    \\\"progreso_analisis\\\",\\n    \\\"desafios_git",
+    "resultado_caracteres": 1521
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Encontrar endpoints para github_explicar, github_preguntar, kaggle_explicar, kaggle_guia, kaggle_estudio_optimo\\nfunciones_extra = [\\\"github_explicar\\\", \\\"kaggle_explicar\\\", \\\"kaggle_guia\\\", \\\"kaggle_estudio_optimo\\\"]\\n\\nfor f in funciones_extra:\\n    hechos = P.hechos(s=f, r=\\\"expone\\\", limite=10)\\n    if hechos:\\n        print(f\\\"{f}: {[h['o'] for h in hechos]}\\\")\\n    else:\\n     ",
+    "resultado_caracteres": 263
+   }
+  ],
+  "859644286e75": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"_crudo\\\")\"}",
+    "resultado_caracteres": 312
+   }
+  ],
+  "d6403322781f": [],
+  "ind_25": [],
+  "ind_12": [],
+  "ind_20": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar la función que expone GET /api/hub/repos\\n# Primero, verifiquemos si existe el endpoint en los hechos\\nhechos = P.hechos(r='expone', o='*hub/repos*')\\nprint(\\\"Hechos de expone para hub/repos:\\\")\\nfor h in hechos:\\n    print(h)\\n\"}",
+    "resultado_caracteres": 52
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar todos los endpoints que contengan \\\"hub\\\"\\nhechos_hub = P.hechos(r='expone', o='*hub*')\\nprint(\\\"Hechos de expone para hub:\\\")\\nfor h in hechos_hub[:10]:  # Limitar a 10 resultados\\n    print(h)\\n\"}",
+    "resultado_caracteres": 58
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Usar la función api de P para obtener información sobre el endpoint\\nresultado = P.api(\\\"GET /api/hub/repos\\\")\\nprint(\\\"Resultado de P.api('GET /api/hub/repos'):\\\")\\nprint(resultado)\\n\"}",
+    "resultado_caracteres": 212
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Verificar la ubicación exacta y el contexto de la función repos\\ncodigo = P.codigo(\\\"hub_api.repos\\\") if \\\"hub_api.repos\\\" in str(resultado) else None\\nif not codigo:\\n    # Intentar obtener más contexto sobre la función\\n    simbolos = P.simbolos(ruta=\\\"backend/hub/api.py\\\", tipo=\\\"metodo\\\")\\n    print(\\\"Métodos en backend/hub/api.py:\\\")\\n    for s in simbolos:\\n        if \\\"repos\\\"",
+    "resultado_caracteres": 91
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/hub/api.py\", \"desde_linea\": 170, \"hasta_linea\": 180}",
+    "resultado_caracteres": 343
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"crear_router\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "ind_14": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"BookService.get_book_citations\\\")\"}",
+    "resultado_caracteres": 465
+   }
+  ]
+ },
+ "respuestas": {
+  "cada06cbd275": "La clave `salto_c` se lee en el módulo `backend/recursos/termico.py`.\n\nEspecíficamente, la propiedad `Gobernador.salto` (línea 450) accede a ella a través del diccionario `self.ajustes`:\n\n```python\n# backend/recursos/termico.py:450-452\n@property\ndef salto(self) -> float:\n    return float(self.ajustes.get(\"salto_c\") or SALTO_INICIAL)\n```\n\nAdemás, `salto_c` está incluida en los ajustes por defecto en la línea 286:\n\n```python\n# backend/recursos/termico.py:286-301\nAJUSTES_POR_DEFECTO = {\n    \"limite_gpu\": LIMITE_GPU,\n    \"margen\": 1.0,\n    \"salto_c\": None,           # <-- Aquí se define el valor por defecto\n    ...\n}\n```\n\nEl grafo de hechos del proyecto confirma que la clase `Gobernador` en `termico.py` tiene la relación `lee_entorno` (o `lee_config` según la clasificación interna) hacia `salto_c`.",
+  "20caa4e10134": "En `backend/memoria_consulta.py`, la constante `MEMORIA_MB` vale **2048**.\n\nSe define en la línea 24:\n```python\nMEMORIA_MB = 2048\n```",
+  "0c5d47251067": "P.api(\"POST /api/github/widget/preview\")El endpoint `POST /api/github/widget/preview` está implementado por la función **`github_widget_preview`**, que se encuentra en el archivo **`backend/app.py`** en la línea 2669.",
+  "78aa8aa2cf71": "La única función que lee la variable de entorno `PRIG_HUB_DIR` es:\n\n- **`ruta_base`** en `backend/hub/servicio.py:40`\n\n```python\ndef ruta_base() -> str:\n    return os.environ.get(\"PRIG_HUB_DIR\") or os.path.expanduser(\"~/.prig_hub\")\n```\n\nEs un accessor simple: si la variable está definida la usa; si no, devuelve `~/.prig_hub` por defecto.",
+  "5075162f5a7c": "P.api(\"/api/kaggle/colecciones\")Las funciones del frontend que llaman al endpoint `/api/kaggle/colecciones` son:\n\n1. **`cargarGuardados`** (en `frontend/js/kaggle_lector.js`, línea 709)\n2. **`abrirGuardar`** (en `frontend/js/kaggle_lector.js`, línea 791)\n3. **`formularioColeccion`** (en `frontend/js/kaggle_lector.js`, línea 872)\n\nTodas estas funciones están definidas en el archivo `frontend/js/kaggle_lector.js`.",
+  "8b544b1c6e67": "P.ficha(\"_ndjson.emitir\")La función `_ndjson.emitir` es una función anidada definida dentro de `_ndjson`. Para saber qué endpoints la usan, necesito ver quién llama a `_ndjson` o quién usa la función `_ndjson_en_hilo` que probablemente la envuelve. Voy a verificar la relación completa.\n\nPerfecto, ahora veo que `_ndjson_en_hilo` llama a `_ndjson_en_hilo.emitir` (que es la función anidada `_ndjson.emitir` a la que se refiere la pregunta). Ahora voy a encontrar qué endpoints HTTP exponen las funciones que llaman a `_ndjson_en_hilo`.\n\nAhora necesito encontrar los endpoints para `_github_con_cache` y sus llamadores:\n\nPerfecto. Ahora tengo todos los endpoints. La función `_ndjson.emitir` (que es la función anidada dentro de `_ndjson_en_hilo`) se ejecuta cuando `_ndjson_en_hilo` se llama, y `_ndjson_en_hilo` es usada por múltiples endpoints HTTP.\n\nSi cambio el comportamiento de `_ndjson.emitir`, los siguientes endpoints HTTP del backend se ven afectados directa o indirectamente:\n\n**Endpoints directos (usan `_ndjson_en_hilo` directamente):**\n1. `POST /api/kaggle/descargar` (kaggle_descargar)\n2. `POST /api/kaggle/explicar_datos` (kaggle_explicar_datos)\n3. `POST /api/github/preguntar` (github_preguntar)\n4. `POST /api/github/descargar` (github_descargar)\n5. `POST /api/recursos/probar` (recursos_probar)\n6. `POST /api/recursos/calibrar` (recursos_calibrar)\n7. `POST /api/progreso/analisis` (progreso_analisis)\n8. `POST /api/desafios/github/replicar` (desafios_github_replicar)\n9. `POST /api/desafios/crear` (desafios_crear)\n10. `POST /api/desafios/*/razonamiento` (desafios_razonamiento)\n11. `POST /api/desafios/*/plan` (desafios_plan)\n12. `POST /api/desafios/*/pista` (desafios_pista)\n13. `POST /api/desafios/*/reflexion` (desafios_reflexion)\n14. `POST /api/desafios/*/traducir` (desafios_traducir)\n15. `POST /api/desafios/chat` (desafios_chat)\n16. `POST /api/desafios/analizar-propuesta` (desafios_analizar_propuesta)\n17. `POST /api/youtube/crear-desafio` (youtube_crear_desafio)\n\n**Endpoints indirectos (usan `_github_con_cache` o `_kaggle_con_cache`, que a su vez usan `_ndjson_en_hilo`):**\n18. `POST /api/github/explicar` (github_explicar → _github_con_cache)\n19. `POST /api/kaggle/explicar` (kaggle_explicar → _kaggle_con_cache)\n20. `POST /api/kaggle/guia` (kaggle_guia → _kaggle_con_cache)\n21. `POST /api/kaggle/notebook/estudio_optimo` (kaggle_estudio_optimo → _kaggle_con_cache)\n\nEn total, **21 endpoints HTTP** se verían afectados si cambias el comportamiento de `_ndjson.emitir`, ya que todos dependen de `_ndjson_en_hilo` para emitir eventos en formato NDJSON de forma asíncrona.",
+  "859644286e75": "P.llamadores(\"_crudo\")Las funciones o métodos que llaman a `_crudo` son:\n\n1. **`abrir`** (en `backend/github_lector.py`, línea 244): La usa para leer el README del repositorio.\n2. **`leer_archivo`** (en `backend/github_lector.py`, línea 274): La usa para obtener el contenido en crudo de un archivo específico del repositorio.\n3. **`es_hub`** (en `backend/hub/github.py`, línea 98): También hace una petición a GitHub para verificar si un recurso es parte de Prig Hub.",
+  "d6403322781f": "`BancoProyecto.version` está definida en **`backend/banco_proyecto.py`**, dentro de la clase `BancoProyecto`. Es una propiedad (`@property`) que devuelve el valor de la clave \"version\" guardada en la base de datos SQLite del banco, con un valor por defecto de `0`.",
+  "ind_25": "Según el código de `agrupar` en `backend/particion_proyecto.py`, las piezas que quedan sueltas (sin llamadas que las unan con otras unidades) se agrupan en dos fases adicionales tras el algoritmo aglomerativo principal:\n\n1. **Primera pasada de lo suelto**: Se agrupan por **carpeta** (comparten carpeta), desde las unidades más pequeñas hacia las más grandes, siempre que quepan en el `tope` de tokens.\n2. **Segunda pasada de lo suelto**: Se juntan aunque sean de **carpetas distintas**, siempre que juntas no superen el `tope` y sean unidades muy pequeñas (menos del 25% del tope). Esto es para reducir lecturas y estados, ya que la cercanía en el archivo también es cohesión.\n\nEl código específico está en las secciones comentadas como:\n- `# Lo suelto (sin llamadas que lo unan): por carpeta...`\n- `# Unidades muy chicas sin relación con nadie: se juntan aunque sean de carpetas distintas...`",
+  "ind_12": "Según el código proporcionado en `backend/ai_engine/motor_moe.py`, la definición de `CONTEXTOS` es un diccionario donde las claves son enteros (contexto en tokens) y los valores son tuplas.\n\nLa línea específica es:\n`16384: (2048, 1803, 2580),`\n\nPor lo tanto, `CONTEXTOS[16384]` devuelve la tupla:\n\n```python\n(2048, 1803, 2580)\n```\n\nDonde, según los comentarios del código (líneas 68-75), estos valores representan:\n1. **2048**: El tamaño de lote (batch size).\n2. **1803**: La VRAM en MB necesaria **sin** MTP (Mixture of Tokens/Parallel decoding).\n3. **2580**: La VRAM en MB necesaria **con** MTP activada.",
+  "ind_20": "Para responder a esta pregunta, necesito consultar el grafo de hechos del proyecto, ya que la relación `expone` vincula directamente un endpoint con la función que lo implementa.\n\nVoy a usar la herramienta `consola` para consultar la base de datos SQLite del proyecto a través del objeto `P`.\n\nParece que la consulta no devolvió resultados directos. Voy a intentar una búsqueda más amplia para ver cómo se almacenan los endpoints en el grafo.\n\nLa consulta no está devolviendo resultados. Voy a intentar usar la función `api` del objeto `P` que está diseñada específicamente para esto.\n\nPerfecto. Ahora tengo la información necesaria. La función que implementa el endpoint `GET /api/hub/repos` es `repos`, que es un método de la clase `crear_router` (o más probablemente, `hub_api.repos` o similar). Voy a verificar el contexto exacto de esta función.\n\nVoy a leer directamente el archivo para ver la implementación:\n\nAhora puedo ver que `repos` es una función local dentro de `crear_router`. Pero según el hecho del grafo, el símbolo es `crear_router.repos`. Voy a verificar si `crear_router` es una función o clase:\n\nAhora tengo toda la información. El endpoint `GET /api/hub/repos` está implementado por la función `repos` que se encuentra en el archivo `backend/hub/api.py` en la línea 176. Esta función es una función anidada dentro de la función `crear_router`.\n\nSin embargo, según el grafo de hechos, el símbolo registrado es `crear_router.repos`. Pero técnicamente, `repos` es una función local dentro de `crear_router`, no un método de clase.\n\nLa respuesta es:\n\n**Función:** `repos` (definida dentro de `crear_router`)\n**Archivo:** `backend/hub/api.py`\n**Línea:** 176\n\nLa implementación es:\n```python\n@r.get(\"/repos\")\ndef repos():\n    return h(servicio().repos)\n```\n\nEsta función llama al método `repos()` del servicio de Hub, que se encuentra en `backend/hub/servicio.py` (líneas 241-267), y envuelve la llamada en la función `h` para manejar excepciones de tipo `ErrorHub`, `git.ErrorGit` y `gh.ErrorGitHubHub`.",
+  "ind_14": "P.llamadores(\"BookService.get_book_citations\")Fuera de los tests, las funciones/métodos que llaman a `BookService.get_book_citations` en `backend/book_service.py` son:\n\n1.  `BookService.save_book_citation` (línea 796): Para obtener las citas existentes antes de añadir o actualizar una nueva.\n2.  `BookService.delete_book_citation` (línea 835): Para obtener la lista actual y eliminar la cita especificada.\n3.  `BookService.export_citations_to_workspace` (línea 859): Para obtener los datos del libro y su ruta de citas antes de exportarlas al espacio de trabajo."
+ },
+ "recorregido": [
+  {
+   "cuando": "2026-10-03 00:31",
+   "cambios": [
+    [
+     "ind_12",
+     0.0,
+     1.0
+    ]
+   ]
+  }
+ ]
+}

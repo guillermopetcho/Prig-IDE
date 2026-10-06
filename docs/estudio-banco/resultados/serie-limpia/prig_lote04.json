@@ -1,0 +1,259 @@
+{
+ "lote": 4,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 39
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 59
+  }
+ },
+ "media": 1.0,
+ "segundos": 288,
+ "modos": {
+  "unidad": 9,
+  "general": 3
+ },
+ "por_tipo": {
+  "config": 1.0,
+  "frontend": 1.0,
+  "ubicacion": 1.0,
+  "endpoint_real": 1.0,
+  "ejecucion": 1.0,
+  "endpoint": 1.0,
+  "diseno": null,
+  "llamadores": 1.0,
+  "constante": 1.0,
+  "recorrido": 1.0,
+  "impacto": 1.0,
+  "entorno": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "resultados": [
+  {
+   "id": "acffcb751a15",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 34.3,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "de13ad704cae",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 7.2,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "4525b4102ca8",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 14.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "0bd4ed189bb0",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 27.4,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "1a166ad6e1c8",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 24.5,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "cddd4484b32b",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 71.7,
+   "modo": "unidad",
+   "herramientas": 5
+  },
+  {
+   "id": "2e875dad3d95",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 21.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "bebce693b1a1",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 22.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "104684ade89e",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 7.1,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_24",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 33.9,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "ind_08",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 7.2,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_21",
+   "tipo": "endpoint_real",
+   "puntaje": 1.0,
+   "segundos": 16.2,
+   "modo": "general",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "acffcb751a15": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"activo\\\", limite=500)\\n\"}",
+    "resultado_caracteres": 210
+   }
+  ],
+  "de13ad704cae": [],
+  "4525b4102ca8": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/hub/desafio/exportar\\\")\"}",
+    "resultado_caracteres": 295
+   }
+  ],
+  "0bd4ed189bb0": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_entorno\\\", o=\\\"XDG_RUNTIME_DIR\\\")\\nprint(f\\\"Encontrados: {len(hechos)}\\\")\\nfor h in hechos:\\n    print(f\\\"{h['s']} en {h['ruta']}:{h['linea']}\\\")\\n\"}",
+    "resultado_caracteres": 137
+   }
+  ],
+  "1a166ad6e1c8": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar llamadas API al endpoint /api/progreso/analisis desde archivos frontend\\nresultados = P.sql(\\\"SELECT s, o, ruta, linea FROM grafo WHERE r = 'llama_api' AND o = '/api/progreso/analisis'\\\")\\nprint(\\\"Llamadas API encontradas:\\\")\\nfor r in resultados:\\n    print(f\\\"  - Función: {r['s']}, Archivo: {r['ruta']}, Línea: {r['linea']}\\\")\\n\\n# También verificar si el endpoint está expues",
+    "resultado_caracteres": 403
+   }
+  ],
+  "cddd4484b32b": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"ruta_analisis\\\")\"}",
+    "resultado_caracteres": 232
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"analisis_guardado\\\"))\\nprint(P.llamadores(\\\"guardar_analisis\\\"))\"}",
+    "resultado_caracteres": 670
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"progreso_analisis_guardado\\\"))\\nprint(P.api(\\\"progreso_analisis\\\"))\"}",
+    "resultado_caracteres": 59
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"progreso_analisis_guardado\"}",
+    "resultado_caracteres": 205
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"progreso_analisis\"}",
+    "resultado_caracteres": 1362
+   }
+  ],
+  "2e875dad3d95": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"job_prepare_stream.emitir\\\"))\"}",
+    "resultado_caracteres": 127
+   }
+  ],
+  "bebce693b1a1": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.camino(\\\"recursos_ritmo_ajustar\\\", \\\"Controlador\\\"))\"}",
+    "resultado_caracteres": 206
+   }
+  ],
+  "104684ade89e": [],
+  "ind_24": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Revisar cómo se maneja la alarma y la correlación de peticiones en memoria_consulta.py\\nprint([linea for linea in P.leer(\\\"backend/memoria_consulta.py\\\").split(\\\"\\\\n\\\") if \\\"alarma\\\" in linea.lower() or \\\"id\\\" in linea.lower() or \\\"numero\\\" in linea.lower()][:30])\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver el bloque completo de la función pedir y cómo maneja la alarma y el ID\\nlines = P.leer(\\\"backend/memoria_consulta.py\\\").split(\\\"\\\\n\\\")\\nfor i, linea in enumerate(lines):\\n    if \\\"def pedir\\\" in linea:\\n        print(\\\"\\\\n\\\".join(lines[i:i+20]))\\n        break\"}",
+    "resultado_caracteres": 1169
+   }
+  ],
+  "ind_08": [],
+  "ind_21": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/hub/repo\\\")\"}",
+    "resultado_caracteres": 266
+   }
+  ]
+ },
+ "respuestas": {
+  "acffcb751a15": "La clave de configuración `activo` es leída por dos métodos de la clase `Ritmo` en `backend/recursos/ritmo.py`:\n\n1. **`Ritmo.activo`** (línea 82): La propiedad que devuelve si el modo suave está activo.\n2. **`Ritmo.fijar`** (línea 76): El método que actualiza los ajustes, donde se procesa el valor de `activo` para activar o desactivar el modo suave.",
+  "de13ad704cae": "En `backend/agent_flows.py`, la constante `MAX_FLUJOS` vale **200**.",
+  "4525b4102ca8": "P.api(\"POST /api/hub/desafio/exportar\")\n\nEl endpoint `POST /api/hub/desafio/exportar` está implementado por la función **`exportar`** dentro de la función **`crear_router`** en el archivo **`backend/hub/api.py`** (línea 296).\n\nInternamente, esta función del endpoint llama a `servicio().exportar_desafio`, que es un método de la clase `Hub` definido en `backend/hub/servicio.py`.",
+  "0bd4ed189bb0": "Para responder a esta pregunta con precisión, necesito consultar el grafo de hechos del proyecto, específicamente las relaciones `lee_entorno` que indiquen `XDG_RUNTIME_DIR`.\n\nLas funciones que leen la variable de entorno `XDG_RUNTIME_DIR` son:\n\n1. **`ruta_control`** en `backend/recursos/motor_suave.py:39`\n2. **`rutas`** en `backend/recursos/nativo/prig_suave.c:72`\n\nAmbas funciones usan `XDG_RUNTIME_DIR` como directorio base para construir la ruta de control del modo suave (si no está definida, fallback a `/tmp`).",
+  "1a166ad6e1c8": "Para responder esta pregunta con precisión, necesito consultar el grafo de hechos del proyecto para ver qué funciones del frontend (archivos `.js`) tienen una relación `llama_api` con el endpoint `/api/progreso/analisis`.\n\nUsaré la herramienta `consola` para ejecutar una consulta SQL directa sobre la base de datos del banco de proyecto, que es la fuente de verdad para estas relaciones.\n\nPerfecto. La consulta al grafo del proyecto revela exactamente qué funciones del frontend llaman al endpoint `/api/progreso/analisis`.\n\n### Respuesta\n\nDentro de las siguientes funciones del frontend se llama al endpoint `/api/progreso/analisis`:\n\n1.  **`render`** en `frontend/js/progreso.js:91`\n2.  **`analizar`** en `frontend/js/progreso.js:258`\n\nAmbas funciones están definidas en el mismo archivo JavaScript (`progreso.js`) y realizan llamadas API al endpoint correspondiente, el cual está expuesto en el backend (`backend/app.py`) por las funciones `progreso_analisis_guardado` (GET) y `progreso_analisis` (POST).",
+  "cddd4484b32b": "P.llamadores(\"ruta_analisis\")La función `ruta_analisis` es llamada por:\n\n1. **`analisis_guardado()`** - que lee el archivo para devolver el análisis guardado\n2. **`guardar_analisis()`** - que escribe el análisis en ese archivo\n\nAmbas funciones están en el mismo archivo `backend/progreso.py`. Ahora necesito ver quién llama a estas dos funciones para encontrar los endpoints HTTP afectados.\n\nPerfecto. Las funciones `analisis_guardado` y `guardar_analisis` son llamadas desde `backend/app.py`. Ahora necesito ver qué endpoints HTTP exponen estas funciones.\n\nNecesito ver el código de estas funciones en app.py para entender qué endpoints las exponen.\n\nPerfecto. Ahora tengo la información completa. Los endpoints HTTP afectados son:\n\n1. **`GET /api/progreso/analisis`** - Expuesto por `progreso_analisis_guardado()`, que llama a `analisis_guardado()` → `ruta_analisis()`\n2. **`POST /api/progreso/analisis`** - Expuesto por `progreso_analisis()`, que llama a `guardar_analisis()` → `ruta_analisis()`\n\nSi cambio el comportamiento de `ruta_analisis`, ambos endpoints se ven afectados directamente porque:\n- El endpoint GET lee el archivo de análisis desde la ruta que devuelve `ruta_analisis()`\n- El endpoint POST escribe el análisis en el archivo cuya ruta devuelve `ruta_analisis()`",
+  "2e875dad3d95": "Looking at the code in `backend/app.py` lines 1441-2818, I can see the function `job_prepare_stream` which defines an inner function `emitir` inside it. Let me check who calls this inner function.\n\nLa función `emitir` definida dentro de `job_prepare_stream` es llamada directamente por:\n\n- **`job_prepare_stream`** (la función contenedora en `backend/app.py`, línea 1597)\n\n`emitir` es una función anidada (closure) que se pasa como argumento a `StreamingResponse(_flujo_cancelable(emitir()), ...)` dentro de la misma función `job_prepare_stream`. No hay ningún otro llamador externo: es una función local que solo se usa internamente para generar el stream de eventos NDJSON.",
+  "bebce693b1a1": "La ejecución pasa por estas funciones en este orden:\n\n1. `recursos_ritmo_ajustar` (en `backend/app.py:5427`)\n2. `gobernador` (en `backend/recursos/termico.py:711`)\n3. `Gobernador.__init__` (en `backend/recursos/termico.py:341`)\n4. `Controlador` (en `backend/recursos/motor_suave.py:174`)\n\nEl endpoint `recursos_ritmo_ajustar` llama a la función `gobernador()` que devuelve el gobernador térmico singleton. En el `__init__` de `Gobernador`, se crea la instancia de `motor_suave.Controlador(self.ritmo, monitor)`, que es donde se construye el objeto `Controlador`.",
+  "104684ade89e": "La función `EditorManager.moveTabToPane` está definida en el archivo que estás leyendo:\n\n**`frontend/js/editor.js`**\n\nEspecíficamente, se encuentra alrededor de la línea 786-818 del archivo `frontend/js/editor.js`.",
+  "ind_24": "Dos mecanismos protegen la ejecución:\n\n1. **Pausa de la alarma durante `P.llm`**: En la función `pedir`, antes de enviar la petición a Prig se guarda el tiempo restante de la alarma con `signal.alarm(0)` y se restaura al final con `if restante: signal.alarm(restante)`. Esto hace que la alarma de 30 s **solo mida el cómputo propio del proceso aislado** (análisis AST, ejecución de Python, SQL), no el tiempo que tarda el modelo externo en responder a `P.llm`.\n\n2. **Identificador único por petición**: Cada llamada a `pedir` incrementa un contador (`numero[0] += 1`) y envía ese `id` en el JSON. Al leer respuestas, el bucle `while True` descarta cualquier mensaje cuyo `id` no coincida con el de la petición actual (`if respuesta.get(\"id\") == numero[0]: break`). Así, si se hacen varias subllamadas en paralelo o secuencialmente, **una respuesta vieja nunca se confunde con la de la petición actual**.",
+  "ind_08": "Según la definición de `_corto` en `backend/examen_proyecto.py` (línea 35):\n\n```python\ndef _corto(nombre: str) -> str:\n    return nombre.split(\".\")[-1]\n```\n\nPara `_corto(\"Clase.metodo\")`:\n1. `\"Clase.metodo\".split(\".\")` produce `[\"Clase\", \"metodo\"]`\n2. `[-1]` toma el último elemento: `\"metodo\"`\n\n**Devuelve:** `\"metodo\"`",
+  "ind_21": "Necesito encontrar qué función expone el endpoint `GET /api/hub/repo` y en qué archivo está definido. Usaré las herramientas del proyecto para buscar esta información.\n\nLa función que implementa el endpoint `GET /api/hub/repo` es `crear_router.repo` y está en el archivo `backend/hub/api.py` en la línea 180.\n\nEl endpoint es consumido por la función `vistaSiguiendo` en `frontend/js/prig_hub.js` en la línea 1320."
+ }
+}

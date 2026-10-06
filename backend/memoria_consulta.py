@@ -521,6 +521,15 @@ class API:
             patron = f"% {ruta_http}"
         expone = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'expone' AND o LIKE ?", (patron,))
         consume = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'llama_api' AND o = ?", (ruta_http,))
+        # El prefijo suele ponerse en otro archivo (include_router, register_blueprint): se empareja por sufijo
+        from banco_proyecto import endpoint_de
+        if not expone:
+            todas = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'expone'")
+            e = endpoint_de(ruta_http, {f["o"].split(" ", 1)[1] for f in todas})
+            expone = [f for f in todas if e and f["o"].split(" ", 1)[1] == e and (f["o"].startswith(metodo + " ") if patron[0] != "%" else True)]
+        if not consume:
+            consume = [f for f in self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'llama_api' AND o LIKE ?", (f"%{ruta_http}",))
+                       if endpoint_de(f["o"], {ruta_http}) == ruta_http]
         return {"expone": expone, "consume": consume}
 
     def ast(self, ruta: str):

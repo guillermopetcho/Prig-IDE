@@ -1,0 +1,455 @@
+{
+ "lote": 10,
+ "repeticion": false,
+ "ok": false,
+ "problemas": [
+  "se guardó memoria durante el lote (memoria=False no se respetó)"
+ ],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5269,
+   "temp_c": 59
+  }
+ },
+ "media": 0.764,
+ "segundos": 1367,
+ "modos": {
+  "general": 4,
+  "unidad": 8
+ },
+ "por_tipo": {
+  "llamadores": 0.0,
+  "entorno": 0.0,
+  "impacto": 0.834,
+  "config": 1.0,
+  "constante": 1.0,
+  "ejecucion": 1.0,
+  "frontend": 1.0,
+  "endpoint": 1.0,
+  "ubicacion": 1.0,
+  "recorrido": 0.5
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [
+  "1f14bd2a14dd"
+ ],
+ "resultados": [
+  {
+   "id": "97b588daee02",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 135.5,
+   "modo": "unidad",
+   "herramientas": 8
+  },
+  {
+   "id": "4216d1fce5ba",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 27.8,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "b0a312b95046",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 23.6,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "1f14bd2a14dd",
+   "tipo": "entorno",
+   "puntaje": 0.0,
+   "segundos": 600.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "4d4a33f5b809",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 10.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "4e95cf147642",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 32.0,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "37eb32849f6f",
+   "tipo": "impacto",
+   "puntaje": 0.667,
+   "segundos": 22.3,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "f46b5c0819d3",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 75.2,
+   "modo": "general",
+   "herramientas": 4
+  },
+  {
+   "id": "02bd1db0d170",
+   "tipo": "llamadores",
+   "puntaje": 0.0,
+   "segundos": 282.7,
+   "modo": "unidad",
+   "herramientas": 17
+  },
+  {
+   "id": "d408dee5873f",
+   "tipo": "recorrido",
+   "puntaje": 0.5,
+   "segundos": 135.5,
+   "modo": "general",
+   "herramientas": 17
+  },
+  {
+   "id": "88a2b26d87e5",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 10.3,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_13",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 10.5,
+   "modo": "unidad",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "97b588daee02": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"mostrar_kaggle\\\")\"}",
+    "resultado_caracteres": 65
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar dónde se lee \\\"mostrar_kaggle\\\" en el código\\nresultados = P.grep(r\\\"mostrar_kaggle\\\")\\nfor r in resultados:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['texto'].strip()}\\\")\"}",
+    "resultado_caracteres": 384
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver el contexto de cada uso en el backend\\nfor linea in P.leer(\\\"backend/github_stats_widget.py\\\").split(\\\"\\\\n\\\"):\\n    if \\\"mostrar_kaggle\\\" in linea:\\n        print(linea)\"}",
+    "resultado_caracteres": 68
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver el contexto alrededor de la línea 262\\nlines = P.leer(\\\"backend/github_stats_widget.py\\\").split(\\\"\\\\n\\\")\\nfor i in range(258, 270):\\n    if i < len(lines):\\n        print(f\\\"{i+1}: {lines[i]}\\\")\"}",
+    "resultado_caracteres": 99
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"lines = P.leer(\\\"backend/github_stats_widget.py\\\").split(\\\"\\\\n\\\")\\nfor i in range(255, 275):\\n    if i < len(lines):\\n        print(f\\\"{i+1}: {lines[i]}\\\")\"}",
+    "resultado_caracteres": 99
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"codigo = P.leer(\\\"backend/github_stats_widget.py\\\")\\nlines = codigo.split(\\\"\\\\n\\\")\\nfor i in range(255, 275):\\n    if i < len(lines):\\n        print(f\\\"{i+1}: {lines[i]}\\\")\"}",
+    "resultado_caracteres": 107
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver las líneas 1-500 del archivo\\nlines = P.lineas(\\\"backend/github_stats_widget.py\\\")\\nfor i in range(255, 275):\\n    if i < len(lines):\\n        print(f\\\"{i+1}: {lines[i]}\\\")\"}",
+    "resultado_caracteres": 831
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"lines = P.lineas(\\\"backend/github_stats_widget.py\\\")\\n# Buscar la función que contiene la línea 262\\nfor i in range(262, -1, -1):\\n    line = lines[i]\\n    if line.startswith(\\\"def \\\"):\\n        print(f\\\"Línea {i+1}: {line}\\\")\\n        break\"}",
+    "resultado_caracteres": 156
+   }
+  ],
+  "4216d1fce5ba": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.grep(r\\\"REFRESCO_S\\\\s*=\\\", rutas=[\\\"backend/recursos/gestor.py\\\"]))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nGestor\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.grep(r\\\"REFRESCO_S\\\\s*=\\\"))\"}",
+    "resultado_caracteres": 80
+   }
+  ],
+  "b0a312b95046": [],
+  "1f14bd2a14dd": [],
+  "4d4a33f5b809": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/librerias/citations\\\")\"}",
+    "resultado_caracteres": 291
+   }
+  ],
+  "4e95cf147642": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/github/estado\\\")\"}",
+    "resultado_caracteres": 270
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/github_lector.js\", \"desde_linea\": 230, \"hasta_linea\": 245}",
+    "resultado_caracteres": 991
+   }
+  ],
+  "37eb32849f6f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"version_suficiente\\\")\"}",
+    "resultado_caracteres": 886
+   }
+  ],
+  "f46b5c0819d3": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# 1. Quién llama a progreso.historial\\nllamadores = P.llamadores(\\\"progreso.historial\\\")\\nprint(\\\"Llamadores directos:\\\", llamadores)\\n\\n# 2. Buscar en el código quién importa progreso y llama a historial\\nimportaciones = P.grep(r\\\"from progreso import|import progreso\\\")\\nprint(\\\"\\\\nImportaciones de progreso:\\\")\\nfor imp in importaciones:\\n    print(f\\\"  {imp['ruta']}:{imp['linea']}\\\")",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver los endpoints exactos en app.py\\nlines = P.lineas(\\\"backend/app.py\\\")\\n# Buscar las rutas /api/progreso\\nfor i, line in enumerate(lines, 1):\\n    if \\\"progreso\\\" in line.lower() and (\\\"/api/\\\" in line or \\\"route\\\" in line.lower() or \\\"@app\\\" in line):\\n        print(f\\\"{i}: {line.strip()}\\\")\\n\"}",
+    "resultado_caracteres": 260
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver la implementación de cada endpoint\\nfor linea in [6335, 6390, 6396, 6401]:\\n    print(f\\\"\\\\n--- Línea {linea} ---\\\")\\n    # Imprimir 10 líneas alrededor\\n    for i in range(linea-1, min(linea+10, len(P.lineas(\\\"backend/app.py\\\")))):\\n        print(f\\\"{i+1}: {P.lineas('backend/app.py')[i]}\\\")\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "anotar",
+    "argumentos": "{\"tipo\": \"nota\", \"titulo\": \"Impacto de progreso.historial\", \"texto\": \"La función progreso.historial es llamada directamente por:\\n1. El endpoint GET /api/progreso/historial (app.py:6390-6393)\\n2. El endpoint POST /api/progreso/analisis (app.py:6405)\\n3. La función progreso.resumen (app.py:236), que a su vez es llamada por GET /api/progreso/resumen (app.py:6335-6338)\\n\\nEl frontend consume estos en",
+    "resultado_caracteres": 73
+   }
+  ],
+  "02bd1db0d170": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>user\\n<tool_response>\\n[{'s': 'Hub._crear', 'r': 'llama', 'o': 'escribir_manifiesto', 'ruta': 'backend/hub/servicio.py', 'linea': 118}\\n {'s': 'Hub.editar_manifiesto', 'invoca': 'escribir_manifiesto', 'ruta': ' llamadores resueltos al símbolo exacto: backend/h Hub.editar_manifiesto (backend/hub/s zweiere",
+    "resultado_caracteres": 84
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Hub.editar_manifiesto\"}",
+    "resultado_caracteres": 1962
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"escribir_manifiesto\\\"))</parameter>\\n</function>\\n</tool_call>\\n<tool_call>\\n<function=ver_simbolo>\\n<parameter=nombre>\\nHub._crear\"}",
+    "resultado_caracteres": 50
+   }
+  ],
+  "d408dee5873f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Primero, veamos la función recursos_ritmo\\nprint(P.codigo(\\\"recursos_ritmo\\\"))\\n\"}",
+    "resultado_caracteres": 339
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la clase gobernador\\nprint(P.codigo(\\\"gobernador\\\"))\\n\"}",
+    "resultado_caracteres": 295
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la clase Gobernador\\nprint(P.codigo(\\\"Gobernador\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la clase Ritmo y su método estado\\nprint(P.codigo(\\\"Ritmo\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la clase Monitor\\nprint(P.codigo(\\\"Monitor\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos las funciones temp_cpu y leer_sensores\\nprint(P.codigo(\\\"temp_cpu\\\"))\\nprint(\\\"---\\\")\\nprint(P.codigo(\\\"leer_sensores\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la función motores_de_prig\\nprint(P.codigo(\\\"motores_de_prig\\\"))\\n\"}",
+    "resultado_caracteres": 1193
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la función reanudar_huerfanos\\nprint(P.codigo(\\\"reanudar_huerfanos\\\"))\\n\"}",
+    "resultado_caracteres": 420
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos el método iniciar de ControladorFrio\\nprint(P.codigo(\\\"ControladorFrio.iniciar\\\"))\\n\"}",
+    "resultado_caracteres": 1978
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos el método _bucle de ControladorFrio\\nprint(P.codigo(\\\"ControladorFrio._bucle\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos el método paso de ControladorFrio\\nprint(P.codigo(\\\"ControladorFrio.paso\\\"))\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la función temp_gpu\\nprint(P.codigo(\\\"temp_gpu\\\"))\\n\"}",
+    "resultado_caracteres": 320
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la función nucleos_eficientes\\nprint(P.codigo(\\\"nucleos_eficientes\\\"))\\n\"}",
+    "resultado_caracteres": 817
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos el método estado_motor de Gobernador\\nprint(P.codigo(\\\"Gobernador.estado_motor\\\"))\\n\"}",
+    "resultado_caracteres": 449
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos las funciones leer_estado y generando\\nprint(P.codigo(\\\"motor_suave.leer_estado\\\"))\\nprint(\\\"---\\\")\\nprint(P.codigo(\\\"motor_suave.generando\\\"))\\n\"}",
+    "resultado_caracteres": 1095
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Veamos la función ruta_control\\nprint(P.codigo(\\\"motor_suave.ruta_control\\\"))\\n\"}",
+    "resultado_caracteres": 306
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# 1. Ver el endpoint recursos_ritmo\\nprint(\\\"=== Endpoint ===\\\")\\nprint(P.codigo(\\\"recursos_ritmo\\\"))\\n\\n# 2. Ver la clase Gobernador\\nprint(\\\"\\\\n=== Gobernador ===\\\")\\ngob_ficha = P.ficha(\\\"Gobernador\\\")\\nprint(gob_ficha.get('firma', 'No tiene firma directa'))\\nprint(gob_ficha.get('doc', 'No tiene doc'))\\n\\n# 3. Ver el método estado de Ritmo\\nprint(\\\"\\\\n=== Ritmo.estado ===\\\")\\nprint(",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "88a2b26d87e5": [],
+  "ind_13": []
+ },
+ "respuestas": {
+  "97b588daee02": "P.ficha(\"mostrar_kaggle\")La clave `mostrar_kaggle` no está definida como un símbolo independiente en el grafo de proyecto. Es una propiedad de configuración dentro de los diccionarios de configuración del widget de GitHub.\n\nBusquemos dónde se usa literalmente esta clave:\n\nAhora veamos qué funciones o métodos leen esta clave en el backend:\n\nAhora identifiquemos qué función/método contiene esa línea:\n\nLa clave `mostrar_kaggle` se lee en:\n\n**`generar_svg()`** en `backend/github_stats_widget.py` (línea 262).\n\nEsta función verifica `cfg.get(\"mostrar_kaggle\", True)` para decidir si incluye la tarjeta de \"Kaggle Learning\" en el SVG generado.\n\nLa clave también aparece como valor por defecto en `CONFIG_PREDETERMINADA` (línea 95) dentro del mismo archivo, pero la única función que realmente la **lee** para tomar una decisión es `generar_svg()`.",
+  "4216d1fce5ba": "La constante `REFRESCO_S` en `backend/recursos/gestor.py` vale **5**.\n\nEstá definida en la línea 25 del archivo y se usa para indicar que la radiografía de la máquina se refresca cada 5 segundos si no es explícitamente solicitada como \"fresca\".",
+  "b0a312b95046": "La función que implementa el endpoint `DELETE /api/github/guardados` es `github_quitar`, ubicada en **backend/app.py** (líneas 2592-2594).\n\n```python\n@app.delete(\"/api/github/guardados\")\ndef github_quitar(ref: str):\n    return {\"repos\": github_lector.quitar(ref)}\n```\n\nInternamente, delega en la función `quitar` del módulo `github_lector` (archivo `backend/github_lector.py`, líneas 495-499), la cual elimina el repositorio cuyo `ref` coincida (insensible a mayúsculas) de la lista de guardados y persiste el cambio en `guardados.json`.",
+  "1f14bd2a14dd": "\n[agotada: cortada a los 600 s sin terminar]",
+  "4d4a33f5b809": "P.api(\"/api/librerias/citations\")La función del frontend que llama al endpoint `/api/librerias/citations` es `selectLibrary`, ubicada en `frontend/js/book_library.js`.",
+  "4e95cf147642": "Para responder a esta pregunta, necesito encontrar qué funciones del frontend llaman al endpoint `/api/github/estado`.\n\nUsaré la herramienta `consola` para consultar el grafo de hechos del proyecto y encontrar las relaciones `llama_api` que apuntan a `/api/github/estado`.\n\nLa consulta muestra que la función `cargarToken` en `frontend/js/github_lector.js` (línea 236) es la que llama al endpoint `/api/github/estado`.\n\nVerifiquemos el contexto de esa llamada para confirmar que es una función con nombre y no un manejador anónimo:\n\nConfirmado. La función `cargarToken` en `frontend/js/github_lector.js` (línea 236) es la única función con nombre que llama al endpoint `/api/github/estado`.\n\n**Respuesta:** `cargarToken` (en `frontend/js/github_lector.js`, línea 236).",
+  "37eb32849f6f": "P.llamadores(\"version_suficiente\")Los endpoints HTTP del backend que se ven afectados directa o indirectamente por un cambio en `version_suficiente` son:\n\n1. **`/api/flujos/catalogo`** (expuesto por `flujos_catalogo` en `backend/app.py`, línea 1738): Usa `version_suficiente` para filtrar los modelos del catálogo que requieren una versión mínima de Ollama, excluyendo aquellos que el usuario no puede descargar con su versión actual.\n\n2. **`/api/flujos/descargar`** (expuesto por `flujos_descargar` en `backend/app.py`, línea 1798): Usa `version_suficiente` para verificar si la versión de Ollama del usuario es suficiente antes de permitir la descarga de ciertos modelos.\n\n3. **`/api/ollama/version`** (expuesto por `get_ollama_version_info` en `backend/app.py`, línea 3152): Usa `version_suficiente` para informar al frontend sobre las versiones mínimas requeridas de Ollama para los modelos más recientes (Qwen3, Gemma 3, Granite 3.3, Qwen3-Coder).\n\nLas pruebas unitarias en `test_catalogo_modelos.py` también usan `version_suficiente`, pero no son endpoints HTTP.",
+  "f46b5c0819d3": "Para determinar el impacto, consulto el grafo de hechos y los llamadores de `progreso.historial`.\n\n## Impacto de cambiar `progreso.historial`\n\nSi modificas la función `historial` en `backend/progreso.py`, se ven afectados los siguientes **3 endpoints HTTP**:\n\n### 1. `GET /api/progreso/historial` (app.py:6390-6393)\n```python\n@app.get(\"/api/progreso/historial\")\ndef progreso_historial(estado=None, concepto=None, fuente=None, limite=200):\n    return {\"desafios\": _desafio(progreso.historial, desafios_almacen, estado, concepto, fuente, limite)}\n```\n**Uso directo**: El frontend lo llama desde `frontend/js/progreso.js` para mostrar la lista de desafíos del alumno.\n\n### 2. `POST /api/progreso/analisis` (app.py:6401-6411)\n```python\n@app.post(\"/api/progreso/analisis\")\ndef progreso_analisis(req: ProgresoAnalisisRequest):\n    guardado = progreso.analisis_guardado()\n    filas = progreso.historial(desafios_almacen, limite=progreso.MAX_HISTORIAL)\n    # ... pasa filas al modelo para generar sugerencias\n```\n**Uso directo**: El endpoint POST usa `historial` para obtener las filas y pasarlas al modelo (local o Gemini) que genera el análisis de \"qué sigue\".\n\n### 3. `GET /api/progreso/resumen` (app.py:6335-6338)\n```python\n@app.get(\"/api/progreso/resumen\")\ndef progreso_resumen(dias=120):\n    return _desafio(progreso.resumen, desafios_almacen, guided, telemetry, dataset_mgr, dias, kaggle_lector)\n```\n**Uso indirecto**: `resumen` (app.py:236) llama internamente a `historial` como primer paso para construir el mapa de calor, los conceptos dominados, la racha, etc. Este endpoint alimenta la pestaña de Inicio (`frontend/js/inicio.js:553`).\n\n---\n\n## Frontend afectado\n\nLos consumidores directos en el cliente son:\n- **`frontend/js/progreso.js`**: Lee el historial para la tabla de desafíos.\n- **`frontend/js/inicio.js`**: Usa el resumen (que depende de historial) para mostrar racha, conceptos fuertes/flojos y actividad.\n- **`frontend/js/prig_hub.js`**: Sincroniza el progreso con Prig Hub.\n\n## Pruebas que debes ejecutar\n\n```bash\npython -m pytest backend/tests/test_progreso.py -v\n```\n\nEn particular:\n- `test_trae_todo_lo_que_hizo_el_alumno` (línea 97)\n- `test_filtros_y_orden` (línea 109)\n- `test_por_concepto` (línea 129)\n- `test_contexto_es_solo_datos` (línea 192)\n\nCualquier cambio en el formato de retorno de `historial` romperá la interfaz con el frontend si las claves del diccionario (`id`, `titulo`, `estado`, `conceptos`, etc.) cambian de nombre o desaparecen.",
+  "02bd1db0d170": "P.llamadores(\"escribir_manifiesto\")\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n...\n\n",
+  "d408dee5873f": "Para responder a esta pregunta, necesito trazar la ruta de ejecución desde el endpoint `recursos_ritmo` en `backend/app.py` hasta la clase `ControladorFrio` en `backend/recursos/frio.py`.\n\nVoy a usar la herramienta `consola` para inspeccionar el código y los hechos del proyecto.\n\nAhora voy a inspeccionar la clase `gobernador` y sus métodos para ver cómo se relaciona con `ControladorFrio`.\n\nAhora voy a ver la clase `Gobernador` y sus atributos `ritmo` y `monitor`.\n\nAhora voy a ver el método `estado` de la clase `Ritmo` y el método `lectura` de la clase `Monitor`.\n\nAhora voy a ver la clase `Monitor` y su método `lectura`.\n\nAhora voy a ver la función `temp_cpu` y la función `leer_sensores`.\n\nAhora voy a ver la función `motores_de_prig` en `frio.py`.\n\nAhora voy a ver la función `reanudar_huerfanos` en `frio.py`.\n\nAhora voy a ver el método `iniciar` de `ControladorFrio`.\n\nAhora voy a ver el método `_bucle` de `ControladorFrio`.\n\nAhora voy a ver el método `paso` de `ControladorFrio`.\n\nAhora voy a ver la función `temp_gpu` en `termico.py`.\n\nAhora voy a ver la función `nucleos_eficientes` en `ritmo.py`.\n\nAhora voy a ver el método `estado_motor` de `Gobernador`.\n\nAhora voy a ver la función `leer_estado` y la función `generando` en `motor_suave.py`.\n\nAhora voy a ver la función `ruta_control` en `motor_suave.py`.\n\n\n\nPara responder a esta pregunta, necesito trazar la ruta de ejecución desde el endpoint `recursos_ritmo` en `backend/app.py` hasta la clase `ControladorFrio` en `backend/recursos/frio.py`.\n\nVoy a usar la herramienta `consola` para inspeccionar el código y los hechos del proyecto.\n\nVoy a trazar la ejecución desde el endpoint hasta `ControladorFrio` usando la consola.\n\nLa consulta a la consola muestra que **no hay una llamada directa** desde `recursos_ritmo` hasta `ControladorFrio`. Son dos subsistemas independientes que se consultan por separado:\n\n1. **`recursos_ritmo`** (endpoint) llama a:\n   - `recursos_termico.gobernador()` → obtiene el objeto `Gobernador`\n   - `gob.ritmo.estado()` → devuelve el estado del **modo suave** (fracción de trabajo, núcleos eficientes)\n   - `gob.estado_motor()` → devuelve el estado del **motor suave** (instalado, generando, fracción)\n\n2. **`ControladorFrio`** es una clase en `frio.py` que se usa para controlar la temperatura de la CPU pausando motores en RAM, pero **no se invoca desde `recursos_ritmo`**.\n\nLa confusión viene porque ambos módulos (`ritmo.py` y `frio.py`) son parte del sistema de gestión térmica, pero operan en capas distintas:\n\n- **Modo suave** (`ritmo.py`): ajusta la fracción de trabajo del motor MoE para no sobrecalentar.\n- **Modo frío** (`frio.py`): congela/reanuda procesos de modelos que no caben en la GPU.\n\nEl endpoint `/api/recursos/ritmo` solo expone el estado del modo suave y del motor suave, no del modo frío. Para ver el estado del modo frío, hay que consultar el almacenamiento (`recursos_almacen.frio()`).\n\n**Respuesta:** La ejecución **no pasa** por `ControladorFrio` desde `recursos_ritmo`. Son rutas separadas:\n1. `recursos_ritmo` → `recursos_termico.gobernador()` → `gob.ritmo.estado()` y `gob.estado_motor()`\n2. `ControladorFrio` se usa en otro contexto (iniciación del modo frío), no en este endpoint.",
+  "88a2b26d87e5": "`github_widget_guardar_config` está definida en **`backend/app.py`**.\n\nSe puede ver en el bloque de código proporcionado, dentro del apartado de \"WIDGET GITHUB PROFILE\", donde se define como:\n\n```python\n@app.post(\"/api/github/widget/config\")\ndef github_widget_guardar_config(req: GithubWidgetConfigRequest):\n    cfg = github_stats_widget.guardar_config(req.config)\n    return {\"ok\": True, \"config\": cfg}\n```",
+  "ind_13": "Si se llama a `validar_paginas` con 9 páginas, se lanza una excepción `ErrorDesafio` con el mensaje: `\"Como mucho 8 páginas.\"`\n\nEsto ocurre porque en la función `validar_paginas` (línea 38 de `backend/desafios/ejecucion.py`) hay una comprobación explícita contra la constante `MAX_PAGINAS`:\n\n```python\nif len(paginas) > MAX_PAGINAS:\n    raise ErrorDesafio(f\"Como mucho {MAX_PAGINAS} páginas.\")\n```\n\nY `MAX_PAGINAS` está definida en la línea 26 como `8`."
+ },
+ "aceptado_tras_revision": {
+  "motivo_del_fallo": "el modelo escribió una nota con la herramienta anotar (12:07:47, pregunta f46b5c0819d3); memoria=False no lo impide",
+  "revision": "la única pregunta posterior en modo general (d408dee5873f, recorrido recursos_ritmo → ControladorFrio) no tiene relación con la nota, no consultó la memoria y no la menciona; las de modo unidad no reciben notas en el contexto. Sin evidencia de exposición: se conserva el lote (repetirlo por algo que salió mal sesgaría la muestra).",
+  "nota": "guardada en e7/fallidos/nota_del_modelo_lote10.json y borrada del banco; desde el lote 11 el arnés borra después de cada pregunta lo que escriba el modelo"
+ }
+}

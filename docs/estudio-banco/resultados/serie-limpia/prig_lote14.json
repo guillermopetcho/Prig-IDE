@@ -1,0 +1,263 @@
+{
+ "lote": 14,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5213,
+   "temp_c": 58
+  }
+ },
+ "media": 1.0,
+ "segundos": 287,
+ "modos": {
+  "general": 6,
+  "unidad": 6
+ },
+ "por_tipo": {
+  "frontend": 1.0,
+  "recorrido": 1.0,
+  "impacto": 1.0,
+  "llamadores": 1.0,
+  "entorno": 1.0,
+  "config": 1.0,
+  "ubicacion": 1.0,
+  "constante": 1.0,
+  "endpoint": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "064e585043be",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 37.8,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "785ff497747f",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 6.7,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "981d5099abea",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 34.6,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "4ddd9c884844",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 19.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8a7b6ca9de4d",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 25.2,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "12cbce4d19e0",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 21.9,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "a2484e9b66f4",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 10.7,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "61949e22dbe5",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 27.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "cd89a4a6fab3",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 19.7,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "82f0da41af3c",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 20.4,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "353ef0ab1484",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 40.3,
+   "modo": "general",
+   "herramientas": 4
+  },
+  {
+   "id": "8b5298ef8c06",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 23.4,
+   "modo": "unidad",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "064e585043be": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"tema\\\")\"}",
+    "resultado_caracteres": 108
+   }
+  ],
+  "785ff497747f": [],
+  "981d5099abea": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.grep(r'/api/buscador/', maximo=20)\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/app.py\", \"desde_linea\": 5979, \"hasta_linea\": 5998}",
+    "resultado_caracteres": 1436
+   }
+  ],
+  "4ddd9c884844": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"ruta_config\\\")\"}",
+    "resultado_caracteres": 992
+   }
+  ],
+  "8a7b6ca9de4d": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_entorno\\\", o=\\\"BROWSER\\\")\\nprint(f\\\"Encontrados: {len(hechos)}\\\")\\nfor h in hechos:\\n    print(f\\\"{h['s']} en {h['ruta']}:{h['linea']}\\\")\"}",
+    "resultado_caracteres": 129
+   }
+  ],
+  "12cbce4d19e0": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar llamadas al endpoint /api/modelos/catalogo en archivos JS\\nresultados = P.grep(\\\"modelos/catalogo\\\", maximo=50)\\nfor r in resultados:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['texto'][:200]}\\\")\\n\"}",
+    "resultado_caracteres": 186
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/modelos.js\", \"desde_linea\": 80, \"hasta_linea\": 130}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "a2484e9b66f4": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/github/widget/preview\\\")\"}",
+    "resultado_caracteres": 301
+   }
+  ],
+  "61949e22dbe5": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.impacto(\\\"ruta_config\\\"))\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "cd89a4a6fab3": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\nP.impacto(\\\"analisis_guardado\\\")\\n\"}",
+    "resultado_caracteres": 375
+   }
+  ],
+  "82f0da41af3c": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores('estilos')\"}",
+    "resultado_caracteres": 842
+   }
+  ],
+  "353ef0ab1484": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver la función modelos_importar completa\\ncodigo = P.codigo(\\\"modelos_importar\\\")\\nprint(codigo)\\n\"}",
+    "resultado_caracteres": 736
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver la función _ndjson\\ncodigo = P.codigo(\\\"_ndjson\\\")\\nprint(codigo)\\n\"}",
+    "resultado_caracteres": 610
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver la función importar_gguf\\ncodigo = P.codigo(\\\"importar_gguf\\\")\\nprint(codigo)\\n\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver la función _flujo_cancelable\\ncodigo = P.codigo(\\\"_flujo_cancelable\\\")\\nprint(codigo)\\n\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "8b5298ef8c06": []
+ },
+ "respuestas": {
+  "064e585043be": "Busco en el grafo de hechos qué símbolos tienen la relación `lee_config` con el objeto `tema`.\n\nLa única función que lee la clave de configuración `tema` es:\n\n- **`generar_svg`** en `backend/github_stats_widget.py` (línea 217)",
+  "785ff497747f": "En el archivo `backend/memoria_consulta.py`, la constante `MAX_LLM_POR_RESPUESTA` vale **24**.\n\nSe define en la línea 19 del módulo:\n```python\nMAX_LLM_POR_RESPUESTA = 24          # medido: sin tope por respuesta, una pregunta tardó 30 min en subllamadas\n```",
+  "981d5099abea": "No existe el endpoint `GET /api/buscador/buscar`.\n\nBusco en el código los endpoints que contengan \"buscador\":\n\nEl endpoint existe. Veo su implementación:\n\nEl endpoint `GET /api/buscador/buscar` está implementado en **`backend/app.py:5979`** y su función es **`buscador_buscar`**.\n\n**Qué hace:**\n\n1. Recibe los parámetros de consulta (`q`), las fuentes a buscar (`ollama`, `huggingface`, `modelscope` por defecto), el orden, la capacidad de GPU y las páginas de paginación por fuente.\n2. Llama a **`buscador_modelos.buscar()`** (archivo `backend/buscador_modelos.py:486`) que ejecuta las búsquedas en paralelo usando `ThreadPoolExecutor` y combina los resultados de las tres plataformas.\n3. Marca cada modelo con dos campos adicionales:\n   - `seguido`: si el usuario lo sigue en Prig Hub\n   - `instalado`: si ya tiene alguna variante descargada en la máquina\n4. Devuelve el resultado con los modelos de cada fuente.",
+  "4ddd9c884844": "P.llamadores(\"ruta_config\")Las funciones/métodos del proyecto que leen la variable de entorno `PRIG_GEMINI_ARCHIVO` son:\n\n1. **`ruta_config()`** en `backend/gemini_motor.py` (línea 63): es la función que devuelve la ruta del archivo de configuración de Gemini, usando `PRIG_GEMINI_ARCHIVO` como valor por defecto.\n2. **`_leer()`** en `backend/gemini_motor.py` (línea 67): lee el archivo de configuración y llama internamente a `ruta_config()` para saber dónde está.\n3. **`guardar_clave()`** en `backend/gemini_motor.py` (línea 132): guarda la clave de API y usa `ruta_config()` para saber dónde guardarla.\n4. **`borrar_clave()`** en `backend/gemini_motor.py` (línea 145): borra el archivo de configuración y usa `ruta_config()` para saber qué archivo borrar.\n\nAdemás, hay pruebas en `backend/tests/test_gemini.py` que también hacen referencia a `ruta_config()`, pero estas son funciones de test, no del código principal del proyecto.",
+  "8a7b6ca9de4d": "Voy a consultar el grafo de hechos para encontrar quién lee esa variable de entorno.\n\nLas funciones que leen la variable de entorno `BROWSER` son:\n\n1. **`_lanzar_navegador_sistema`** en `backend/app.py:6986`\n2. **`obtener_navegador_ejecutable`** en `main.py:25`",
+  "12cbce4d19e0": "Voy a buscar dónde se llama al endpoint `/api/modelos/catalogo` en el frontend.\n\nAhora veo que la llamada está en `frontend/js/modelos.js` línea 105. Voy a ver qué función contiene esa línea:\n\nLa llamada al endpoint `/api/modelos/catalogo` está dentro de la función **`abrir`** en `frontend/js/modelos.js:105`.\n\nLa función `abrir` (línea 89) es la encargada de abrir el modal de modelos y, entre otras cosas, carga el catálogo desde el backend si aún no está en el estado.",
+  "a2484e9b66f4": "La función del frontend que llama al endpoint `/api/github/widget/preview` es **`actualizarPreview`**, ubicada en `frontend/js/github_widget.js` (línea 629).",
+  "61949e22dbe5": "Cambiar el comportamiento de `ruta_config` afecta a los siguientes endpoints HTTP del backend:\n\n**Endpoints relacionados directamente con la clave de Gemini:**\n- `GET /api/gemini/estado`\n- `DELETE /api/gemini/clave`\n\n**Endpoints de desafíos (usan la clave para conectar con Gemini):**\n- `POST /api/desafios/crear`\n- `POST /api/desafios/chat`\n- `POST /api/desafios/analizar-propuesta`\n- `POST /api/desafios/evaluar-salida`\n- `POST /api/desafios/*/plan`\n- `POST /api/desafios/*/pista`\n- `POST /api/desafios/*/razonamiento`\n- `POST /api/desafios/*/reflexion`\n- `POST /api/desafios/*/traducir`\n- `POST /api/desafios/github/replicar`\n- `GET /api/desafios/internet/buscar`\n\n**Endpoints de chat AI y otros módulos (también usan `clave_actual()` que lee `ruta_config`):**\n- `POST /api/ai/chat`\n- `POST /api/github/explicar`\n- `POST /api/github/preguntar`\n- `POST /api/kaggle/explicar`\n- `POST /api/kaggle/explicar_datos`\n- `POST /api/kaggle/guia`\n- `POST /api/kaggle/notebook/estudio_optimo`\n- `POST /api/kaggle/preguntar`\n- `POST /api/progreso/analisis`\n- `POST /api/youtube/analizar`\n- `POST /api/youtube/crear-desafio`\n- `POST /api/youtube/traducir_texto`\n\nEn total son **26 endpoints** que, directa o indirectamente, dependen de `ruta_config` porque llaman a funciones que a su vez leen la configuración de la clave de Gemini.",
+  "cd89a4a6fab3": "Si cambias el comportamiento de `analisis_guardado` en `backend/progreso.py`, los endpoints HTTP del backend afectados directa o indirectamente son:\n\n1. **`GET /api/progreso/analisis`** — expuesto por `progreso_analisis_guardado` en `backend/app.py`, que llama a `analisis_guardado()` para leer el análisis previo.\n2. **`POST /api/progreso/analisis`** — expuesto por `progreso_analisis` en `backend/app.py`, que llama a `guardar_analisis()` (que a su vez lee/usa la misma ruta que `analisis_guardado`) para persistir el nuevo análisis.\n\nAmbos endpoints dependen de `analisis_guardado` para leer el análisis guardado, por lo que cualquier cambio en su comportamiento (formato, ruta, estructura de datos) afectará directamente a estas dos rutas API.",
+  "82f0da41af3c": "En `frontend/js/prig_hub.js`, la función `estilos` es llamada por:\n\n- **`montar`** (línea 210): Es el único llamador dentro de `prig_hub.js`. `montar` se encarga de inicializar el panel de Prig Hub y, en su primer paso, inyecta los estilos CSS en el `<head>` del documento.\n\nLas otras llamadas a funciones llamadas `estilos` que devuelve la consulta son de **otros archivos** (`buscador_modelos.js`, `desafios.js`, `progreso.js`, etc.), ya que cada módulo tiene su propia función `estilos` con un nombre idéntico pero ámbito independiente.",
+  "353ef0ab1484": "Voy a rastrear el flujo de ejecución desde `modelos_importar` hasta `_flujo_cancelable.emitir`.\n\nLa ejecución pasa por estas funciones en orden:\n\n1. **`modelos_importar`** (app.py:5828) — Endpoint que recibe la petición POST, valida la ruta y llama a `_ndjson(gestor_modelos.importar_gguf(ruta, req.nombre))`.\n\n2. **`gestor_modelos.importar_gguf`** (ollama_gestion.py:181) — Método de `GestorModelos` que es un generador (`Generator[Dict, None, None]`). Calcula la huella SHA-256, sube el blob a Ollama y crea el modelo. Va `yield`-eando eventos de progreso (`{\"fase\": \"huella\", ...}`, `{\"fase\": \"subida\", ...}`, `{\"fase\": \"creando\", ...}`, `{\"fase\": \"listo\", ...}`).\n\n3. **`_ndjson`** (app.py:5618) — Recibe el generador de `importar_gguf`. Define una función interna `emitir()` que envuelve cada evento en JSON con formato NDJSON. Luego llama a `_flujo_cancelable(emitir())` y devuelve un `StreamingResponse`.\n\n4. **`_flujo_cancelable`** (app.py:5054) — Recibe `emitir` (generador síncrono). Como no tiene `__aiter__`, crea una cola y un hilo. Define la función interna `correr()` que ejecuta el generador en otro hilo, y `emitir()` (async) que lee de la cola y `yield`-ea los trozos. Finalmente retorna `emitir()` (que es un generador asíncrono).\n\n5. **`_flujo_cancelable.emitir`** (app.py:5088) — Es el generador asíncrono devuelto por `_flujo_cancelable`. Se ejecuta en el hilo principal de FastAPI/Starlette, leyendo de la cola mientras `correr()` produce eventos desde `importar_gguf`. Si el cliente se desconecta, se cancela mediante `cancelar.set()`.\n\n**Resumen del flujo:**\n```\nmodelos_importar\n  → gestor_modelos.importar_gguf (generador síncrono con eventos de progreso)\n    → _ndjson (envuelve en NDJSON)\n      → _flujo_cancelable (crea hilo + cola + generador asíncrono)\n        → emitir (generador async que lee de la cola y yield-ea al cliente)\n```",
+  "8b5298ef8c06": "La función `importDocumentFile` está definida en el archivo **`frontend/js/book_library.js`**.\n\nEspecíficamente, es un método de la clase `BookLibraryManager`. Se encuentra alrededor de la **línea 902** del archivo, dentro del bloque `async importDocumentFile()` que gestiona la importación de archivos PDF o de código a la biblioteca de conocimiento."
+ }
+}

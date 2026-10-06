@@ -1,0 +1,11 @@
+[
+ {
+  "id": 1,
+  "tipo": "nota",
+  "titulo": "Impacto de progreso.historial",
+  "texto": "La función progreso.historial es llamada directamente por:\n1. El endpoint GET /api/progreso/historial (app.py:6390-6393)\n2. El endpoint POST /api/progreso/analisis (app.py:6405)\n3. La función progreso.resumen (app.py:236), que a su vez es llamada por GET /api/progreso/resumen (app.py:6335-6338)\n\nEl frontend consume estos endpoints desde:\n- frontend/js/progreso.js (líneas 89, 90, 91, 258)\n- frontend/js/inicio.js (línea 553)\n- frontend/js/prig_hub.js (línea 366)",
+  "rutas": "[\"backend/app.py\", \"backend/progreso.py\", \"frontend/js/inicio.js\", \"frontend/js/prig_hub.js\", \"frontend/js/progreso.js\"]",
+  "origen": "modelo",
+  "creado": "2026-10-03T12:07:47"
+ }
+]

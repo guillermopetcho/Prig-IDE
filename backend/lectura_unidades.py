@@ -23,12 +23,14 @@ El prefijo de cada lectura va por capas, lo más estable primero:
 El estado se guarda justo al final del código; lo que se pregunte después va en otro mensaje.
 """
 
+import glob
 import hashlib
 import json
 import os
+import sqlite3
 import time
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 # El sistema va en el prefijo guardado: corto y fijo. Todo lo que puede cambiar (la guía y la API de
 # la consola, el contexto del grafo) va con cada pregunta; si no, cada mejora obligaría a releer las 94
@@ -258,9 +260,75 @@ class LectorUnidades:
                        datetime.now().isoformat(timespec="seconds")))
         return salida
 
+    def reasignar(self) -> int:
+        """ Tras reparticionar, los números de las unidades se corren. Se reasignan DE UNA VEZ las lecturas
+        cuya llave sigue existiendo (y cuyo estado sigue en disco). Antes se hacía unidad por unidad dentro de
+        la pasada: cada INSERT OR REPLACE por número pisaba el registro de otra unidad todavía válida que aún no
+        se había procesado, y se regeneraban resúmenes de unidades ya leídas (medido: 5 de 96 vigentes cuando
+        66 podían reusarse; docs/estudio-banco.md). Devuelve cuántas quedaron asignadas. """
+        from ai_engine import motor_moe
+        with self.banco.conectar() as c:
+            _crear_tabla(c)
+            filas = [dict(f) for f in c.execute("SELECT * FROM lecturas")]
+            por_llave: Dict[str, Dict[str, Any]] = {}
+            for f in filas:
+                if f["archivo"] and os.path.exists(os.path.join(motor_moe.CARPETA_PROYECTOS, f["archivo"])):
+                    por_llave.setdefault(f["llave"], f)
+            nuevas = [{**por_llave[k], "orden": orden} for orden, u in self._unidades.items()
+                      if (k := json.dumps(self.llave(u))) in por_llave]
+            # Los estados de las lecturas que ya no sirven (su unidad cambió) se borran ahora. Si quedan, el tope
+            # de disco del motor desaloja por antigüedad y se lleva estados VÁLIDOS antes que esta basura
+            # (medido: 6 unidades vigentes perdidas al releer 30; docs/estudio-banco.md)
+            en_uso = {f["archivo"] for f in nuevas}
+            ajenos = self._estados_de_otros_bancos()
+            for f in filas:
+                if f["archivo"] and f["archivo"] not in en_uso and ajenos is not None and f["archivo"] not in ajenos:
+                    for ruta in (os.path.join(motor_moe.CARPETA_PROYECTOS, f["archivo"]),
+                                 os.path.join(motor_moe.CARPETA_PROYECTOS, f["archivo"][:-4] + ".calientes.json")):
+                        try:
+                            os.remove(ruta)
+                        except OSError:
+                            pass
+            c.execute("DELETE FROM lecturas")
+            if nuevas:
+                columnas = list(nuevas[0].keys())
+                c.executemany(f"INSERT INTO lecturas ({', '.join(columnas)}) VALUES ({', '.join('?' * len(columnas))})",
+                              [[f[k] for k in columnas] for f in nuevas])
+        return len(nuevas)
+
+    def _estados_de_otros_bancos(self) -> Optional[Set[str]]:
+        """ Los estados del motor que usan las lecturas de OTROS bancos. La carpeta de estados es una sola para todos:
+        dos carpetas con el mismo nombre y el mismo código (un clon, una copia) producen el mismo prefijo y comparten
+        el estado. reasignar() borraba los que SU banco ya no usaba aunque otro los siguiera usando (visto en el
+        estudio: la copia de prueba le habría quitado lecturas al banco real; docs/estudio-banco.md). None si algún
+        banco no se pudo leer: entonces no se borra nada (es preferible dejar basura a perder lecturas válidas). """
+        import banco_proyecto as bp
+        carpetas = {os.path.dirname(os.path.abspath(self.banco.carpeta)), os.path.abspath(bp.carpeta_bancos()),
+                    os.path.abspath(os.path.expanduser("~/.prig_bancos"))}
+        propio = os.path.abspath(self.banco.ruta_db)
+        usados: Set[str] = set()
+        for carpeta in carpetas:
+            for db in glob.glob(os.path.join(carpeta, "*", "banco.db")):
+                if os.path.abspath(db) == propio:
+                    continue
+                try:
+                    c = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+                    try:
+                        usados |= {f[0] for f in c.execute("SELECT archivo FROM lecturas") if f[0]}
+                    finally:
+                        c.close()
+                except sqlite3.OperationalError as e:
+                    if "no such table" not in str(e):
+                        return None            # ocupada o ilegible: no se sabe qué usa
+                except sqlite3.Error:
+                    return None
+        return usados
+
     def pasada(self, ordenes: Optional[List[int]] = None, progreso: Optional[Callable[[Dict[str, Any]], None]] = None,
                cancelar=None) -> List[Dict[str, Any]]:
         salida = []
+        if ordenes is None:
+            self.reasignar()
         for orden in (ordenes if ordenes is not None else sorted(self._unidades)):
             if cancelar is not None and cancelar.is_set():
                 break

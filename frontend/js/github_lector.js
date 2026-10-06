@@ -735,11 +735,20 @@
         }
         const esCodigo = /\.(py|cpp|cc|cxx|c|hpp|h|ipynb)$/i.test(a.ruta);
         const esCuaderno = /\.ipynb$/i.test(a.ruta);
+        const favKey = 'gh:' + (estado.repo ? estado.repo.ref : '') + ':' + a.ruta;
+        let esFav = false;
+        try {
+            const favs = new Set(JSON.parse(localStorage.getItem('prig_desafios_favoritos') || '[]'));
+            esFav = favs.has(favKey);
+        } catch (e) {}
+
         const cabecera = `<div class="gh-fila gh-ayuda" style="padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.06); position:sticky; top:0; background:var(--bg-dark); z-index:1;">
             <i class="fa-regular ${esCuaderno ? 'fa-note-sticky' : 'fa-file-code'}"></i> <b style="color:#fff;">${esc(a.ruta)}</b> · ${esCuaderno ? 'cuaderno Jupyter' : `${a.lineas} líneas`} · ${tam(a.bytes)}
             <span style="flex:1"></span>
             ${esCuaderno ? `<button class="gh-btn" id="gh-ver-json" title="Alternar entre el cuaderno y su JSON">${estado.verJson ? '<i class="fa-solid fa-book-open"></i> Ver cuaderno' : '<i class="fa-solid fa-code"></i> Ver JSON'}</button>` : ''}
-            ${esCodigo ? '<button class="gh-btn verde" id="gh-replicar-desafio" title="Replicar este archivo como un desafío interactivo en Prig"><i class="fa-solid fa-chess-knight"></i> Replicar como Desafío</button>' : ''}
+            ${esCodigo ? `
+              <button class="gh-btn ${esFav ? 'amarillo' : ''}" id="gh-fav-desafio" title="${esFav ? 'Quitar de favoritos' : 'Guardar como favorito'}"><i class="fa-${esFav ? 'solid' : 'regular'} fa-star"></i></button>
+              <button class="gh-btn verde" id="gh-replicar-desafio" title="Replicar este archivo como un desafío interactivo en Prig"><i class="fa-solid fa-chess-knight"></i> Replicar como Desafío</button>` : ''}
             <button class="gh-btn" id="gh-volver-readme">README</button></div>`;
         if (a.lenguaje === 'markdown') {
             c.innerHTML = cabecera + '<div class="gh-md" id="gh-md-archivo"></div>';
@@ -760,6 +769,19 @@
         $('gh-volver-readme').onclick = () => { estado.archivo = null; pintarArbol(); pintarCentro(); pintarExplicacion(); };
         const verJson = $('gh-ver-json');
         if (verJson) verJson.onclick = () => { estado.verJson = !estado.verJson; pintarCentro(); };
+        const btnFav = $('gh-fav-desafio');
+        if (btnFav) btnFav.onclick = () => {
+            try {
+                const favs = new Set(JSON.parse(localStorage.getItem('prig_desafios_favoritos') || '[]'));
+                if (favs.has(favKey)) favs.delete(favKey);
+                else favs.add(favKey);
+                localStorage.setItem('prig_desafios_favoritos', JSON.stringify([...favs]));
+                if (window.Desafios && window.Desafios.estado) {
+                    window.Desafios.estado.favoritos = favs;
+                }
+            } catch (e) {}
+            pintarCentro();
+        };
         const btnRep = $('gh-replicar-desafio');
         if (btnRep) btnRep.onclick = async () => {
             btnRep.disabled = true;
@@ -784,6 +806,14 @@
                         }
                     }
                 });
+                if (esFav && r && r.id) {
+                    try {
+                        const favs = new Set(JSON.parse(localStorage.getItem('prig_desafios_favoritos') || '[]'));
+                        favs.add(r.id);
+                        localStorage.setItem('prig_desafios_favoritos', JSON.stringify([...favs]));
+                        if (window.Desafios && window.Desafios.estado) window.Desafios.estado.favoritos = favs;
+                    } catch (e) {}
+                }
                 if (window.Desafios && window.Desafios.abrir) {
                     window.Desafios.abrir({ id: r.id });
                 } else {

@@ -1,0 +1,256 @@
+{
+ "lote": 8,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5229,
+   "temp_c": 57
+  }
+ },
+ "media": 0.889,
+ "segundos": 338,
+ "modos": {
+  "general": 5,
+  "unidad": 7
+ },
+ "por_tipo": {
+  "ejecucion": 1.0,
+  "recorrido": 1.0,
+  "llamadores": 1.0,
+  "endpoint": 1.0,
+  "impacto": 0.0,
+  "frontend": 0.667,
+  "constante": 1.0,
+  "config": 1.0,
+  "entorno": 1.0,
+  "ubicacion": 1.0
+ },
+ "distintos_a_la_corrida_final": [
+  {
+   "id": "99ac6130926e",
+   "antes": 0.667,
+   "ahora": 1.0
+  }
+ ],
+ "limite_s": 600,
+ "agotadas": [],
+ "resultados": [
+  {
+   "id": "92462378c98c",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.3,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "99ac6130926e",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 15.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "742cd0dff057",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 7.1,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "b135fc33d9e6",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 5.3,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "0d83a529f3a3",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 29.4,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "882da1634d8b",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 13.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "530e800a411b",
+   "tipo": "frontend",
+   "puntaje": 0.667,
+   "segundos": 51.3,
+   "modo": "general",
+   "herramientas": 5
+  },
+  {
+   "id": "29b468d8a2cb",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 43.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "4480b3119585",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 21.3,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "c6ec7f7ca24a",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 68.7,
+   "modo": "general",
+   "herramientas": 3
+  },
+  {
+   "id": "b6c9ca4e2eb2",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 4.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_09",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 35.0,
+   "modo": "general",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "92462378c98c": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_config\\\", o=\\\"vatios\\\", limite=50)\\nprint(f\\\"Total de hechos que leen 'vatios': {len(hechos)}\\\")\\nfor h in hechos:\\n    print(f\\\"{h['s']} en {h['ruta']}:{h['linea']}\\\")\\n\"}",
+    "resultado_caracteres": 95
+   }
+  ],
+  "99ac6130926e": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"last_workspace\\\")\"}",
+    "resultado_caracteres": 261
+   }
+  ],
+  "742cd0dff057": [],
+  "b135fc33d9e6": [],
+  "0d83a529f3a3": [],
+  "882da1634d8b": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_ENERGIA_AYUDANTE\\\", limite=500))\"}",
+    "resultado_caracteres": 246
+   }
+  ],
+  "530e800a411b": [
+   {
+    "nombre": "buscar_en_archivos",
+    "argumentos": "{\"texto\": \"modelos/descargar\"}",
+    "resultado_caracteres": 446
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/modelos.js\", \"desde_linea\": 250, \"hasta_linea\": 290}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/modelos.js\", \"desde_linea\": 600, \"hasta_linea\": 640}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/modelos.js\", \"desde_linea\": 180, \"hasta_linea\": 250}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/modelos.js\", \"desde_linea\": 100, \"hasta_linea\": 180}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "29b468d8a2cb": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"rebind_workspace\\\")\"}",
+    "resultado_caracteres": 932
+   }
+  ],
+  "4480b3119585": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"registro_de\\\")\"}",
+    "resultado_caracteres": 627
+   }
+  ],
+  "c6ec7f7ca24a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# 1. Ver quién llama a modelos_config_fijar (el endpoint)\\nprint(\\\"=== Llamadores de modelos_config_fijar ===\\\")\\nllamadores = P.llamadores(\\\"modelos_config_fijar\\\")\\nprint(llamadores)\\n\\n# 2. Ver el código de modelos_config_fijar para ver a qué llama internamente\\nprint(\\\"\\\\n=== Código de modelos_config_fijar ===\\\")\\nprint(P.codigo(\\\"modelos_config_fijar\\\"))\\n\\n# 3. Ver el código de _",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver la función config() de ollama_opciones\\nprint(\\\"=== Código de ollama_opciones.config ===\\\")\\nprint(P.codigo(\\\"config\\\"))\\n\\n# Ver si hay una instancia global o cómo se crea\\nprint(\\\"\\\\n=== Búsqueda de 'config' en ollama_opciones ===\\\")\\nresultados = P.grep(r\\\"config\\\\s*=\\\", rutas=[\\\"backend/ollama_opciones.py\\\"])\\nfor r in resultados:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['t",
+    "resultado_caracteres": 475
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver __init__ de ConfigModelos\\nprint(\\\"=== ConfigModelos.__init__ ===\\\")\\nprint(P.codigo(\\\"ConfigModelos.__init__\\\"))\\n\\n# La pregunta es: ¿por qué desde modelos_config_fijar llega a _leer?\\n# La respuesta es: NO llega directamente. _leer se llama en la inicialización de ConfigModelos.\\n# Pero el endpoint llama a config().fijar(), y config() crea el ConfigModelos si no existe,\\n# lo ",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "b6c9ca4e2eb2": [],
+  "ind_09": []
+ },
+ "respuestas": {
+  "92462378c98c": "Necesito verificar los hechos del grafo del proyecto para encontrar quién lee la configuración `vatios`.\n\nLa función **`_frio_estado`** en `backend/app.py:5465` es la que lee la clave de configuración `vatios`.\n\nEspecíficamente, la línea 5465 del archivo `backend/app.py` contiene:\n\n```python\n\"vatios\": int(ajustes.get(\"vatios\") or 20)\n```\n\nEsta función obtiene el valor de `vatios` desde el almacén de recursos (`recursos_almacen().frio()`) y devuelve el estado actual de la configuración de energía fría.",
+  "99ac6130926e": "P.hechos(r=\"lee_config\", o=\"last_workspace\")Dos métodos leen la clave `last_workspace` de la configuración:\n\n1.  **`FileManager._load_last_workspace`** (en `backend/file_manager.py`, línea 68): Se encarga de cargar el último espacio de trabajo al inicializar el gestor de archivos.\n2.  **`ServiciosIDE.anotar_reciente`** (en `backend/ide_servicios.py`, línea 285): Actualiza o lee la configuración para gestionar los espacios de trabajo recientes.",
+  "742cd0dff057": "La constante `MAX_PASOS` en `backend/agent_flows.py` vale 12.",
+  "b135fc33d9e6": "La constante `TIPO_CADENA` en `backend/recursos/gguf.py` vale **8**.",
+  "0d83a529f3a3": "La función que implementa el endpoint `POST /api/github/descargar` es `github_descargar`, ubicada en **`backend/app.py`** (líneas 2597-2610).\n\nAquí está el código literal:\n\n```python\n@app.post(\"/api/github/descargar\")\ndef github_descargar(req: GithubRefRequest):\n    \"\"\" El repositorio en <proyecto>/github_repos/<nombre>/ (NDJSON con el progreso) \"\"\"\n    cancelar = threading.Event()\n    with ai_engine._streams_lock:\n        ai_engine.__dict__.setdefault(\"_cancelables\", set()).add(cancelar)\n\n    def trabajo(avisar):\n        try:\n            return github_lector.descargar(req.ref, file_mgr.base_dir, avisar, cancelar)\n        finally:\n            with ai_engine._streams_lock:\n                ai_engine._cancelables.discard(cancelar)\n    return _ndjson_en_hilo(trabajo)\n```\n\n**Resumen del flujo:**\n1. Crea un evento `cancelar` para permitir la interrupción de la descarga.\n2. Registra este evento en el conjunto `_cancelables` del motor de IA para que pueda ser interrumpido si el usuario lo solicita.\n3. Define una función interna `trabajo` que llama a `github_lector.descargar(req.ref, ...)` pasando la referencia del repositorio, el directorio base, una función `avisar` para el progreso y el evento de cancelación.\n4. Ejecuta `trabajo` en un hilo separado usando `_ndjson_en_hilo`, lo que permite enviar actualizaciones de progreso al frontend mientras se descarga y descomprime el repositorio.",
+  "882da1634d8b": "Las funciones que leen la variable de entorno `PRIG_ENERGIA_AYUDANTE` son:\n\n1. **`instalacion`** (línea 62 de `backend/recursos/energia.py`)\n2. **`_ayudante`** (línea 41 de `backend/recursos/energia.py`)\n\nAmbas están definidas en el módulo `backend/recursos/energia.py`.",
+  "530e800a411b": "Para encontrar dónde se llama al endpoint `/api/modelos/descargar` en el frontend, busco el texto \"modelos/descargar\" en los archivos JavaScript.\n\nHay dos llamadas en `frontend/js/modelos.js`. Veo el contexto de ambas para identificar los nombres de las funciones que las contienen.\n\nAhora veo que la línea 277 está dentro de una función anterior. Busco el nombre de esa función para la primera llamada.\n\nPerfecto, ya tengo la información completa. La primera llamada está dentro de la función `ajustes` (línea 158) y la segunda dentro de `cargados` (línea 604).\n\nLas llamadas al endpoint `/api/modelos/descargar` en el frontend se encuentran dentro de estas dos funciones:\n\n1. **`ajustes`** (`frontend/js/modelos.js:277-280`) — Se ejecuta cuando el usuario pulsa el botón \"Descargar de memoria\" en la pestaña Ajustes. Llama a `post('/api/modelos/descargar', { modelo: m.nombre })` donde `m.nombre` es el modelo seleccionado actualmente.\n\n2. **`cargados`** (`frontend/js/modelos.js:623-627`) — Se ejecuta cuando el usuario pulsa el botón \"Descargar\" (icono de flecha abajo) en la tabla de modelos que están actualmente en memoria (RAM/VRAM). Llama a `post('/api/modelos/descargar', { modelo: b.dataset.descargar })` donde `b.dataset.descargar` contiene el nombre del modelo de esa fila.\n\nNota: También hay una llamada en `frontend/js/ai_chat.js:96`, pero esa es una llamada genérica de `fetch` directa (no usando la función `post` helper) desde el chat, probablemente para descargar el modelo antes de enviar un mensaje.",
+  "29b468d8a2cb": "P.ficha(\"rebind_workspace\")**Endpoints HTTP afectados directa o indirectamente:**\n\nLa función `rebind_workspace` es llamada por los endpoints **`open_workspace`** (línea 2878) y **`browse_workspace`** (línea 2887). Por lo tanto, estos dos endpoints son los que **directamente** ven afectado su comportamiento si se cambia `rebind_workspace`, ya que es dentro de ellos donde se reapuntan los repositorios al nuevo workspace.\n\n**Indirectamente**, al cambiar `rebind_workspace` se modifican las instancias de las siguientes clases que son usadas por múltiples endpoints del backend:\n\n1.  **`StudyPlanEngine`**: Usado por endpoints de planes de estudio y aprendizaje guiado.\n2.  **`SeguimientoRepository`**: Usado para el seguimiento del progreso.\n3.  **`LearnerDatasetManager`**: Usado para la gestión de datasets de aprendizaje.\n4.  **`LearningTelemetry`**: Usado por endpoints de métricas de aprendizaje y ejercicios.\n5.  **`ExerciseStore`**: Usado por los endpoints de ejercicios (`/api/exercise/*`).\n6.  **`GuidedLearningService`**: Usado por los endpoints de aprendizaje guiado (`/api/guided/*`).\n\nEn resumen, **los endpoints directamente afectados son `open_workspace` y `browse_workspace`**, pero **indirectamente todos los endpoints que dependen de los servicios de estudio, progreso, ejercicios y telemetría** se verían afectados, ya que estos servicios se re-inicializan con el nuevo directorio base.",
+  "4480b3119585": "P.llamadores(\"registro_de\")\n\nLos llamadores directos a `registro_de` en `backend/buscador_modelos.py` son:\n\n1. **`comprobar`** (línea 175 de `buscador_modelos.py`): La función `comprobar` llama a `registro_de(ref)` para obtener el registro, repositorio y tag de un modelo antes de pedir el manifiesto.\n2. **`registro_de`** (línea 145 de `buscador_modelos.py`): La propia función `registro_de` se llama a sí misma de forma recursiva, reenviando la llamada a `recursos.ficha.registro_de`.\n\nAdemás, hay un import local en `comprobar` que reenvía a `recursos.ficha.registro_de`, y en `recursos/ficha.py` la función `desde_registro` también llama a `registro_de`.",
+  "c6ec7f7ca24a": "Para trazar la ruta exacta, consulto el grafo de hechos y el código de las funciones intermedias.\n\nAhora necesito ver cuándo se crea `ConfigModelos` para entender cómo llega `_leer`. La clave está en `ollama_opciones.config()`.\n\nPerfecto. Ahora tengo el panorama completo. Veo que hay una desconexión: `_leer` se llama desde `__init__`, no desde `fijar`. Déjame confirmar la cadena completa:\n\nLa ejecución pasa por estas funciones en este orden:\n\n1. **`modelos_config_fijar`** (`backend/app.py:5690`) — El endpoint `POST /api/modelos/config` recibe la petición y construye la llamada: `ollama_opciones.config().fijar(...)`.\n\n2. **`_modelos`** (`backend/app.py:5608`) — Función envoltorio en `app.py` que captura errores (`ErrorConfig`, `ErrorGestion`) y los convierte en `HTTPException`. Ejecuta `fn(*args, **kwargs)` donde `fn` es el método `fijar`.\n\n3. **`config`** (`backend/ollama_opciones.py:435`) — La función `ollama_opciones.config()` verifica si `_config` es `None`. Si lo es, crea `_config = ConfigModelos()`, lo que dispara el `__init__`.\n\n4. **`ConfigModelos.__init__`** (`backend/ollama_opciones.py:283`) — Inicializa la instancia y ejecuta `self._datos = self._leer()`, cargando la configuración desde el archivo JSON.\n\n5. **`ConfigModelos._leer`** (`backend/ollama_opciones.py:288`) — Lee el archivo `~/.prig_modelos.json`, normaliza las capas y limpia opciones excluidas.\n\n6. **`ConfigModelos.fijar`** (`backend/ollama_opciones.py:344`) — Ya con los datos cargados, valida los nuevos valores con `validar()`, los aplica a la capa correspondiente y guarda con `_guardar()`.\n\nLa clave es que `_leer` **no** se llama desde `fijar`, sino desde `__init__`, que se ejecuta cuando `config()` crea la instancia `ConfigModelos` por primera vez (o cuando cambia la ruta).",
+  "b6c9ca4e2eb2": "`abrirLog` está definida en `frontend/js/recursos.js` (línea 356).",
+  "ind_09": "Devuelve `False`.\n\nAnalicemos la expresión regular en `examen_proyecto.py:304-342`:\n\n```python\ndef _aparece(nombre: str, texto: str) -> bool:\n    for candidato in {nombre, _corto(nombre)}:\n        if candidato and re.search(r\"(?<![\\w.])\" + re.escape(candidato) + r\"(?![\\w])\", texto):\n            return True\n    return False\n```\n\n1.  **Argumentos**: `nombre=\"guardar\"`, `texto=\"Hub.guardar()\"`.\n2.  **Iteración**:\n    *   Primer candidato: `\"guardar\"`.\n    *   `re.escape(\"guardar\")` produce `guardar`.\n    *   La regex completa es: `(?<![\\w.])guardar(?![\\w])`.\n    *   Esto busca la palabra \"guardar\" que **no** esté precedida por un carácter de palabra (`\\w`) o punto (`.`), y **no** esté seguida por un carácter de palabra.\n3.  **Coincidencia**:\n    *   En `\"Hub.guardar()\"`, la subcadena \"guardar\" está precedida por `.` (un punto).\n    *   El lookahead negativo `(?<![\\w.])` falla porque el carácter inmediatamente anterior es un punto, que está incluido en la clase `[\\w.]`.\n    *   Por lo tanto, no hay coincidencia para `\"guardar\"`.\n4.  **Segunda iteración**:\n    *   `_corto(\"guardar\")` devuelve `\"guardar\"` (no hay puntos).\n    *   El candidato es el mismo, la búsqueda falla de nuevo.\n\nResultado: `False`.\n\n*(Nota: Si el texto fuera `\"Hub.guardar()\"` y el nombre fuera `\"Hub.guardar\"`, `_corto` devolvería `\"guardar\"`, pero el candidato completo `\"Hub.guardar\"` fallaría por el mismo motivo del punto inicial. Sin embargo, la función itera sobre `{nombre, _corto(nombre)}`, es decir, sobre el nombre completo y su parte final. En este caso, solo prueba \"guardar\", que falla por el punto anterior).*"
+ }
+}

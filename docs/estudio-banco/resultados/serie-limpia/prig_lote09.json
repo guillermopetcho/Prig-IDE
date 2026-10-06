@@ -1,0 +1,231 @@
+{
+ "lote": 9,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 61
+  }
+ },
+ "media": 1.0,
+ "segundos": 257,
+ "modos": {
+  "unidad": 4,
+  "general": 8
+ },
+ "por_tipo": {
+  "frontend": 1.0,
+  "impacto": 1.0,
+  "config": 1.0,
+  "ubicacion": 1.0,
+  "recorrido": 1.0,
+  "constante": 1.0,
+  "endpoint": 1.0,
+  "ejecucion": 1.0,
+  "llamadores": 1.0,
+  "entorno": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "resultados": [
+  {
+   "id": "03c545c743a8",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 40.0,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "cb2cab8aaa3f",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 24.0,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "1e12f7c7493a",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 29.1,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "2b4cd7b65219",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 20.9,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "8323406d8dc6",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 17.4,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "f07fe5643c5f",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 18.7,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "3bb8e96b8249",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 23.5,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "23358f956144",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 15.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8d4c39095fd6",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 16.7,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "0b5f93c17f28",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 32.3,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "eb7b08a79b9c",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 5.9,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_06",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 12.0,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "03c545c743a8": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_config\\\", o=\\\"tramo_s\\\", limite=50)\\nhechos\"}",
+    "resultado_caracteres": 126
+   }
+  ],
+  "cb2cab8aaa3f": [],
+  "1e12f7c7493a": [],
+  "2b4cd7b65219": [],
+  "8323406d8dc6": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"hechos = P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_BOOKS_DIR\\\", limite=50)\\nprint(f\\\"Encontrados: {len(hechos)}\\\")\\nfor h in hechos:\\n    print(f\\\"{h['ruta']}:{h['linea']} -> {h['s']}\\\")\\n\"}",
+    "resultado_caracteres": 150
+   }
+  ],
+  "f07fe5643c5f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_SUAVE_SO\\\")\"}",
+    "resultado_caracteres": 451
+   }
+  ],
+  "3bb8e96b8249": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/progreso/resumen\\\")\\n\"}",
+    "resultado_caracteres": 268
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"render\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "23358f956144": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.impacto(\\\"calcular_score_educativo\\\"))\"}",
+    "resultado_caracteres": 647
+   }
+  ],
+  "8d4c39095fd6": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores('GlobalConfigManager._showToastNotice')\"}",
+    "resultado_caracteres": 255
+   }
+  ],
+  "0b5f93c17f28": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Verificar la firma y llamadores de modelos_borrar_parciales\\nficha_bp = P.ficha('modelos_borrar_parciales')\\nprint(\\\"Ficha modelos_borrar_parciales:\\\")\\nprint(ficha_bp)\\n\\n# Verificar la firma y llamadores de librerias_disponibles\\nficha_ld = P.ficha('librerias_disponibles')\\nprint(\\\"\\\\nFicha librerias_disponibles:\\\")\\nprint(ficha_ld)\\n\\n# Buscar si hay alguna conexión directa o indi",
+    "resultado_caracteres": 1517
+   }
+  ],
+  "eb7b08a79b9c": [],
+  "ind_06": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"_carpeta\"}",
+    "resultado_caracteres": 217
+   }
+  ]
+ },
+ "respuestas": {
+  "03c545c743a8": "Buscaré los hechos `lee_config` para esa clave en el grafo del proyecto.\n\nLa única función que lee la clave de configuración `tramo_s` es:\n\n- **`Ritmo.pausa`** en `backend/recursos/ritmo.py:116`\n\nEste método compara el valor de `tramo_s` (ajuste del modo suave) con los segundos que ha estado trabajando el modelo para decidir si toca una pausa térmica.",
+  "cb2cab8aaa3f": "La constante `MAX_BYTES_DATOS` en `backend/banco_proyecto.py` vale **200,000** (doscientos mil).",
+  "1e12f7c7493a": "El endpoint `POST /api/guided/generate` está implementado en **`backend/app.py`**, líneas **827-844**, por la función **`guided_generate`**.\n\nSu código literal es:\n\n```python\n@app.post(\"/api/guided/generate\")\ndef guided_generate(req: GuidedGenerateRequest):\n    \"\"\" Una sola puerta de entrada; la diferencia es la profundidad del análisis \"\"\"\n    try:\n        if req.mode == \"profundo\":\n            path = guided.generate_deep(req.goal, req.topics, level=req.level,\n                                        focus=req.focus, model=req.model)\n        else:\n            if not req.topics.strip():\n                raise HTTPException(status_code=400,\n                                    detail=\"El modo rápido necesita una lista de temas.\")\n            path = guided.generate_fast(req.goal, req.topics, level=req.level,\n                                        focus=req.focus, model=req.model)\n    except HTTPException:\n        raise\n    except Exception as err:\n        raise HTTPException(status_code=500, detail=f\"No se pudo generar la ruta: {err}\")\n    return path.model_dump()\n```\n\nEsta función actúa como un router que delega en:\n- **`guided.generate_deep`** (si `mode == \"profundo\"`): genera un plan con tres agentes (Knowledge Architect, Practice Architect, Notebook Manager).\n- **`guided.generate_fast`** (si `mode == \"rapido\"`): genera un plan sencillo usando solo `run_topic_organizer`.\n\nAmbos métodos pertenecen a la clase **`GuidedLearningService`** en **`backend/guided_learning.py`**.",
+  "2b4cd7b65219": "La función que implementa el endpoint `GET /api/recursos/maquina` es `recursos_maquina` y está definida en el archivo **`backend/app.py`** (líneas 5163-5182).\n\nSu código literal es:\n\n```python\n@app.get(\"/api/recursos/maquina\")\ndef recursos_maquina(fresca: bool = False):\n    g = recursos_gestor()\n    try:\n        maq = g.maquina(fresca=fresca)\n    except Exception as e:\n        raise HTTPException(status_code=500, detail=f\"No se pudo analizar la máquina: {e}\")\n    rad = maq.radiografia\n    cal = recursos_almacen().calibracion(rad[\"huella\"])\n    return {\n        \"huella\": rad[\"huella\"],\n        \"sistema\": rad.get(\"sistema\"), \"cpu\": rad.get(\"cpu\"), \"memoria\": rad.get(\"memoria\"),\n        \"gpus\": rad.get(\"gpus\"), \"disco\": rad.get(\"disco\"), \"energia\": rad.get(\"energia\"),\n        \"ancho_banda_ram_gbps\": rad.get(\"ancho_banda_ram_gbps\"),\n        \"resumen\": maq.resumen(),\n        \"servidor\": recursos_srv.estado(rad.get(\"ollama\")),\n        \"calibracion\": ({k: v for k, v in cal.items() if k not in (\"muestras\", \"detalle\")}\n                        if cal else None),\n        \"vivo\": g.estado_vivo(),\n    }\n```\n\n### Resumen del flujo:\n1. Obtiene el gestor de recursos (`recursos_gestor()`).\n2. Llama a `g.maquina(fresca=fresca)` para obtener la radiografía actual de la máquina y la calibración almacenada.\n3. Devuelve un diccionario con la huella, los componentes detectados (CPU, GPU, RAM, etc.), un resumen calculado (`maq.resumen()`), el estado del servidor Ollama y la calibración vigente (sin detalles internos de las pruebas).",
+  "8323406d8dc6": "Vamos a consultar el grafo de hechos del proyecto, que ya contiene las relaciones `lee_entorno` generadas por el análisis estático.\n\nLas funciones que leen la variable de entorno `PRIG_BOOKS_DIR` son:\n\n*   **`BookService.__init__`** en `backend/book_service.py` (línea 39).\n*   **`LibreriasService.__init__`** en `backend/librerias_service.py` (línea 105).\n\nAmbas inician intentando obtener el valor de `PRIG_BOOKS_DIR` desde el entorno para definir la ruta base de los libros y bibliotecas del usuario.",
+  "f07fe5643c5f": "Para responder con precisión, voy a buscar en el grafo de hechos del proyecto quién tiene la relación `lee_entorno` con el objeto `PRIG_SUAVE_SO`.\n\nLas funciones que leen la variable de entorno `PRIG_SUAVE_SO` son:\n\n1. **`ruta_biblioteca`** en `backend/recursos/motor_suave.py:44`\n2. **`TestInstalar.test_instalar_y_desinstalar_exacto`** en `backend/tests/test_motor_suave.py:63`\n3. **`TestInstalar.test_el_envoltorio_solo_actua_al_cargar_un_modelo`** en `backend/tests/test_motor_suave.py:97`\n\nLa principal es `ruta_biblioteca`, que es la función de producción que define la ruta de la biblioteca nativa (`prig_suave.so`), usando la variable de entorno como alternativa a la ruta predeterminada. Las otras dos son tests unitarios que la usan para verificar el comportamiento del motor suave.",
+  "3bb8e96b8249": "Para responder a esta pregunta de tipo \"frontend\", necesito encontrar qué funciones del código JavaScript del frontend llaman al endpoint `/api/progreso/resumen`.\n\nVoy a usar la herramienta `P.api` para obtener los consumidores de este endpoint directamente desde el grafo de hechos del proyecto.\n\nLa herramienta `P.api` devuelve que la función `render` dentro del archivo `frontend/js/progreso.js` (línea 89) es la que llama al endpoint `/api/progreso/resumen`.\n\nPara confirmar que `render` es efectivamente una función con nombre (y no un manejador anónimo), voy a verificar su definición.\n\nLa función `render` en `frontend/js/progreso.js` (líneas 76-101) es la que contiene la llamada al endpoint. La verificación con `ver_simbolo` confirma que es una función declarada con `async function render(contenedor)`.\n\nLa respuesta es:\n\n**`render`** (definida en `frontend/js/progreso.js:76`)",
+  "23358f956144": "Cambiar `calcular_score_educativo` afecta directamente el endpoint **`GET /api/youtube/buscar`** (expuesto en `backend/app.py`), porque:\n\n1. `buscar_cursos_youtube` (en `youtube_buscador.py`) llama a `calcular_score_educativo` para asignar `score_educativo` a cada resultado y luego los ordena (por defecto, `orden=\"educativo\"`).\n2. `youtube_buscar` (en `backend/app.py`) es el manejador del endpoint `GET /api/youtube/buscar` y delega en `buscar_cursos_youtube`.\n3. El frontend `youtube_hub.js` consume ese endpoint a través de `ejecutarBusquedaYt`, que muestra los resultados ordenados por score educativo.\n\nIndirectamente, cualquier cambio en la lógica de puntuación altera el orden y la relevancia percibida de los resultados que ve el usuario en la sección de YouTube Hub.",
+  "8d4c39095fd6": "`_showToastNotice` es llamada por **dos métodos** dentro de `GlobalConfigManager` en `frontend/js/global_config.js`:\n\n1. **`applyProfile`** (línea 1243)\n2. **`selectCatalogModel`** (línea 1384)\n\nAmbos métodos usan `_showToastNotice` para mostrar un banner temporal azul en la sección de avisos de salud (`#cfg-salud-avisos`), informando al usuario sobre el resultado de acciones como aplicar un perfil de configuración o seleccionar un modelo del catálogo.",
+  "0b5f93c17f28": "Para responder con precisión, necesito verificar la cadena de llamadas exacta. El endpoint `modelos_borrar_parciales` parece no tener relación directa con `librerias_disponibles` (que lista motores de GPU), pero buscaré en el grafo de hechos y el código para confirmar si hay una conexión transversal o si la premisa de la pregunta se basa en una confusión.\n\nNo hay conexión directa entre `modelos_borrar_parciales` y `librerias_disponibles`. Son dos funciones que operan en ramas distintas del sistema:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5876-5878`): Endpoint `DELETE /api/modelos/parciales`. Llama a:\n   - `_carpeta_modelos_servidor()`\n   - `GestorModelos.borrar_parciales()`\n\n2. **`librerias_disponibles`** (`backend/recursos/servidor.py:72-76`): Función auxiliar que lista los motores de GPU instalados. Es llamada por:\n   - `validar()` (para validar el valor de `OLLAMA_LLM_LIBRARY`)\n   - `estado()` (para devolver la lista en la respuesta del estado del servidor)\n\nSi tu pregunta se refiere a por qué **`estado()`** (que sí está relacionado con el servidor de Ollama) llama a `librerias_disponibles`, la respuesta es: porque `estado()` construye el diccionario de respuesta que incluye la clave `\"librerias\"` para que el frontend (`modelos.js`) pueda poblar el selector de motores de cálculo.\n\n¿Quizás confundiste el endpoint o buscas otra cadena de llamadas?",
+  "eb7b08a79b9c": "`StudyPlanEngine.toggle_validation_criterion` está definida en `backend/study_plan_engine.py`.",
+  "ind_06": "`_carpeta(\"backend/ai_engine/motor_moe.py\")` devuelve `\"backend/ai_engine\"`.\n\nLa función toma la ruta, le quita el archivo (`\"backend/ai_engine/motor_moe.py\".split(\"/\")[:-1]` → `[\"backend\", \"ai_engine\", \"motor_moe\"]`), y une los dos primeros niveles (`[\"backend\", \"ai_engine\"]` → `\"backend/ai_engine\"`)."
+ }
+}

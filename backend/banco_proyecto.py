@@ -53,7 +53,9 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-VERSION_ESQUEMA = 5          # 5: funciones anidadas como símbolos (endpoints de APIRouter, clausuras)
+VERSION_ESQUEMA = 6          # 5: funciones anidadas como símbolos (endpoints de APIRouter, clausuras)
+                             # 6: prefijo de APIRouter/Blueprint en `expone`, métodos de route(), `lee_config` sin
+                             #    escrituras ni tests, `llama_api` con cualquier cadena /api/ (docs/estudio-banco.md, E2)
 MAX_ARCHIVOS = 20000
 MAX_BYTES = 1_000_000
 MAX_BYTES_DATOS = 200_000          # json/yaml/csv: más grandes son datos, no código
@@ -494,7 +496,10 @@ def importaciones_genericas(texto: str, lenguaje: str) -> List[str]:
 # Hechos: el grafo de bajo nivel del proyecto
 # ======================================================================
 
-_ES_CONFIG = re.compile(r"(^|[._])(config|cfg|configuracion|ajustes|settings|opciones)$", re.I)
+# El objeto se LLAMA así (config, self.config, ai_engine.config, cfg): no alcanza con contenerlo (loop_config,
+# opciones de una función); medido en E2: la mitad de los `lee_config` no eran configuración
+_ES_CONFIG = re.compile(r"(^|\.)(config|cfg|configuracion|ajustes|settings)$", re.I)
+_ROUTERS = {"APIRouter", "Blueprint"}
 _METODOS_HTTP = {"get", "post", "put", "delete", "patch", "websocket", "route", "api_route"}
 _SUBPROCESO = {"run", "Popen", "check_output", "check_call", "call"}
 
@@ -519,6 +524,17 @@ def hechos_python(rel: str, texto: str, simbolos: List[Simbolo]) -> List[Tuple[s
         return []
     salida: List[Tuple[str, str, str, int]] = []
     donde = lambda n: _dentro(simbolos, getattr(n, "lineno", 0), rel)
+    es_test = bool(_ES_TEST.search(rel))
+    # r = APIRouter(prefix="/api/hub") / bp = Blueprint(..., url_prefix="/x"): el prefijo va en la ruta expuesta
+    prefijos: Dict[str, str] = {}
+    for n in ast.walk(arbol):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+            f = n.value.func
+            nombre = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
+            if nombre in _ROUTERS:
+                for kw in n.value.keywords:
+                    if kw.arg in ("prefix", "url_prefix") and (_constante(kw.value) or "").startswith("/"):
+                        prefijos[n.targets[0].id] = _constante(kw.value).rstrip("/")
     for n in ast.walk(arbol):
         if isinstance(n, ast.ClassDef):
             clase = _dentro(simbolos, n.lineno, n.name)
@@ -531,9 +547,19 @@ def hechos_python(rel: str, texto: str, simbolos: List[Simbolo]) -> List[Tuple[s
             for d in n.decorator_list:
                 if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in _METODOS_HTTP \
                         and d.args and (_constante(d.args[0]) or "").startswith("/"):
-                    metodo = "GET" if d.func.attr in ("route", "api_route") else d.func.attr.upper()
-                    salida.append((_dentro(simbolos, n.lineno, n.name), "expone",
-                                   f"{metodo} {ruta_http_canonica(_constante(d.args[0]))}", n.lineno))
+                    receptor = d.func.value.id if isinstance(d.func.value, ast.Name) else ""
+                    ruta = prefijos.get(receptor, "") + _constante(d.args[0])
+                    if d.func.attr in ("route", "api_route"):
+                        # Flask / FastAPI: route("/x", methods=["POST", ...]); sin methods, GET
+                        metodos = ["GET"]
+                        for kw in d.keywords:
+                            if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple)):
+                                metodos = [m.upper() for m in (_constante(e) for e in kw.value.elts) if m] or ["GET"]
+                    else:
+                        metodos = [d.func.attr.upper()]
+                    for metodo in metodos:
+                        salida.append((_dentro(simbolos, n.lineno, n.name), "expone",
+                                       f"{metodo} {ruta_http_canonica(ruta)}", n.lineno))
         elif isinstance(n, ast.Raise) and n.exc is not None:
             f = n.exc.func if isinstance(n.exc, ast.Call) else n.exc
             nombre = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else None)
@@ -557,7 +583,7 @@ def hechos_python(rel: str, texto: str, simbolos: List[Simbolo]) -> List[Tuple[s
                 salida.append((donde(n), "lee_entorno", clave, n.lineno))
             elif clave and f.attr == "getenv":
                 salida.append((donde(n), "lee_entorno", clave, n.lineno))
-            elif clave and f.attr in ("get", "setdefault") and _ES_CONFIG.search(base):
+            elif clave and f.attr == "get" and _ES_CONFIG.search(base) and not es_test:
                 salida.append((donde(n), "lee_config", clave, n.lineno))
             elif f.attr in _SUBPROCESO and base == "subprocess" and n.args:
                 a = n.args[0]
@@ -571,9 +597,10 @@ def hechos_python(rel: str, texto: str, simbolos: List[Simbolo]) -> List[Tuple[s
                     base = ast.unparse(n.value)
                 except Exception:
                     base = ""
-                if base.endswith("environ"):
+                escritura = isinstance(n.ctx, (ast.Store, ast.Del))
+                if base.endswith("environ") and not escritura:
                     salida.append((donde(n), "lee_entorno", clave, n.lineno))
-                elif _ES_CONFIG.search(base):
+                elif _ES_CONFIG.search(base) and not escritura and not es_test:
                     salida.append((donde(n), "lee_config", clave, n.lineno))
         elif isinstance(n, ast.Assign):
             for t in n.targets:
@@ -591,15 +618,30 @@ def hechos_python(rel: str, texto: str, simbolos: List[Simbolo]) -> List[Tuple[s
     return unicos
 
 
-_API_JS = re.compile(r"""(?:fetch|prigFetchJson|prigJson|json|post|get|put|del|axios\.\w+|request)\(\s*([`'"])(/api/.*?)\1""")
+_API_JS = re.compile(r"""([`'"])(/api/(?:[^`'"\\]|\$\{[^}]*\})*?)\1""")
 
 
 def ruta_http_canonica(ruta: str) -> str:
     """ La misma forma para las rutas del backend y del frontend, así se comparan con ==:
     /api/x/{id} y `/api/x/${id}` → /api/x/*  (sin consulta ni barra final) """
-    ruta = re.sub(r"\$\{[^}]*\}", "*", ruta.split("?")[0].split("#")[0])
+    # primero los ${...}: pueden tener «?» dentro (${abierto ? '…' : ''}) y cortar antes los partía
+    # tras «/» un ${...} es un parámetro de la ruta (*); pegado a un segmento es una consulta opcional y se quita
+    ruta = re.sub(r"(?<=/)\$\{[^}]*\}", "*", ruta)
+    ruta = re.sub(r"\$\{[^}]*\}", "", ruta).split("?")[0].split("#")[0]
     ruta = re.sub(r"\{[^}]*\}", "*", ruta)
     return ruta.rstrip("/") or "/"
+def endpoint_de(consumida: str, expuestas) -> Optional[str]:
+    """ La ruta expuesta (sin método) que atiende una ruta que llama el frontend: la misma, o la más larga que
+    sea sufijo en un límite de segmento. El prefijo suele ponerse en otro archivo (include_router(...,
+    prefix=settings.API_V1_STR), register_blueprint): el backend expone /items y el frontend llama a
+    /api/v1/items. Medido en full-stack-fastapi-template: sin esto ningún endpoint se enlazaba. """
+    expuestas = set(expuestas)
+    if consumida in expuestas:
+        return consumida
+    cands = [e for e in expuestas if len(e) > 1 and consumida.endswith(e)]
+    return max(cands, key=len) if cands else None
+
+
 _DOM_USO = re.compile(r"""(?:getElementById|\$)\(\s*['"]([\w-]+)['"]\s*\)|querySelector(?:All)?\(\s*['"]#([\w-]+)""")
 _DOM_DEF = re.compile(r"""\bid\s*=\s*["']([\w-]+)["']""")
 _ENV_C = re.compile(r"""\bgetenv\(\s*"([^"]+)"\s*\)""")
@@ -1720,15 +1762,16 @@ class BancoProyecto:
 
     # ------------------------------------------------------------------ contexto de una pregunta
     def componer(self, pregunta: str, presupuesto: int = 8000, version_vista: Optional[int] = None,
-                 excluir_rutas: Optional[Set[str]] = None) -> Dict[str, Any]:
-        """ Lo relevante para esta pregunta, dentro del presupuesto de tokens """
+                 excluir_rutas: Optional[Set[str]] = None, usar_resoluciones: bool = True) -> Dict[str, Any]:
+        """ Lo relevante para esta pregunta, dentro del presupuesto de tokens. `usar_resoluciones=False`: sin
+        las respuestas anteriores (mediciones aisladas: si no, cada corrida ve las respuestas de la anterior) """
         t0 = time.time()
         vista = int(self._meta("version_vista", "0") or 0) if version_vista is None else version_vista
         vector = self._vector_consulta(pregunta)
         fragmentos = self.buscar(pregunta, k=40, vector=vector)
         rutas_top = {f["ruta"] for f in fragmentos[:8]}
         conocimiento = self.buscar_conocimiento(pregunta, vector=vector, rutas=rutas_top)
-        resoluciones = self.buscar_resoluciones(pregunta, vector=vector)
+        resoluciones = self.buscar_resoluciones(pregunta, vector=vector) if usar_resoluciones else []
         cambios = self.cambios_desde(vista) if vista < self.version else []
         excluir_rutas = excluir_rutas or set()
 

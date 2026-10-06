@@ -1,0 +1,303 @@
+[
+ {
+  "id": "ind_01",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `ruta_http_canonica(\"/api/x/{id}/y?z=1\")` (definida en `backend/banco_proyecto.py`)?",
+  "esperado": [
+   "\"/api/x/*/y\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de bp.ruta_http_canonica(\"/api/x/{id}/y?z=1\")"
+ },
+ {
+  "id": "ind_02",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `ruta_http_canonica(\"/api/desafios/${id}/comprobar/\")` (definida en `backend/banco_proyecto.py`)?",
+  "esperado": [
+   "\"/api/desafios/*/comprobar\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de bp.ruta_http_canonica(\"/api/desafios/${id}/comprobar/\")"
+ },
+ {
+  "id": "ind_03",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `estimar_tokens(\"abcd\" * 30)` (definida en `backend/banco_proyecto.py`)?",
+  "esperado": [
+   "35"
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de bp.estimar_tokens(\"abcd\" * 30)"
+ },
+ {
+  "id": "ind_04",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `lenguaje_de(\"frontend/js/app.js\")` (definida en `backend/banco_proyecto.py`)?",
+  "esperado": [
+   "\"js\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de bp.lenguaje_de(\"frontend/js/app.js\")"
+ },
+ {
+  "id": "ind_05",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `lenguaje_de(\"docs/notas.md\")` (definida en `backend/banco_proyecto.py`)?",
+  "esperado": [
+   "\"md\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de bp.lenguaje_de(\"docs/notas.md\")"
+ },
+ {
+  "id": "ind_06",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `_carpeta(\"backend/ai_engine/motor_moe.py\")` (definida en `backend/particion_proyecto.py`)?",
+  "esperado": [
+   "\"backend/ai_engine\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de pp._carpeta(\"backend/ai_engine/motor_moe.py\")"
+ },
+ {
+  "id": "ind_07",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `_carpeta(\"backend/ai_engine/motor_moe.py\", 1)` (definida en `backend/particion_proyecto.py`)?",
+  "esperado": [
+   "\"backend\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de pp._carpeta(\"backend/ai_engine/motor_moe.py\", 1)"
+ },
+ {
+  "id": "ind_08",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `_corto(\"Clase.metodo\")` (definida en `backend/examen_proyecto.py`)?",
+  "esperado": [
+   "\"metodo\""
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de ex._corto(\"Clase.metodo\")"
+ },
+ {
+  "id": "ind_09",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `_aparece(\"guardar\", \"Hub.guardar()\")` (definida en `backend/examen_proyecto.py`)?",
+  "esperado": [
+   "false"
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de ex._aparece(\"guardar\", \"Hub.guardar()\")"
+ },
+ {
+  "id": "ind_10",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `_json_lista('antes ```json\\n[{\"a\": 1}, 2]\\n``` después')` (definida en `backend/fichas_simbolos.py`)?",
+  "esperado": [
+   "[{\"a\": 1}]"
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de fs._json_lista(\"antes ```json\\n[{\\\"a\\\": 1}, 2]\\n``` después\")"
+ },
+ {
+  "id": "ind_11",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `es_moe(\" qwen3.6-35b-moe:prig \")` (definida en `backend/ai_engine/motor_moe.py`)?",
+  "esperado": [
+   "true"
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de motor_moe.es_moe(\" qwen3.6-35b-moe:prig \")"
+ },
+ {
+  "id": "ind_12",
+  "tipo": "ejecucion",
+  "pregunta": "Sin ejecutarlo, ¿qué devuelve `CONTEXTOS[16384]` (definida en `backend/ai_engine/motor_moe.py`)?",
+  "esperado": [
+   "[2048, 1803, 2580]"
+  ],
+  "evaluar": "valor_exacto",
+  "origen_de_la_verdad": "ejecución de motor_moe.CONTEXTOS[16384]"
+ },
+ {
+  "id": "ind_13",
+  "tipo": "ejecucion",
+  "pregunta": "¿Qué pasa si se llama a `validar_paginas` (en `backend/desafios/ejecucion.py`) con 9 páginas?",
+  "esperado": [
+   "ErrorDesafio"
+  ],
+  "evaluar": "contiene",
+  "origen_de_la_verdad": "ejecución",
+  "rubrica": [
+   "ErrorDesafio: Como mucho 8 páginas."
+  ]
+ },
+ {
+  "id": "ind_14",
+  "tipo": "llamadores_independiente",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `get_book_citations` definida en `backend/book_service.py`?",
+  "esperado": [
+   "backend/app.py",
+   "delete_book_citation",
+   "export_citations_to_workspace",
+   "save_book_citation"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "jedi get_references (no el banco)"
+ },
+ {
+  "id": "ind_15",
+  "tipo": "llamadores_independiente",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "esperado": [
+   "delete_book"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "jedi get_references (no el banco)"
+ },
+ {
+  "id": "ind_16",
+  "tipo": "llamadores_independiente",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "esperado": [
+   "_num_gpus",
+   "estado_vivo",
+   "maquina",
+   "recursos_servidor_aplicar"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "jedi get_references (no el banco)"
+ },
+ {
+  "id": "ind_17",
+  "tipo": "llamadores_independiente",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `load_state` definida en `backend/study_plan_engine.py`?",
+  "esperado": [
+   "backend/study_plan_engine.py",
+   "build_and_save_dataset",
+   "migrate_legacy_plans"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "jedi get_references (no el banco)"
+ },
+ {
+  "id": "ind_18",
+  "tipo": "endpoint_real",
+  "pregunta": "¿Qué función implementa el endpoint `GET /api/hub/estado` y en qué archivo está?",
+  "esperado": [
+   "estado",
+   "backend/hub/api.py"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "decorador + prefijo de APIRouter (AST)"
+ },
+ {
+  "id": "ind_19",
+  "tipo": "endpoint_real",
+  "pregunta": "¿Qué función implementa el endpoint `GET /api/hub/todo` y en qué archivo está?",
+  "esperado": [
+   "todo",
+   "backend/hub/api.py"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "decorador + prefijo de APIRouter (AST)"
+ },
+ {
+  "id": "ind_20",
+  "tipo": "endpoint_real",
+  "pregunta": "¿Qué función implementa el endpoint `GET /api/hub/repos` y en qué archivo está?",
+  "esperado": [
+   "repos",
+   "backend/hub/api.py"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "decorador + prefijo de APIRouter (AST)"
+ },
+ {
+  "id": "ind_21",
+  "tipo": "endpoint_real",
+  "pregunta": "¿Qué función implementa el endpoint `GET /api/hub/repo` y en qué archivo está?",
+  "esperado": [
+   "repo",
+   "backend/hub/api.py"
+  ],
+  "evaluar": "conjunto",
+  "origen_de_la_verdad": "decorador + prefijo de APIRouter (AST)"
+ },
+ {
+  "id": "ind_22",
+  "tipo": "diseno",
+  "pregunta": "¿Por qué `LectorUnidades.mensajes` (en `backend/lectura_unidades.py`) no incluye el contexto del grafo ni la guía de la consola?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "ese contexto cambia cuando se edita otra parte del proyecto",
+   "si estuviera en el prefijo invalidaría el estado guardado",
+   "por eso va con cada pregunta (pregunta_con_contexto)"
+  ]
+ },
+ {
+  "id": "ind_23",
+  "tipo": "diseno",
+  "pregunta": "¿Por qué el motor MoE tiene que guardar el estado exacto al final del bloque leído, y no uno parecido?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "las capas SSM (DeltaNet) no pueden retroceder",
+   "un estado posterior no sirve para otro sufijo"
+  ]
+ },
+ {
+  "id": "ind_24",
+  "tipo": "diseno",
+  "pregunta": "En la consola P, ¿qué impide que un código que tarda en `P.llm` se corte por la alarma de 30 s, y qué evita confundir respuestas?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "la alarma se pausa mientras se espera a Prig",
+   "cada petición lleva un número y las respuestas viejas se descartan"
+  ]
+ },
+ {
+  "id": "ind_25",
+  "tipo": "diseno",
+  "pregunta": "¿Qué hace `agrupar` (en `backend/particion_proyecto.py`) con las piezas que quedan sueltas, sin llamadas que las unan?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "las junta por carpeta, de la más chica a la más grande",
+   "las muy chicas se juntan aunque sean de carpetas distintas",
+   "siempre respetando el tope de tokens"
+  ]
+ },
+ {
+  "id": "ind_26",
+  "tipo": "diseno",
+  "pregunta": "¿Qué impide que el código de la consola P modifique la base del banco?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "la base se abre en solo lectura (mode=ro)",
+   "P.sql solo acepta SELECT",
+   "las escrituras las hace Prig a pedido"
+  ]
+ },
+ {
+  "id": "ind_27",
+  "tipo": "diseno",
+  "pregunta": "¿Cómo decide el motor MoE cuántos expertos calientes cargar, y qué hace si al arrancar no caben en la GPU?",
+  "esperado": [],
+  "evaluar": "rubrica_manual",
+  "origen_de_la_verdad": "lectura humana del código y sus docstrings",
+  "rubrica": [
+   "según la VRAM libre y el contexto",
+   "si no arranca, reintenta con menos expertos calientes",
+   "y si no, sin MTP"
+  ]
+ }
+]

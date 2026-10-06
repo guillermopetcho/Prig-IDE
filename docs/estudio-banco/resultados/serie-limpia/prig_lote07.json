@@ -1,0 +1,240 @@
+{
+ "lote": 7,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 46
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 59
+  }
+ },
+ "media": 0.875,
+ "segundos": 231,
+ "modos": {
+  "unidad": 8,
+  "general": 4
+ },
+ "por_tipo": {
+  "impacto": 0.0,
+  "recorrido": 1.0,
+  "endpoint": 1.0,
+  "entorno": 1.0,
+  "ejecucion": 1.0,
+  "ubicacion": 1.0,
+  "llamadores": 1.0,
+  "config": 0.5,
+  "frontend": 1.0,
+  "constante": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "resultados": [
+  {
+   "id": "3c07b79d8bbe",
+   "tipo": "config",
+   "puntaje": 0.5,
+   "segundos": 40.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "b1725cec299b",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 4.9,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ac4bfae271d0",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "7dd65879dc1b",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 26.2,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "b17c3469bfcd",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 10.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "12bb842411c5",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 12.8,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "1acc79de9a82",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 10.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "535b590ec9a1",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 48.9,
+   "modo": "general",
+   "herramientas": 3
+  },
+  {
+   "id": "b8cd029d7efe",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 22.9,
+   "modo": "general",
+   "herramientas": 3
+  },
+  {
+   "id": "5d60d0ccfab7",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 7.8,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "b21d7fc4051d",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 11.3,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_10",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 24.9,
+   "modo": "unidad",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "3c07b79d8bbe": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"limite_gpu\\\")\"}",
+    "resultado_caracteres": 2
+   }
+  ],
+  "b1725cec299b": [],
+  "ac4bfae271d0": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/kb/indice\\\")\"}",
+    "resultado_caracteres": 147
+   }
+  ],
+  "7dd65879dc1b": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_SUAVE_GIRO\\\")\\n\"}",
+    "resultado_caracteres": 136
+   }
+  ],
+  "b17c3469bfcd": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/librerias/list\\\")\"}",
+    "resultado_caracteres": 278
+   }
+  ],
+  "12bb842411c5": [],
+  "1acc79de9a82": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"crear_motor\\\"))\"}",
+    "resultado_caracteres": 117
+   }
+  ],
+  "535b590ec9a1": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# 1. Verificar la función config() en ollama_opciones\\nimport backend.ollama_opciones as oo\\nimport inspect\\n\\n# Obtener el código de config\\nprint(\\\"=== config ===\\\")\\nprint(inspect.getsource(oo.config))\\n\\nprint(\\\"\\\\n=== embeddings ===\\\")\\n# embeddings es un método de ConfigModelos\\nprint(inspect.getsource(oo.ConfigModelos.embeddings))\\n\"}",
+    "resultado_caracteres": 204
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"config\"}",
+    "resultado_caracteres": 316
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"ConfigModelos.embeddings\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "b8cd029d7efe": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"kaggle_estado\"}",
+    "resultado_caracteres": 248
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"estado\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"credenciales\"}",
+    "resultado_caracteres": 1781
+   }
+  ],
+  "5d60d0ccfab7": [],
+  "b21d7fc4051d": [],
+  "ind_10": []
+ },
+ "respuestas": {
+  "3c07b79d8bbe": "P.llamadores(\"limite_gpu\")La herramienta `P.llamadores(\"limite_gpu\")` devuelve una lista vacía, lo que indica que no hay funciones o métodos en el proyecto que lean la clave de configuración `limite_gpu` a través del grafo de hechos del proyecto (que rastrea lecturas de configuración explícitas).\n\nSin embargo, revisando el código proporcionado en `backend/recursos/termico.py`, vemos que `limite_gpu` es una constante global definida al inicio del archivo:\n\n```python\nLIMITE_GPU = 60.0\n```\n\nY esta constante es usada por la clase `Gobernador` en su propiedad `limite`:\n\n```python\n@property\ndef limite(self) -> float:\n    return float(self.ajustes[\"limite_gpu\"])\n```\n\nAquí, `self.ajustes[\"limite_gpu\"]` proviene de los ajustes del gobernador, que se inicializan con `AJUSTES_POR_DEFECTO` que incluye `\"limite_gpu\": LIMITE_GPU`. Por lo tanto, aunque no hay una lectura de \"clave de configuración\" en el sentido de un archivo de config externo rastreado por el grafo, el valor se usa directamente desde la constante `LIMITE_GPU` y se almacena/gestiona en los ajustes del `Gobernador`.\n\nSi la pregunta se refiere estrictamente a lecturas de una clave de configuración externa (como JSON, YAML, etc.) a través de un sistema de configuración centralizado, la respuesta es **ninguna**. El valor se maneja como una constante y dentro del estado del objeto `Gobernador`.",
+  "b1725cec299b": "En `backend/agent_flows_v2.py`, la constante `TIMEOUT_SANDBOX_DEFECTO` vale **15**.",
+  "ac4bfae271d0": "P.api(\"GET /api/kb/indice\")La función que implementa el endpoint `GET /api/kb/indice` es `kb_indice_estado` y está en el archivo `backend/app.py` (línea 1386).",
+  "7dd65879dc1b": "La única función que lee la variable de entorno `PRIG_SUAVE_GIRO` es:\n\n- **`cudaStreamSynchronize`** en `backend/recursos/nativo/prig_suave.c:120`\n\nAhí se usa para decidir si el sincronismo del stream CUDA es bloqueante o no:\n\n```cpp\nbloqueante = getenv(\"PRIG_SUAVE_GIRO\") ? 0 : 1;\n```\n\nSi la variable está presente (valor no vacío), `bloqueante` vale `0` (no bloqueante); si no, vale `1` (bloqueante).",
+  "b17c3469bfcd": "P.api(\"/api/librerias/list\")La función del frontend que llama al endpoint `/api/librerias/list` es `loadLibrariesList`, ubicada en el archivo `frontend/js/book_library.js`.",
+  "12bb842411c5": "1. `cleanup_all_processes` es la función de limpieza que se ejecuta al apagar la aplicación FastAPI (a través del `lifespan`).\n2. Según el grafo de hechos del proyecto, la función `api_shutdown` (que expone el endpoint `POST /api/shutdown`) llama directamente a `cleanup_all_processes`.\n3. No hay otros endpoints HTTP que llamen a esta función de forma directa o indirecta en la cadena de ejecución.\n\nPor lo tanto, el único endpoint HTTP afectado es:\n\n- **`POST /api/shutdown`** (expuesto por `api_shutdown` en `backend/app.py`), ya que es el que invoca a `cleanup_all_processes` para detener todos los procesos activos antes de cerrar la aplicación.",
+  "1acc79de9a82": "La función `procesar` (en `kaggle_worker/prig_extract.py`, línea 656) es la que llama a `crear_motor`.",
+  "535b590ec9a1": "Vamos a trazar el camino exacto desde el endpoint `modelos_embeddings` hasta `ConfigModelos._leer`.\n\n1.  **`modelos_embeddings`** (backend/app.py:5890) es el endpoint.\n2.  Dentro, llama a `ollama_opciones.config()` para obtener la instancia de configuración.\n3.  Luego llama a `.embeddings()` sobre esa instancia.\n\nNecesito ver el código de `ollama_opciones.config()` y `ConfigModelos.embeddings()` para ver si hay más pasos intermedios antes de que se lea el archivo. El archivo se lee en `__init__` o en algún método de acceso.\n\nAhora veo el flujo:\n\n1.  `modelos_embeddings` (app.py:5890) llama a `ollama_opciones.config()`\n2.  `config()` (ollama_opciones.py:435) crea/devuelve un `ConfigModelos()`\n3.  `ConfigModelos.__init__` (ollama_opciones.py:283) llama a `self._leer()`\n4.  `ConfigModelos._leer` (ollama_opciones.py:288) lee el archivo JSON\n\nEl endpoint también llama a `.embeddings()`, pero eso lee de `self._datos` que ya está en memoria. La lectura del disco ocurre en `__init__`.\n\nEl camino es:\n\n**`modelos_embeddings` → `config` → `ConfigModelos.__init__` → `ConfigModelos._leer`**\n\n1.  **`modelos_embeddings`** (backend/app.py:5890): El endpoint Flask. Llama a `ollama_opciones.config().embeddings()`.\n2.  **`config`** (backend/ollama_opciones.py:435): Función global que inicializa (si es la primera vez) y devuelve la instancia única `ConfigModelos`. Al crear `ConfigModelos()`, ejecuta `__init__`.\n3.  **`ConfigModelos.__init__`** (backend/ollama_opciones.py:283): Inicializa la instancia llamando a `self._leer()` para cargar los datos desde el disco en `self._datos`.\n4.  **`ConfigModelos._leer`** (backend/ollama_opciones.py:288): Abre el archivo JSON (`~/.prig_modelos.json` por defecto), lo parsea y devuelve el diccionario.\n\nDespués, `embeddings()` (l.371) solo devuelve una copia de `self._datos[\"embeddings\"]`, que ya está en memoria. La lectura del archivo ocurre una sola vez en `__init__`.",
+  "b8cd029d7efe": "Voy a verificar el flujo de ejecución para asegurarme de que no hay llamadas intermedias ocultas.\n\nEl flujo es:\n\n1. **`kaggle_estado`** (`backend/app.py:2744`) — Endpoint que recibe la petición HTTP `GET /api/kaggle/estado` y llama directamente a `kaggle_lector.estado()`.\n2. **`estado`** (`backend/kaggle_lector.py:115`) — Recupera las credenciales llamando a `credenciales()` y construye el diccionario de estado.\n3. **`credenciales`** (`backend/kaggle_lector.py:81`) — Función que busca credenciales en múltiples fuentes. La primera línea que ejecuta es `prig = _leer_json(ruta_credenciales_prig())`, llamando así a:\n4. **`_leer_json`** (`backend/kaggle_lector.py:55`) — Lee y parsea un archivo JSON desde disco.\n\n**Orden de llamadas:**\n`kaggle_estado` → `estado` → `credenciales` → `_leer_json`",
+  "5d60d0ccfab7": "`libro_analizar` está definida en `backend/app.py`.",
+  "b21d7fc4051d": "`ErrorDesafio` está definida en **`backend/desafios/ejecucion.py`** en la línea 34.\n\n```python\nclass ErrorDesafio(Exception):\n    pass\n```\n\nEs una excepción simple que se usa para indicar errores de validación o ejecución en el módulo de desafíos (por ejemplo, cuando un desafío no se puede comprobar, cuando hay errores de permisos en los archivos o cuando el modelo falla).",
+  "ind_10": "Vamos a analizar la función `_json_lista` de `backend/fichas_simbolos.py` paso a paso con la entrada dada:\n\n```python\ntexto = 'antes ```json\\n[{\"a\": 1}, 2]\\n``` después'\n```\n\nEl código de `_json_lista`:\n\n```python\ndef _json_lista(texto: str) -> List[Dict[str, Any]]:\n    texto = (texto or \"\").strip()  # 'antes ```json\\n[{\"a\": 1}, 2]\\n``` después'\n    m = re.search(r\"```(?:json)?\\s*(\\[.*\\])\\s*```\", texto, re.S)\n    if m:\n        texto = m.group(1)  # Esto captura el JSON dentro de los backticks\n    else:\n        ini, fin = texto.find(\"[\"), texto.rfind(\"]\")\n        if ini >= 0 and fin > ini:\n            texto = texto[ini:fin + 1]\n    datos = json.loads(texto)\n    return [d for d in datos if isinstance(d, dict)] if isinstance(datos, list) else []\n```\n\n1. `re.search(r\"```(?:json)?\\s*(\\[.*\\])\\s*```\", texto, re.S)` con `re.S` (DOTALL) hace que `.` coincida también con saltos de línea.\n2. La expresión busca:\n   - ``` (opcionalmente seguido de \"json\")\n   - `\\s*` (espacios opcionales)\n   - `(\\[.*\\])` (captura: un `[`, cualquier cosa, y un `]`)\n   - `\\s*` (espacios opcionales)\n   - ```\n3. Con `re.S`, el `.*` dentro de `(\\[.*\\])` coincide con todo hasta el último `]` que esté antes de ``` después.\n4. En el texto `'antes ```json\\n[{\"a\": 1}, 2]\\n``` después'`, la regex coincide con:\n   - `m.group(0)` = `'```json\\n[{\"a\": 1}, 2]\\n```'`\n   - `m.group(1)` = `'{\"a\": 1}, 2'`... no, espera. `(\\[.*\\])` captura desde el `[` hasta el `]`. El `[` está después de `\\n`, y el `]` está antes de `\\n``` después`.\n   - Entonces `m.group(1)` = `'[{\"a\": 1}, 2]'`\n5. `json.loads('[{\"a\": 1}, 2]')` devuelve `[{\"a\": 1}, 2]`.\n6. La lista por compresión filtra solo los elementos que son `dict`: `[d for d in [{\"a\": 1}, 2] if isinstance(d, dict)]` = `[{\"a\": 1}]`.\n\nPor lo tanto, la función devuelve:\n\n```python\n[{\"a\": 1}]\n```"
+ }
+}

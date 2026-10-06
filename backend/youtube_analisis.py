@@ -17,62 +17,41 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 
-def extraer_subtitulos_youtube(video_id: str) -> Optional[str]:
-    """ Intenta extraer la transcripción o subtítulos automáticos del video desde YouTube """
+PRESUPUESTO_TRANSCRIPCION = 16000  # caracteres de transcripción que ve el modelo al analizar
+
+
+def extraer_subtitulos_youtube(video_id: str, presupuesto: int = PRESUPUESTO_TRANSCRIPCION) -> Optional[Dict[str, Any]]:
+    """ La transcripción del video como texto «[mm:ss] párrafo», para el modelo.
+
+    Usa el mismo extractor que el panel de traducción (cliente Android de InnerTube, con caché en disco):
+    el scraper web anterior ya no recibía subtítulos y el análisis se hacía solo con el título, así que el
+    modelo inventaba el contenido. Si no entra en el presupuesto, toma bloques de párrafos repartidos por
+    todo el video (no solo el principio), para que los objetivos cubran la clase entera.
+    Devuelve {"texto", "completa", "duracion_segundos", "segmentos"} o None si el video no tiene subtítulos. """
     if not video_id:
         return None
-    try:
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept-Language": "es,en;q=0.9",
-            },
-        )
-        raw_html = urllib.request.urlopen(req, timeout=7).read().decode("utf-8", errors="ignore")
-        m = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", raw_html)
-        if not m:
-            return None
-        data = json.loads(m.group(1))
-        captions = data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
-        if not captions:
-            return None
-
-        # Priorizar subtítulos en español, luego en inglés, o el primero disponible
-        track = next((c for c in captions if c.get("languageCode") in ("es", "es-419", "es-ES")), None)
-        if not track:
-            track = next((c for c in captions if c.get("languageCode") in ("en", "en-US", "en-GB")), captions[0])
-
-        base_url = track.get("baseUrl")
-        if not base_url:
-            return None
-
-        cap_req = urllib.request.Request(base_url, headers={"User-Agent": "Mozilla/5.0"})
-        cap_xml = urllib.request.urlopen(cap_req, timeout=7).read().decode("utf-8", errors="ignore")
-
-        # Parsear marcas <text start="X" dur="Y">texto</text>
-        lineas = []
-        for start_str, txt in re.findall(r'<text start="([\d\.]+)"[^>]*>(.*?)</text>', cap_xml):
-            limpio = html.unescape(txt).replace("\n", " ").strip()
-            if limpio:
-                segundos = int(float(start_str))
-                m_num, s_num = divmod(segundos, 60)
-                h_num, m_num = divmod(m_num, 60)
-                if h_num > 0:
-                    ts = f"[{h_num}:{m_num:02d}:{s_num:02d}]"
-                else:
-                    ts = f"[{m_num:02d}:{s_num:02d}]"
-                lineas.append(f"{ts} {limpio}")
-
-        if lineas:
-            return "\n".join(lineas)
-    except Exception:
-        pass
-    return None
+    datos = extraer_transcripcion_estructurada(video_id, idioma_destino="es")
+    segmentos = datos.get("segmentos") or [] if datos.get("ok") else []
+    if not segmentos:
+        return None
+    lineas = [f"[{formatear_segundos_hms(sg['start'])}] {sg.get('texto', '').strip()}" for sg in segmentos]
+    total = sum(len(l) + 1 for l in lineas)
+    completa = total <= presupuesto
+    if not completa:
+        POR_BLOQUE = 3
+        media = total / len(lineas)
+        n_bloques = max(1, int(presupuesto / (media * POR_BLOQUE)))
+        paso = len(lineas) / n_bloques
+        elegidas: List[str] = []
+        for b in range(n_bloques):
+            ini = int(b * paso)
+            elegidas.extend(lineas[ini:ini + POR_BLOQUE])
+            if b < n_bloques - 1:
+                elegidas.append("[…]")
+        lineas = elegidas
+    return {"texto": "\n".join(lineas), "completa": completa,
+            "duracion_segundos": int(segmentos[-1].get("end") or segmentos[-1].get("start") or 0),
+            "segmentos": len(segmentos)}
 
 
 def formatear_segundos_hms(segundos: float) -> str:
@@ -86,6 +65,7 @@ def formatear_segundos_hms(segundos: float) -> str:
 
 
 DEFAULT_INNERTUBE_API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
+VERSION_TRANSCRIPCION = 2  # 2: intervalos sin solapes; las cachés anteriores se recalculan
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "cache_transcripciones")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -276,6 +256,13 @@ def _parsear_fragmentos_subtitulos(xml_str: str) -> List[Dict[str, Any]]:
             except Exception:
                 continue
 
+    # Los subtítulos automáticos se pisan (cada línea sigue en pantalla mientras entra la siguiente):
+    # el fin de cada una se recorta al inicio de la siguiente, así los intervalos no se solapan
+    entradas.sort(key=lambda e: e["start"])
+    for actual, siguiente in zip(entradas, entradas[1:]):
+        if actual["end"] > siguiente["start"]:
+            actual["end"] = max(actual["start"], siguiente["start"])
+            actual["dur"] = round(actual["end"] - actual["start"], 2)
     return entradas
 
 
@@ -388,7 +375,7 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 datos_cache = json.load(f)
-                if datos_cache.get("ok") and datos_cache.get("segmentos"):
+                if datos_cache.get("ok") and datos_cache.get("segmentos") and datos_cache.get("version") == VERSION_TRANSCRIPCION:
                     return datos_cache
         except Exception:
             pass
@@ -429,7 +416,12 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
                 xml_origen = xml_traducido
                 idioma_usado = "es"
                 nombre_es = _extraer_nombre_track(track_es)
-                idioma_nombre = f"Español ({nombre_es})" if nombre_es != "Español" else "Español (oficial de YouTube)"
+                if nombre_es == "Español":
+                    idioma_nombre = "Español (oficial de YouTube)"
+                elif nombre_es.lower().startswith("español"):
+                    idioma_nombre = nombre_es
+                else:
+                    idioma_nombre = f"Español ({nombre_es})"
                 idioma_origen = track_es.get("languageCode", "es")
             else:
                 # Descargar original para agrupar y traducir párrafos
@@ -462,10 +454,19 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
         segmentos_agrupados = []
         actual_chunk = None
 
-        for ent in base_entradas:
+        import bisect
+        misma_fuente = xml_origen == xml_traducido
+        inicios_orig = [e["start"] for e in entradas_orig]
+        for n_ent, ent in enumerate(base_entradas):
             orig_match = None
-            if entradas_orig:
-                orig_match = min(entradas_orig, key=lambda x: abs(x["start"] - ent["start"]))
+            if misma_fuente and n_ent < len(entradas_orig):
+                orig_match = entradas_orig[n_ent]
+            elif entradas_orig:
+                # La más cercana en tiempo, por búsqueda binaria (antes era un recorrido completo por línea:
+                # cuadrático, segundos de CPU en un curso de 15 h)
+                k = bisect.bisect_left(inicios_orig, ent["start"])
+                vecinas = [entradas_orig[x] for x in (k - 1, k) if 0 <= x < len(entradas_orig)]
+                orig_match = min(vecinas, key=lambda x: abs(x["start"] - ent["start"]))
 
             texto_orig_val = orig_match["texto"] if orig_match else ent["texto"]
             texto_trad_val = ent["texto"]
@@ -529,16 +530,22 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
             try:
                 textos_a_traducir = [seg.get("texto", "") for seg in segmentos_agrupados]
                 textos_traducidos = _traducir_lote_parrafos(textos_a_traducir, "es")
+                cambiados = 0
                 for i, trad in enumerate(textos_traducidos):
                     if trad and trad != segmentos_agrupados[i]["texto"]:
                         segmentos_agrupados[i]["texto"] = trad
-                idioma_usado = "es"
-                idioma_nombre = f"Español (traducido desde {nombre_origen})"
+                        cambiados += 1
+                if cambiados:
+                    idioma_usado = "es"
+                    idioma_nombre = f"Español (traducido desde {nombre_origen})"
+                    if cambiados < len(segmentos_agrupados):
+                        idioma_nombre += f" · {len(segmentos_agrupados) - cambiados} párrafos sin traducir"
             except Exception:
                 pass
 
         resultado = {
             "ok": True,
+            "version": VERSION_TRANSCRIPCION,
             "video_id": video_id,
             "idioma_destino": idioma_destino,
             "idioma_usado": idioma_usado,
@@ -548,8 +555,11 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
             "segmentos": segmentos_agrupados
         }
 
-        # Guardar en caché persistente en disco
+        # Guardar en caché persistente en disco (no si la traducción pedida falló: se reintenta la próxima vez)
+        traduccion_fallida = idioma_destino in ("es", "es-419", "es-ES") and idioma_usado != "es"
         try:
+            if traduccion_fallida:
+                raise OSError("sin traducir")
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(resultado, f, ensure_ascii=False, indent=2)
         except Exception:
@@ -562,13 +572,18 @@ def extraer_transcripcion_estructurada(video_id: str, idioma_destino: str = "es"
 
 def preparar_contexto_video(video_id: str, titulo: str, canal: str, duracion: str,
                             descripcion: str = "", texto_usuario: str = "",
-                            notas_usuario: str = "") -> str:
-    """ Compila y estructura todo el texto disponible del video """
+                            notas_usuario: str = "") -> Dict[str, Any]:
+    """ Compila todo el texto disponible del video.
+    Devuelve {"texto": contexto para el modelo, "fuente": "transcripcion" | "texto_usuario" | "solo_metadatos",
+    "transcripcion_completa": bool, "duracion_segundos": int} """
     partes = [
         f"VIDEO: «{titulo}»",
         f"CANAL: {canal or 'YouTube'}",
         f"DURACIÓN: {duracion or 'N/A'}"
     ]
+    fuente = "solo_metadatos"
+    completa = False
+    duracion_segundos = 0
 
     if descripcion and descripcion.strip():
         partes.append(f"\nDESCRIPCIÓN / TEMARIO OFICIAL DEL CURSO:\n{descripcion.strip()}")
@@ -578,16 +593,33 @@ def preparar_contexto_video(video_id: str, titulo: str, canal: str, duracion: st
 
     if texto_usuario and texto_usuario.strip():
         partes.append(f"\nTEXTO / TRANSCRIPCIÓN PROPORCIONADA POR EL USUARIO:\n{texto_usuario.strip()}")
+        if len(texto_usuario.strip()) >= 100:
+            fuente = "texto_usuario"
 
-    # Intentar subtítulos de YouTube si no hay texto largo del usuario
-    if len(texto_usuario or "") < 100:
+    # Subtítulos de YouTube si no hay texto largo del usuario
+    if fuente != "texto_usuario":
         subs = extraer_subtitulos_youtube(video_id)
         if subs:
-            # Limitar a ~12000 caracteres para no desbordar contexto
-            recorte = subs[:12000] + ("\n…(transcripción resumida)" if len(subs) > 12000 else "")
-            partes.append(f"\nTRANSCRIPCIÓN DE SUBTÍTULOS DEL VIDEO:\n{recorte}")
+            fuente = "transcripcion"
+            completa = subs["completa"]
+            duracion_segundos = subs["duracion_segundos"]
+            aviso = "" if completa else (" (EXTRACTOS repartidos por todo el video; «[…]» marca los saltos; "
+                                         "los minutos entre corchetes son los reales)")
+            partes.append(f"\nTRANSCRIPCIÓN DE SUBTÍTULOS DEL VIDEO{aviso}:\n{subs['texto']}")
 
-    return "\n\n".join(partes)
+    if fuente == "solo_metadatos":
+        partes.append("\n(ATENCIÓN: este video no tiene transcripción disponible. Trabaja SOLO con el título, la "
+                      "descripción y los apuntes; no inventes contenidos, ejemplos ni minutos concretos que no "
+                      "estén en ese material.)")
+
+    return {"texto": "\n\n".join(partes), "fuente": fuente, "transcripcion_completa": completa,
+            "duracion_segundos": duracion_segundos}
+
+
+def error_del_motor(texto: str) -> Optional[str]:
+    """ Los motores no lanzan excepción: devuelven «[Error …]» como texto. Eso no es un resumen ni una traducción """
+    t = (texto or "").strip()
+    return t if t.startswith("[Error") else None
 
 
 def _extraer_json(texto: str) -> Optional[Any]:
@@ -645,7 +677,8 @@ def generar_resumen_estructurado(motor, modelo: str, titulo: str, canal: str,
         '  ],\n'
         '  "conclusiones": "Cómo aplicar lo aprendido en proyectos reales."\n'
         "}\n"
-        "No inventes librerías externas innecesarias. Sé riguroso y pedagógico."
+        "Todo debe salir del material dado (transcripción, descripción, apuntes): no inventes temas, código ni "
+        "librerías que el video no trate. Los snippets ilustran lo que se enseña en ESTE video. Sé riguroso y pedagógico."
     )
 
     prompt = (
@@ -656,6 +689,8 @@ def generar_resumen_estructurado(motor, modelo: str, titulo: str, canal: str,
 
     resp_raw = "".join(motor.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
                                                options={"temperature": 0.25}, uso="tutor"))
+    if error_del_motor(resp_raw):
+        raise ValueError(error_del_motor(resp_raw))
     datos = _extraer_json(resp_raw)
     if not datos or not isinstance(datos, dict):
         return {
@@ -670,7 +705,7 @@ def generar_resumen_estructurado(motor, modelo: str, titulo: str, canal: str,
 
 def generar_objetivos_didacticos(motor, modelo: str, titulo: str, canal: str,
                                 duracion: str, contexto: str, nivel: str = "intermedio",
-                                categoria: str = "") -> List[Dict[str, Any]]:
+                                categoria: str = "", duracion_segundos: int = 0) -> List[Dict[str, Any]]:
     """ Descompone el video en 3 a 6 hitos u objetivos de aprendizaje concretos con timestamps """
     sistema = (
         "Eres un DISEÑADOR CURRICULAR Y PEDAGÓGICO DE PROGRAMACIÓN de Prig IDE.\n"
@@ -682,19 +717,22 @@ def generar_objetivos_didacticos(motor, modelo: str, titulo: str, canal: str,
         "    {\n"
         '      "id": "obj_1",\n'
         '      "numero": 1,\n'
-        '      "titulo": "Título breve y activo (ej. Comprender la gestión de memoria en el Heap)",\n'
-        '      "descripcion": "Explicación clara de lo que el alumno debe saber y saber hacer.",\n'
-        '      "inicio_timestamp": "00:00",\n'
-        '      "fin_timestamp": "06:30",\n'
-        '      "inicio_segundos": 0,\n'
-        '      "conceptos": ["punteros", "malloc", "heap"],\n'
+        '      "titulo": "<verbo + tema concreto de ESTE video>",\n'
+        '      "descripcion": "<lo que el alumno debe saber y saber hacer, según lo que se ve en el video>",\n'
+        '      "inicio_timestamp": "<mm:ss o h:mm:ss donde empieza en la transcripción>",\n'
+        '      "fin_timestamp": "<mm:ss o h:mm:ss donde termina>",\n'
+        '      "inicio_segundos": <segundos de inicio_timestamp>,\n'
+        '      "conceptos": ["<concepto del video>", "<otro>"],\n'
         '      "dificultad": "principiante | intermedio | avanzado",\n'
         '      "criterio_evaluacion": "Qué debe ser capaz de implementar o responder para darlo por superado."\n'
         "    }\n"
         "  ]\n"
         "}\n"
         "REGLAS:\n"
-        "1. Los timestamps deben ser crecientes y cubrir momentos lógicos del video.\n"
+        "0. Todo sale del material dado (transcripción, descripción, apuntes). Nunca copies los marcadores <…> "
+        "de la plantilla ni inventes temas que no estén en el video.\n"
+        "1. Los timestamps deben ser crecientes, dentro de la duración del video, y tomados de los minutos "
+        "[mm:ss] de la transcripción.\n"
         "2. Cada objetivo debe ser evaluable con un ejercicio de código o comprensión.\n"
         "3. La redacción debe ser en español neutro y motivador."
     )
@@ -707,37 +745,57 @@ def generar_objetivos_didacticos(motor, modelo: str, titulo: str, canal: str,
 
     resp_raw = "".join(motor.generate_response(prompt, model=modelo, system_prompt=sistema, think=False,
                                                options={"temperature": 0.3}, uso="tutor"))
+    if error_del_motor(resp_raw):
+        raise ValueError(error_del_motor(resp_raw))
     datos = _extraer_json(resp_raw)
     if datos and isinstance(datos, dict) and isinstance(datos.get("objetivos"), list):
-        return datos["objetivos"]
-    if isinstance(datos, list):
-        return datos
+        datos = datos["objetivos"]
+    if not isinstance(datos, list) or not datos:
+        # Antes se devolvían dos objetivos genéricos con minutos inventados, como si fueran del video
+        raise ValueError("El modelo no devolvió los objetivos en JSON. Vuelve a intentarlo o elige otro modelo.")
+    return normalizar_objetivos(datos, duracion_segundos)
 
-    # Fallback predeterminado si el modelo no genera formato JSON
-    return [
-        {
-            "id": "obj_1",
-            "numero": 1,
-            "titulo": f"Fundamentos y conceptos clave de {titulo}",
-            "descripcion": f"Comprender la base teórica y la arquitectura presentada en la primera parte de la lección.",
-            "inicio_timestamp": "00:00",
-            "fin_timestamp": "10:00",
-            "inicio_segundos": 0,
-            "conceptos": [categoria or "programación"],
-            "dificultad": nivel or "principiante",
-            "criterio_evaluacion": "Identificar los componentes esenciales y su aplicación práctica."
-        },
-        {
-            "id": "obj_2",
-            "numero": 2,
-            "titulo": f"Implementación práctica y resolución de problemas",
-            "descripcion": f"Aplicar los conceptos en código limpio siguiendo las mejores prácticas.",
-            "inicio_timestamp": "10:00",
-            "fin_timestamp": "25:00",
-            "inicio_segundos": 600,
-            "conceptos": [categoria or "programación", "código"],
-            "dificultad": nivel or "intermedio",
-            "criterio_evaluacion": "Escribir la solución y verificar con pruebas unitarias."
-        }
-    ]
 
+def _a_segundos(ts: Any) -> Optional[int]:
+    """ «1:02:30», «12:34», «90» o 90 → segundos """
+    if isinstance(ts, (int, float)):
+        return int(ts)
+    partes = str(ts or "").strip().split(":")
+    try:
+        numeros = [int(float(x)) for x in partes]
+    except ValueError:
+        return None
+    total = 0
+    for n in numeros:
+        total = total * 60 + n
+    return total
+
+
+def normalizar_objetivos(objetivos: List[Any], duracion_segundos: int = 0) -> List[Dict[str, Any]]:
+    """ Ids y números en orden, inicio_segundos calculado del timestamp, minutos crecientes y dentro del video """
+    salida: List[Dict[str, Any]] = []
+    previo = 0
+    for o in objetivos:
+        if not isinstance(o, dict) or not str(o.get("titulo") or "").strip():
+            continue
+        o = dict(o)
+        ini = _a_segundos(o.get("inicio_timestamp"))
+        if ini is None:
+            ini = _a_segundos(o.get("inicio_segundos"))
+        fin = _a_segundos(o.get("fin_timestamp"))
+        if duracion_segundos:
+            ini = min(ini, duracion_segundos) if ini is not None else None
+            fin = min(fin, duracion_segundos) if fin is not None else None
+        ini = max(ini if ini is not None else previo, previo)
+        if fin is not None and fin < ini:
+            fin = None
+        n = len(salida) + 1
+        o.update({"id": f"obj_{n}", "numero": n, "inicio_segundos": ini, "inicio_timestamp": formatear_segundos_hms(ini),
+                  "fin_timestamp": formatear_segundos_hms(fin) if fin is not None else ""})
+        if not isinstance(o.get("conceptos"), list):
+            o["conceptos"] = [str(o["conceptos"])] if o.get("conceptos") else []
+        salida.append(o)
+        previo = ini
+    if not salida:
+        raise ValueError("El modelo devolvió objetivos vacíos. Vuelve a intentarlo o elige otro modelo.")
+    return salida

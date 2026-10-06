@@ -1,0 +1,27 @@
+{
+ "cambio": "termico.py: Tramo.pico_real devuelve 0.0 en vez de None sin lecturas",
+ "sincronizacion": {
+  "modificados": 1
+ },
+ "notas": {
+  "N1": {
+   "marcada": true,
+   "deberia": "la función cambiada: debe marcarse"
+  },
+  "N2": {
+   "marcada": true,
+   "deberia": "otra cosa del mismo archivo, que no cambió: marcarla sobra"
+  },
+  "N3": {
+   "marcada": false,
+   "deberia": "depende de la función cambiada, desde otro archivo: debería marcarse"
+  },
+  "N4": {
+   "marcada": false,
+   "deberia": "nada que ver: no debe marcarse"
+  }
+ },
+ "fichas_con_sha_viejo": 2,
+ "fichas_del_archivo": 43,
+ "aviso_en_el_contexto": true
+}
