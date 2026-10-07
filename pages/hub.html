@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prig: Prig Hub · Plataforma Descentralizada de Aprendizaje Basada en Git</title>
+    <meta name="description" content="Prig Hub: Guarda tus rutas de estudio, recursos, notas y desafíos de código en repositorios Git en texto plano (YAML/Markdown). Comparte packs de aprendizaje y sincroniza tu progreso sin ataduras.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        :root {
+            --hub-teal: #94e2d5;
+            --hub-green: #a6e3a1;
+        }
+        .hub-hero-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 40px;
+            align-items: center;
+            padding: 30px 0 50px;
+        }
+        .hub-mock-card {
+            background: #090b14;
+            border: 1px solid var(--hub-teal);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(148, 226, 213, 0.2);
+        }
+        .hub-mock-header {
+            background: #11111b;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .hub-tree-box {
+            background: rgba(18, 22, 38, 0.85);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 14px;
+            font-family: var(--font-code);
+            font-size: 11.5px;
+            color: #cdd6f4;
+            line-height: 1.65;
+        }
+        .hub-tag-badge {
+            font-size: 10px;
+            font-family: var(--font-code);
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(148, 226, 213, 0.15);
+            color: var(--hub-teal);
+            border: 1px solid rgba(148, 226, 213, 0.3);
+        }
+        .hub-sync-box {
+            background: rgba(9, 11, 20, 0.9);
+            border-left: 3px solid var(--neon-green);
+            padding: 14px;
+            border-radius: 6px;
+            font-family: var(--font-code);
+            font-size: 11px;
+            color: #cdd6f4;
+            line-height: 1.6;
+            margin: 0 14px 14px;
+        }
+        .pack-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        @media (max-width: 1024px) {
+            .hub-hero-grid { grid-template-columns: 1fr; }
+            .pack-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .pack-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fondo de Partículas Dinámicas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="site-wrapper">
+        <!-- Barra de Navegación -->
+        <header class="navbar">
+            <a href="index.html" class="nav-brand">
+                <div class="brand-icon" style="border-color:var(--hub-teal); color:var(--hub-teal); background:rgba(148, 226, 213, 0.2);">
+                    <i class="fa-solid fa-cube"></i>
+                </div>
+                <div>
+                    <span class="brand-name">PRIG: HUB</span>
+                    <span class="brand-tag" style="background:rgba(148, 226, 213, 0.15); color:var(--hub-teal); border-color:rgba(148, 226, 213, 0.3);">GIT ECOSYSTEM</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Volver al IDE</a></li>
+                <li><a href="#protocolo" class="nav-link">Protocolo Git</a></li>
+                <li><a href="#packs" class="nav-link">Packs &amp; Rutas</a></li>
+                <li><a href="#desafios" class="nav-link">Desafíos</a></li>
+                <li><a href="github.html" class="nav-link" style="color:var(--neon-purple);"><i class="fa-brands fa-github"></i> GitHub</a></li>
+                <li><a href="kaggle.html" class="nav-link" style="color:var(--neon-cyan);"><i class="fa-brands fa-kaggle"></i> Kaggle</a></li>
+                <li><a href="youtube.html" class="nav-link" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> YouTube</a></li>
+            </ul>
+
+            <a href="index.html#instalacion" class="btn-primary" style="background:linear-gradient(135deg, var(--hub-teal), var(--hub-green)); color:#0b0d17; padding:8px 18px; font-size:13px;">
+                <i class="fa-solid fa-download"></i> Probar en Prig
+            </a>
+        </header>
+
+        <!-- HERO SECTION PRIG HUB -->
+        <section class="hub-hero-grid">
+            <div>
+                <div class="hero-badge" style="background:rgba(148, 226, 213, 0.12); border-color:rgba(148, 226, 213, 0.35); color:var(--hub-teal);">
+                    <i class="fa-solid fa-code-branch"></i> PROTOCOLO DE APRENDIZAJE ABIERTO &amp; DESCENTRALIZADO
+                </div>
+                <h1 class="hero-title">
+                    Tu Progreso, Rutas y Desafíos Guardados en <span style="background:linear-gradient(135deg, var(--hub-teal), var(--hub-green), var(--neon-cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Repositorios Git</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Prig Hub rechaza las plataformas cerradas con suscripciones de pago. Tu plan de estudio, tus notas y tus desafíos de código viven en <strong>texto plano (YAML &amp; Markdown)</strong> dentro de un repositorio Git bajo tu control absoluto, sincronizable con GitHub, GitLab, Codeberg o servidores locales.
+                </p>
+                <div class="hero-actions">
+                    <a href="#protocolo" class="btn-primary" style="background:linear-gradient(135deg, var(--hub-teal), var(--hub-green)); color:#0b0d17;">
+                        <i class="fa-solid fa-book-open"></i> Explorar el Formato
+                    </a>
+                    <a href="index.html" class="btn-secondary">
+                        <i class="fa-solid fa-laptop-code"></i> Volver al IDE
+                    </a>
+                </div>
+            </div>
+
+            <!-- MOCKUP DEL REPOSITORIO PRIG HUB -->
+            <div class="hub-mock-card">
+                <div class="hub-mock-header">
+                    <div class="hcc-dots">
+                        <div class="hcc-dot red"></div>
+                        <div class="hcc-dot yellow"></div>
+                        <div class="hcc-dot green"></div>
+                    </div>
+                    <span style="font-family:var(--font-code); font-size:11px; color:var(--hub-teal); font-weight:700;">
+                        <i class="fa-solid fa-code-fork"></i> REPO: usuario/prig-machine-learning
+                    </span>
+                </div>
+
+                <div class="hub-tree-box">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-weight:700; color:#ffffff;"><i class="fa-solid fa-folder"></i> Estructura del Pack / Perfil</span>
+                        <span class="hub-tag-badge">prig.yaml (v1)</span>
+                    </div>
+                    <div style="color:var(--text-dim); font-size:11px;">
+                        ├── 📄 <span style="color:var(--neon-green);">prig.yaml</span> (Manifiesto, autor, nivel y licencia)<br>
+                        ├── 📄 <span style="color:var(--neon-cyan);">personas.yaml</span> (Canales y autores a seguir)<br>
+                        ├── 📄 <span style="color:var(--neon-cyan);">recursos.yaml</span> (Datasets, papers, videos y cursos)<br>
+                        ├── 📁 <span style="color:var(--neon-yellow);">rutas/</span> (Roadmaps en Markdown con pasos)<br>
+                        │&nbsp;&nbsp;&nbsp;└── 📄 <span style="color:#ffffff;">deep_learning_senior.md</span><br>
+                        └── 📁 <span style="color:var(--neon-pink);">desafios/</span> (Ejercicios de código con tests)
+                    </div>
+                </div>
+
+                <div class="hub-sync-box">
+                    <span style="color:var(--neon-green); font-weight:700;"><i class="fa-solid fa-arrows-rotate"></i> Sincronización Canónica Universal:</span><br>
+                    Los recursos usan claves estables (<code>youtube:video:id</code>, <code>kaggle:dataset:id</code>, <code>github:repo:id</code>). Tu progreso se mantiene sincronizado entre todos tus packs.
+                </div>
+            </div>
+        </section>
+
+        <!-- PILARES DEL PROTOCOLO -->
+        <section id="protocolo" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--hub-teal); border-color:rgba(148, 226, 213, 0.3); background:rgba(148, 226, 213, 0.1);">FILOSOFÍA DE DATOS</span>
+                <h2 class="section-title">¿Por qué Prig Hub usa Repositorios Git?</h2>
+                <p class="section-desc">Tus conocimientos no deben depender de la base de datos propietaria de ninguna empresa.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon green" style="background:rgba(148, 226, 213, 0.15); color:var(--hub-teal); border-color:rgba(148, 226, 213, 0.3);">
+                        <i class="fa-solid fa-file-lines"></i>
+                    </div>
+                    <h3 class="card-title">100% Texto Plano (YAML/Markdown)</h3>
+                    <p class="card-desc">
+                        Cualquier persona puede leer, editar a mano o auditar un pack de estudio con cualquier editor de texto, con Prig IDE o sin él.
+                    </p>
+                    <span class="card-tag">HUMAN READABLE</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon purple">
+                        <i class="fa-solid fa-code-compare"></i>
+                    </div>
+                    <h3 class="card-title">Versionado Semántico Real</h3>
+                    <p class="card-desc">
+                        Historial de cambios con <code>git log</code>, bifurcaciones (forks), pull requests colaborativos y control de versiones semántico (ej. <code>1.2.0</code>).
+                    </p>
+                    <span class="card-tag">GIT POWERED</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon cyan">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    <h3 class="card-title">Identidad Canónica Inmutable</h3>
+                    <p class="card-desc">
+                        Los recursos se identifican por su enlace normalizado. Si un video aparece en dos rutas distintas, Prig sincroniza el progreso automáticamente en ambas.
+                    </p>
+                    <span class="card-tag">CANONICAL IDS</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon yellow">
+                        <i class="fa-solid fa-route"></i>
+                    </div>
+                    <h3 class="card-title">Rutas de Estudio Estructuradas</h3>
+                    <p class="card-desc">
+                        Archivos <code>rutas/&lt;id&gt;.md</code> donde cada ítem de lista es un paso pedagógico con metas, enlaces directos a videos o repositorios y notas.
+                    </p>
+                    <span class="card-tag">LEARNING ROADMAPS</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon pink">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+                    <h3 class="card-title">Desafíos con Pruebas Unitarias</h3>
+                    <p class="card-desc">
+                        Carpetas <code>desafios/&lt;id&gt;/</code> con enunciados didácticos y tests automatizados que el alumno resuelve en vivo dentro del Editor Prig.
+                    </p>
+                    <span class="card-tag">AUTO-GRADED TESTS</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon blue">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </div>
+                    <h3 class="card-title">Comunidad Abierta (Packs)</h3>
+                    <p class="card-desc">
+                        Crea un repositorio con el topic <code>prig-pack</code> para compartir tus selecciones con estudiantes y programadores de todo el mundo.
+                    </p>
+                    <span class="card-tag">COMMUNITY PACKS</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- PACKS Y RUTAS DE EJEMPLO -->
+        <section id="packs" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-green); border-color:rgba(166, 227, 161, 0.3); background:rgba(166, 227, 161, 0.1);">PACKS TEMÁTICOS</span>
+                <h2 class="section-title">Especializaciones Listas para Estudiar</h2>
+                <p class="section-desc">Packs modulares que combinan papers de Machine Learning, clases de YouTube y datasets de Kaggle.</p>
+            </div>
+
+            <div class="pack-grid">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <span class="hub-tag-badge">NIVEL SENIOR</span>
+                        <span style="font-family:var(--font-code); font-size:11px; color:var(--neon-yellow);"><i class="fa-solid fa-star"></i> 21 Papers</span>
+                    </div>
+                    <h4 style="font-size:16px; font-weight:700; color:#ffffff; margin-bottom:8px;">Deep Learning &amp; Transformers</h4>
+                    <p style="font-size:13px; color:var(--text-muted); line-height:1.55; margin-bottom:16px;">
+                        Ruta completa desde perceptrones multicapa hasta modelos de difusión DDPM y arquitecturas Transformer autorregresivas estilo GPT.
+                    </p>
+                    <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-code); border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+                        <span>prig/pack-deep-learning</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <span class="hub-tag-badge" style="background:rgba(203, 166, 247, 0.15); color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3);">C++20 MODERN</span>
+                        <span style="font-family:var(--font-code); font-size:11px; color:var(--neon-green);"><i class="fa-solid fa-clock"></i> 40h de práctica</span>
+                    </div>
+                    <h4 style="font-size:16px; font-weight:700; color:#ffffff; margin-bottom:8px;">C++ Moderno, Memoria &amp; STL</h4>
+                    <p style="font-size:13px; color:var(--text-muted); line-height:1.55; margin-bottom:16px;">
+                        Punteros inteligentes, conceptos C++20, gestión del heap, optimización de caché L1/L2 y programación concurrente multihilo.
+                    </p>
+                    <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-code); border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+                        <span>prig/pack-cpp-moderno</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <span class="hub-tag-badge" style="background:rgba(243, 139, 168, 0.15); color:var(--neon-pink); border-color:rgba(243, 139, 168, 0.3);">COMPETICIÓN</span>
+                        <span style="font-family:var(--font-code); font-size:11px; color:var(--neon-cyan);"><i class="fa-solid fa-trophy"></i> Kaggle Grandmaster</span>
+                    </div>
+                    <h4 style="font-size:16px; font-weight:700; color:#ffffff; margin-bottom:8px;">Kaggle Grandmaster Pipeline</h4>
+                    <p style="font-size:13px; color:var(--text-muted); line-height:1.55; margin-bottom:16px;">
+                        Ingeniería de características avanzada, validación cruzada estratificada (K-Fold), ensamblados LightGBM/XGBoost/CatBoost y Stacking.
+                    </p>
+                    <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-code); border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+                        <span>prig/pack-kaggle-master</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: HUB</span>
+                <span>— Ecosistema Descentralizado de Conocimiento</span>
+            </div>
+            <ul class="footer-links">
+                <li><a href="index.html">Página Principal</a></li>
+                <li><a href="github.html" style="color:var(--neon-purple);"><i class="fa-brands fa-github"></i> Prig: GitHub</a></li>
+                <li><a href="kaggle.html" style="color:var(--neon-cyan);"><i class="fa-brands fa-kaggle"></i> Prig: Kaggle</a></li>
+                <li><a href="youtube.html" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> Prig: YouTube</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+            <p style="font-size:11.5px; color:var(--text-dim);">
+                Construido sobre especificaciones abiertas Git, YAML 1.2, Markdown GFM y licencias Creative Commons / MIT.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+</body>
+</html>
