@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prig IDE · Entorno de Desarrollo Asistido por IA Local y Agentes ASCII</title>
-    <meta name="description" content="Prig IDE es un entorno de desarrollo de alto rendimiento para Linux con Director de IA local (7B), memoria comprimida AST, personajes y temas ASCII dinámicos, audio-reactividad nativa y cuadernos Jupyter.">
+    <title>Prig IDE · Entorno de Programación Inteligente Local & Agentes ASCII</title>
+    <meta name="description" content="Prig IDE es el entorno de desarrollo para Linux asistido por un Director LLM 7B local, compresión semántica AST (>85% ahorro en tokens), corchetes no obstructivos, modo cerebro 60/20/20, audio-reactividad por hardware y soporte de cuadernos Jupyter.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -30,9 +30,9 @@
             </a>
 
             <ul class="nav-links">
-                <li><a href="#cualidades" class="nav-link">Cualidades</a></li>
-                <li><a href="#arquitectura" class="nav-link">Arquitectura AST</a></li>
-                <li><a href="#demostracion" class="nav-link">Demostración</a></li>
+                <li><a href="#pilares" class="nav-link">Pilares Técnicos</a></li>
+                <li><a href="#modos-interactivos" class="nav-link">Showcase Interactivo</a></li>
+                <li><a href="#benchmark" class="nav-link">Compresión AST</a></li>
                 <li><a href="#galeria" class="nav-link">Capturas</a></li>
                 <li><a href="#instalacion" class="nav-link">Instalación</a></li>
             </ul>
@@ -47,20 +47,20 @@
         <section class="hero">
             <div class="hero-content">
                 <div class="hero-badge">
-                    <i class="fa-solid fa-sparkles"></i> MOTOR DIRECTOR 7B & MEMORIA AST COMPRIMIDA
+                    <i class="fa-solid fa-microchip"></i> DIRECTOR LLM 7B LOCAL · MEMORIA AST & AGENTES ASCII
                 </div>
                 <h1 class="hero-title">
-                    El IDE de Programación con <span class="gradient-text">Agentes ASCII y LLM Local</span>
+                    Programación Guiada por <span class="gradient-text">Razonamiento Semántico Local</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Prig combina la potencia de <strong>Monaco Editor</strong> y <strong>Jupyter Notebooks</strong> con un <strong>Director Narrativo 7B</strong> que analiza el 100% de tu código mediante árboles sintácticos AST, generando corchetes de rango, grafos de flujo y audio-reactividad por hardware sin consumir tu GPU innecesariamente.
+                    Prig trasciende los autocompletadores tradicionales. Integra un <strong>Director de IA 7B autónomo</strong> que analiza el 100% de tu código mediante <strong>Árboles Sintácticos (AST)</strong> y <strong>Grafos de Flujo (CFG)</strong>, proyectando corchetes delimitadores y explicaciones tras bambalinas, con <strong>Modo Cerebro 60/20/20</strong>, menú radial por rueda del ratón y audio-reactividad por hardware.
                 </p>
                 <div class="hero-actions">
                     <a href="#instalacion" class="btn-primary">
-                        <i class="fa-solid fa-download"></i> Comenzar Ahora
+                        <i class="fa-solid fa-download"></i> Comenzar en Linux
                     </a>
-                    <a href="#demostracion" class="btn-secondary">
-                        <i class="fa-solid fa-play"></i> Ver Demostración
+                    <a href="#modos-interactivos" class="btn-secondary">
+                        <i class="fa-solid fa-layer-group"></i> Ver Modos Interactivos
                     </a>
                 </div>
             </div>
@@ -73,22 +73,22 @@
                         <div class="hcc-dot yellow"></div>
                         <div class="hcc-dot green"></div>
                     </div>
-                    <span class="hcc-badge"><i class="fa-solid fa-robot"></i> AGENTE EN VIVO</span>
+                    <span class="hcc-badge"><i class="fa-solid fa-robot"></i> AGENTE TEMÁTICO EN VIVO</span>
                 </div>
                 <canvas id="hero-character-canvas"></canvas>
                 <div class="hcc-footer">
-                    <span>Mueve el cursor sobre el personaje</span>
+                    <span>Mueve el cursor para interacción láser</span>
                     <span style="color: var(--neon-cyan);">60 FPS · Hardware Sync</span>
                 </div>
             </div>
         </section>
 
-        <!-- CUALIDADES Y CARACTERÍSTICAS -->
-        <section id="cualidades" class="section">
+        <!-- PILARES TÉCNICOS Y ARQUITECTURA -->
+        <section id="pilares" class="section">
             <div class="section-header">
-                <span class="section-badge">CARACTERÍSTICAS CLAVE</span>
-                <h2 class="section-title">Diseñado para el Flujo del Programador</h2>
-                <p class="section-desc">Tecnología local sin telemetría externa, privacidad absoluta y una experiencia audiovisual inmersiva.</p>
+                <span class="section-badge">ARQUITECTURA DE VANGUARDIA</span>
+                <h2 class="section-title">Ingeniería Diseñada para Cero Desperdicio</h2>
+                <p class="section-desc">Sin dependencias de la nube, sin saturación de GPU y con una capa visual no obstructiva.</p>
             </div>
 
             <div class="grid-3">
@@ -96,132 +96,288 @@
                     <div class="card-icon purple">
                         <i class="fa-solid fa-brain"></i>
                     </div>
-                    <h3 class="card-title">Director IA 7B y Memoria AST</h3>
+                    <h3 class="card-title">Director IA 7B con 6 Lentes Analíticas</h3>
                     <p class="card-desc">
-                        Analizador sintáctico profundo que extrae funciones, clases, complejidad ciclomática O(N) y dependencias, logrando más del <strong>85% de ahorro en tokens</strong>.
+                        Razonamiento en tiempo real sobre el código completo con rotación de lentes: <em>Arquitectura SRP</em>, <em>Complejidad O(N)&rarr;O(1)</em>, <em>Cláusulas de Guarda</em>, <em>Concurrencia Asíncrona</em>, <em>Tipado e Invariantes</em> y <em>Clean Code</em>.
                     </p>
-                    <span class="card-tag">OLLAMA / LOCAL LLM</span>
+                    <span class="card-tag">OLLAMA / 7B REASONING</span>
                 </div>
 
                 <div class="card">
                     <div class="card-icon cyan">
-                        <i class="fa-solid fa-brackets-curly"></i>
+                        <i class="fa-solid fa-network-wired"></i>
                     </div>
-                    <h3 class="card-title">Grandes Corchetes y Anotaciones</h3>
+                    <h3 class="card-title">Compresión AST & Grafo de Símbolos</h3>
                     <p class="card-desc">
-                        Corchetes de rango delimitadores y anotaciones flotantes con flechas que se mantienen <strong>anclados milimétricamente al hacer scroll</strong> en el código.
+                        Extractor sintáctico profundo que descompone módulos en firmas, dependencias y puntos críticos, reduciendo el consumo de tokens en <strong>más del 85% al 92%</strong> en el Cerebro IA.
                     </p>
-                    <span class="card-tag">SCROLL ANCHORED</span>
+                    <span class="card-tag">&gt;85% TOKEN REDUCTION</span>
                 </div>
 
                 <div class="card">
                     <div class="card-icon green">
-                        <i class="fa-solid fa-wave-pulse"></i>
+                        <i class="fa-solid fa-brackets-curly"></i>
                     </div>
-                    <h3 class="card-title">Audio-Reactividad Nativa</h3>
+                    <h3 class="card-title">Corchetes No Obstructivos con Scroll Lock</h3>
                     <p class="card-desc">
-                        Analizador FFT de 32 bandas por hardware que modula la iluminación y efectos al compás de tu música en Spotify, YouTube o reproductores locales.
+                        El modelo nunca tapa tu código ni mueve la cámara del editor: dibuja grandes corchetes delimitadores y vectores explicativos en capas z-index inferiores sincronizadas al scrollear.
                     </p>
-                    <span class="card-tag">PULSEAUDIO / PIPEWIRE</span>
+                    <span class="card-tag">NON-OBSTRUCTIVE UI</span>
                 </div>
 
                 <div class="card">
                     <div class="card-icon blue">
-                        <i class="fa-solid fa-book-bookmark"></i>
+                        <i class="fa-solid fa-expand"></i>
                     </div>
-                    <h3 class="card-title">Biblioteca de ML y Papers</h3>
+                    <h3 class="card-title">Modo Cerebro 60/20/20 (Ctrl + Alt)</h3>
                     <p class="card-desc">
-                        Catálogo integrado de 21 algoritmos seminales de Machine Learning (Transformers, XGBoost, DDPM, ResNet) con código ejecutable e implementación matemática.
+                        Presiona <kbd style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;">Ctrl+Alt</kbd> para minimizar el código como minimapa HUD superior izquierdo y abrir el diálogo central con el modelo y el mecha ASCII. <kbd style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;">Esc</kbd> regresa al instante.
                     </p>
-                    <span class="card-tag">ML RESEARCH</span>
+                    <span class="card-tag">DUAL WORKSPACE</span>
                 </div>
 
                 <div class="card">
                     <div class="card-icon yellow">
-                        <i class="fa-solid fa-laptop-code"></i>
+                        <i class="fa-solid fa-compass"></i>
                     </div>
-                    <h3 class="card-title">Cuadernos Jupyter y Monaco</h3>
+                    <h3 class="card-title">Menú Deslizante por Rueda del Mouse</h3>
                     <p class="card-desc">
-                        Soporte multipestaña de 1 a 3 columnas, ejecución de celdas en kernels IPython, exportador PDF y menú deslizante de archivos al pulsar la rueda del mouse.
+                        Pulsa el botón central del mouse para desplegar un selector radial flotante con los archivos del workspace directamente sobre la posición del cursor, cerrándose con un clic exterior.
                     </p>
-                    <span class="card-tag">IPYTHON & MONACO</span>
+                    <span class="card-tag">RADIAL FAST NAV</span>
                 </div>
 
                 <div class="card">
                     <div class="card-icon pink">
-                        <i class="fa-solid fa-temperature-arrow-down"></i>
+                        <i class="fa-solid fa-wave-pulse"></i>
                     </div>
-                    <h3 class="card-title">Gobernador Térmico y MoE</h3>
+                    <h3 class="card-title">Audio FFT y Gobernador Térmico</h3>
                     <p class="card-desc">
-                        Monitor de temperatura de GPU/CPU y control de carga en modo suave para garantizar fluidez constante y cero sobrecalentamiento.
+                        Espectrograma reactivo de 32 bandas conectado al bus de audio de PulseAudio/PipeWire y monitor térmico nativo con modo suave para evitar throttling de hardware.
                     </p>
-                    <span class="card-tag">THERMAL GOVERNOR</span>
+                    <span class="card-tag">FFT 32-BANDS & THERMAL</span>
                 </div>
             </div>
         </section>
 
-        <!-- DEMOSTRACIÓN DE CORCHETES Y FLUJO DE CÓDIGO -->
-        <section id="demostracion" class="section">
+        <!-- SHOWCASE INTERACTIVO DE 4 MODOS -->
+        <section id="modos-interactivos" class="section">
             <div class="section-header">
-                <span class="section-badge">INSPECCIÓN VISUAL</span>
-                <h2 class="section-title">Explicación Estructurada Fuera del Código</h2>
-                <p class="section-desc">El modelo nunca dibuja encima del código: enmarca la lógica con corchetes en los márgenes y flechas explicativas.</p>
+                <span class="section-badge">INTERACTIVIDAD EN VIVO</span>
+                <h2 class="section-title">Explora las Vistas del Ecosistema</h2>
+                <p class="section-desc">Cambia entre pestañas para inspeccionar la experiencia del programador en cada flujo de trabajo.</p>
             </div>
 
-            <div class="demo-container">
-                <div class="demo-header">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-code" style="color:var(--neon-cyan);"></i>
-                        <span style="font-family:var(--font-code); font-size:12px; font-weight:700;">pipeline_optimizador.py</span>
-                    </div>
-                    <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);">● AST INDEXED (100% CÓDIGO)</span>
+            <div class="showcase-wrapper">
+                <div class="showcase-tabs">
+                    <button class="showcase-tab active" data-tab="tab-cerebro">
+                        <i class="fa-solid fa-brain"></i> 1. Modo Cerebro IA (Ctrl+Alt)
+                    </button>
+                    <button class="showcase-tab" data-tab="tab-corchetes">
+                        <i class="fa-solid fa-code"></i> 2. Corchetes & AST en Editor
+                    </button>
+                    <button class="showcase-tab" data-tab="tab-rueda">
+                        <i class="fa-solid fa-compass"></i> 3. Menú Rueda de Archivos
+                    </button>
+                    <button class="showcase-tab" data-tab="tab-jupyter">
+                        <i class="fa-solid fa-chart-line"></i> 4. Jupyter & 21 Papers ML
+                    </button>
                 </div>
 
-                <div class="demo-code-area">
-                    <div class="code-mock">
-                        <div class="code-line"><span class="line-num">1</span><span class="line-content"><span class="token-kw">import</span> math</span></div>
-                        <div class="code-line"><span class="line-num">2</span><span class="line-content"><span class="token-kw">from</span> typing <span class="token-kw">import</span> List, Optional</span></div>
-                        <div class="code-line"><span class="line-num">3</span><span class="line-content"></span></div>
-                        <div class="code-line"><span class="line-num">4</span><span class="line-content"><span class="token-kw">class</span> <span class="token-fn">PipelineDatos</span>:</span></div>
-                        <div class="code-line"><span class="line-num">5</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">async def</span> <span class="token-fn">procesar_lote</span>(self, items: List[float]) -&gt; List[float]:</span></div>
-                        <div class="code-line line-bracket-highlight"><span class="line-num">6</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">if not</span> items: <span class="token-kw">return</span> [] <span class="token-comment"># Cláusula de guarda</span></span></div>
-                        <div class="code-line line-bracket-highlight"><span class="line-num">7</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resultado = []</span></div>
-                        <div class="code-line line-bracket-highlight"><span class="line-num">8</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">for</span> x <span class="token-kw">in</span> items:</span></div>
-                        <div class="code-line line-bracket-highlight"><span class="line-num">9</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resultado.append(math.sqrt(x) * 1.414)</span></div>
-                        <div class="code-line line-bracket-highlight"><span class="line-num">10</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">return</span> resultado</span></div>
+                <!-- TAB 1: MODO CEREBRO (LAYOUT 60/20/20) -->
+                <div id="tab-cerebro" class="showcase-content active">
+                    <div class="cerebro-split-demo">
+                        <!-- 20% Izquierda: Minimapa HUD -->
+                        <div class="cerebro-left-hud">
+                            <span class="hud-title"><i class="fa-solid fa-map"></i> MINIMAPA CÓDIGO (HUD)</span>
+                            <div class="minimap-box">
+                                class PipelineDatos:<br>
+                                &nbsp;&nbsp;def __init__(self):<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;self.cache = {}<br>
+                                &nbsp;&nbsp;async def transformar():<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;if not data: return<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;for item in data:<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yield process(item)<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;return result
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-dim); font-family:var(--font-code);">
+                                <span>Estado:</span> <span style="color:var(--neon-green);">● Minimizado</span><br>
+                                <span>Atajo:</span> <kbd>Esc para volver</kbd>
+                            </div>
+                        </div>
+
+                        <!-- 60% Centro: Diálogo y Razonamiento -->
+                        <div class="cerebro-center-main">
+                            <div class="cerebro-header-bar">
+                                <span class="cot-badge-lens">⚡ LENTE: COMPLEJIDAD ASINTÓTICA O(N)</span>
+                                <span style="font-size: 11.5px; color: var(--neon-cyan); font-family:var(--font-code);">
+                                    <i class="fa-solid fa-bolt"></i> CoT STREAMING ACTIVO
+                                </span>
+                            </div>
+                            <div class="cot-stream-box">
+                                <p><span class="cot-tag">PENSAMIENTO (Chain-of-Thought):</span><br>
+                                1. Identificación de función <code>transformar()</code> en línea 4 con iteración secuencial.<br>
+                                2. Búsqueda lineal en <code>self.cache</code> tiene costo O(N); transformar en hash table O(1).<br>
+                                3. Se añade generador <code>yield</code> para mantener uso de RAM en O(1) bajo streams continuos.</p>
+                                <hr style="border:0; border-top:1px solid rgba(255,255,255,0.08); margin:12px 0;">
+                                <p><span class="cot-tag">DIÁLOGO DEL DIRECTOR [Titán Mecha]:</span><br>
+                                <em>"He detectado una oportunidad crítica de optimización en tu pipeline. Al pre-indexar elementos en memoria, eliminamos la latencia de búsqueda en colecciones extensas."</em></p>
+                            </div>
+                        </div>
+
+                        <!-- 20% Derecha: Personaje ASCII en Vivo -->
+                        <div class="cerebro-right-agent">
+                            <div class="agent-avatar-ascii">
+                                /| [ TITAN ] |\<br>
+                                (O) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (O)<br>
+                                \___=___/<br>
+                                | [CORE] |<br>
+                                \________/
+                            </div>
+                            <div class="agent-live-status">
+                                <i class="fa-solid fa-shield-halved"></i> <strong>MECHA ACTIVO</strong><br>
+                                <span style="font-size: 10px; color: var(--text-dim);">Supervisando 100% de cambios</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: CORCHETES NO OBSTRUCTIVOS EN EDITOR -->
+                <div id="tab-corchetes" class="showcase-content">
+                    <div class="demo-container">
+                        <div class="demo-header">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-code" style="color:var(--neon-cyan);"></i>
+                                <span style="font-family:var(--font-code); font-size:12px; font-weight:700;">servicio_pipeline.py</span>
+                            </div>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);">● 100% CÓDIGO ANALIZADO</span>
+                        </div>
+
+                        <div class="demo-code-area">
+                            <div class="code-mock">
+                                <div class="code-line"><span class="line-num">1</span><span class="line-content"><span class="token-kw">import</span> math</span></div>
+                                <div class="code-line"><span class="line-num">2</span><span class="line-content"><span class="token-kw">from</span> typing <span class="token-kw">import</span> List, Optional</span></div>
+                                <div class="code-line"><span class="line-num">3</span><span class="line-content"></span></div>
+                                <div class="code-line"><span class="line-num">4</span><span class="line-content"><span class="token-kw">class</span> <span class="token-fn">ServicioProcesamiento</span>:</span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">5</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">async def</span> <span class="token-fn">ejecutar_lote</span>(self, elementos: List[int]) -&gt; List[float]:</span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">6</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">if not</span> elementos: <span class="token-kw">return</span> [] <span class="token-comment"># Cláusula de guarda</span></span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">7</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resultado = []</span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">8</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">for</span> e <span class="token-kw">in</span> elementos:</span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">9</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resultado.append(math.sqrt(e))</span></div>
+                                <div class="code-line line-bracket-highlight"><span class="line-num">10</span><span class="line-content">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="token-kw">return</span> resultado</span></div>
+                            </div>
+
+                            <div class="demo-inspector">
+                                <div class="badge-annotation" style="border-color: var(--neon-purple);">
+                                    <div class="ba-header" style="color: var(--neon-purple);">
+                                        <span>⚡ [CORCHETE DE RANGO L5-L10]</span>
+                                        <span>ANCLADO AL SCROLL</span>
+                                    </div>
+                                    <div class="ba-body">
+                                        Renderizado en capa inferior tras el texto para mantener libre la selección de código del programador.
+                                    </div>
+                                </div>
+
+                                <div class="badge-annotation" style="border-color: var(--neon-pink);">
+                                    <div class="ba-header" style="color: var(--neon-pink);">
+                                        <span>🛡️ [CLÁUSULA DE GUARDA L6]</span>
+                                        <span>EARLY RETURN</span>
+                                    </div>
+                                    <div class="ba-body">
+                                        Previene excepciones por NoneType o listas vacías antes de iniciar cómputo de raíces.
+                                    </div>
+                                </div>
+
+                                <div class="badge-annotation" style="border-color: var(--neon-green);">
+                                    <div class="ba-header" style="color: var(--neon-green);">
+                                        <span>🧠 MEMORIA AST PERSISTENTE</span>
+                                        <span>91.4% AHORRO TOKENS</span>
+                                    </div>
+                                    <div class="ba-body">
+                                        Indexado en base de datos local SQLite para consultas instantáneas al Cerebro IA.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: MENÚ RUEDA DESLIZANTE -->
+                <div id="tab-rueda" class="showcase-content">
+                    <div class="wheel-demo-container">
+                        <div class="wheel-radial-menu">
+                            <div class="wheel-center-core">
+                                <i class="fa-solid fa-computer-mouse" style="font-size:16px; margin-bottom:4px; color:var(--neon-purple);"></i>
+                                <span>RUEDA CLIC</span>
+                            </div>
+                            <div class="wheel-node pos-top"><i class="fa-solid fa-file-code"></i> backend/app.py</div>
+                            <div class="wheel-node pos-right"><i class="fa-solid fa-file-lines"></i> llm_director.py</div>
+                            <div class="wheel-node pos-bottom"><i class="fa-solid fa-folder-open"></i> frontend/js/</div>
+                            <div class="wheel-node pos-left"><i class="fa-solid fa-book-bookmark"></i> cuaderno.ipynb</div>
+                        </div>
+                        <div style="position:absolute; bottom:16px; font-family:var(--font-code); font-size:11.5px; color:var(--text-muted); background:rgba(0,0,0,0.6); padding:4px 12px; border-radius:20px;">
+                            <span>💡 Haz clic en la rueda del mouse para abrir el selector radial sobre la posición del cursor.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: JUPYTER & 21 PAPERS ML -->
+                <div id="tab-jupyter" class="showcase-content">
+                    <div style="background:#090b14; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                            <span style="font-family:var(--font-code); font-size:12px; color:var(--neon-cyan); font-weight:700;">
+                                <i class="fa-solid fa-cube"></i> CUADERNO: 20_transformer_atencion.ipynb [IPython Kernel Live]
+                            </span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);">GPU NVML: 42°C · 0.8% VRAM</span>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border-left:3px solid var(--neon-blue); padding:14px; border-radius:6px; font-family:var(--font-code); font-size:12px; color:#cdd6f4; margin-bottom:12px;">
+                            <span style="color:var(--text-dim);"># Celda 3 [Markdown & KaTeX]:</span><br>
+                            $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+                        </div>
+                        <div style="background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.06); padding:12px; border-radius:6px; font-family:var(--font-code); font-size:11px; color:var(--neon-green);">
+                            &gt;&gt;&gt; MultiHeadAttention(d_model=512, n_heads=8) inicializado con éxito.<br>
+                            &gt;&gt;&gt; Pérdida de convergencia: 0.0412 · 21 Papers Seminales disponibles para entrenamiento.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN DE BENCHMARK Y COMPRESIÓN DE TOKENS -->
+        <section id="benchmark" class="section">
+            <div class="section-header">
+                <span class="section-badge">EFICIENCIA DE CONTEXTO</span>
+                <h2 class="section-title">Ahorro Cuántico de Tokens con Memoria AST</h2>
+                <p class="section-desc">Comparativa real de procesamiento entre enviar archivos planos vs. compresión sintáctica de Prig.</p>
+            </div>
+
+            <div class="benchmark-box">
+                <div class="bench-bar-container">
+                    <div class="bench-bar-item">
+                        <div class="bench-label">
+                            <span style="color:#f38ba8;"><i class="fa-solid fa-file-lines"></i> Enfoque Tradicional (Texto Plano)</span>
+                            <span style="color:#f38ba8; font-weight:700;">4,200 tokens / escaneo</span>
+                        </div>
+                        <div class="bench-progress">
+                            <div class="bench-fill red"></div>
+                        </div>
                     </div>
 
-                    <div class="demo-inspector">
-                        <div class="badge-annotation" style="border-color: var(--neon-yellow);">
-                            <div class="ba-header" style="color: var(--neon-yellow);">
-                                <span>⚡ [OPTIMIZACIÓN O(N)]</span>
-                                <span>L6-L10</span>
-                            </div>
-                            <div class="ba-body">
-                                <strong>Bucle de Procesamiento:</strong> Vectorizable mediante comprehensions o generadores para evitar mutación secuencial.
-                            </div>
+                    <div class="bench-bar-item">
+                        <div class="bench-label">
+                            <span style="color:var(--neon-green);"><i class="fa-solid fa-microchip"></i> Prig IDE (Ficha AST Comprimida)</span>
+                            <span style="color:var(--neon-green); font-weight:700;">340 tokens (91.9% Ahorro)</span>
                         </div>
-
-                        <div class="badge-annotation" style="border-color: var(--neon-pink);">
-                            <div class="ba-header" style="color: var(--neon-pink);">
-                                <span>🛡️ [CLÁUSULA DE GUARDA]</span>
-                                <span>L6</span>
-                            </div>
-                            <div class="ba-body">
-                                Validación temprana de invariantes para listas vacías o valores nulos antes del cálculo matemático.
-                            </div>
-                        </div>
-
-                        <div class="badge-annotation" style="border-color: var(--neon-green);">
-                            <div class="ba-header" style="color: var(--neon-green);">
-                                <span>🧠 CEREBRO IA · COMPRESIÓN AST</span>
-                                <span>91.4% AHORRO</span>
-                            </div>
-                            <div class="ba-body">
-                                Ficha semántica almacenada en memoria persistente sin desperdicio de contexto en la ventana del LLM.
-                            </div>
+                        <div class="bench-progress">
+                            <div class="bench-fill green"></div>
                         </div>
                     </div>
+                </div>
+
+                <div style="font-size:13.5px; color:var(--text-muted); line-height:1.7;">
+                    <p>
+                        Al almacenar únicamente el <strong>grafo de dependencias</strong>, <strong>firmas de métodos con type hints</strong> y <strong>complejidad ciclomática</strong> en una base SQLite local, el modelo razona sobre todo el proyecto instantáneamente sin llenar la ventana de contexto de tu LLM 7B ni provocar alucinaciones.
+                    </p>
                 </div>
             </div>
         </section>
@@ -236,50 +392,68 @@
 
             <div class="gallery-grid">
                 <div class="gallery-card">
-                    <img src="assets/inicio.png" alt="Pantalla de Inicio de Prig" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/inicio.png" alt="Pantalla de Inicio de Prig" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-house"></i> DASHBOARD</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Pantalla de Inicio & Dashboard</h4>
-                        <p class="gallery-caption">Acceso a proyectos recientes, telemetría y biblioteca técnica.</p>
+                        <p class="gallery-caption">Acceso a proyectos recientes, telemetría de GPU/CPU y biblioteca técnica.</p>
                     </div>
                 </div>
 
                 <div class="gallery-card">
-                    <img src="assets/cuaderno.png" alt="Cuadernos Jupyter Interactivos" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/cuaderno.png" alt="Cuadernos Jupyter Interactivos" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-book"></i> JUPYTER</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Cuadernos Jupyter y Monaco</h4>
-                        <p class="gallery-caption">Ejecución interactiva de celdas con soporte para Markdown y gráficas.</p>
+                        <p class="gallery-caption">Ejecución interactiva de celdas con soporte para Markdown, LaTeX y gráficas.</p>
                     </div>
                 </div>
 
                 <div class="gallery-card">
-                    <img src="assets/kaggle-datasets.png" alt="Explorador de Datasets de Kaggle" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/kaggle-datasets.png" alt="Explorador de Datasets de Kaggle" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-database"></i> DATASETS</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Explorador de Datasets Kaggle</h4>
-                        <p class="gallery-caption">Búsqueda y descarga directa de datasets para entrenamiento de modelos.</p>
+                        <p class="gallery-caption">Búsqueda y descarga directa de datasets para entrenamiento de modelos ML.</p>
                     </div>
                 </div>
 
                 <div class="gallery-card">
-                    <img src="assets/github-repositorio.png" alt="Integración con Repositorios de GitHub" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/github-repositorio.png" alt="Integración con Repositorios de GitHub" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-brands fa-github"></i> REPOS</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Explorador de Repositorios GitHub</h4>
-                        <p class="gallery-caption">Importación de código, clonación y lectura de árboles de proyectos.</p>
+                        <p class="gallery-caption">Importación de código, clonación y lectura de árboles de proyectos remotos.</p>
                     </div>
                 </div>
 
                 <div class="gallery-card">
-                    <img src="assets/modo-suave.png" alt="Modo Suave y Rendimiento" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/modo-suave.png" alt="Modo Suave y Rendimiento" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-temperature-low"></i> TÉRMICO</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Control Térmico y Modo Suave</h4>
-                        <p class="gallery-caption">Ajuste de consumo de CPU/GPU y prevención de throttling.</p>
+                        <p class="gallery-caption">Ajuste fino de consumo de hardware para garantizar cero sobrecalentamiento.</p>
                     </div>
                 </div>
 
                 <div class="gallery-card">
-                    <img src="assets/kaggle-explorador.png" alt="Kaggle Notebooks y Competencias" class="gallery-img">
+                    <div class="gallery-img-wrap">
+                        <img src="assets/kaggle-explorador.png" alt="Kaggle Notebooks y Competencias" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-trophy"></i> COMPETENCIAS</span>
+                    </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Notebooks y Competencias Kaggle</h4>
-                        <p class="gallery-caption">Inspección de código ganador y soluciones de la comunidad.</p>
+                        <p class="gallery-caption">Inspección de soluciones de la comunidad y modelos de alto rendimiento.</p>
                     </div>
                 </div>
             </div>
@@ -295,7 +469,7 @@
 
             <div class="terminal-box">
                 <div class="tb-header">
-                    <span class="tb-title"><i class="fa-solid fa-terminal"></i> bash - terminal</span>
+                    <span class="tb-title"><i class="fa-solid fa-terminal"></i> bash - terminal linux</span>
                     <span style="font-size: 11px; color: var(--text-dim);">Python 3.10+ / Linux</span>
                 </div>
                 <div class="tb-body">
@@ -327,16 +501,17 @@
         <footer class="footer">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-weight:800; color:#fff; font-size:16px;">PRIG IDE</span>
-                <span>— Entorno de Programación Inteligente Local</span>
+                <span>— Entorno de Programación Inteligente Local para Linux</span>
             </div>
             <ul class="footer-links">
-                <li><a href="#cualidades">Cualidades</a></li>
-                <li><a href="#arquitectura">Arquitectura</a></li>
+                <li><a href="#pilares">Pilares Técnicos</a></li>
+                <li><a href="#modos-interactivos">Showcase</a></li>
+                <li><a href="#benchmark">Memoria AST</a></li>
                 <li><a href="#galeria">Capturas</a></li>
                 <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
             </ul>
             <p style="font-size:11.5px; color:var(--text-dim);">
-                Desarrollado con arquitectura de alto rendimiento, Monaco Editor, FastAPI, Ollama y agentes ASCII.
+                Construido con FastAPI, Monaco Editor, Ollama 7B, AST topológico, WebSockets y audio FFT en tiempo real.
             </p>
         </footer>
     </div>
@@ -350,4 +525,3 @@
     <script src="js/main.js"></script>
 </body>
 </html>
-
