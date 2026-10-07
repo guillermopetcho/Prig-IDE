@@ -19,7 +19,7 @@
     <div class="site-wrapper">
         <!-- Barra de Navegación -->
         <header class="navbar">
-            <a href="#" class="nav-brand">
+            <a href="index.html" class="nav-brand">
                 <div class="brand-icon">
                     <i class="fa-solid fa-terminal"></i>
                 </div>
@@ -30,54 +30,56 @@
             </a>
 
             <ul class="nav-links">
+                <li><a href="#ecosistema" class="nav-link" style="color:var(--neon-cyan); font-weight:600;"><i class="fa-solid fa-layer-group"></i> Ecosistema</a></li>
                 <li><a href="#pilares" class="nav-link">Pilares Técnicos</a></li>
-                <li><a href="#modos-interactivos" class="nav-link">Showcase Interactivo</a></li>
+                <li><a href="#modos-interactivos" class="nav-link">Showcase</a></li>
                 <li><a href="#benchmark" class="nav-link">Compresión AST</a></li>
-                <li><a href="hub.html" class="nav-link" style="color:var(--neon-teal); font-weight:700;"><i class="fa-solid fa-cube"></i> Prig Hub</a></li>
-                <li><a href="github.html" class="nav-link" style="color:var(--neon-purple); font-weight:700;"><i class="fa-brands fa-github"></i> GitHub</a></li>
-                <li><a href="kaggle.html" class="nav-link" style="color:var(--neon-cyan); font-weight:700;"><i class="fa-brands fa-kaggle"></i> Kaggle</a></li>
-                <li><a href="youtube.html" class="nav-link" style="color:var(--neon-pink); font-weight:700;"><i class="fa-brands fa-youtube"></i> YouTube</a></li>
+                <li><a href="#galeria" class="nav-link">Capturas</a></li>
                 <li><a href="#instalacion" class="nav-link">Instalación</a></li>
             </ul>
 
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="btn-github">
-                <i class="fa-brands fa-github"></i>
-                <span>Ver en GitHub</span>
-            </a>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <a href="https://github.com/guillermopetcho/Prig-IDE" target="_blank" rel="noopener noreferrer" class="btn-github">
+                    <i class="fa-brands fa-github"></i>
+                    <span>GitHub</span>
+                </a>
+                <a href="#instalacion" class="btn-primary" style="padding:8px 16px; font-size:13px;">
+                    <i class="fa-solid fa-download"></i> Probar v2.0
+                </a>
+            </div>
         </header>
 
         <!-- SECCIÓN HERO -->
         <section class="hero">
             <div class="hero-content">
                 <div class="hero-badge">
-                    <i class="fa-solid fa-microchip"></i> DIRECTOR LLM 7B LOCAL · MEMORIA AST & AGENTES ASCII
+                    <i class="fa-solid fa-microchip"></i> DIRECTOR LLM 7B LOCAL · MOTOR AST & 0% NUBE
                 </div>
                 <h1 class="hero-title">
                     Programación Guiada por <span class="gradient-text">Razonamiento Semántico Local</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Prig trasciende los autocompletadores tradicionales. Integra un <strong>Director de IA 7B autónomo</strong> que analiza el 100% de tu código mediante <strong>Árboles Sintácticos (AST)</strong> y <strong>Grafos de Flujo (CFG)</strong>, proyectando corchetes delimitadores y explicaciones tras bambalinas, con <strong>Modo Cerebro 60/20/20</strong>, menú radial por rueda del ratón y audio-reactividad por hardware.
+                    Prig trasciende los autocompletadores superficiales. Integra un <strong>Director de IA 7B autónomo</strong> que comprende tu código mediante <strong>Árboles Sintácticos (AST)</strong> y <strong>Grafos de Flujo (CFG)</strong>, proyectando corchetes z-index no obstructivos, <strong>Modo Cerebro 60/20/20</strong>, selector radial por rueda y audio-reactividad por hardware.
                 </p>
                 <div class="hero-actions">
                     <a href="#instalacion" class="btn-primary">
                         <i class="fa-solid fa-download"></i> Comenzar en Linux
                     </a>
-                    <a href="hub.html" class="btn-secondary" style="border-color:var(--neon-teal); color:var(--neon-teal);">
-                        <i class="fa-solid fa-cube"></i> Prig: Hub
+                    <a href="#ecosistema" class="btn-secondary">
+                        <i class="fa-solid fa-layer-group"></i> Explorar los 4 Hubs
                     </a>
-                    <a href="github.html" class="btn-secondary" style="border-color:var(--neon-purple); color:var(--neon-purple);">
-                        <i class="fa-brands fa-github"></i> Prig: GitHub
-                    </a>
-                    <a href="kaggle.html" class="btn-secondary" style="border-color:var(--kaggle-cyan); color:var(--kaggle-cyan);">
-                        <i class="fa-brands fa-kaggle"></i> Prig: Kaggle
-                    </a>
-                    <a href="youtube.html" class="btn-secondary" style="border-color:var(--neon-pink); color:var(--neon-pink);">
-                        <i class="fa-brands fa-youtube"></i> Prig: YouTube
-                    </a>
+                </div>
+
+                <!-- Comando Rápido de Instalación en Hero -->
+                <div class="hero-cmd-box">
+                    <span class="hero-cmd-code">git clone https://github.com/guillermopetcho/Prig-IDE.git &amp;&amp; cd Prig-IDE</span>
+                    <button class="btn-copy" data-cmd="git clone https://github.com/guillermopetcho/Prig-IDE.git && cd Prig-IDE" title="Copiar comando">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
                 </div>
             </div>
 
-            <!-- Showcase Interactivo de Personaje ASCII -->
+            <!-- Showcase Interactivo de Personaje ASCII y Telemetría -->
             <div class="hero-canvas-card">
                 <div class="hcc-header">
                     <div class="hcc-dots">
@@ -85,12 +87,147 @@
                         <div class="hcc-dot yellow"></div>
                         <div class="hcc-dot green"></div>
                     </div>
-                    <span class="hcc-badge"><i class="fa-solid fa-robot"></i> AGENTE TEMÁTICO EN VIVO</span>
+                    <span class="hcc-badge"><i class="fa-solid fa-shield-halved"></i> TELEMETRÍA TITAN 7B</span>
                 </div>
                 <canvas id="hero-character-canvas"></canvas>
                 <div class="hcc-footer">
-                    <span>Mueve el cursor para interacción láser</span>
-                    <span style="color: var(--neon-cyan);">60 FPS · Hardware Sync</span>
+                    <span><i class="fa-solid fa-circle-check" style="color:var(--neon-green);"></i> 100% Cómputo Local</span>
+                    <span style="color: var(--neon-cyan);"><i class="fa-solid fa-bolt"></i> 60 FPS Hardware Sync</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- BARRA DE TELEMETRÍA Y MÉTRICAS CLAVE -->
+        <div class="stats-strip">
+            <div class="stat-item">
+                <div class="stat-val">91.9%</div>
+                <div class="stat-lbl">Ahorro de Tokens (AST)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">100%</div>
+                <div class="stat-lbl">Local, Privado &amp; Offline</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">6 Lentes</div>
+                <div class="stat-lbl">Razonamiento CoT Activo</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">4 Hubs</div>
+                <div class="stat-lbl">Ecosistemas Integrados</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-val">32 Bandas</div>
+                <div class="stat-lbl">Audio FFT Reactivo</div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: ECOSISTEMA DE 4 HUBS -->
+        <section id="ecosistema" class="section" style="padding-top:20px;">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-teal); border-color:rgba(148, 226, 213, 0.35); background:rgba(148, 226, 213, 0.1);">ECOSISTEMA INTEGRADO</span>
+                <h2 class="section-title">Cuatro Hubs Especializados en un Solo IDE</h2>
+                <p class="section-desc">Cada flujo de trabajo cuenta con su propia estación de trabajo dedicada, potenciada por el Director de IA y sin dependencias externas.</p>
+            </div>
+
+            <div class="ecosystem-grid">
+                <!-- Card 1: Prig Hub -->
+                <div class="ecosystem-card" style="border-color:rgba(148, 226, 213, 0.3);">
+                    <div>
+                        <div class="eco-icon-wrap" style="background:rgba(148, 226, 213, 0.15); color:var(--neon-teal); border:1px solid rgba(148, 226, 213, 0.35);">
+                            <i class="fa-solid fa-cube"></i>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <h3 class="eco-title">Prig Hub</h3>
+                            <span class="card-tag" style="color:var(--neon-teal); border:1px solid rgba(148, 226, 213, 0.3);">GIT OPEN PROTOCOL</span>
+                        </div>
+                        <p class="eco-desc">
+                            Plataforma de aprendizaje descentralizada. Rutas, notas y desafíos guardados en texto plano (YAML/Markdown) en repositorios Git bajo tu control absoluto.
+                        </p>
+                        <ul class="eco-points">
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-teal);"></i> Manifiesto estándar <code>prig.yaml</code></li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-teal);"></i> Desafíos con tests unitarios integrados</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-teal);"></i> Sin suscripciones ni ataduras comerciales</li>
+                        </ul>
+                    </div>
+                    <a href="hub.html" class="eco-action-btn" style="background:rgba(148, 226, 213, 0.12); color:var(--neon-teal); border:1px solid rgba(148, 226, 213, 0.3);">
+                        <span>Ver Prig Hub</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <!-- Card 2: GitHub Hub -->
+                <div class="ecosystem-card" style="border-color:rgba(203, 166, 247, 0.3);">
+                    <div>
+                        <div class="eco-icon-wrap" style="background:rgba(203, 166, 247, 0.15); color:var(--neon-purple); border:1px solid rgba(203, 166, 247, 0.35);">
+                            <i class="fa-brands fa-github"></i>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <h3 class="eco-title">Prig: GitHub</h3>
+                            <span class="card-tag" style="color:var(--neon-purple); border:1px solid rgba(203, 166, 247, 0.3);">REMOTE CODE AUDIT</span>
+                        </div>
+                        <p class="eco-desc">
+                            Inspecciona, lee y audita la arquitectura de cualquier repositorio público o privado sin clonar previamente archivos a tu almacenamiento local.
+                        </p>
+                        <ul class="eco-points">
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-purple);"></i> Árbol y código vía GitHub REST API v3</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-purple);"></i> Auditor de patrones y deuda técnica con IA</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-purple);"></i> Exportador a PDF técnico maquetado</li>
+                        </ul>
+                    </div>
+                    <a href="github.html" class="eco-action-btn" style="background:rgba(203, 166, 247, 0.12); color:var(--neon-purple); border:1px solid rgba(203, 166, 247, 0.3);">
+                        <span>Ver Prig GitHub</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <!-- Card 3: Kaggle Hub -->
+                <div class="ecosystem-card" style="border-color:rgba(137, 220, 235, 0.3);">
+                    <div>
+                        <div class="eco-icon-wrap" style="background:rgba(137, 220, 235, 0.15); color:var(--neon-cyan); border:1px solid rgba(137, 220, 235, 0.35);">
+                            <i class="fa-brands fa-kaggle"></i>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <h3 class="eco-title">Prig: Kaggle</h3>
+                            <span class="card-tag" style="color:var(--neon-cyan); border:1px solid rgba(137, 220, 235, 0.3);">ML WORKSTATION</span>
+                        </div>
+                        <p class="eco-desc">
+                            Workstation especializada para Machine Learning y Data Science. Descarga datasets, explora kernels y adapta scripts automáticamente para Linux.
+                        </p>
+                        <ul class="eco-points">
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-cyan);"></i> Reescritura virtual <code>/kaggle/input/</code></li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-cyan);"></i> Descarga de datasets con barra de progreso</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-cyan);"></i> Telemetría de GPU NVML y VRAM en vivo</li>
+                        </ul>
+                    </div>
+                    <a href="kaggle.html" class="eco-action-btn" style="background:rgba(137, 220, 235, 0.12); color:var(--neon-cyan); border:1px solid rgba(137, 220, 235, 0.3);">
+                        <span>Ver Prig Kaggle</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <!-- Card 4: YouTube Hub -->
+                <div class="ecosystem-card" style="border-color:rgba(243, 139, 168, 0.3);">
+                    <div>
+                        <div class="eco-icon-wrap" style="background:rgba(243, 139, 168, 0.15); color:var(--neon-pink); border:1px solid rgba(243, 139, 168, 0.35);">
+                            <i class="fa-brands fa-youtube"></i>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <h3 class="eco-title">Prig: YouTube</h3>
+                            <span class="card-tag" style="color:var(--neon-pink); border:1px solid rgba(243, 139, 168, 0.3);">EDUCATION HUB</span>
+                        </div>
+                        <p class="eco-desc">
+                            Laboratorio de código interactivo a partir de conferencias y cursos de YouTube. Reproducción sin anuncios con transcripciones sincronizadas y desafíos IA.
+                        </p>
+                        <ul class="eco-points">
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-pink);"></i> Transcripciones cronometradas clicables</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-pink);"></i> Generador de desafíos con el Director 7B</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-pink);"></i> Catálogo curado de 50+ cursos de élite</li>
+                        </ul>
+                    </div>
+                    <a href="youtube.html" class="eco-action-btn" style="background:rgba(243, 139, 168, 0.12); color:var(--neon-pink); border:1px solid rgba(243, 139, 168, 0.3);">
+                        <span>Ver Prig YouTube</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
                 </div>
             </div>
         </section>
@@ -388,8 +525,48 @@
 
                 <div style="font-size:13.5px; color:var(--text-muted); line-height:1.7;">
                     <p>
-                        Al almacenar únicamente el <strong>grafo de dependencias</strong>, <strong>firmas de métodos con type hints</strong> y <strong>complejidad ciclomática</strong> en una base SQLite local, el modelo razona sobre todo el proyecto instantáneamente sin llenar la ventana de contexto de tu LLM 7B ni provocar alucinaciones.
+                        Al indexar el <strong>grafo de dependencias</strong>, <strong>firmas de métodos con type hints</strong> y <strong>complejidad ciclomática</strong> en una base SQLite local, el modelo razona sobre todo el proyecto instantáneamente sin llenar la ventana de contexto de tu LLM 7B ni provocar alucinaciones.
                     </p>
+                </div>
+
+                <!-- Tabla de Comparativa Técnica AST vs RAG Tradicional -->
+                <div class="ast-table-wrap">
+                    <table class="ast-table">
+                        <thead>
+                            <tr>
+                                <th>Dimensión Arquitectural</th>
+                                <th>Enfoque Tradicional (Texto Plano / RAG Naive)</th>
+                                <th style="color:var(--neon-green);">Prig IDE (Compresión AST & Grafo CFG)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Ventana de Contexto</strong></td>
+                                <td style="color:#f38ba8;">Saturada con tokens de sintaxis trivial y comentarios</td>
+                                <td style="color:var(--neon-green);">Firmas compactas, contratos e invariantes estructurados</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Consumo de Tokens</strong></td>
+                                <td style="color:#f38ba8;">4,000 ~ 12,000 tokens por consulta al proyecto</td>
+                                <td style="color:var(--neon-green);">250 ~ 450 tokens (91.9% de reducción media)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Riesgo de Alucinación</strong></td>
+                                <td style="color:#f38ba8;">Elevado al perder atención en prompts extensos</td>
+                                <td style="color:var(--neon-green);">Cero alucinación en tipos, firmas y dependencias</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Latencia de Respuesta</strong></td>
+                                <td style="color:#f38ba8;">3.5s - 8.0s por volumen de prompt enviado</td>
+                                <td style="color:var(--neon-green);">&lt; 0.6s con SQLite local y Ollama 7B stream</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Consumo de VRAM</strong></td>
+                                <td style="color:#f38ba8;">Requiere 16GB+ VRAM para KV-Cache masivo</td>
+                                <td style="color:var(--neon-green);">Funciona fluido en 6GB ~ 8GB VRAM (GPU Linux o CPU)</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -443,7 +620,7 @@
                     </div>
                     <div class="gallery-info">
                         <h4 class="gallery-title">Explorador de Repositorios GitHub</h4>
-                        <p class="gallery-caption">Importación de código, clonación y lectura de árboles de proyectos remotos.</p>
+                        <p class="gallery-caption">Importación de código, inspección remota y lectura de árboles sin clonar.</p>
                     </div>
                 </div>
 
@@ -476,57 +653,164 @@
             <div class="section-header">
                 <span class="section-badge">DESPLIEGUE RÁPIDO</span>
                 <h2 class="section-title">Instalación en 3 Pasos (Linux)</h2>
-                <p class="section-desc">Clona el repositorio y ejecuta Prig en tu entorno local con soporte para modelos 7B en Ollama.</p>
+                <p class="section-desc">Clona el repositorio y ejecuta Prig en tu entorno local con soporte nativo para modelos 7B en Ollama.</p>
             </div>
 
-            <div class="terminal-box">
-                <div class="tb-header">
-                    <span class="tb-title"><i class="fa-solid fa-terminal"></i> bash - terminal linux</span>
-                    <span style="font-size: 11px; color: var(--text-dim);">Python 3.10+ / Linux</span>
+            <!-- Selector de Entornos -->
+            <div class="install-tabs">
+                <button class="install-tab-btn active" data-install="inst-linux">
+                    <i class="fa-brands fa-linux"></i> Linux (Recomendado)
+                </button>
+                <button class="install-tab-btn" data-install="inst-docker">
+                    <i class="fa-brands fa-docker"></i> Contenedor Docker
+                </button>
+                <button class="install-tab-btn" data-install="inst-reqs">
+                    <i class="fa-solid fa-microchip"></i> Requisitos del Sistema
+                </button>
+            </div>
+
+            <!-- Panel 1: Linux Nativo -->
+            <div id="inst-linux" class="install-pane active">
+                <div class="terminal-box">
+                    <div class="tb-header">
+                        <span class="tb-title"><i class="fa-solid fa-terminal"></i> bash - terminal linux</span>
+                        <span style="font-size: 11px; color: var(--neon-green);">Python 3.10+ / Linux x86_64</span>
+                    </div>
+                    <div class="tb-body">
+                        <div class="cmd-line">
+                            <span class="cmd-text">git clone https://github.com/guillermopetcho/Prig-IDE.git &amp;&amp; cd Prig-IDE</span>
+                            <button class="btn-copy" data-cmd="git clone https://github.com/guillermopetcho/Prig-IDE.git && cd Prig-IDE">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+
+                        <div class="cmd-line">
+                            <span class="cmd-text">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
+                            <button class="btn-copy" data-cmd="python3 -m venv .venv && source .venv/bin/activate">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+
+                        <div class="cmd-line">
+                            <span class="cmd-text">pip install -r requirements.txt &amp;&amp; python3 main.py</span>
+                            <button class="btn-copy" data-cmd="pip install -r requirements.txt && python3 main.py">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="tb-body">
-                    <div class="cmd-line">
-                        <span class="cmd-text">git clone https://github.com/tu-usuario/prig.git &amp;&amp; cd prig</span>
-                        <button class="btn-copy" data-cmd="git clone https://github.com/tu-usuario/prig.git && cd prig">
-                            <i class="fa-regular fa-copy"></i> Copiar
-                        </button>
-                    </div>
+            </div>
 
-                    <div class="cmd-line">
-                        <span class="cmd-text">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
-                        <button class="btn-copy" data-cmd="python3 -m venv .venv && source .venv/bin/activate">
-                            <i class="fa-regular fa-copy"></i> Copiar
-                        </button>
+            <!-- Panel 2: Docker -->
+            <div id="inst-docker" class="install-pane">
+                <div class="terminal-box">
+                    <div class="tb-header">
+                        <span class="tb-title"><i class="fa-brands fa-docker"></i> docker run - contenedor aislado</span>
+                        <span style="font-size: 11px; color: var(--neon-blue);">NVIDIA Container Toolkit Opcional</span>
                     </div>
+                    <div class="tb-body">
+                        <div class="cmd-line">
+                            <span class="cmd-text">docker pull ghcr.io/guillermopetcho/prig-ide:latest</span>
+                            <button class="btn-copy" data-cmd="docker pull ghcr.io/guillermopetcho/prig-ide:latest">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                        <div class="cmd-line">
+                            <span class="cmd-text">docker run -d -p 8000:8000 --gpus all -v $(pwd):/workspace prig-ide:latest</span>
+                            <button class="btn-copy" data-cmd="docker run -d -p 8000:8000 --gpus all -v $(pwd):/workspace prig-ide:latest">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="cmd-line">
-                        <span class="cmd-text">pip install -r requirements.txt &amp;&amp; python3 main.py</span>
-                        <button class="btn-copy" data-cmd="pip install -r requirements.txt && python3 main.py">
-                            <i class="fa-regular fa-copy"></i> Copiar
-                        </button>
+            <!-- Panel 3: Requisitos -->
+            <div id="inst-reqs" class="install-pane">
+                <div style="background:var(--bg-card); border:1px solid var(--border-card); border-radius:12px; padding:22px; font-family:var(--font-code); font-size:12.5px; color:#cdd6f4; line-height:1.7;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px;">
+                        <div>
+                            <span style="color:var(--neon-purple); font-weight:700;">● Sistema Operativo:</span><br>
+                            Linux (Ubuntu, Debian, Fedora, Arch, Pop!_OS)
+                        </div>
+                        <div>
+                            <span style="color:var(--neon-cyan); font-weight:700;">● Entorno Python:</span><br>
+                            Python 3.10 o superior (venv recomendado)
+                        </div>
+                        <div>
+                            <span style="color:var(--neon-green); font-weight:700;">● Motor LLM:</span><br>
+                            Ollama con modelo 7B (Qwen 2.5 Coder o DeepSeek)
+                        </div>
+                        <div>
+                            <span style="color:var(--neon-yellow); font-weight:700;">● Hardware Mínimo:</span><br>
+                            8GB RAM (CPU inference) o 6GB VRAM (NVIDIA CUDA)
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- PIE DE PÁGINA -->
-        <footer class="footer">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG IDE</span>
-                <span>— Entorno de Programación Inteligente Local para Linux</span>
+        <!-- PIE DE PÁGINA PROFESIONAL -->
+        <footer class="footer-pro">
+            <div class="footer-pro-grid">
+                <!-- Columna 1: Brand & Propósito -->
+                <div class="footer-pro-brand">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="brand-icon" style="width:32px; height:32px; font-size:15px;">
+                            <i class="fa-solid fa-terminal"></i>
+                        </div>
+                        <span style="font-size:18px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">PRIG IDE</span>
+                        <span class="brand-tag">v2.0</span>
+                    </div>
+                    <p style="font-size:12.5px; color:var(--text-muted); line-height:1.6;">
+                        Entorno de desarrollo de nueva generación para Linux. Guiado por razonamiento semántico local mediante AST, agentes mecha CoT y cero telemetría externa.
+                    </p>
+                    <div style="margin-top:6px;">
+                        <span class="system-status-badge">
+                            <span class="pulse-dot"></span> Motor Local 100% Offline
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Columna 2: Ecosistema de Hubs -->
+                <div>
+                    <h4 class="footer-pro-title">Ecosistema</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="hub.html"><i class="fa-solid fa-cube" style="color:var(--neon-teal);"></i> Prig Hub (Git)</a></li>
+                        <li><a href="github.html"><i class="fa-brands fa-github" style="color:var(--neon-purple);"></i> Prig: GitHub Hub</a></li>
+                        <li><a href="kaggle.html"><i class="fa-brands fa-kaggle" style="color:var(--neon-cyan);"></i> Prig: Kaggle Hub</a></li>
+                        <li><a href="youtube.html"><i class="fa-brands fa-youtube" style="color:var(--neon-pink);"></i> Prig: YouTube Hub</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 3: Arquitectura & Motor -->
+                <div>
+                    <h4 class="footer-pro-title">Arquitectura</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="#pilares"><i class="fa-solid fa-microchip"></i> Motor AST & CFG</a></li>
+                        <li><a href="#modos-interactivos"><i class="fa-solid fa-brain"></i> Modo Cerebro 60/20/20</a></li>
+                        <li><a href="#modos-interactivos"><i class="fa-solid fa-code"></i> Editor Prig</a></li>
+                        <li><a href="#pilares"><i class="fa-solid fa-wave-pulse"></i> Audio FFT & NVML</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 4: Proyecto & Comunidad -->
+                <div>
+                    <h4 class="footer-pro-title">Proyecto</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> Repositorio GitHub</a></li>
+                        <li><a href="#instalacion"><i class="fa-solid fa-download"></i> Guía de Instalación</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-scale-balanced"></i> Licencia MIT</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/issues" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-bug"></i> Reportar Issue</a></li>
+                    </ul>
+                </div>
             </div>
-            <ul class="footer-links">
-                <li><a href="#pilares">Pilares Técnicos</a></li>
-                <li><a href="#modos-interactivos">Showcase</a></li>
-                <li><a href="hub.html" style="color:var(--neon-teal); font-weight:700;"><i class="fa-solid fa-cube"></i> Prig: Hub</a></li>
-                <li><a href="github.html" style="color:var(--neon-purple); font-weight:700;"><i class="fa-brands fa-github"></i> Prig: GitHub Hub</a></li>
-                <li><a href="kaggle.html" style="color:var(--kaggle-cyan); font-weight:700;"><i class="fa-brands fa-kaggle"></i> Prig: Kaggle Hub</a></li>
-                <li><a href="youtube.html" style="color:var(--neon-pink); font-weight:700;"><i class="fa-brands fa-youtube"></i> Prig: YouTube Hub</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-            </ul>
-            <p style="font-size:11.5px; color:var(--text-dim);">
-                Construido con FastAPI, Editor Prig, Ollama 7B, AST topológico, WebSockets y audio FFT en tiempo real.
-            </p>
+
+            <!-- Barra Inferior de Copyright -->
+            <div class="footer-pro-bottom">
+                <span>© 2026 PRIG IDE. Desarrollado con código abierto para la comunidad de programadores.</span>
+                <span>Construido con FastAPI, Editor Prig, Ollama 7B, AST Topológico y PipeWire FFT.</span>
+            </div>
         </footer>
     </div>
 

@@ -280,6 +280,25 @@
         });
     }
 
+    // 6. PESTAÑAS DE INSTALACIÓN
+    function initInstallTabs() {
+        const btns = document.querySelectorAll('.install-tab-btn');
+        const panes = document.querySelectorAll('.install-pane');
+        if (!btns.length || !panes.length) return;
+
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.install;
+                if (!target) return;
+                btns.forEach(b => b.classList.remove('active'));
+                panes.forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                const pane = document.getElementById(target);
+                if (pane) pane.classList.add('active');
+            });
+        });
+    }
+
     // Inicializar todo al cargar el DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -288,6 +307,7 @@
             initShowcaseTabs();
             initLightbox();
             initCopyButtons();
+            initInstallTabs();
         });
     } else {
         initBackgroundCanvas();
@@ -295,6 +315,7 @@
         initShowcaseTabs();
         initLightbox();
         initCopyButtons();
+        initInstallTabs();
     }
 
 })();
