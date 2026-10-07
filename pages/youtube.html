@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prig: YouTube Hub · Aprendizaje Interactivo de Programación e IA sin Distracciones</title>
+    <meta name="description" content="Prig YouTube Hub transforma cualquier video o curso de YouTube en un entorno de aprendizaje interactivo con transcripción cronometrada, generación automática de desafíos en código, tutor IA 7B y toma de notas en Markdown.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .yt-hero-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 40px;
+            align-items: center;
+            padding: 30px 0 50px;
+        }
+        .yt-player-mock {
+            background: #090b14;
+            border: 1px solid var(--neon-pink);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(243, 139, 168, 0.2);
+        }
+        .yt-player-screen {
+            position: relative;
+            background: linear-gradient(135deg, #181825, #11111b);
+            height: 220px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer;
+        }
+        .yt-play-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(243, 139, 168, 0.25);
+            border: 2px solid var(--neon-pink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 24px;
+            box-shadow: 0 0 25px rgba(243, 139, 168, 0.6);
+            transition: var(--transition);
+        }
+        .yt-play-btn:hover {
+            transform: scale(1.1);
+            background: var(--neon-pink);
+            color: #0b0d17;
+        }
+        .yt-split-workarea {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(13, 16, 28, 0.95);
+            height: 220px;
+        }
+        .yt-transcript-pane {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: var(--font-code);
+            font-size: 11px;
+            overflow-y: auto;
+            color: #cdd6f4;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .yt-transcript-item {
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            gap: 8px;
+        }
+        .yt-transcript-item:hover, .yt-transcript-item.active {
+            background: rgba(203, 166, 247, 0.15);
+            color: var(--neon-cyan);
+        }
+        .yt-time-badge {
+            color: var(--neon-purple);
+            font-weight: 700;
+        }
+        .yt-ai-pane {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(166, 227, 161, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            overflow-y: auto;
+        }
+        .course-filter-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 36px;
+        }
+        .course-filter-btn {
+            background: rgba(18, 22, 36, 0.8);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            padding: 8px 18px;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .course-filter-btn:hover, .course-filter-btn.active {
+            background: var(--neon-purple);
+            color: #0b0d17;
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 15px rgba(203, 166, 247, 0.4);
+        }
+        .course-card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .course-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: var(--transition);
+        }
+        .course-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 16px 36px rgba(0,0,0,0.5), 0 0 20px rgba(137, 220, 235, 0.15);
+        }
+        .course-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .course-univ-badge {
+            font-size: 10px;
+            font-family: var(--font-code);
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(249, 226, 175, 0.15);
+            color: var(--neon-yellow);
+            border: 1px solid rgba(249, 226, 175, 0.3);
+        }
+        .course-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .course-channel {
+            font-size: 12.5px;
+            color: var(--neon-cyan);
+            font-family: var(--font-code);
+            margin-bottom: 12px;
+        }
+        .course-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+        .course-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11.5px;
+            color: var(--text-dim);
+            font-family: var(--font-code);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            padding-top: 10px;
+        }
+        @media (max-width: 1024px) {
+            .yt-hero-grid { grid-template-columns: 1fr; }
+            .course-card-grid { grid-template-columns: repeat(2, 1fr); }
+            .yt-split-workarea { grid-template-columns: 1fr; height: auto; }
+        }
+        @media (max-width: 640px) {
+            .course-card-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fondo de Partículas Dinámicas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="site-wrapper">
+        <!-- Barra de Navegación -->
+        <header class="navbar">
+            <a href="index.html" class="nav-brand">
+                <div class="brand-icon" style="border-color:var(--neon-pink); color:var(--neon-pink); background:rgba(243, 139, 168, 0.2);">
+                    <i class="fa-brands fa-youtube"></i>
+                </div>
+                <div>
+                    <span class="brand-name">PRIG: YOUTUBE</span>
+                    <span class="brand-tag" style="background:rgba(243, 139, 168, 0.15); color:var(--neon-pink); border-color:rgba(243, 139, 168, 0.3);">EDUCATION HUB</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Volver al IDE</a></li>
+                <li><a href="#capacidades" class="nav-link">Capacidades</a></li>
+                <li><a href="#transcripcion-ia" class="nav-link">Transcripción &amp; IA</a></li>
+                <li><a href="#catalogo" class="nav-link">Cursos Curados</a></li>
+                <li><a href="#flujo" class="nav-link">Flujo de Estudio</a></li>
+            </ul>
+
+            <a href="index.html#instalacion" class="btn-primary" style="background:linear-gradient(135deg, var(--neon-pink), var(--neon-purple)); padding:8px 18px; font-size:13px;">
+                <i class="fa-solid fa-download"></i> Probar en Prig
+            </a>
+        </header>
+
+        <!-- HERO SECTION YOUTUBE HUB -->
+        <section class="yt-hero-grid">
+            <div>
+                <div class="hero-badge" style="background:rgba(243, 139, 168, 0.12); border-color:rgba(243, 139, 168, 0.35); color:var(--neon-pink);">
+                    <i class="fa-brands fa-youtube"></i> APRENDIZAJE ACELERADO SIN PUBLICIDAD NI DISTRACCIONES
+                </div>
+                <h1 class="hero-title">
+                    Transforma Clases de YouTube en un <span style="background:linear-gradient(135deg, var(--neon-pink), var(--neon-purple), var(--neon-cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Laboratorio de Código Vivo</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Prig YouTube Hub integra un reproductor nativo sin anuncios invasivos, <strong>extracción de transcripciones cronometradas</strong>, <strong>generación de desafíos interactivos con el Director IA 7B</strong> y toma de apuntes en Markdown sincronizados segundo a segundo con el editor Monaco.
+                </p>
+                <div class="hero-actions">
+                    <a href="#catalogo" class="btn-primary" style="background:linear-gradient(135deg, var(--neon-pink), var(--neon-purple));">
+                        <i class="fa-solid fa-graduation-cap"></i> Explorar Cursos Curados
+                    </a>
+                    <a href="index.html" class="btn-secondary">
+                        <i class="fa-solid fa-laptop-code"></i> Ver Ecosistema Completo
+                    </a>
+                </div>
+            </div>
+
+            <!-- MOCKUP DEL REPRODUCTOR Y ASISTENTE IA -->
+            <div class="yt-player-mock">
+                <div class="hcc-header" style="background:#11111b; padding:10px 16px;">
+                    <div class="hcc-dots">
+                        <div class="hcc-dot red"></div>
+                        <div class="hcc-dot yellow"></div>
+                        <div class="hcc-dot green"></div>
+                    </div>
+                    <span style="font-family:var(--font-code); font-size:11px; color:var(--neon-pink); font-weight:700;">
+                        <i class="fa-solid fa-circle-play"></i> HARVARD CS50P · CLASE EN VIVO
+                    </span>
+                </div>
+                <div class="yt-player-screen">
+                    <div class="yt-play-btn">
+                        <i class="fa-solid fa-play" style="margin-left:4px;"></i>
+                    </div>
+                    <span style="position:absolute; bottom:12px; font-family:var(--font-code); font-size:11px; color:#ffffff; background:rgba(0,0,0,0.6); padding:3px 10px; border-radius:4px;">
+                        [12:34 / 15:57:48] · Sincronizado con Editor Monaco
+                    </span>
+                </div>
+                <div class="yt-split-workarea">
+                    <!-- Transcripción Sincronizada -->
+                    <div class="yt-transcript-pane">
+                        <div style="font-weight:700; color:var(--neon-cyan); margin-bottom:4px; font-size:10px;">
+                            <i class="fa-solid fa-align-left"></i> SUBTÍTULOS CRONOMETRADOS:
+                        </div>
+                        <div class="yt-transcript-item">
+                            <span class="yt-time-badge">[12:15]</span>
+                            <span>"En Python las listas son mutables a diferencia de las tuplas..."</span>
+                        </div>
+                        <div class="yt-transcript-item active">
+                            <span class="yt-time-badge">[12:34]</span>
+                            <span>"Podemos definir una comprensión para filtrar valores pares:"</span>
+                        </div>
+                        <div class="yt-transcript-item">
+                            <span class="yt-time-badge">[12:50]</span>
+                            <span>"pares = [x for x in numeros if x % 2 == 0]"</span>
+                        </div>
+                    </div>
+
+                    <!-- Asistente IA / Desafío Generado -->
+                    <div class="yt-ai-pane">
+                        <div style="font-weight:700; color:var(--neon-green); margin-bottom:6px; font-family:var(--font-code); font-size:11px;">
+                            <i class="fa-solid fa-robot"></i> DESAFÍO IA GENERADO:
+                        </div>
+                        <p style="margin-bottom:6px;">Implementa una función <code>filtrar_pares(lista)</code> utilizando list comprehensions como se explicó en <code>12:34</code>.</p>
+                        <div style="background:#090b14; padding:6px; border-radius:4px; font-family:var(--font-code); font-size:10px; color:var(--neon-purple);">
+                            def filtrar_pares(items):<br>
+                            &nbsp;&nbsp;return [x for x in items if x % 2 == 0]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAPACIDADES DEL HUB -->
+        <section id="capacidades" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-pink); border-color:rgba(243, 139, 168, 0.3); background:rgba(243, 139, 168, 0.1);">CARACTERÍSTICAS EXCLUSIVAS</span>
+                <h2 class="section-title">¿Qué hace único a Prig YouTube Hub?</h2>
+                <p class="section-desc">Diseñado para que aprender a programar viendo videos sea una experiencia activa, práctica y libre de distracciones.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon pink">
+                        <i class="fa-solid fa-film"></i>
+                    </div>
+                    <h3 class="card-title">Cero Anuncios & Modo Cine</h3>
+                    <p class="card-desc">
+                        Reproducción directa y limpia mediante la API de embebido, sin comerciales sorpresa ni recomendaciones algorítmicas adictivas que rompan tu concentración.
+                    </p>
+                    <span class="card-tag">100% DISTRACTION-FREE</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon purple">
+                        <i class="fa-solid fa-closed-captioning"></i>
+                    </div>
+                    <h3 class="card-title">Transcripción Cronometrada</h3>
+                    <p class="card-desc">
+                        Extracción automática de subtítulos (timedtext) en español e inglés. Puedes buscar cualquier palabra clave y hacer clic en el texto para saltar al segundo exacto.
+                    </p>
+                    <span class="card-tag">TIMEDTEXT SYNC</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon green">
+                        <i class="fa-solid fa-code-pull-request"></i>
+                    </div>
+                    <h3 class="card-title">Generación de Desafíos en Código</h3>
+                    <p class="card-desc">
+                        El Director IA 7B analiza la transcripción de la clase y genera ejercicios interactivos autocontenidos en Monaco Editor para poner a prueba lo aprendido de inmediato.
+                    </p>
+                    <span class="card-tag">AUTO EXERCISE GENERATOR</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon cyan">
+                        <i class="fa-solid fa-note-sticky"></i>
+                    </div>
+                    <h3 class="card-title">Apuntes Markdown Sincronizados</h3>
+                    <p class="card-desc">
+                        Editor de notas integrado que guarda tus apuntes en archivos <code>.md</code> locales, con marcas de tiempo interactivas que rebobinan o avanzan el video al pulsar.
+                    </p>
+                    <span class="card-tag">MARKDOWN NOTES</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon blue">
+                        <i class="fa-solid fa-file-code"></i>
+                    </div>
+                    <h3 class="card-title">Cheat-Sheet y Glosario por IA</h3>
+                    <p class="card-desc">
+                        Con un clic, el modelo extrae un resumen ejecutivo del video, la hoja de trucos (*cheat-sheet*) con sintaxis clave y el glosario de términos técnicos explicados.
+                    </p>
+                    <span class="card-tag">AI SUMMARY & GLOSSARY</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon yellow">
+                        <i class="fa-solid fa-building-columns"></i>
+                    </div>
+                    <h3 class="card-title">Catálogo Universitario Curado</h3>
+                    <p class="card-desc">
+                        Acceso inmediato a más de 50 cursos completos de Harvard (CS50), Stanford, MIT, freeCodeCamp, The Cherno, Corey Schafer, 3Blue1Brown y Andrej Karpathy.
+                    </p>
+                    <span class="card-tag">50+ CURATED COURSES</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN DE TRANSCRIPCIÓN E IA -->
+        <section id="transcripcion-ia" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-cyan); border-color:rgba(137, 220, 235, 0.3); background:rgba(137, 220, 235, 0.1);">INTELIGENCIA DIDÁCTICA</span>
+                <h2 class="section-title">De la Explicación Teórica a la Práctica en Monaco</h2>
+                <p class="section-desc">Cómo interactúa el Director 7B con los subtítulos para acelerar tu aprendizaje.</p>
+            </div>
+
+            <div class="benchmark-box" style="grid-template-columns: 1.2fr 0.8fr;">
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div style="display:flex; align-items:flex-start; gap:14px;">
+                        <div style="width:32px; height:32px; border-radius:8px; background:rgba(243, 139, 168, 0.2); color:var(--neon-pink); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-code);">1</div>
+                        <div>
+                            <h4 style="color:#ffffff; font-size:15px; margin-bottom:4px;">Extracción de Subtítulos de Alta Fidelidad</h4>
+                            <p style="font-size:13px; color:var(--text-muted);">Descarga directa de bloques timedtext con caché local en disco para permitir consultas instantáneas y búsquedas por expresiones regulares.</p>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:flex-start; gap:14px;">
+                        <div style="width:32px; height:32px; border-radius:8px; background:rgba(203, 166, 247, 0.2); color:var(--neon-purple); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-code);">2</div>
+                        <div>
+                            <h4 style="color:#ffffff; font-size:15px; margin-bottom:4px;">Segmentación en Objetivos Pedagógicos</h4>
+                            <p style="font-size:13px; color:var(--text-muted);">El modelo desglosa clases extensas (de 1 a 15 horas) en unidades temáticas asimilables con sus marcas de inicio y fin.</p>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:flex-start; gap:14px;">
+                        <div style="width:32px; height:32px; border-radius:8px; background:rgba(166, 227, 161, 0.2); color:var(--neon-green); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-code);">3</div>
+                        <div>
+                            <h4 style="color:#ffffff; font-size:15px; margin-bottom:4px;">Verificación y Ejecución de Código</h4>
+                            <p style="font-size:13px; color:var(--text-muted);">Los ejercicios generados se abren en pestañas con suites de testing automatizadas para que verifiques tu solución al instante.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background:#090b14; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px; font-family:var(--font-code); font-size:11.5px; color:#cdd6f4; line-height:1.6;">
+                    <div style="color:var(--neon-purple); font-weight:700; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px;">
+                        <i class="fa-solid fa-terminal"></i> RESUMEN GENERADO POR EL TUTOR
+                    </div>
+                    <span style="color:var(--neon-yellow);"># Tema:</span> Clases y Métodos Mágicos en Python<br>
+                    <span style="color:var(--neon-yellow);"># Timestamps:</span> [01:14:20 &rarr; 01:45:00]<br>
+                    <span style="color:var(--neon-yellow);"># Conceptos:</span> <code>__repr__</code>, <code>__eq__</code>, <code>dataclasses</code><br>
+                    <span style="color:var(--neon-yellow);"># Dificultad:</span> Intermedio<br><br>
+                    <span style="color:var(--neon-green);">&gt;&gt;&gt; 3 desafíos prácticos listos en el editor Monaco.</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- CATÁLOGO CURADO DE CURSOS -->
+        <section id="catalogo" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-yellow); border-color:rgba(249, 226, 175, 0.3); background:rgba(249, 226, 175, 0.1);">BIBLIOTECA MAGISTRAL</span>
+                <h2 class="section-title">Compendio de Cursos Integrados</h2>
+                <p class="section-desc">Selección rigurosa de las mejores clases magistrales disponibles libremente en YouTube.</p>
+            </div>
+
+            <div class="course-filter-bar">
+                <button class="course-filter-btn active" data-filter="all">Todos los Cursos</button>
+                <button class="course-filter-btn" data-filter="python">Python</button>
+                <button class="course-filter-btn" data-filter="cpp">C++ Moderno</button>
+                <button class="course-filter-btn" data-filter="ml">Machine Learning</button>
+                <button class="course-filter-btn" data-filter="dl">Deep Learning &amp; LLMs</button>
+            </div>
+
+            <div class="course-card-grid">
+                <!-- Harvard CS50P -->
+                <div class="course-card" data-category="python">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">HARVARD</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 15h 57m</span>
+                        </div>
+                        <h4 class="course-title">CS50P: Introduction to Programming with Python</h4>
+                        <div class="course-channel">David J. Malan / freeCodeCamp</div>
+                        <p class="course-desc">El estándar universitario de referencia: funciones, bucles, excepciones, pytest, POO y expresiones regulares.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Principiante &rarr; Univ</span>
+                        <span style="color:var(--neon-pink);">ID: nLRL_NcnK-4</span>
+                    </div>
+                </div>
+
+                <!-- C++20 Daniel Gakwaya -->
+                <div class="course-card" data-category="cpp">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">C++20 COMPLETO</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 31h 07m</span>
+                        </div>
+                        <h4 class="course-title">C++ Programming Course (Beginner to Advanced)</h4>
+                        <div class="course-channel">Daniel Gakwaya / freeCodeCamp</div>
+                        <p class="course-desc">Enciclopedia de 31 horas: punteros, gestión del heap, RAII, conceptos C++20, templates y la STL completa.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Principiante &rarr; Senior</span>
+                        <span style="color:var(--neon-pink);">ID: 8jLOx1hD3_o</span>
+                    </div>
+                </div>
+
+                <!-- Andrej Karpathy LLMs -->
+                <div class="course-card" data-category="dl">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">STANFORD / OPENAI</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 2h 15m</span>
+                        </div>
+                        <h4 class="course-title">Let's build GPT: from scratch, in code, spelled out</h4>
+                        <div class="course-channel">Andrej Karpathy</div>
+                        <p class="course-desc">Construcción paso a paso de un Transformer autorregresivo estilo nanoGPT en PyTorch con Multi-Head Attention.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Intermedio &rarr; Avanzado</span>
+                        <span style="color:var(--neon-pink);">ID: kCc8FmEb1nY</span>
+                    </div>
+                </div>
+
+                <!-- 3Blue1Brown Redes Neuronales -->
+                <div class="course-card" data-category="dl">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">VISUAL MATH</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 1h 40m</span>
+                        </div>
+                        <h4 class="course-title">Neural Networks &amp; Deep Learning Fundamentals</h4>
+                        <div class="course-channel">3Blue1Brown (Grant Sanderson)</div>
+                        <p class="course-desc">La explicación visual y matemática más elogiada sobre backpropagation, descenso del gradiente y funciones de activación.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Todos los niveles</span>
+                        <span style="color:var(--neon-pink);">ID: aircAruvnKk</span>
+                    </div>
+                </div>
+
+                <!-- The Cherno C++ Memory -->
+                <div class="course-card" data-category="cpp">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">GAME ENGINES</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 20m</span>
+                        </div>
+                        <h4 class="course-title">Pointers &amp; Memory Architecture in Modern C++</h4>
+                        <div class="course-channel">The Cherno</div>
+                        <p class="course-desc">Explicación profunda sobre el stack, el heap, punteros crudos, referencias, smart pointers y ciclo de vida en memoria.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Intermedio &rarr; Senior</span>
+                        <span style="color:var(--neon-pink);">ID: DTxHyVn0ODg</span>
+                    </div>
+                </div>
+
+                <!-- StatQuest Machine Learning -->
+                <div class="course-card" data-category="ml">
+                    <div>
+                        <div class="course-header">
+                            <span class="course-univ-badge">ESTADÍSTICA &amp; ML</span>
+                            <span style="font-size:11px; color:var(--neon-green); font-family:var(--font-code);"><i class="fa-solid fa-clock"></i> 4h 30m</span>
+                        </div>
+                        <h4 class="course-title">StatQuest: Machine Learning from Scratch</h4>
+                        <div class="course-channel">Josh Starmer (StatQuest)</div>
+                        <p class="course-desc">Regresión logística, árboles de decisión CART, Random Forests, Gradient Boosting y PCA explicados paso a paso sin cajas negras.</p>
+                    </div>
+                    <div class="course-meta">
+                        <span>Nivel: Principiante &rarr; Intermedio</span>
+                        <span style="color:var(--neon-pink);">ID: Gv9_4yMHFhI</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FLUJO DE TRABAJO -->
+        <section id="flujo" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3); background:rgba(203, 166, 247, 0.1);">METODOLOGÍA DE ESTUDIO</span>
+                <h2 class="section-title">Aprende un 300% más Rápido con Prig</h2>
+                <p class="section-desc">Un flujo activo de 4 pasos para no quedarte como espectador pasivo.</p>
+            </div>
+
+            <div class="grid-3" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:28px; color:var(--neon-pink); margin-bottom:12px;"><i class="fa-solid fa-magnifying-glass"></i></div>
+                    <h4 style="color:#ffffff; font-size:15px; margin-bottom:8px;">1. Busca o Pega URL</h4>
+                    <p style="font-size:12.5px; color:var(--text-muted);">Pega cualquier enlace de YouTube o usa el buscador para cargar el video y sus subtítulos.</p>
+                </div>
+
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:28px; color:var(--neon-cyan); margin-bottom:12px;"><i class="fa-solid fa-bolt"></i></div>
+                    <h4 style="color:#ffffff; font-size:15px; margin-bottom:8px;">2. Explora la Transcripción</h4>
+                    <p style="font-size:12.5px; color:var(--text-muted);">Filtra conceptos clave en el texto cronometrado y salta al minuto exacto con un clic.</p>
+                </div>
+
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:28px; color:var(--neon-purple); margin-bottom:12px;"><i class="fa-solid fa-brain"></i></div>
+                    <h4 style="color:#ffffff; font-size:15px; margin-bottom:8px;">3. Pide Desafíos a la IA</h4>
+                    <p style="font-size:12.5px; color:var(--text-muted);">Genera ejercicios prácticos autocontenidos basados en lo que acaba de explicar el instructor.</p>
+                </div>
+
+                <div class="card" style="text-align:center;">
+                    <div style="font-size:28px; color:var(--neon-green); margin-bottom:12px;"><i class="fa-solid fa-code"></i></div>
+                    <h4 style="color:#ffffff; font-size:15px; margin-bottom:8px;">4. Resuelve en Monaco</h4>
+                    <p style="font-size:12.5px; color:var(--text-muted);">Escribe, ejecuta y prueba el código en vivo sin salir del reproductor ni cambiar de ventana.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: YOUTUBE HUB</span>
+                <span>— Ecosistema Educativo de Prig IDE</span>
+            </div>
+            <ul class="footer-links">
+                <li><a href="index.html">Página Principal</a></li>
+                <li><a href="index.html#pilares">Pilares Técnicos</a></li>
+                <li><a href="index.html#modos-interactivos">Showcase</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+            <p style="font-size:11.5px; color:var(--text-dim);">
+                Desarrollado para programadores que buscan formación continua de alto nivel sin fricción ni anuncios.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Script de partículas y filtros de cursos -->
+    <script src="js/main.js"></script>
+    <script>
+        // Filtro de cursos interactivo
+        document.querySelectorAll('.course-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.course-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                document.querySelectorAll('.course-card').forEach(card => {
+                    if (filter === 'all' || card.dataset.category === filter) {
+                        card.style.display = 'flex';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
