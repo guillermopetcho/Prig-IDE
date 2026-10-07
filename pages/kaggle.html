@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prig: Kaggle Hub · Explorador de Datasets, Competiciones y Notebooks Locales</title>
+    <meta name="description" content="Prig Kaggle Hub: Descarga y explora datasets de Kaggle, ejecuta notebooks de la comunidad con reescritura automática de rutas /kaggle/input/, tutor de IA para análisis de código y ejecución de kernels IPython.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        :root {
+            --kaggle-cyan: #20beff;
+            --kaggle-blue: #0088cc;
+        }
+        .kg-hero-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 40px;
+            align-items: center;
+            padding: 30px 0 50px;
+        }
+        .kg-mock-card {
+            background: #090b14;
+            border: 1px solid var(--kaggle-cyan);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(32, 190, 255, 0.2);
+        }
+        .kg-mock-header {
+            background: #11111b;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .kg-search-bar-mock {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(32, 190, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-family: var(--font-code);
+            font-size: 12px;
+            color: #cdd6f4;
+            margin: 14px;
+        }
+        .kg-dataset-item-mock {
+            background: rgba(18, 22, 38, 0.85);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 0 14px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--transition);
+        }
+        .kg-dataset-item-mock:hover {
+            border-color: var(--kaggle-cyan);
+            background: rgba(32, 190, 255, 0.08);
+        }
+        .kg-tag-badge {
+            font-size: 10px;
+            font-family: var(--font-code);
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(166, 227, 161, 0.15);
+            color: var(--neon-green);
+            border: 1px solid rgba(166, 227, 161, 0.3);
+        }
+        .kg-path-rewrite-box {
+            background: rgba(9, 11, 20, 0.9);
+            border-left: 3px solid var(--neon-purple);
+            padding: 14px;
+            border-radius: 6px;
+            font-family: var(--font-code);
+            font-size: 11.5px;
+            color: #cdd6f4;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+        @media (max-width: 1024px) {
+            .kg-hero-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fondo de Partículas Dinámicas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="site-wrapper">
+        <!-- Barra de Navegación -->
+        <header class="navbar">
+            <a href="index.html" class="nav-brand">
+                <div class="brand-icon" style="border-color:var(--kaggle-cyan); color:var(--kaggle-cyan); background:rgba(32, 190, 255, 0.2);">
+                    <i class="fa-brands fa-kaggle"></i>
+                </div>
+                <div>
+                    <span class="brand-name">PRIG: KAGGLE</span>
+                    <span class="brand-tag" style="background:rgba(32, 190, 255, 0.15); color:var(--kaggle-cyan); border-color:rgba(32, 190, 255, 0.3);">ML WORKSTATION</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Volver al IDE</a></li>
+                <li><a href="#capacidades" class="nav-link">Capacidades</a></li>
+                <li><a href="#reescritura-rutas" class="nav-link">Rutas /kaggle/input/</a></li>
+                <li><a href="#capturas" class="nav-link">Capturas Reales</a></li>
+                <li><a href="youtube.html" class="nav-link" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> Prig: YouTube</a></li>
+            </ul>
+
+            <a href="index.html#instalacion" class="btn-primary" style="background:linear-gradient(135deg, var(--kaggle-cyan), var(--neon-purple)); padding:8px 18px; font-size:13px;">
+                <i class="fa-solid fa-download"></i> Probar en Prig
+            </a>
+        </header>
+
+        <!-- HERO SECTION KAGGLE HUB -->
+        <section class="kg-hero-grid">
+            <div>
+                <div class="hero-badge" style="background:rgba(32, 190, 255, 0.12); border-color:rgba(32, 190, 255, 0.35); color:var(--kaggle-cyan);">
+                    <i class="fa-brands fa-kaggle"></i> EXPLORACIÓN, DESCARGA Y EJECUCIÓN NATIVA
+                </div>
+                <h1 class="hero-title">
+                    El Ecosistema Kaggle Integrado en tu <span style="background:linear-gradient(135deg, var(--kaggle-cyan), var(--neon-blue), var(--neon-purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">IDE Local</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Prig conecta directamente con la API oficial de Kaggle. Busca y descarga datasets públicos sin salir del editor, <strong>ejecuta kernels de la comunidad con reescritura transparente de rutas <code>/kaggle/input/</code></strong>, e inspecciona soluciones ganadoras con el Director IA 7B.
+                </p>
+                <div class="hero-actions">
+                    <a href="#capturas" class="btn-primary" style="background:linear-gradient(135deg, var(--kaggle-cyan), var(--neon-purple));">
+                        <i class="fa-solid fa-images"></i> Ver Capturas Reales
+                    </a>
+                    <a href="index.html" class="btn-secondary">
+                        <i class="fa-solid fa-laptop-code"></i> Explorar el IDE
+                    </a>
+                </div>
+            </div>
+
+            <!-- MOCKUP DEL EXPLORADOR KAGGLE -->
+            <div class="kg-mock-card">
+                <div class="kg-mock-header">
+                    <div class="hcc-dots">
+                        <div class="hcc-dot red"></div>
+                        <div class="hcc-dot yellow"></div>
+                        <div class="hcc-dot green"></div>
+                    </div>
+                    <span style="font-family:var(--font-code); font-size:11px; color:var(--kaggle-cyan); font-weight:700;">
+                        <i class="fa-solid fa-database"></i> KAGGLE DATASETS &amp; KERNELS EXPLORER
+                    </span>
+                </div>
+
+                <div class="kg-search-bar-mock">
+                    <i class="fa-solid fa-magnifying-glass" style="color:var(--kaggle-cyan);"></i>
+                    <span>titanic machine learning / tabular / nlp transformers</span>
+                </div>
+
+                <div class="kg-dataset-item-mock">
+                    <div>
+                        <div style="font-weight:700; color:#ffffff; font-size:13px; margin-bottom:2px;">
+                            Titanic - Machine Learning from Disaster
+                        </div>
+                        <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-code);">
+                            kaggle.com/c/titanic · 68.2k participantes
+                        </div>
+                    </div>
+                    <span class="kg-tag-badge"><i class="fa-solid fa-download"></i> 1 Clic</span>
+                </div>
+
+                <div class="kg-dataset-item-mock">
+                    <div>
+                        <div style="font-weight:700; color:#ffffff; font-size:13px; margin-bottom:2px;">
+                            Credit Card Fraud Detection (Parquet &amp; CSV)
+                        </div>
+                        <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-code);">
+                            mlg-ulb/creditcardfraud · 284,807 filas · 30 features
+                        </div>
+                    </div>
+                    <span class="kg-tag-badge" style="background:rgba(203, 166, 247, 0.15); color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3);">
+                        <i class="fa-solid fa-table"></i> Tabular
+                    </span>
+                </div>
+
+                <div style="padding: 10px 14px 14px;">
+                    <div class="kg-path-rewrite-box">
+                        <span style="color:var(--neon-yellow); font-weight:700;">⚡ Mapeo Automático de Rutas:</span><br>
+                        <code>/kaggle/input/titanic/train.csv</code> &rarr; <code>&lt;proyecto&gt;/kaggle_datos/titanic/train.csv</code><br>
+                        <span style="color:var(--neon-green);">&gt;&gt;&gt; Ejecuta cualquier notebook descargado sin cambiar tu código.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAPACIDADES CLAVE -->
+        <section id="capacidades" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--kaggle-cyan); border-color:rgba(32, 190, 255, 0.3); background:rgba(32, 190, 255, 0.1);">CARACTERÍSTICAS INTEGRALES</span>
+                <h2 class="section-title">El Flujo de Trabajo para Data Science &amp; ML</h2>
+                <p class="section-desc">Diseñado para investigar, probar hipótesis y entrenar modelos con máxima velocidad y cero fricción.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon cyan" style="background:rgba(32, 190, 255, 0.15); color:var(--kaggle-cyan); border-color:rgba(32, 190, 255, 0.3);">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                    </div>
+                    <h3 class="card-title">Búsqueda y Descarga en 1 Clic</h3>
+                    <p class="card-desc">
+                        Explora millones de datasets por relevancia, votos o popularidad. Descarga y descomprime automáticamente archivos CSV, Parquet, JSON o bases SQLite en segundo plano.
+                    </p>
+                    <span class="card-tag">DATASET DOWNLOADER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon purple">
+                        <i class="fa-solid fa-code-fork"></i>
+                    </div>
+                    <h3 class="card-title">Reescritura de Rutas /kaggle/input/</h3>
+                    <p class="card-desc">
+                        Los notebooks de Kaggle usan rutas canónicas <code>/kaggle/input/&lt;dataset&gt;/</code>. Prig las mapea automáticamente a tu disco local para que el código corra tal cual vino de la web.
+                    </p>
+                    <span class="card-tag">AUTO PATH MAPPING</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon green">
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <h3 class="card-title">Tutor IA para Notebooks</h3>
+                    <p class="card-desc">
+                        El Director LLM 7B desglosa cada celda de notebooks de Grandmasters de Kaggle: explica la ingeniería de features, el pipeline de preprocesamiento y el ensamblado de modelos.
+                    </p>
+                    <span class="card-tag">GRANDMASTER EXPLAINER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon blue">
+                        <i class="fa-solid fa-table-columns"></i>
+                    </div>
+                    <h3 class="card-title">Inspección Previa de Tablas</h3>
+                    <p class="card-desc">
+                        Visualizador tabular de alta velocidad con cálculo de estadísticas descriptivas, tipos de datos, cardinalidad y detección de valores nulos antes de cargar en RAM.
+                    </p>
+                    <span class="card-tag">SCHEMA &amp; STATS VIEWER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon yellow">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <h3 class="card-title">Explorador de Competiciones</h3>
+                    <p class="card-desc">
+                        Monitorea competiciones activas (Featured, Playground, Research, Getting Started), fechas límite, premios y reglas sin abrir el navegador.
+                    </p>
+                    <span class="card-tag">COMPETITIONS TRACKER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon pink">
+                        <i class="fa-solid fa-book-bookmark"></i>
+                    </div>
+                    <h3 class="card-title">21 Algoritmos Seminales de ML</h3>
+                    <p class="card-desc">
+                        Aplica directamente implementaciones de referencia de Transformers, DDPM (Difusión), XGBoost, LightGBM, ResNet, PCA y t-SNE sobre tus datasets descargados.
+                    </p>
+                    <span class="card-tag">21 ML ALGORITHMS</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- REESCRITURA DE RUTAS Y ARQUITECTURA -->
+        <section id="reescritura-rutas" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-green); border-color:rgba(166, 227, 161, 0.3); background:rgba(166, 227, 161, 0.1);">CERO FRICCIÓN</span>
+                <h2 class="section-title">¿Cómo Funciona la Compatibilidad Local?</h2>
+                <p class="section-desc">Prig elimina la necesidad de reescribir manualmente las rutas de archivos en los notebooks que descargas.</p>
+            </div>
+
+            <div class="benchmark-box">
+                <div>
+                    <h4 style="color:#ffffff; font-size:16px; margin-bottom:10px;">
+                        <i class="fa-solid fa-folder-tree" style="color:var(--kaggle-cyan);"></i> Arquitectura de Carpetas Transparente
+                    </h4>
+                    <p style="font-size:13.5px; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">
+                        Cuando descargas un dataset desde el explorador, Prig lo almacena en <code>&lt;tu_proyecto&gt;/kaggle_datos/&lt;slug&gt;/</code>.
+                    </p>
+                    <p style="font-size:13.5px; color:var(--text-muted); line-height:1.6;">
+                        Al abrir y ejecutar un notebook de Kaggle, el intérprete redirige cualquier llamada a <code>pd.read_csv('/kaggle/input/...')</code> hacia la copia local sin romper la reproducibilidad del código.
+                    </p>
+                </div>
+
+                <div style="background:#090b14; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px; font-family:var(--font-code); font-size:11px; color:#cdd6f4; line-height:1.7;">
+                    <span style="color:var(--text-dim);"># Código original del Grandmaster en Kaggle:</span><br>
+                    <span class="token-kw">import</span> pandas <span class="token-kw">as</span> pd<br>
+                    df = pd.read_csv(<span class="token-str">'/kaggle/input/titanic/train.csv'</span>)<br><br>
+                    <span style="color:var(--neon-green);"># En Prig IDE ejecuta directamente sin errores:</span><br>
+                    <span style="color:var(--neon-cyan);">&gt;&gt;&gt; [Auto-Mapped] Leyendo /proyecto/kaggle_datos/titanic/train.csv</span><br>
+                    <span style="color:var(--neon-green);">&gt;&gt;&gt; 891 filas x 12 columnas cargadas en 4.2 ms.</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAPTURAS REALES DE LA SECCIÓN KAGGLE -->
+        <section id="capturas" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3); background:rgba(203, 166, 247, 0.1);">CAPTURAS EN ALTA RESOLUCIÓN</span>
+                <h2 class="section-title">La Sección Kaggle en Acción</h2>
+                <p class="section-desc">Haz clic en cualquier captura para ampliarla con el visor Lightbox.</p>
+            </div>
+
+            <div class="gallery-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <!-- Captura 1: Kaggle Datasets -->
+                <div class="gallery-card">
+                    <div class="gallery-img-wrap" style="height:260px;">
+                        <img src="assets/kaggle-datasets.png" alt="Explorador de Datasets de Kaggle en Prig IDE" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-database"></i> EXPLORADOR DE DATASETS</span>
+                    </div>
+                    <div class="gallery-info">
+                        <h4 class="gallery-title">Explorador de Datasets &amp; Descarga Local</h4>
+                        <p class="gallery-caption">
+                            Búsqueda en tiempo real conectada a la API de Kaggle, filtros por etiquetas y descarga en 1 clic lista para entrenar.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Captura 2: Kaggle Explorador / Kernels -->
+                <div class="gallery-card">
+                    <div class="gallery-img-wrap" style="height:260px;">
+                        <img src="assets/kaggle-explorador.png" alt="Explorador de Notebooks y Competiciones Kaggle" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-trophy"></i> NOTEBOOKS &amp; COMPETICIONES</span>
+                    </div>
+                    <div class="gallery-info">
+                        <h4 class="gallery-title">Notebooks de la Comunidad &amp; Kernels</h4>
+                        <p class="gallery-caption">
+                            Inspección de código ganador, kernels populares de la comunidad y desglose didáctico asistido por IA.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: KAGGLE HUB</span>
+                <span>— Workstation de Machine Learning y Data Science</span>
+            </div>
+            <ul class="footer-links">
+                <li><a href="index.html">Página Principal</a></li>
+                <li><a href="youtube.html" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> Prig: YouTube</a></li>
+                <li><a href="index.html#pilares">Pilares Técnicos</a></li>
+                <li><a href="index.html#modos-interactivos">Showcase</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+            <p style="font-size:11.5px; color:var(--text-dim);">
+                Conectado con la API oficial de Kaggle v1, Monaco Editor, IPython Kernels y modelos LLM 7B locales.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Modal Lightbox para Zoom de Capturas -->
+    <div id="lightbox-modal" class="lightbox-modal">
+        <button id="lightbox-close" class="lightbox-close" title="Cerrar (Esc)">&times;</button>
+        <img id="lightbox-img" class="lightbox-content" src="" alt="Captura ampliada">
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+</body>
+</html>
