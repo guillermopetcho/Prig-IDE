@@ -54,6 +54,24 @@ PERFILES_PREDETERMINADOS = [
             "velocidad": 1.0,
             "interaccionMouse": True,
             "pausarEnSegundoPlano": True
+        },
+        "sintaxis": {
+            "presetActivo": "personalizado",
+            "tokens": {
+                "keyword": { "color": "#cba6f7", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "type": { "color": "#89b4fa", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "function": { "color": "#89dceb", "fontStyle": "", "efectoRaro": "ninguno" },
+                "string": { "color": "#a6e3a1", "fontStyle": "", "efectoRaro": "ninguno" },
+                "number": { "color": "#fab387", "fontStyle": "", "efectoRaro": "ninguno" },
+                "comment": { "color": "#6c7086", "fontStyle": "italic", "efectoRaro": "ninguno" },
+                "operator": { "color": "#89dceb", "fontStyle": "", "efectoRaro": "ninguno" },
+                "variable": { "color": "#cdd6f4", "fontStyle": "", "efectoRaro": "ninguno" }
+            },
+            "efectosGlobales": {
+                "lineasEscaneo": False,
+                "resplandorCursor": False,
+                "codigoCss": ""
+            }
         }
     },
     {
@@ -98,6 +116,24 @@ PERFILES_PREDETERMINADOS = [
             "velocidad": 1.2,
             "interaccionMouse": True,
             "pausarEnSegundoPlano": True
+        },
+        "sintaxis": {
+            "presetActivo": "cyberpunk_glitch",
+            "tokens": {
+                "keyword": { "color": "#ff007f", "fontStyle": "bold", "efectoRaro": "glitch_rgb" },
+                "type": { "color": "#00ffff", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "function": { "color": "#00ff66", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "string": { "color": "#ffe600", "fontStyle": "", "efectoRaro": "ninguno" },
+                "number": { "color": "#ff0055", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "comment": { "color": "#a277ff", "fontStyle": "italic", "efectoRaro": "ninguno" },
+                "operator": { "color": "#00f0ff", "fontStyle": "", "efectoRaro": "ninguno" },
+                "variable": { "color": "#00ffff", "fontStyle": "", "efectoRaro": "ninguno" }
+            },
+            "efectosGlobales": {
+                "lineasEscaneo": False,
+                "resplandorCursor": True,
+                "codigoCss": ""
+            }
         }
     },
     {
@@ -140,6 +176,24 @@ PERFILES_PREDETERMINADOS = [
             "velocidad": 0.8,
             "interaccionMouse": False,
             "pausarEnSegundoPlano": True
+        },
+        "sintaxis": {
+            "presetActivo": "monokai_bizarro",
+            "tokens": {
+                "keyword": { "color": "#ff007f", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "type": { "color": "#66d9ef", "fontStyle": "bold italic", "efectoRaro": "ninguno" },
+                "function": { "color": "#a6e22e", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "string": { "color": "#e6db74", "fontStyle": "", "efectoRaro": "ninguno" },
+                "number": { "color": "#ae81ff", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "comment": { "color": "#88846f", "fontStyle": "italic", "efectoRaro": "ninguno" },
+                "operator": { "color": "#f92672", "fontStyle": "", "efectoRaro": "ninguno" },
+                "variable": { "color": "#fd971f", "fontStyle": "", "efectoRaro": "ninguno" }
+            },
+            "efectosGlobales": {
+                "lineasEscaneo": False,
+                "resplandorCursor": True,
+                "codigoCss": ""
+            }
         }
     },
     {
@@ -184,6 +238,24 @@ PERFILES_PREDETERMINADOS = [
             "velocidad": 0.7,
             "interaccionMouse": True,
             "pausarEnSegundoPlano": True
+        },
+        "sintaxis": {
+            "presetActivo": "nord_aurora_mistica",
+            "tokens": {
+                "keyword": { "color": "#88c0d0", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "type": { "color": "#81a1c1", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "function": { "color": "#8fbcbb", "fontStyle": "bold", "efectoRaro": "subrayado_onda" },
+                "string": { "color": "#a3be8c", "fontStyle": "", "efectoRaro": "ninguno" },
+                "number": { "color": "#b48ead", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "comment": { "color": "#616e88", "fontStyle": "italic", "efectoRaro": "ninguno" },
+                "operator": { "color": "#81a1c1", "fontStyle": "", "efectoRaro": "ninguno" },
+                "variable": { "color": "#eceff4", "fontStyle": "", "efectoRaro": "ninguno" }
+            },
+            "efectosGlobales": {
+                "lineasEscaneo": False,
+                "resplandorCursor": True,
+                "codigoCss": ""
+            }
         }
     },
     {
@@ -228,18 +300,66 @@ PERFILES_PREDETERMINADOS = [
             "velocidad": 1.0,
             "interaccionMouse": True,
             "pausarEnSegundoPlano": True
+        },
+        "sintaxis": {
+            "presetActivo": "lava_arcade_8bit",
+            "tokens": {
+                "keyword": { "color": "#ff3d00", "fontStyle": "bold", "efectoRaro": "fuego_retro" },
+                "type": { "color": "#ff9100", "fontStyle": "bold", "efectoRaro": "resplandor_neon" },
+                "function": { "color": "#ffea00", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "string": { "color": "#00e676", "fontStyle": "", "efectoRaro": "ninguno" },
+                "number": { "color": "#d500f9", "fontStyle": "bold", "efectoRaro": "ninguno" },
+                "comment": { "color": "#a1887f", "fontStyle": "italic", "efectoRaro": "ninguno" },
+                "operator": { "color": "#ff3d00", "fontStyle": "", "efectoRaro": "ninguno" },
+                "variable": { "color": "#ffffff", "fontStyle": "", "efectoRaro": "ninguno" }
+            },
+            "efectosGlobales": {
+                "lineasEscaneo": False,
+                "resplandorCursor": True,
+                "codigoCss": ""
+            }
         }
     }
 ]
 
+DATASET_DIR = os.path.dirname(RUTA_PERFILES)
+RUTA_APARIENCIA = os.path.join(DATASET_DIR, "apariencia.json")
+RUTA_SINTAXIS = os.path.join(DATASET_DIR, "sintaxis_personalizada.json")
+RUTA_MOTOR_MOVIMIENTO = os.path.join(DATASET_DIR, "motor_movimiento.json")
+RUTA_ACCESIBILIDAD = os.path.join(DATASET_DIR, "accesibilidad.json")
+RUTA_AUDIO_REACTIVO = os.path.join(DATASET_DIR, "audio_reactivo.json")
+
 
 def _asegurar_directorio():
-    directorio = os.path.dirname(RUTA_PERFILES)
+    directorio = DATASET_DIR
     if not os.path.exists(directorio):
         try:
             os.makedirs(directorio, exist_ok=True)
         except Exception:
             pass
+
+
+def _cargar_json(ruta: str, por_defecto: Any) -> Any:
+    _asegurar_directorio()
+    if not os.path.isfile(ruta):
+        return por_defecto
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error cargando JSON de {ruta}: {e}")
+        return por_defecto
+
+
+def _guardar_json(ruta: str, datos: Any) -> bool:
+    _asegurar_directorio()
+    try:
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(datos, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error guardando JSON en {ruta}: {e}")
+        return False
 
 
 def cargar_perfiles() -> Dict[str, Any]:
@@ -266,16 +386,102 @@ def cargar_perfiles() -> Dict[str, Any]:
 
 
 def guardar_perfiles(datos: Dict[str, Any]) -> bool:
-    _asegurar_directorio()
-    try:
-        with open(RUTA_PERFILES, "w", encoding="utf-8") as f:
-            json.dump(datos, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        print(f"Error guardando perfiles en {RUTA_PERFILES}: {e}")
-        return False
+    return _guardar_json(RUTA_PERFILES, datos)
+
+
+# ==========================================
+# APARIENCIA Y TEMAS
+# ==========================================
+
+def cargar_apariencia() -> Dict[str, Any]:
+    return _cargar_json(RUTA_APARIENCIA, {})
+
+
+def guardar_apariencia(datos: Dict[str, Any]) -> bool:
+    return _guardar_json(RUTA_APARIENCIA, datos)
+
+
+# ==========================================
+# SINTAXIS Y TOKENS PERSONALIZADOS
+# ==========================================
+
+def cargar_sintaxis() -> Dict[str, Any]:
+    return _cargar_json(RUTA_SINTAXIS, {})
+
+
+def guardar_sintaxis(datos: Dict[str, Any]) -> bool:
+    return _guardar_json(RUTA_SINTAXIS, datos)
+
+
+# ==========================================
+# MOTOR DE MOVIMIENTO Y RENDIMIENTO
+# ==========================================
+
+def cargar_motor_movimiento() -> Dict[str, Any]:
+    return _cargar_json(RUTA_MOTOR_MOVIMIENTO, {})
+
+
+def guardar_motor_movimiento(datos: Dict[str, Any]) -> bool:
+    return _guardar_json(RUTA_MOTOR_MOVIMIENTO, datos)
+
+
+# ==========================================
+# ACCESIBILIDAD Y ATAJOS
+# ==========================================
+
+def cargar_accesibilidad() -> Dict[str, Any]:
+    return _cargar_json(RUTA_ACCESIBILIDAD, {})
+
+
+def guardar_accesibilidad(datos: Dict[str, Any]) -> bool:
+    return _guardar_json(RUTA_ACCESIBILIDAD, datos)
+
+
+# ==========================================
+# AUDIO REACTIVO Y LUCES
+# ==========================================
+
+def cargar_audio_reactivo() -> Dict[str, Any]:
+    return _cargar_json(RUTA_AUDIO_REACTIVO, {})
+
+
+def guardar_audio_reactivo(datos: Dict[str, Any]) -> bool:
+    return _guardar_json(RUTA_AUDIO_REACTIVO, datos)
+
+
+# ==========================================
+# ESTADO COMPLETO UNIFICADO
+# ==========================================
+
+def cargar_estado_completo() -> Dict[str, Any]:
+    return {
+        "apariencia": cargar_apariencia(),
+        "sintaxis": cargar_sintaxis(),
+        "motor_movimiento": cargar_motor_movimiento(),
+        "audio_reactivo": cargar_audio_reactivo(),
+        "accesibilidad": cargar_accesibilidad(),
+        "perfiles": cargar_perfiles()
+    }
+
+
+def guardar_estado_completo(datos: Dict[str, Any]) -> Dict[str, bool]:
+    res = {}
+    if "apariencia" in datos and isinstance(datos["apariencia"], dict):
+        res["apariencia"] = guardar_apariencia(datos["apariencia"])
+    if "sintaxis" in datos and isinstance(datos["sintaxis"], dict):
+        res["sintaxis"] = guardar_sintaxis(datos["sintaxis"])
+    if "motor_movimiento" in datos and isinstance(datos["motor_movimiento"], dict):
+        res["motor_movimiento"] = guardar_motor_movimiento(datos["motor_movimiento"])
+    if "audio_reactivo" in datos and isinstance(datos["audio_reactivo"], dict):
+        res["audio_reactivo"] = guardar_audio_reactivo(datos["audio_reactivo"])
+    if "accesibilidad" in datos and isinstance(datos["accesibilidad"], dict):
+        res["accesibilidad"] = guardar_accesibilidad(datos["accesibilidad"])
+    if "perfiles" in datos and isinstance(datos["perfiles"], dict):
+        res["perfiles"] = guardar_perfiles(datos["perfiles"])
+    return res
 
 
 class PerfilGuardarRequest(BaseModel):
     perfil_activo: Optional[str] = "catppuccin_equilibrado"
     perfiles: List[Dict[str, Any]]
+

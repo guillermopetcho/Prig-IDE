@@ -12,12 +12,13 @@ import subprocess
 import zipfile
 import requests as requests_lib
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple
+from audio_monitor import audio_monitor
 
 logger = logging.getLogger("prig")
 
@@ -2062,6 +2063,132 @@ def restablecer_perfiles_config():
     return datos
 
 
+@app.get("/api/config/apariencia")
+def obtener_apariencia_config():
+    """ Devuelve la configuración de apariencia y temas guardada en disco. """
+    return perfiles_config.cargar_apariencia()
+
+
+@app.post("/api/config/apariencia")
+def guardar_apariencia_config(datos: Dict[str, Any]):
+    """ Guarda la configuración de apariencia y temas de forma persistente en disco. """
+    exito = perfiles_config.guardar_apariencia(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la apariencia en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/sintaxis")
+def obtener_sintaxis_config():
+    """ Devuelve la configuración de sintaxis, tokens y efectos guardada en disco. """
+    return perfiles_config.cargar_sintaxis()
+
+
+@app.post("/api/config/sintaxis")
+def guardar_sintaxis_config(datos: Dict[str, Any]):
+    """ Guarda la configuración de sintaxis y tokens de forma persistente en disco. """
+    exito = perfiles_config.guardar_sintaxis(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de sintaxis en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/motor_movimiento")
+def obtener_motor_movimiento_config():
+    """ Devuelve los parámetros del motor de movimiento guardados en disco. """
+    return perfiles_config.cargar_motor_movimiento()
+
+
+@app.post("/api/config/motor_movimiento")
+def guardar_motor_movimiento_config(datos: Dict[str, Any]):
+    """ Guarda los parámetros del motor de movimiento de forma persistente en disco. """
+    exito = perfiles_config.guardar_motor_movimiento(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración del motor de movimiento en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/audio_reactivo")
+def obtener_audio_reactivo_config():
+    """ Devuelve los parámetros del sistema de audio reactivo guardados en disco. """
+    return perfiles_config.cargar_audio_reactivo()
+
+
+@app.post("/api/config/audio_reactivo")
+def guardar_audio_reactivo_config(datos: Dict[str, Any]):
+    """ Guarda los parámetros del sistema de audio reactivo en disco. """
+    exito = perfiles_config.guardar_audio_reactivo(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de audio reactivo en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/audio/aplicaciones")
+def listar_aplicaciones_audio():
+    """ Devuelve la lista en tiempo real de aplicaciones y pestañas que reproducen audio en Linux. """
+    return {"aplicaciones": audio_monitor.listar_aplicaciones_audio()}
+
+
+@app.post("/api/audio/seleccionar_fuente")
+def seleccionar_fuente_audio(datos: Dict[str, Any]):
+    """ Cambia la fuente de captura de audio al stream o aplicación indicada. """
+    fuente_id = str(datos.get("fuente_id", "sistema_global"))
+    audio_monitor.seleccionar_fuente(fuente_id)
+    return {"ok": True, "fuente_actual": fuente_id}
+
+
+@app.get("/api/audio/datos_actuales")
+def obtener_datos_audio_actuales():
+    """ Devuelve el último paquete de análisis FFT y energía en tiempo real. """
+    return audio_monitor.datos_actuales
+
+
+@app.websocket("/ws/audio_reactivo")
+async def websocket_audio_reactivo(websocket: WebSocket):
+    """ Transmite paquetes de análisis de espectro FFT a 50-60 FPS en tiempo real. """
+    await websocket.accept()
+    audio_monitor.incrementar_suscriptor()
+    try:
+        while True:
+            await websocket.send_json(audio_monitor.datos_actuales)
+            await asyncio.sleep(0.02)  # ~50 FPS
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"Desconexión de websocket de audio: {e}")
+    finally:
+        audio_monitor.decrementar_suscriptor()
+
+
+@app.get("/api/config/accesibilidad")
+def obtener_accesibilidad_config():
+    """ Devuelve las opciones de accesibilidad guardadas en disco. """
+    return perfiles_config.cargar_accesibilidad()
+
+
+@app.post("/api/config/accesibilidad")
+def guardar_accesibilidad_config(datos: Dict[str, Any]):
+    """ Guarda las opciones de accesibilidad en disco. """
+    exito = perfiles_config.guardar_accesibilidad(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la accesibilidad en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/estado_completo")
+def obtener_estado_completo():
+    """ Devuelve todo el estado unificado de configuración y apariencia. """
+    return perfiles_config.cargar_estado_completo()
+
+
+@app.post("/api/config/estado_completo")
+def guardar_estado_completo(datos: Dict[str, Any]):
+    """ Guarda todo el estado unificado de configuración en disco. """
+    res = perfiles_config.guardar_estado_completo(datos)
+    return {"ok": True, "detalle": res}
+
+
+
 # ======================================================================
 # Ficha de libro: analizar un libro entero con un flujo de agentes
 # ======================================================================
@@ -3107,6 +3234,17 @@ def write_file(req: FileWriteRequest):
     res = file_mgr.write_file(req.path, req.content)
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
+    try:
+        from llm_director import director_llm
+        ext = os.path.splitext(req.path)[1].lower()
+        lenguaje = "python" if ext == ".py" else ("javascript" if ext in (".js", ".jsx") else ("typescript" if ext in (".ts", ".tsx") else ("html" if ext == ".html" else ("css" if ext == ".css" else ("c_cpp" if ext in (".c", ".cpp", ".h") else ("rust" if ext == ".rs" else "text"))))))
+        director_llm.memoria.registrar_lectura_archivo(
+            archivo=req.path,
+            codigo=req.content,
+            lenguaje=lenguaje
+        )
+    except Exception as e:
+        logger.debug("Error registrando memoria AST al guardar archivo: %s", e)
     return res
 
 @app.post("/api/create")
@@ -7135,7 +7273,6 @@ def youtube_traducir_texto(req: YouTubeTraducirRequest):
 
 # ============================================================================
 # Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
-
 # ============================================================================
 from hub.api import crear_router as _hub_router  # noqa: E402
 
@@ -7144,8 +7281,110 @@ app.include_router(_hub_router(
     telemetria=_registrar_telemetria, publico=AlmacenDesafios.publico, validar_desafio=des_ejec.validar_desafio,
     autor=lambda: inicio.perfil().get("nombre") or ""))
 
+# ============================================================================
+# API DIRECTOR NARRATIVO Y DE AGENTES ASCII (Modelos 7B / Ollama / Local)
+# ============================================================================
+from llm_director import director_llm
+
+class LLMDirectorRequest(BaseModel):
+    tema_id: str = "tema_mecha_patrol"
+    contexto: Dict[str, Any] = {}
+    modelo: Optional[str] = None
+    endpoint: Optional[str] = None
+
+@app.post("/api/llm/director_decision")
+def obtener_decision_director(req: LLMDirectorRequest):
+    """
+    Retorna directivas de movimiento, animaciones y diálogos de fondo
+    generados por un modelo 7B o motor procedural.
+    """
+    try:
+        decision = director_llm.consultar_director(
+            tema_id=req.tema_id,
+            contexto_editor=req.contexto,
+            modelo_personalizado=req.modelo,
+            endpoint_personalizado=req.endpoint
+        )
+        return {"ok": True, "data": decision}
+    except Exception as e:
+        logger.error(f"Error en director LLM: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/director_stream")
+def obtener_decision_director_stream(req: LLMDirectorRequest):
+    """
+    Emite tokens progresivos en streaming (Server-Sent Events) con latencia < 150ms
+    y entrega la decisión completa estructurada al finalizar.
+    """
+    try:
+        gen = director_llm.consultar_director_stream(
+            tema_id=req.tema_id,
+            contexto_editor=req.contexto,
+            modelo_personalizado=req.modelo,
+            endpoint_personalizado=req.endpoint
+        )
+        return StreamingResponse(gen, media_type="text/event-stream")
+    except Exception as e:
+        logger.error(f"Error en streaming del director LLM: {e}")
+        return {"ok": False, "error": str(e)}
+
+class PreguntaCerebroRequest(BaseModel):
+    pregunta: str
+    modelo: Optional[str] = None
+    endpoint: Optional[str] = None
+
+@app.get("/api/llm/memoria_archivos")
+def obtener_memoria_archivos():
+    """
+    Retorna la lista de archivos leídos y comprimidos semánticamente (TC-AST)
+    junto con las estadísticas de ahorro de tokens.
+    """
+    try:
+        archivos = director_llm.memoria.obtener_resumen_memoria()
+        stats = director_llm.memoria.obtener_estadisticas_tokens()
+        return {
+            "ok": True,
+            "archivos": archivos,
+            "stats": stats,
+            "historial_preguntas": director_llm.memoria.historial_preguntas
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo memoria de archivos: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/preguntar_cerebro")
+def preguntar_cerebro_memoria(req: PreguntaCerebroRequest):
+    """
+    Responde preguntas sobre los archivos leídos utilizando únicamente
+    la memoria semántica comprimida (ahorrando ~90% tokens).
+    """
+    try:
+        res = director_llm.memoria.preguntar_al_cerebro(
+            pregunta=req.pregunta,
+            director_instancia=director_llm,
+            modelo=req.modelo,
+            endpoint=req.endpoint
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error consultando al cerebro: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/limpiar_memoria_cerebro")
+def limpiar_memoria_cerebro():
+    """Limpia el almacén de memoria comprimida"""
+    try:
+        director_llm.memoria.archivos_memorizados.clear()
+        director_llm.memoria.historial_preguntas.clear()
+        director_llm.memoria._guardar_memoria()
+        return {"ok": True, "mensaje": "Memoria del cerebro reiniciada"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 
 # Serve frontend static assets
+
 
 if os.path.exists(frontend_dir):
 

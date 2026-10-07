@@ -875,6 +875,28 @@ class GlobalConfigManager {
         if (document.getElementById('cfg-editor-tab-size')) document.getElementById('cfg-editor-tab-size').value = tabSize;
         if (document.getElementById('cfg-editor-theme')) document.getElementById('cfg-editor-theme').value = theme;
 
+        // Cargar Ajustes del Menú Deslizante de Rueda del Ratón
+        if (window.menuRuedaArchivos) {
+            const mrcfg = window.menuRuedaArchivos.config || {};
+            const elHab = document.getElementById('cfg-menu-rueda-habilitado');
+            if (elHab) elHab.checked = mrcfg.habilitado !== false;
+
+            const elDisp = document.getElementById('cfg-menu-rueda-disparador');
+            if (elDisp) elDisp.value = mrcfg.disparador || 'rueda_click';
+
+            const elEstilo = document.getElementById('cfg-menu-rueda-estilo');
+            if (elEstilo) elEstilo.value = mrcfg.estilo || 'deslizante_neon';
+
+            const elMax = document.getElementById('cfg-menu-rueda-max-items');
+            if (elMax) elMax.value = String(mrcfg.maxItems !== undefined ? mrcfg.maxItems : '12');
+
+            const elBusq = document.getElementById('cfg-menu-rueda-busqueda');
+            if (elBusq) elBusq.checked = mrcfg.busquedaRapida !== false;
+
+            const elRec = document.getElementById('cfg-menu-rueda-recientes');
+            if (elRec) elRec.checked = mrcfg.mostrarRecientes !== false;
+        }
+
         // 4. Permisos & Terminal
         const autoDiagnose = localStorage.getItem('prig_auto_diagnose_errors') || 'true';
         const allowAutoCmd = localStorage.getItem('prig_allow_auto_cmd') || 'ask';
@@ -1229,6 +1251,9 @@ class GlobalConfigManager {
             <button class="tool-btn ${this.aparienciaSubTab === 'sintaxis' ? 'primary' : ''}" id="ap-subtab-btn-sintaxis" style="font-size: 11.5px; padding: 6px 14px; border-radius: 6px; border-color: rgba(203,166,247,0.4);">
               <i class="fa-solid fa-code" style="color: var(--accent-purple);"></i> 5. Sintaxis y Tokens Raros
             </button>
+            <button class="tool-btn ${this.aparienciaSubTab === 'audio' ? 'primary' : ''}" id="ap-subtab-btn-audio" style="font-size: 11.5px; padding: 6px 14px; border-radius: 6px; border-color: rgba(0,240,255,0.4);">
+              <i class="fa-solid fa-wand-magic-sparkles" style="color: #00f0ff;"></i> 6. Audio Reactivo y Luces
+            </button>
           </div>
 
           <!-- Contenedor del contenido del sub-tab activo -->
@@ -1240,12 +1265,14 @@ class GlobalConfigManager {
         const btnSecciones = document.getElementById('ap-subtab-btn-secciones');
         const btnEfectos = document.getElementById('ap-subtab-btn-efectos');
         const btnSintaxis = document.getElementById('ap-subtab-btn-sintaxis');
+        const btnAudio = document.getElementById('ap-subtab-btn-audio');
 
         if (btnColores) btnColores.onclick = () => this.initApariencia('colores');
         if (btnFondo) btnFondo.onclick = () => this.initApariencia('fondo-global');
         if (btnSecciones) btnSecciones.onclick = () => this.initApariencia('secciones');
         if (btnEfectos) btnEfectos.onclick = () => this.initApariencia('efectos');
         if (btnSintaxis) btnSintaxis.onclick = () => this.initApariencia('sintaxis');
+        if (btnAudio) btnAudio.onclick = () => this.initApariencia('audio');
 
         const body = document.getElementById('ap-subtab-body');
         if (!body) return;
@@ -1260,6 +1287,8 @@ class GlobalConfigManager {
             this._renderSubTabEfectos(body, ap);
         } else if (this.aparienciaSubTab === 'sintaxis') {
             this._renderSubTabSintaxis(body, ap);
+        } else if (this.aparienciaSubTab === 'audio') {
+            this._renderSubTabAudioReactivo(body, ap);
         }
     }
 
@@ -1282,6 +1311,11 @@ class GlobalConfigManager {
             { key: 'accent_red', label: 'Acento Rojo (Error & Peligro)', desc: 'Errores, fallos en pruebas y botones de eliminar', css: '--accent-red' },
             { key: 'accent_yellow', label: 'Acento Amarillo (Avisos & Pistas)', desc: 'Pistas, advertencias y favoritos', css: '--accent-yellow' }
         ];
+
+        const seccionesIde = window.SECCIONES_IDE || [];
+        const transSec = est.transparenciasSecciones || {};
+        const globalAlfa = est.opacidad !== undefined ? est.opacidad : 0.92;
+        const globalBlur = est.desenfoque !== undefined ? est.desenfoque : 10;
 
         container.innerHTML = `
           <!-- Galería de Temas Predefinidos -->
@@ -1317,6 +1351,93 @@ class GlobalConfigManager {
             </div>
           </div>
 
+          <!-- BARRAS PARA CONTROLAR LA TRANSPARENCIA DE CADA SECCIÓN -->
+          <div style="background: rgba(0,0,0,0.25); border: 1.5px solid rgba(137,180,250,0.3); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+              <div>
+                <span style="font-weight: 700; color: #fff; font-size: 12.5px; display: flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> Control de Transparencia de Cada Sección del Programa
+                </span>
+                <span style="font-size: 11px; color: var(--text-muted);">Ajusta la barra de opacidad de cada sección para crear efectos de vidrio (Glassmorphism) y ver los fondos animados</span>
+              </div>
+              
+              <!-- Botones de Presets Rápidos -->
+              <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                <button class="tool-btn" data-ap-preset="solido" style="font-size: 10.5px; padding: 3px 8px;" title="100% Opaco sin transparencia">
+                  <i class="fa-solid fa-square"></i> 100% Sólido
+                </button>
+                <button class="tool-btn" data-ap-preset="vidrio_suave" style="font-size: 10.5px; padding: 3px 8px; color: var(--accent-blue);" title="Translucidez equilibrada">
+                  <i class="fa-solid fa-gem"></i> Vidrio Suave (88%)
+                </button>
+                <button class="tool-btn" data-ap-preset="cristal" style="font-size: 10.5px; padding: 3px 8px; color: var(--accent-purple);" title="Cristal translúcido">
+                  <i class="fa-solid fa-cube"></i> Cristal (60%)
+                </button>
+                <button class="tool-btn" data-ap-preset="ultra_transparente" style="font-size: 10.5px; padding: 3px 8px; color: var(--accent-green);" title="Máxima transparencia para ver fondos">
+                  <i class="fa-solid fa-ghost"></i> Fantasma (35%)
+                </button>
+              </div>
+            </div>
+
+            <!-- Controles Maestros (Globales) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                  <label style="font-weight: 700; color: #fff; font-size: 11.5px; display: flex; align-items: center; gap: 5px;">
+                    <i class="fa-solid fa-layer-group" style="color: var(--accent-blue);"></i> Opacidad General Maestra:
+                  </label>
+                  <span id="cfg-trans-maestra-val" style="font-weight: 700; color: var(--accent-blue); font-size: 12px; font-family: monospace;">${Math.round(globalAlfa * 100)}%</span>
+                </div>
+                <input type="range" id="cfg-trans-maestra" min="0.10" max="1.0" step="0.01" value="${globalAlfa}" style="width: 100%; accent-color: var(--accent-blue); cursor: pointer;">
+              </div>
+
+              <div>
+                <div style="display: justify; display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                  <label style="font-weight: 700; color: #fff; font-size: 11.5px; display: flex; align-items: center; gap: 5px;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-purple);"></i> Desenfoque Glassmorphism (Blur):
+                  </label>
+                  <span id="cfg-blur-maestro-val" style="font-weight: 700; color: var(--accent-purple); font-size: 12px; font-family: monospace;">${globalBlur}px</span>
+                </div>
+                <input type="range" id="cfg-blur-maestro" min="0" max="30" step="1" value="${globalBlur}" style="width: 100%; accent-color: var(--accent-purple); cursor: pointer;">
+              </div>
+            </div>
+
+            <!-- Barras Individuales por Sección -->
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Barras de Transparencia Individuales:</span>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px;">
+                ${seccionesIde.map(s => {
+                    const secCfg = (est.secciones && est.secciones[s.id]) || {};
+                    let alfaSec = globalAlfa;
+                    if (secCfg.alfa !== undefined) {
+                        alfaSec = secCfg.alfa;
+                    } else if (transSec[s.id] !== undefined) {
+                        alfaSec = transSec[s.id];
+                    } else if (s.defAlfa !== undefined) {
+                        alfaSec = s.defAlfa;
+                    }
+                    const pct = Math.round(alfaSec * 100);
+
+                    return `
+                      <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                          <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                            <i class="fa-solid ${s.icono || 'fa-window-maximize'}" style="color: var(--accent-blue); font-size: 12px; flex-shrink: 0;"></i>
+                            <span style="font-weight: 600; color: #fff; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${s.nombre}">${s.nombre}</span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="cfg-trans-sec-val-${s.id}" style="font-weight: 700; color: ${pct < 60 ? 'var(--accent-green)' : (pct < 90 ? 'var(--accent-purple)' : 'var(--text-main)')}; font-size: 11.5px; font-family: monospace;">${pct}%</span>
+                            <button class="tool-btn" data-sec-reset="${s.id}" style="font-size: 9px; padding: 2px 5px; line-height: 1;" title="Restablecer a opacidad predeterminada"><i class="fa-solid fa-rotate-left"></i></button>
+                            <button class="tool-btn" data-sec-solid="${s.id}" style="font-size: 9px; padding: 2px 5px; line-height: 1;" title="Fijar en 100% sólido"><i class="fa-solid fa-square"></i></button>
+                          </div>
+                        </div>
+                        <input type="range" id="cfg-trans-sec-${s.id}" class="cfg-slider-sec-trans" data-seccion-id="${s.id}" min="0.05" max="1.0" step="0.01" value="${alfaSec}" style="width: 100%; accent-color: var(--accent-blue); cursor: pointer;">
+                      </div>
+                    `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
           <!-- Editor Completo de Paleta de Colores Individuales -->
           <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -1349,6 +1470,82 @@ class GlobalConfigManager {
             card.onclick = () => {
                 ap.setTema(card.dataset.tema);
                 this.initApariencia('colores');
+            };
+        });
+
+        // Conectar botones de presets de transparencia
+        container.querySelectorAll('[data-ap-preset]').forEach(btn => {
+            btn.onclick = () => {
+                ap.aplicarPresetTransparencia(btn.dataset.apPreset);
+                this.initApariencia('colores');
+            };
+        });
+
+        // Conectar slider de transparencia maestra
+        const rngMaestra = document.getElementById('cfg-trans-maestra');
+        const lblMaestra = document.getElementById('cfg-trans-maestra-val');
+        if (rngMaestra) {
+            rngMaestra.oninput = () => {
+                const val = parseFloat(rngMaestra.value);
+                if (lblMaestra) lblMaestra.textContent = `${Math.round(val * 100)}%`;
+                ap.setTransparenciaGlobal(val);
+                // Actualizar sliders individuales en vivo
+                seccionesIde.forEach(s => {
+                    const secRng = document.getElementById(`cfg-trans-sec-${s.id}`);
+                    const secLbl = document.getElementById(`cfg-trans-sec-val-${s.id}`);
+                    if (secRng) secRng.value = val;
+                    if (secLbl) secLbl.textContent = `${Math.round(val * 100)}%`;
+                    ap.setTransparenciaSeccion(s.id, val);
+                });
+            };
+        }
+
+        // Conectar slider de desenfoque glassmorphism
+        const rngBlur = document.getElementById('cfg-blur-maestro');
+        const lblBlur = document.getElementById('cfg-blur-maestro-val');
+        if (rngBlur) {
+            rngBlur.oninput = () => {
+                const val = parseInt(rngBlur.value, 10);
+                if (lblBlur) lblBlur.textContent = `${val}px`;
+                ap.setDesenfoqueGlobal(val);
+            };
+        }
+
+        // Conectar sliders individuales de secciones
+        container.querySelectorAll('.cfg-slider-sec-trans').forEach(slider => {
+            slider.oninput = () => {
+                const secId = slider.dataset.seccionId;
+                const val = parseFloat(slider.value);
+                const lbl = document.getElementById(`cfg-trans-sec-val-${secId}`);
+                if (lbl) {
+                    lbl.textContent = `${Math.round(val * 100)}%`;
+                    lbl.style.color = val < 0.6 ? 'var(--accent-green)' : (val < 0.9 ? 'var(--accent-purple)' : 'var(--text-main)');
+                }
+                ap.setTransparenciaSeccion(secId, val);
+            };
+        });
+
+        // Conectar botones de restablecer sección
+        container.querySelectorAll('[data-sec-reset]').forEach(btn => {
+            btn.onclick = () => {
+                const secId = btn.dataset.secReset;
+                ap.restablecerSeccion(secId);
+                this.initApariencia('colores');
+            };
+        });
+
+        // Conectar botones de 100% sólido por sección
+        container.querySelectorAll('[data-sec-solid]').forEach(btn => {
+            btn.onclick = () => {
+                const secId = btn.dataset.secSolid;
+                ap.setTransparenciaSeccion(secId, 1.0);
+                const slider = document.getElementById(`cfg-trans-sec-${secId}`);
+                const lbl = document.getElementById(`cfg-trans-sec-val-${secId}`);
+                if (slider) slider.value = 1.0;
+                if (lbl) {
+                    lbl.textContent = '100%';
+                    lbl.style.color = 'var(--text-main)';
+                }
             };
         });
 
@@ -1548,10 +1745,53 @@ class GlobalConfigManager {
                   </div>
                 </div>
 
-                <!-- Catálogo de 12 Efectos de Movimiento -->
+                <!-- Control de Director de IA (Modelos 7B / Ollama / Local) -->
+                <div style="background: rgba(137, 180, 250, 0.08); border: 1px solid rgba(137, 180, 250, 0.3); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-brain" style="color: var(--accent-blue); font-size: 14px;"></i>
+                      <span style="font-weight: 700; font-size: 12px; color: #fff;">Director Autónomo LLM (Modelos 7B / Ollama)</span>
+                      <span style="font-size: 10px; background: rgba(166,227,161,0.2); color: var(--accent-green); padding: 2px 6px; border-radius: 4px; font-weight: 600;">Control Libre</span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <button id="cfg-dir-disparar-btn" class="tool-btn primary" style="font-size: 11px; padding: 4px 10px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Forzar Acción/Diálogo IA
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 120px; gap: 10px; align-items: center;">
+                    <div>
+                      <label style="font-size: 10.5px; color: var(--text-muted); display: block; margin-bottom: 3px;">Modelo 7B Local:</label>
+                      <input type="text" id="cfg-dir-modelo" value="${(window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.modeloLLM) || 'qwen2.5-coder:7b'}" placeholder="qwen2.5-coder:7b, llama3:8b, mistral:7b" style="width: 100%; padding: 5px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 5px; font-size: 11px;">
+                    </div>
+
+                    <div>
+                      <label style="font-size: 10.5px; color: var(--text-muted); display: block; margin-bottom: 3px;">Host / Endpoint Ollama:</label>
+                      <input type="text" id="cfg-dir-endpoint" value="${(window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.endpointLLM) || 'http://localhost:11434'}" placeholder="http://localhost:11434" style="width: 100%; padding: 5px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 5px; font-size: 11px;">
+                    </div>
+
+                    <div>
+                      <label style="font-size: 10.5px; color: var(--text-muted); display: block; margin-bottom: 3px;">Ciclo IA:</label>
+                      <select id="cfg-dir-intervalo" style="width: 100%; padding: 5px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 5px; font-size: 11px;">
+                        <option value="10000" ${window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.intervaloDecisionMs === 10000 ? 'selected' : ''}>Cada 10s</option>
+                        <option value="15000" ${!window.DIRECTOR_ASCII || window.DIRECTOR_ASCII.intervaloDecisionMs === 15000 ? 'selected' : ''}>Cada 15s</option>
+                        <option value="30000" ${window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.intervaloDecisionMs === 30000 ? 'selected' : ''}>Cada 30s</option>
+                        <option value="60000" ${window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.intervaloDecisionMs === 60000 ? 'selected' : ''}>Cada 60s</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style="font-size: 10.5px; color: var(--text-muted); line-height: 1.4;">
+                    <i class="fa-solid fa-shield-halved" style="color: var(--accent-yellow);"></i> <strong>Protección Anti-Obstrucción:</strong> Los diálogos y personajes se posicionan exclusivamente en márgenes periféricos traseros y se auto-atenúan si el cursor de escritura se acerca.
+                  </div>
+                </div>
+
+                <!-- Catálogo de Efectos y Temas de Movimiento -->
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <div style="font-size: 11.5px; color: #fff; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-purple);"></i> Elige un Efecto de Movimiento del Catálogo:
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent-purple);"></i> Elige un Escenario o Efecto de Movimiento del Catálogo:
                   </div>
                   <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px;">
                     ${efectosMov.map(ef => {
@@ -1817,6 +2057,36 @@ class GlobalConfigManager {
                 elEst.textContent = t.estado;
             }
         }, 400);
+
+        // Eventos Director Autónomo LLM
+        const btnDirDisparar = document.getElementById('cfg-dir-disparar-btn');
+        const inDirModelo = document.getElementById('cfg-dir-modelo');
+        const inDirEndpoint = document.getElementById('cfg-dir-endpoint');
+        const selDirIntervalo = document.getElementById('cfg-dir-intervalo');
+
+        if (btnDirDisparar && window.DIRECTOR_ASCII) {
+            btnDirDisparar.onclick = () => {
+                btnDirDisparar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Consultando IA...';
+                window.DIRECTOR_ASCII.dispararDecisionDirector('solicitud_manual').finally(() => {
+                    btnDirDisparar.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Forzar Acción/Diálogo IA';
+                });
+            };
+        }
+        if (inDirModelo && window.DIRECTOR_ASCII) {
+            inDirModelo.onchange = () => {
+                window.DIRECTOR_ASCII.modeloLLM = inDirModelo.value.trim() || 'qwen2.5-coder:7b';
+            };
+        }
+        if (inDirEndpoint && window.DIRECTOR_ASCII) {
+            inDirEndpoint.onchange = () => {
+                window.DIRECTOR_ASCII.endpointLLM = inDirEndpoint.value.trim() || 'http://localhost:11434';
+            };
+        }
+        if (selDirIntervalo && window.DIRECTOR_ASCII) {
+            selDirIntervalo.onchange = () => {
+                window.DIRECTOR_ASCII.intervaloDecisionMs = parseInt(selDirIntervalo.value, 10) || 15000;
+            };
+        }
 
         // Eventos efectos de movimiento
         container.querySelectorAll('.cfg-fg-efecto-card').forEach(card => {
@@ -2365,7 +2635,18 @@ class GlobalConfigManager {
             { id: 'resplandor_neon', label: '💡 Resplandor Neón Pulsante' },
             { id: 'subrayado_onda', label: '〰️ Subrayado en Onda Neón' },
             { id: 'fuego_retro', label: '🔥 Fuego Retro Incandescente' },
-            { id: 'fantasma_italica', label: '👻 Fantasma Holográfico Neón' }
+            { id: 'fantasma_italica', label: '👻 Fantasma Holográfico Neón' },
+            { id: 'plasma_pulsar_electrico', label: '⚡ Plasma Eléctrico Pulsante' },
+            { id: 'oro_alquimico_brillo', label: '✨ Shimmer Oro Alquímico' },
+            { id: 'matrix_digital_rain', label: '📟 Lluvia Digital Matrix' },
+            { id: 'vaporwave_3d_anaglyph', label: '🕶️ Holograma Anaglifo 3D' },
+            { id: 'espejismo_calor_desierto', label: '🏜️ Espejismo Ondulante de Calor' },
+            { id: 'cristal_prismatico', label: '💎 Refracción Cristal Prismático' },
+            { id: 'radioactivo_uranio', label: '☢️ Radiación Uranio 235' },
+            { id: 'vortice_gravedad_negra', label: '🕳️ Vórtice Singularidad Gravitacional' },
+            { id: 'pixel_arcade_8bit', label: '👾 Sombra Píxel Arcade Retro' },
+            { id: 'derretido_dali', label: '⏳ Texto Derretido Surrealista' },
+            { id: 'niebla_espectral', label: '🌫️ Niebla Espectral Flotante' }
         ];
 
         container.innerHTML = `
@@ -2423,9 +2704,9 @@ class GlobalConfigManager {
           <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
               <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-pen-nib" style="color: var(--accent-yellow);"></i> Colores, Tipografía y Efectos por Token
+                <i class="fa-solid fa-pen-nib" style="color: var(--accent-yellow);"></i> Colores, Tipografía y Efectos por Token (17 Efectos Raros)
               </span>
-              <span style="font-size: 11px; color: var(--text-muted);">Personaliza cada categoría gramatical con efectos raros</span>
+              <span style="font-size: 11px; color: var(--text-muted);">Configura cada token sin romper el rendimiento</span>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -2460,7 +2741,7 @@ class GlobalConfigManager {
                         </div>
 
                         <!-- Selector de Efecto Raro Especial -->
-                        <select class="ap-tok-efecto-sel" data-token="${tok.key}" style="padding: 4px 8px; background: rgba(0,0,0,0.4); border: 1px solid ${cfg.efectoRaro && cfg.efectoRaro !== 'ninguno' ? 'var(--accent-purple)' : 'var(--border-color)'}; color: #fff; border-radius: 4px; font-size: 11px; cursor: pointer; max-width: 200px;">
+                        <select class="ap-tok-efecto-sel" data-token="${tok.key}" style="padding: 4px 8px; background: rgba(0,0,0,0.4); border: 1px solid ${cfg.efectoRaro && cfg.efectoRaro !== 'ninguno' ? 'var(--accent-purple)' : 'var(--border-color)'}; color: #fff; border-radius: 4px; font-size: 11px; cursor: pointer; max-width: 210px;">
                           ${opcionesEfectos.map(ef => `<option value="${ef.id}" ${cfg.efectoRaro === ef.id ? 'selected' : ''}>${ef.label}</option>`).join('')}
                         </select>
                       </div>
@@ -2470,29 +2751,50 @@ class GlobalConfigManager {
             </div>
           </div>
 
-          <!-- 4. Efectos Globales del Editor & Motor de Código Libre -->
+          <!-- 4. Efectos Atmosféricos Globales & Inyector CSS -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
-            <!-- Efectos de Entorno -->
-            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Efectos de Entorno (7 Efectos Globales) -->
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
               <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
                 <i class="fa-solid fa-tv" style="color: var(--accent-blue);"></i> Efectos Atmosféricos del Editor
               </span>
 
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                <input type="checkbox" id="ap-glob-scanlines" ${glob.lineasEscaneo ? 'checked' : ''} style="accent-color: var(--accent-purple);">
-                <div>
-                  <div style="font-weight: 600;">Líneas de Escaneo CRT Analógicas</div>
-                  <div style="font-size: 10px; color: var(--text-muted);">Genera textura de monitor retro analógico sobre el código</div>
-                </div>
-              </label>
+              <div style="display: grid; grid-template-columns: 1fr; gap: 6px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-scanlines" ${glob.lineasEscaneo ? 'checked' : ''} style="accent-color: var(--accent-purple);">
+                  <span>📺 Líneas de Escaneo CRT Analógicas</span>
+                </label>
 
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                <input type="checkbox" id="ap-glob-cursor" ${glob.resplandorCursor ? 'checked' : ''} style="accent-color: var(--accent-blue);">
-                <div>
-                  <div style="font-weight: 600;">Cursor Neón con Resplandor Láser</div>
-                  <div style="font-size: 10px; color: var(--text-muted);">Añade brillo pulsante y halo a la línea actual de edición</div>
-                </div>
-              </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-cursor" ${glob.resplandorCursor ? 'checked' : ''} style="accent-color: var(--accent-blue);">
+                  <span>🔦 Cursor Neón Láser con Resplandor</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-aberracion" ${glob.aberracionCromaticaGlobal ? 'checked' : ''} style="accent-color: var(--accent-red);">
+                  <span>⚡ Aberración Cromática RGB en Todo el Editor</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-vignette" ${glob.vignetteRetro ? 'checked' : ''} style="accent-color: var(--accent-yellow);">
+                  <span>🎬 Viñeta Analógica Cinematográfica (Bordes Suaves)</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-vidrio" ${glob.fondoVidrioLiquido ? 'checked' : ''} style="accent-color: var(--accent-green);">
+                  <span>🧊 Vidrio Ahumado Líquido (Glassmorphism Monaco)</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-linea" ${glob.lineaActivaPulsante ? 'checked' : ''} style="accent-color: var(--accent-purple);">
+                  <span>🌟 Línea Activa con Respiración Neón</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #fff; cursor: pointer; background: var(--bg-panel); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border-color);">
+                  <input type="checkbox" id="ap-glob-seleccion" ${glob.seleccionGalactica ? 'checked' : ''} style="accent-color: var(--accent-blue);">
+                  <span>🌌 Selección de Texto con Halo Galáctico</span>
+                </label>
+              </div>
             </div>
 
             <!-- Editor de Código CSS Libre para Monaco -->
@@ -2509,13 +2811,16 @@ class GlobalConfigManager {
                   <i class="fa-solid fa-bolt"></i> Ejecutar CSS
                 </button>
                 <button class="tool-btn" id="ap-btn-snippet-glitch" style="font-size: 10px; padding: 4px 8px;">
-                  + Snippet Glitch
+                  + Glitch 3D
                 </button>
                 <button class="tool-btn" id="ap-btn-snippet-neon" style="font-size: 10px; padding: 4px 8px;">
-                  + Snippet Aura Neón
+                  + Aura Neón
                 </button>
                 <button class="tool-btn" id="ap-btn-snippet-glass" style="font-size: 10px; padding: 4px 8px;">
-                  + Snippet Glassmorphism
+                  + Glassmorphism
+                </button>
+                <button class="tool-btn" id="ap-btn-snippet-fuego" style="font-size: 10px; padding: 4px 8px;">
+                  + Magma Arcade
                 </button>
               </div>
             </div>
@@ -2673,20 +2978,23 @@ class GlobalConfigManager {
             };
         });
 
-        // Toggles globales (Scanlines y Cursor Glow)
-        const chkScan = document.getElementById('ap-glob-scanlines');
-        if (chkScan) {
-            chkScan.onchange = () => {
-                sm.setEfectoGlobal('lineasEscaneo', chkScan.checked);
-            };
-        }
+        // Toggles globales (7 Efectos de Entorno)
+        const bindToggleGlobal = (id, clave) => {
+            const chk = document.getElementById(id);
+            if (chk) {
+                chk.onchange = () => {
+                    sm.setEfectoGlobal(clave, chk.checked);
+                };
+            }
+        };
 
-        const chkCursor = document.getElementById('ap-glob-cursor');
-        if (chkCursor) {
-            chkCursor.onchange = () => {
-                sm.setEfectoGlobal('resplandorCursor', chkCursor.checked);
-            };
-        }
+        bindToggleGlobal('ap-glob-scanlines', 'lineasEscaneo');
+        bindToggleGlobal('ap-glob-cursor', 'resplandorCursor');
+        bindToggleGlobal('ap-glob-aberracion', 'aberracionCromaticaGlobal');
+        bindToggleGlobal('ap-glob-vignette', 'vignetteRetro');
+        bindToggleGlobal('ap-glob-vidrio', 'fondoVidrioLiquido');
+        bindToggleGlobal('ap-glob-linea', 'lineaActivaPulsante');
+        bindToggleGlobal('ap-glob-seleccion', 'seleccionGalactica');
 
         // Editor CSS y Snippets
         const txtCss = document.getElementById('ap-glob-css-input');
@@ -2701,7 +3009,7 @@ class GlobalConfigManager {
         const btnSnipGlitch = document.getElementById('ap-btn-snippet-glitch');
         if (btnSnipGlitch && txtCss) {
             btnSnipGlitch.onclick = () => {
-                txtCss.value += `\n/* Efecto Glitch Aberrante */\n.monaco-editor .view-line {\n  animation: prigGlitchTexto 4s steps(2) infinite !important;\n}\n`;
+                txtCss.value += `\n/* Efecto Glitch 3D */\n.monaco-editor .view-line {\n  animation: prigGlitchTexto 3s steps(2) infinite !important;\n}\n`;
             };
         }
 
@@ -2716,6 +3024,13 @@ class GlobalConfigManager {
         if (btnSnipGlass && txtCss) {
             btnSnipGlass.onclick = () => {
                 txtCss.value += `\n/* Fondo Glassmorphism Monaco */\n.monaco-editor, .monaco-editor-background {\n  background: rgba(10, 5, 20, 0.75) !important;\n  backdrop-filter: blur(12px) !important;\n}\n`;
+            };
+        }
+
+        const btnSnipFuego = document.getElementById('ap-btn-snippet-fuego');
+        if (btnSnipFuego && txtCss) {
+            btnSnipFuego.onclick = () => {
+                txtCss.value += `\n/* Magma Arcade 8-Bit */\n.monaco-editor .cursor {\n  box-shadow: 0 0 12px #ff3d00, 0 0 24px #ff9100 !important;\n}\n.monaco-editor .current-line {\n  border-left: 3px solid #ff3d00 !important;\n}\n`;
             };
         }
 
@@ -2764,9 +3079,514 @@ class GlobalConfigManager {
         }
     }
 
+    _renderSubTabAudioReactivo(container, ap) {
+        const arm = window.audioReactivoMgr || (window.AudioReactivoManager ? (window.audioReactivoMgr = new window.AudioReactivoManager()) : null);
+        if (!arm) {
+            container.innerHTML = `<div style="padding: 20px; color: var(--text-muted); text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando motor de audio reactivo...</div>`;
+            return;
+        }
+
+        const cfg = arm.config;
+        const estaActivo = arm.estaActivo();
+        const fuente = arm.getFuenteActual();
+        const nombreFuente = arm.getNombreFuenteActual();
+        const colorActual = arm.obtenerColorLuz();
+
+        container.innerHTML = `
+          <!-- 1. Banner de Presentación y Estado de Captura -->
+          <div style="background: linear-gradient(135deg, rgba(0, 240, 255, 0.12), rgba(203, 166, 247, 0.08)); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.25);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(0, 240, 255, 0.2); border: 1px solid rgba(0, 240, 255, 0.5); display: flex; align-items: center; justify-content: center; font-size: 19px; color: #00f0ff;">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: #fff; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                    Sincronización de Luces y Audio del Sistema
+                    <span id="ap-audio-badge-estado" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: 600; background: ${estaActivo ? 'rgba(166, 227, 161, 0.2)' : 'rgba(255, 255, 255, 0.08)'}; color: ${estaActivo ? '#a6e3a1' : 'var(--text-muted)'}; border: 1px solid ${estaActivo ? '#a6e3a1' : 'var(--border-color)'};">
+                      <i class="fa-solid ${estaActivo ? 'fa-circle-dot fa-fade' : 'fa-circle'}"></i> ${estaActivo ? `En Vivo: ${nombreFuente}` : 'Inactivo'}
+                    </span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                    Detecta automáticamente las aplicaciones abiertas (YouTube, Spotify, Firefox, Chrome, VLC) y modula los efectos visuales al ritmo exacto de la música.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botones de Acción Global -->
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button class="tool-btn ${estaActivo && fuente === 'sistema_global' ? 'primary' : ''}" id="ap-audio-btn-sistema-global" style="font-size: 11px; padding: 7px 14px; border-radius: 6px; font-weight: 600; border-color: rgba(0,240,255,0.5);">
+                  <i class="fa-solid fa-volume-high" style="color: #00f0ff;"></i> Todo el Audio de la PC
+                </button>
+                <button class="tool-btn" id="ap-audio-btn-refrescar-apps" style="font-size: 11px; padding: 7px 12px; border-radius: 6px;">
+                  <i class="fa-solid fa-rotate"></i> Escanear Aplicaciones
+                </button>
+                ${estaActivo ? `
+                <button class="tool-btn" id="ap-audio-btn-detener" style="font-size: 11px; padding: 7px 13px; border-radius: 6px; background: rgba(243, 139, 168, 0.18); color: var(--accent-red); border-color: rgba(243, 139, 168, 0.5);">
+                  <i class="fa-solid fa-stop"></i> Detener
+                </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Lista de Aplicaciones y Pestañas Abiertas con Audio -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-list-check" style="color: var(--accent-purple);"></i> Seleccionar Aplicación o Pestaña Específica
+              </span>
+              <span style="font-size: 10.5px; color: var(--text-muted);">Haz clic en cualquier app para sincronizar su sonido</span>
+            </div>
+
+            <div id="ap-audio-apps-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px; grid-column: 1 / -1;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Escaneando aplicaciones activas...
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Espectrograma Ecualizador en Tiempo Real -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-chart-simple" style="color: #00f0ff;"></i> Espectro de Frecuencias en Tiempo Real (FFT 32 Bandas)
+              </span>
+              <span style="font-size: 10px; color: var(--text-muted);">
+                ${estaActivo ? '🟢 Procesando señal de audio en vivo (50 FPS)' : '⚪ Esperando señal de audio'}
+              </span>
+            </div>
+
+            <div style="position: relative; width: 100%; height: 95px; background: rgba(0, 0, 0, 0.4); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06);">
+              <canvas id="ap-audio-spectrum-canvas" width="650" height="95" style="width: 100%; height: 100%; display: block;"></canvas>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text-muted); padding: 0 4px; font-family: monospace;">
+              <span>20 Hz (Sub-Bass)</span>
+              <span>120 Hz (Graves)</span>
+              <span>500 Hz (Bajos-Medios)</span>
+              <span>2 kHz (Voces)</span>
+              <span>6 kHz (Presencia)</span>
+              <span>16 kHz (Agudos)</span>
+            </div>
+          </div>
+
+          <!-- 4. Selección de Banda de Frecuencia a la que Reaccionar -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-sliders" style="color: var(--accent-purple);"></i> Rango de Frecuencias para la Modulación
+              </span>
+              <span style="font-size: 11px; color: var(--text-muted);">
+                Elige qué rango de tonos activará las luces y el movimiento (ideal: graves para música con beat o medios para voces).
+              </span>
+            </div>
+
+            <!-- Botones Pills de Bandas -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;">
+              <button class="tool-btn ${cfg.bandaFrecuencia === 'graves' ? 'primary' : ''} ap-audio-band-btn" data-band="graves" style="font-size: 11px; padding: 10px 8px; flex-direction: column; gap: 3px; height: auto; text-align: center;">
+                <span style="font-weight: 700;"><i class="fa-solid fa-drum"></i> Graves / Bass</span>
+                <span style="font-size: 9.5px; opacity: 0.8;">20 - 250 Hz (Bombos, Bajos, 808s)</span>
+              </button>
+              <button class="tool-btn ${cfg.bandaFrecuencia === 'medios' ? 'primary' : ''} ap-audio-band-btn" data-band="medios" style="font-size: 11px; padding: 10px 8px; flex-direction: column; gap: 3px; height: auto; text-align: center;">
+                <span style="font-weight: 700;"><i class="fa-solid fa-microphone-lines"></i> Medios / Voces</span>
+                <span style="font-size: 9.5px; opacity: 0.8;">250 - 4000 Hz (Guitarras, Voces)</span>
+              </button>
+              <button class="tool-btn ${cfg.bandaFrecuencia === 'agudos' ? 'primary' : ''} ap-audio-band-btn" data-band="agudos" style="font-size: 11px; padding: 10px 8px; flex-direction: column; gap: 3px; height: auto; text-align: center;">
+                <span style="font-weight: 700;"><i class="fa-solid fa-bolt-lightning"></i> Agudos / Treble</span>
+                <span style="font-size: 9.5px; opacity: 0.8;">4000 - 20000 Hz (Platillos, Brillo)</span>
+              </button>
+              <button class="tool-btn ${cfg.bandaFrecuencia === 'completo' ? 'primary' : ''} ap-audio-band-btn" data-band="completo" style="font-size: 11px; padding: 10px 8px; flex-direction: column; gap: 3px; height: auto; text-align: center;">
+                <span style="font-weight: 700;"><i class="fa-solid fa-wave-square"></i> Todo el Espectro</span>
+                <span style="font-size: 9.5px; opacity: 0.8;">20 - 20000 Hz (Energía total)</span>
+              </button>
+              <button class="tool-btn ${cfg.bandaFrecuencia === 'personalizado' ? 'primary' : ''} ap-audio-band-btn" data-band="personalizado" style="font-size: 11px; padding: 10px 8px; flex-direction: column; gap: 3px; height: auto; text-align: center;">
+                <span style="font-weight: 700;"><i class="fa-solid fa-wrench"></i> Personalizado</span>
+                <span style="font-size: 9.5px; opacity: 0.8;">Ajuste manual de Hz</span>
+              </button>
+            </div>
+
+            <!-- Controles de Frecuencia Personalizada -->
+            <div id="ap-audio-custom-hz-container" style="display: ${cfg.bandaFrecuencia === 'personalizado' ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap: 14px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; border: 1px dashed var(--border-color);">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                  <span style="color: #fff; font-weight: 600;">Frecuencia Mínima:</span>
+                  <span id="ap-audio-min-hz-val" style="color: #00f0ff; font-weight: 700;">${cfg.minHz || 20} Hz</span>
+                </div>
+                <input type="range" id="ap-audio-min-hz" min="20" max="8000" step="10" value="${cfg.minHz || 20}" style="width: 100%;">
+              </div>
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                  <span style="color: #fff; font-weight: 600;">Frecuencia Máxima:</span>
+                  <span id="ap-audio-max-hz-val" style="color: #00f0ff; font-weight: 700;">${cfg.maxHz || 250} Hz</span>
+                </div>
+                <input type="range" id="ap-audio-max-hz" min="50" max="20000" step="50" value="${cfg.maxHz || 250}" style="width: 100%;">
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Sensibilidad, Umbral y Calibración -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+                <span style="color: #fff; font-weight: 600;"><i class="fa-solid fa-gauge-high"></i> Sensibilidad / Ganancia</span>
+                <span id="ap-audio-sens-val" style="color: var(--accent-blue); font-weight: 700;">${cfg.sensibilidad || 1.5}x</span>
+              </div>
+              <input type="range" id="ap-audio-sens" min="0.5" max="3.5" step="0.1" value="${cfg.sensibilidad || 1.5}" style="width: 100%;">
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Aumenta la fuerza de la respuesta con volúmenes bajos.</div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+                <span style="color: #fff; font-weight: 600;"><i class="fa-solid fa-filter"></i> Umbral de Ruido (Gate)</span>
+                <span id="ap-audio-umbral-val" style="color: var(--accent-purple); font-weight: 700;">${Math.round((cfg.umbral || 0.05) * 100)}%</span>
+              </div>
+              <input type="range" id="ap-audio-umbral" min="0.0" max="0.35" step="0.01" value="${cfg.umbral || 0.05}" style="width: 100%;">
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Filtra silencios y ruidos de fondo.</div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+                <span style="color: #fff; font-weight: 600;"><i class="fa-solid fa-water"></i> Suavizado FFT</span>
+                <span id="ap-audio-suavizado-val" style="color: var(--accent-green); font-weight: 700;">${Math.round((cfg.suavizado || 0.82) * 100)}%</span>
+              </div>
+              <input type="range" id="ap-audio-suavizado" min="0.3" max="0.95" step="0.01" value="${cfg.suavizado || 0.82}" style="width: 100%;">
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Controla la inercia de caída de las luces.</div>
+            </div>
+          </div>
+
+          <!-- 6. Destinos y Efectos de Luz Activables -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-lightbulb" style="color: #00f0ff;"></i> Efectos Visuales y Zonas de Modulación
+            </span>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <input type="checkbox" id="ap-audio-chk-bordes" ${cfg.efectoBordes ? 'checked' : ''}>
+                <div>
+                  <div style="font-size: 11.5px; font-weight: 600; color: #fff;">Resplandor Neón en Bordes del IDE</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">Pulso de luz en divisores y marcos de los paneles</div>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <input type="checkbox" id="ap-audio-chk-topbar" ${cfg.efectoTopbar ? 'checked' : ''}>
+                <div>
+                  <div style="font-size: 11.5px; font-weight: 600; color: #fff;">Pulso en Barra Superior y Pestañas</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">Brillo en la cabecera y pestañas activas al ritmo</div>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <input type="checkbox" id="ap-audio-chk-fondo" ${cfg.efectoFondo ? 'checked' : ''}>
+                <div>
+                  <div style="font-size: 11.5px; font-weight: 600; color: #fff;">Reactividad en Fondo de Movimiento</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">Acelera partículas, expande ondas y brilla en picos</div>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <input type="checkbox" id="ap-audio-chk-sintaxis" ${cfg.efectoSintaxis ? 'checked' : ''}>
+                <div>
+                  <div style="font-size: 11.5px; font-weight: 600; color: #fff;">Resplandor en Sintaxis / Monaco</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">Pulso lumínico en palabras clave del editor de código</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- 7. Configuración del Color e Intensidad de la Luz -->
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div>
+              <span style="font-weight: 700; color: #fff; font-size: 12px; display: block; margin-bottom: 8px;">
+                <i class="fa-solid fa-palette" style="color: var(--accent-blue);"></i> Color de la Luz Reactiva
+              </span>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="ap-audio-tipo-color" style="background: var(--bg-editor); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+                  <option value="tema" ${cfg.tipoColor === 'tema' ? 'selected' : ''}>Acento del Tema Activo (${ap.estado ? ap.estado.acento : '#00f0ff'})</option>
+                  <option value="personalizado" ${cfg.tipoColor === 'personalizado' ? 'selected' : ''}>Color Neón Personalizado</option>
+                </select>
+                <input type="color" id="ap-audio-color-picker" value="${cfg.colorLuz || '#00f0ff'}" style="width: 36px; height: 32px; border: none; border-radius: 6px; cursor: pointer; background: transparent; ${cfg.tipoColor === 'tema' ? 'display:none;' : ''}">
+                <input type="text" id="ap-audio-color-hex" value="${cfg.colorLuz || '#00f0ff'}" style="width: 80px; background: var(--bg-editor); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; padding: 5px 8px; font-size: 11px; font-family: monospace; ${cfg.tipoColor === 'tema' ? 'display:none;' : ''}">
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+                <span style="color: #fff; font-weight: 600;"><i class="fa-solid fa-sun"></i> Intensidad de Brillo Máximo</span>
+                <span id="ap-audio-intensidad-val" style="color: #00f0ff; font-weight: 700;">${cfg.intensidadLuz || 1.2}x</span>
+              </div>
+              <input type="range" id="ap-audio-intensidad" min="0.2" max="3.0" step="0.1" value="${cfg.intensidadLuz || 1.2}" style="width: 100%;">
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Escala la amplitud y expansión del resplandor de luz.</div>
+            </div>
+          </div>
+
+          <!-- 8. Botones de Acción y Persistencia -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 11px; color: var(--text-muted);">
+              <i class="fa-solid fa-info-circle"></i> Los cambios se guardan automáticamente en tu perfil y en disco.
+            </div>
+            <button class="tool-btn primary" id="ap-audio-btn-guardar" style="font-size: 11.5px; padding: 7px 16px; font-weight: 600; border-radius: 6px;">
+              <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración de Audio
+            </button>
+          </div>
+        `;
+
+        // Conectar el canvas al visualizador en vivo de AudioReactivoManager
+        const canvas = document.getElementById('ap-audio-spectrum-canvas');
+        if (canvas) {
+            arm.conectarVisualizadorCanvas(canvas);
+        }
+
+        // Cargar y renderizar la lista de aplicaciones activas
+        const containerApps = document.getElementById('ap-audio-apps-container');
+        const cargarApps = async () => {
+            if (!containerApps) return;
+            containerApps.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 11px; grid-column: 1 / -1;"><i class="fa-solid fa-spinner fa-spin"></i> Escaneando aplicaciones activas...</div>`;
+            const apps = await arm.listarAplicacionesNativas();
+
+            const appsEspecificas = (apps || []).filter(a => a.id !== 'sistema_global');
+
+            if (appsEspecificas.length === 0) {
+                containerApps.innerHTML = `
+                    <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11.5px; grid-column: 1 / -1; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                        <i class="fa-solid fa-headphones-simple" style="font-size: 24px; opacity: 0.5; margin-bottom: 6px; display: block;"></i>
+                        No se detectaron aplicaciones reproduciendo audio en este instante.<br>
+                        <span style="font-size: 10.5px; opacity: 0.8;">Inicia un vídeo o música en YouTube, Spotify, SoundCloud o tu navegador y pulsa <strong>Escanear Aplicaciones</strong>.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            containerApps.innerHTML = '';
+            appsEspecificas.forEach(app => {
+                const esActiva = arm.estaActivo() && String(arm.getFuenteActual()) === String(app.id);
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: ${esActiva ? 'rgba(0, 240, 255, 0.14)' : 'rgba(0,0,0,0.25)'};
+                    border: 1px solid ${esActiva ? '#00f0ff' : 'var(--border-color)'};
+                    border-radius: 6px;
+                    padding: 10px 12px;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                `;
+                card.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1;">
+                        <div style="width: 34px; height: 34px; border-radius: 6px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 16px; color: ${esActiva ? '#00f0ff' : 'var(--accent-purple)'}; flex-shrink: 0;">
+                            <i class="${app.icono || 'fa-solid fa-music'}"></i>
+                        </div>
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                            <div style="font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                                ${app.app}
+                                ${app.pausado ? '<span style="font-size: 9px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.1); color: var(--text-muted);">Pausado</span>' : '<span style="font-size: 9px; padding: 1px 5px; border-radius: 4px; background: rgba(166,227,161,0.15); color: #a6e3a1;"><i class="fa-solid fa-volume-low"></i> Reproduciendo</span>'}
+                            </div>
+                            <div style="font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${app.title}">${app.title}</div>
+                        </div>
+                    </div>
+                    <div style="margin-left: 8px; flex-shrink: 0;">
+                        <button class="tool-btn ${esActiva ? 'primary' : ''}" style="font-size: 10px; padding: 5px 11px; border-radius: 4px; pointer-events: none;">
+                            <i class="fa-solid ${esActiva ? 'fa-circle-dot fa-fade' : 'fa-play'}"></i> ${esActiva ? 'Activo' : 'Sincronizar'}
+                        </button>
+                    </div>
+                `;
+                card.onclick = async () => {
+                    const btn = card.querySelector('.tool-btn');
+                    if (btn) {
+                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...`;
+                    }
+                    try {
+                        await arm.iniciarCapturaNativa(app.id, `${app.app} (${app.title})`);
+                        this.initApariencia('audio');
+                    } catch (e) {
+                        alert(`Error al sincronizar audio con ${app.app}: ${e.message}`);
+                        if (btn) {
+                            btn.innerHTML = `<i class="fa-solid fa-play"></i> Sincronizar`;
+                        }
+                    }
+                };
+                containerApps.appendChild(card);
+            });
+        };
+
+        cargarApps();
+
+        // Botón Refrescar Apps
+        const btnRefrescar = document.getElementById('ap-audio-btn-refrescar-apps');
+        if (btnRefrescar) {
+            btnRefrescar.onclick = () => cargarApps();
+        }
+
+        // Botón Todo el Sistema
+        const btnGlobal = document.getElementById('ap-audio-btn-sistema-global');
+        if (btnGlobal) {
+            btnGlobal.onclick = async () => {
+                btnGlobal.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Conectando...`;
+                try {
+                    await arm.iniciarCapturaNativa('sistema_global', 'Todo el Audio de la PC');
+                    this.initApariencia('audio');
+                } catch (e) {
+                    alert(`Error al iniciar captura global: ${e.message}`);
+                    btnGlobal.innerHTML = `<i class="fa-solid fa-volume-high" style="color: #00f0ff;"></i> Todo el Audio de la PC`;
+                }
+            };
+        }
+
+        const btnDetener = document.getElementById('ap-audio-btn-detener');
+        if (btnDetener) {
+            btnDetener.onclick = () => {
+                arm.detenerCaptura(true);
+                this.initApariencia('audio');
+            };
+        }
+
+        // Listener de Selección de Bandas
+        container.querySelectorAll('.ap-audio-band-btn').forEach(btn => {
+            btn.onclick = () => {
+                const banda = btn.getAttribute('data-band');
+                arm.guardarConfig({ bandaFrecuencia: banda });
+                this.initApariencia('audio');
+            };
+        });
+
+        // Sliders de Frecuencia Personalizada
+        const slMinHz = document.getElementById('ap-audio-min-hz');
+        const txtMinHz = document.getElementById('ap-audio-min-hz-val');
+        if (slMinHz && txtMinHz) {
+            slMinHz.oninput = () => {
+                const val = parseInt(slMinHz.value, 10);
+                txtMinHz.textContent = `${val} Hz`;
+                arm.guardarConfig({ minHz: val });
+            };
+        }
+
+        const slMaxHz = document.getElementById('ap-audio-max-hz');
+        const txtMaxHz = document.getElementById('ap-audio-max-hz-val');
+        if (slMaxHz && txtMaxHz) {
+            slMaxHz.oninput = () => {
+                const val = parseInt(slMaxHz.value, 10);
+                txtMaxHz.textContent = `${val} Hz`;
+                arm.guardarConfig({ maxHz: val });
+            };
+        }
+
+        // Calibración
+        const slSens = document.getElementById('ap-audio-sens');
+        const txtSens = document.getElementById('ap-audio-sens-val');
+        if (slSens && txtSens) {
+            slSens.oninput = () => {
+                const val = parseFloat(slSens.value);
+                txtSens.textContent = `${val}x`;
+                arm.guardarConfig({ sensibilidad: val });
+            };
+        }
+
+        const slUmbral = document.getElementById('ap-audio-umbral');
+        const txtUmbral = document.getElementById('ap-audio-umbral-val');
+        if (slUmbral && txtUmbral) {
+            slUmbral.oninput = () => {
+                const val = parseFloat(slUmbral.value);
+                txtUmbral.textContent = `${Math.round(val * 100)}%`;
+                arm.guardarConfig({ umbral: val });
+            };
+        }
+
+        const slSuav = document.getElementById('ap-audio-suavizado');
+        const txtSuav = document.getElementById('ap-audio-suavizado-val');
+        if (slSuav && txtSuav) {
+            slSuav.oninput = () => {
+                const val = parseFloat(slSuav.value);
+                txtSuav.textContent = `${Math.round(val * 100)}%`;
+                arm.guardarConfig({ suavizado: val });
+            };
+        }
+
+        // Toggles de Efectos
+        const bindCheck = (id, key) => {
+            const chk = document.getElementById(id);
+            if (chk) {
+                chk.onchange = () => {
+                    arm.guardarConfig({ [key]: chk.checked });
+                };
+            }
+        };
+
+        bindCheck('ap-audio-chk-bordes', 'efectoBordes');
+        bindCheck('ap-audio-chk-topbar', 'efectoTopbar');
+        bindCheck('ap-audio-chk-fondo', 'efectoFondo');
+        bindCheck('ap-audio-chk-sintaxis', 'efectoSintaxis');
+
+        // Color e Intensidad
+        const selTipoCol = document.getElementById('ap-audio-tipo-color');
+        const pickColor = document.getElementById('ap-audio-color-picker');
+        const txtColorHex = document.getElementById('ap-audio-color-hex');
+
+        if (selTipoCol) {
+            selTipoCol.onchange = () => {
+                const tipo = selTipoCol.value;
+                if (pickColor && txtColorHex) {
+                    pickColor.style.display = tipo === 'tema' ? 'none' : 'inline-block';
+                    txtColorHex.style.display = tipo === 'tema' ? 'none' : 'inline-block';
+                }
+                arm.guardarConfig({ tipoColor: tipo });
+            };
+        }
+
+        if (pickColor && txtColorHex) {
+            pickColor.oninput = () => {
+                txtColorHex.value = pickColor.value;
+                arm.guardarConfig({ colorLuz: pickColor.value, tipoColor: 'personalizado' });
+            };
+            txtColorHex.onchange = () => {
+                let v = txtColorHex.value.trim();
+                if (!v.startsWith('#')) v = '#' + v;
+                if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                    pickColor.value = v;
+                    arm.guardarConfig({ colorLuz: v, tipoColor: 'personalizado' });
+                }
+            };
+        }
+
+        const slIntens = document.getElementById('ap-audio-intensidad');
+        const txtIntens = document.getElementById('ap-audio-intensidad-val');
+        if (slIntens && txtIntens) {
+            slIntens.oninput = () => {
+                const val = parseFloat(slIntens.value);
+                txtIntens.textContent = `${val}x`;
+                arm.guardarConfig({ intensidadLuz: val });
+            };
+        }
+
+        const btnGuardar = document.getElementById('ap-audio-btn-guardar');
+        if (btnGuardar) {
+            btnGuardar.onclick = async () => {
+                await arm.guardarConfig();
+                alert('¡Configuración de audio reactivo guardada con éxito!');
+            };
+        }
+    }
+
     // ==========================================
     // ACCESIBILIDAD Y ATAJOS DE TECLADO
     // ==========================================
+
+    async sincronizarAccesibilidad() {
+        try {
+            const res = await fetch('/api/config/accesibilidad');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+                    try {
+                        localStorage.setItem('prig_accesibilidad', JSON.stringify(data));
+                    } catch (e) {}
+                    this.aplicarAccesibilidadGuardada();
+                }
+            }
+        } catch (e) {}
+    }
 
     aplicarAccesibilidadGuardada() {
         try {
@@ -2801,6 +3621,11 @@ class GlobalConfigManager {
         const guardar = () => {
             try {
                 localStorage.setItem('prig_accesibilidad', JSON.stringify(cfg));
+                fetch('/api/config/accesibilidad', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                }).catch(() => {});
             } catch (e) {}
             this.aplicarAccesibilidadGuardada();
         };
@@ -3090,6 +3915,19 @@ class GlobalConfigManager {
         localStorage.setItem('prig_auto_diagnose_errors', autoDiagnose);
         localStorage.setItem('prig_allow_auto_cmd', allowAutoCmd);
 
+        // Guardar Ajustes del Menú Deslizante de Rueda del Ratón
+        if (window.menuRuedaArchivos) {
+            const nuevaMenuRuedaCfg = {
+                habilitado: document.getElementById('cfg-menu-rueda-habilitado')?.checked ?? true,
+                disparador: document.getElementById('cfg-menu-rueda-disparador')?.value || 'rueda_click',
+                estilo: document.getElementById('cfg-menu-rueda-estilo')?.value || 'deslizante_neon',
+                maxItems: parseInt(document.getElementById('cfg-menu-rueda-max-items')?.value || '12', 10),
+                busquedaRapida: document.getElementById('cfg-menu-rueda-busqueda')?.checked ?? true,
+                mostrarRecientes: document.getElementById('cfg-menu-rueda-recientes')?.checked ?? true
+            };
+            window.menuRuedaArchivos.guardarConfig(nuevaMenuRuedaCfg);
+        }
+
         // Aplicarlas de verdad al editor: antes se guardaban y nadie las leía
         this.applyEditorSettings();
 
@@ -3344,7 +4182,9 @@ class GlobalConfigManager {
         const theme = localStorage.getItem('prig_editor_theme') || 'prig-dark';
 
         editor.updateOptions({ fontSize, fontFamily, tabSize });
-        if (typeof monaco !== 'undefined') {
+        if (window.sintaxisMgr && typeof window.sintaxisMgr.aplicar === 'function') {
+            window.sintaxisMgr.aplicar();
+        } else if (typeof monaco !== 'undefined') {
             monaco.editor.setTheme(theme);
         }
     }

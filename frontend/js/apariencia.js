@@ -359,9 +359,9 @@ const TEMAS_PREDEFINIDOS = {
         nombre: '8-Bit Lava Arcade Retro',
         icono: 'fa-gamepad',
         colores: {
-            bg_dark: '#240804',
-            bg_panel: '#3b0d07',
-            bg_editor: '#140301',
+            bg_dark: '#26100c',
+            bg_panel: '#3b1712',
+            bg_editor: '#1a0b08',
             bg_hover: '#5c160c',
             border_color: '#ff450066',
             text_main: '#ffbe0b',
@@ -377,13 +377,13 @@ const TEMAS_PREDEFINIDOS = {
         nombre: 'Singularidad Cuántica Invertida',
         icono: 'fa-atom',
         colores: {
-            bg_dark: '#05070d',
-            bg_panel: '#0c101c',
-            bg_editor: '#020306',
-            bg_hover: '#192138',
+            bg_dark: '#0f1422',
+            bg_panel: '#161c2e',
+            bg_editor: '#111625',
+            bg_hover: '#222b45',
             border_color: '#7000ff77',
             text_main: '#ffffff',
-            text_muted: '#7b8fad',
+            text_muted: '#a0b3d6',
             accent_blue: '#00f0ff',
             accent_purple: '#7000ff',
             accent_green: '#00ffb3',
@@ -395,10 +395,10 @@ const TEMAS_PREDEFINIDOS = {
         nombre: 'Hiperespacio Radioactivo',
         icono: 'fa-radiation',
         colores: {
-            bg_dark: '#0d1607',
-            bg_panel: '#15240c',
-            bg_editor: '#060b03',
-            bg_hover: '#243b14',
+            bg_dark: '#121e0b',
+            bg_panel: '#1b2d10',
+            bg_editor: '#101a0a',
+            bg_hover: '#284517',
             border_color: '#76ff0355',
             text_main: '#b2ff59',
             text_muted: '#76ff03',
@@ -434,19 +434,38 @@ const EFECTOS_MOVIMIENTO_GLOBAL = [
     { id: 'lluvia_neon', nombre: 'Lluvia Neón en Cristal', icono: 'fa-cloud-rain', desc: 'Gotas de lluvia luminosas cayendo a diferentes profundidades y velocidades' },
     { id: 'fuego_fatuo', nombre: 'Luciérnagas del Bosque', icono: 'fa-wand-magic', desc: 'Partículas orgánicas con parpadeo suave y movimiento Browniano natural' },
     { id: 'tunel_vortex', nombre: 'Vórtice Dimensional', icono: 'fa-compact-disc', desc: 'Anillos concéntricos giratorios que crean una sensación de túnel infinito' },
-    { id: 'ondas_gradiente', nombre: 'Degradado Líquido Fluido', icono: 'fa-wand-magic-sparkles', desc: 'Transición continua de gradientes suaves con armonía de colores' }
+    { id: 'ondas_gradiente', nombre: 'Degradado Líquido Fluido', icono: 'fa-wand-magic-sparkles', desc: 'Transición continua de gradientes suaves con armonía de colores' },
+    { id: 'atractor_lorentz', nombre: 'Atractor Caótico de Lorenz 3D', icono: 'fa-infinity', desc: 'Ecuaciones diferenciales no lineales trazando la mística mariposa del caos matemático en 3D' },
+    { id: 'agujero_negro_interstellar', nombre: 'Agujero Negro Interstellar', icono: 'fa-circle-notch', desc: 'Disco de acreción gravitacional con curvatura del espaciotiempo e interacción orbital al cursor' },
+    { id: 'red_micelio_fungico', nombre: 'Micelio Alienígena Bioluminiscente', icono: 'fa-dna', desc: 'Ramificación biológica de hifas fosforescentes con emisión de esporas de plasma' },
+    { id: 'glitch_cyber_digital', nombre: 'Glitch Cuántico Cyberpunk', icono: 'fa-bug', desc: 'Bloques de datos fragmentados y aberración cuántica con decodificación en tiempo real' },
+    { id: 'hipercubo_4d_tesseract', nombre: 'Hipercubo 4D Tesseract', icono: 'fa-cube', desc: 'Proyección matemática tridimensional de un teseracto de 4 dimensiones rotando en el hiperespacio' },
+    { id: 'robot_matrix', nombre: 'Robot Matrix Artillero', icono: 'fa-robot', desc: 'Robot cibernético gigante de código Matrix que apunta y dispara caracteres donde escribes en el editor' },
+    { id: 'ascii_monolito_cosmico', nombre: 'Monolito Cósmico ASCII', icono: 'fa-cubes-stacked', desc: 'Obelisco 3D en arte ASCII con sombreado de bloques dithered y anillos de runas giratorios' },
+    { id: 'ascii_santuario_torii', nombre: 'Santuario Torii & Pagoda Zen', icono: 'fa-torii-gate', desc: 'Arquitectura tradicional japonesa en arte ASCII minimalista con caída suave de flores de cerezo' },
+    { id: 'ascii_oni_cyberpunk', nombre: 'Guardián Oni Cyberpunk', icono: 'fa-mask', desc: 'Máscara cibernética Oni en arte ASCII venam con visor de barrido óptico y corrientes de datos' },
+    { id: 'ascii_paisaje_zen', nombre: 'Olas Japonesas & Solsticio', icono: 'fa-water', desc: 'Olas matemáticas dithered estilo Ukiyo-e en arte ASCII minimalista con gran sol naciente' },
+    { id: 'ascii_nave_interceptor', nombre: 'Caza Espacial Interceptor', icono: 'fa-jet-fighter', desc: 'Nave espacial geométrica retro en arte ASCII venam cruzando el hiperespacio con estelas de plasma' },
+    { id: 'tema_mecha_patrol', nombre: 'Mecha Titan Defense [IA 7B]', icono: 'fa-robot', desc: 'Escuadrón Mecha Titán y Droides orbitales con física y diálogos traseros dirigidos por modelo LLM 7B' },
+    { id: 'tema_cyber_netrunner', nombre: 'Netrunner 2077 [IA 7B]', icono: 'fa-user-secret', desc: 'Cyborg Skull y Caza furtivo en matriz de datos controlados autónomamente por IA 7B' },
+    { id: 'tema_dragon_sanctuary', nombre: 'Santuario del Dragón [IA 7B]', icono: 'fa-dragon', desc: 'Dragón serpentino místico y carpas koi con vuelo libre e interacción poética por LLM' },
+    { id: 'tema_deep_space', nombre: 'Odisea Interestelar [IA 7B]', icono: 'fa-satellite', desc: 'Crucero estelar y satélite orbital explorando el espacio profundo bajo la guía del modelo 7B' },
+    { id: 'tema_dungeon_crawler', nombre: 'Catacumba Rúnica [IA 7B]', icono: 'fa-dungeon', desc: 'El Segador y espadas rúnicas en las profundidades de la fortaleza con narrativa oscura por IA' },
+    { id: 'tema_wild_nature', nombre: 'Bosque Místico [IA 7B]', icono: 'fa-tree', desc: 'Lobo aullando, búho sabio y león majestuoso en diálogo armónico con el ritmo de tu código' },
+    { id: 'tema_retro_arcade', nombre: 'Arcade 1989 [IA 7B]', icono: 'fa-gamepad', desc: 'Space Invaders y Pacman con IA retro competitiva y sintetizador chiptune reactivo' },
+    { id: 'tema_quantum_void', nombre: 'Vacío Isométrico [IA 7B]', icono: 'fa-cube', desc: 'Poliedros isométricos cuánticos con transformaciones espaciales en 4D dirigidas por el modelo' }
 ];
 
 const SECCIONES_IDE = [
-    { id: 'topbar', nombre: 'Barra Superior de Menús', selector: '#prig-topbar', icono: 'fa-window-maximize' },
-    { id: 'sidebar_left', nombre: 'Explorador y Barra Lateral Izq.', selector: '#sidebar-left, #vista-archivos, #sidebar', icono: 'fa-folder-tree' },
-    { id: 'sidebar_right', nombre: 'Chat IA y Tutor Prig', selector: '#sidebar-right, #vista-modelo', icono: 'fa-brain' },
-    { id: 'editor', nombre: 'Editor de Código y Trabajo', selector: '#editor-container, #workarea-container, #monaco-editor-container, .monaco-editor, .monaco-editor-background', icono: 'fa-code' },
-    { id: 'terminal', nombre: 'Terminal y Panel Inferior', selector: '#bottom-panel, #terminal-container, .terminal-container, .terminal-body', icono: 'fa-terminal' },
-    { id: 'chat_messages', nombre: 'Área de Mensajes del Chat', selector: '#ai-chat-messages, .chat-history', icono: 'fa-comments' },
-    { id: 'modales', nombre: 'Ventanas y Modales Flotantes', selector: '.modal-container, .modal-content, .des-eval-dialog', icono: 'fa-window-restore' },
-    { id: 'desafios', nombre: 'Módulo de Desafíos y Hojas', selector: '#desafios-raiz, .des-lado, .des-seccion, .des-hoja', icono: 'fa-chess-knight' },
-    { id: 'biblioteca', nombre: 'Biblioteca de Libros y Hubs', selector: '.book-library-container, #book-library-modal, #youtube-hub-root', icono: 'fa-book' }
+    { id: 'topbar', nombre: 'Barra Superior de Menús', selector: '#prig-topbar', icono: 'fa-window-maximize', colorKey: 'bg_panel', defAlfa: 0.92 },
+    { id: 'sidebar_left', nombre: 'Explorador y Barra Lateral Izq.', selector: '#sidebar-left, #vista-archivos', icono: 'fa-folder-tree', colorKey: 'bg_panel', defAlfa: 0.88 },
+    { id: 'sidebar_right', nombre: 'Chat IA y Tutor Prig', selector: '#seccion-modelo', icono: 'fa-brain', colorKey: 'bg_panel', defAlfa: 0.88 },
+    { id: 'editor', nombre: 'Editor de Código y Trabajo', selector: '#seccion-trabajo, #panel-trabajo-izq, #trabajo-split-contenedor, #trabajo-vistas, #vista-editor, #editor-grid-container, .editor-col, .editor-col-body, .monaco-container, .monaco-editor-pane, #notebook-view-container', icono: 'fa-code', colorKey: 'bg_editor', defAlfa: 0.90 },
+    { id: 'terminal', nombre: 'Terminal y Panel Inferior', selector: '#bottom-panel, #terminal-container', icono: 'fa-terminal', colorKey: 'bg_panel', defAlfa: 0.88 },
+    { id: 'chat_messages', nombre: 'Área de Mensajes del Chat', selector: '#ai-chat-messages', icono: 'fa-comments', colorKey: 'bg_panel', defAlfa: 0.85 },
+    { id: 'modales', nombre: 'Ventanas y Modales Flotantes', selector: '.modal-content, .des-eval-dialog, .config-modal-content, .gcfg-modal-content', icono: 'fa-window-restore', colorKey: 'bg_panel', defAlfa: 0.95 },
+    { id: 'desafios', nombre: 'Módulo de Desafíos y Hojas', selector: '#desafios-raiz, .des-lado, .des-hoja', icono: 'fa-chess-knight', colorKey: 'bg_dark', defAlfa: 0.90 },
+    { id: 'biblioteca', nombre: 'Biblioteca de Libros y Hubs', selector: '.book-library-container, #youtube-hub-root', icono: 'fa-book', colorKey: 'bg_panel', defAlfa: 0.92 }
 ];
 
 const EJEMPLOS_CODIGO_FONDO = {
@@ -541,6 +560,17 @@ class AparienciaManager {
             acento: '#89b4fa',
             densidad: 'normal',
             colores: Object.assign({}, TEMAS_PREDEFINIDOS.catppuccin_mocha.colores),
+            transparenciasSecciones: {
+                topbar: 0.92,
+                sidebar_left: 0.88,
+                sidebar_right: 0.88,
+                editor: 0.90,
+                terminal: 0.88,
+                chat_messages: 0.85,
+                modales: 0.95,
+                desafios: 0.90,
+                biblioteca: 0.92
+            },
             fondoGlobal: {
                 tipo: 'defecto', // 'defecto' | 'color' | 'gradiente' | 'imagen' | 'movimiento' | 'codigo_js' | 'codigo_css'
                 color: '#181825',
@@ -561,6 +591,10 @@ class AparienciaManager {
         this.estado = this._cargar();
         this._animFrameId = null;
         this._canvasData = null;
+        this._guardarTimer = null;
+
+        // Sincronizar con el backend de inmediato
+        this.sincronizarBackend();
     }
 
     _cargar() {
@@ -573,19 +607,65 @@ class AparienciaManager {
                 ...data,
                 colores: { ...this.def.colores, ...(data.colores || {}) },
                 fondoGlobal: { ...this.def.fondoGlobal, ...(data.fondoGlobal || {}) },
-                secciones: { ...(data.secciones || {}) }
+                secciones: { ...(data.secciones || {}) },
+                transparenciasSecciones: { ...this.def.transparenciasSecciones, ...(data.transparenciasSecciones || {}) }
             };
         } catch (e) {
             return JSON.parse(JSON.stringify(this.def));
         }
     }
 
+    async sincronizarBackend() {
+        try {
+            const res = await fetch('/api/config/apariencia');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && typeof data === 'object' && Object.keys(data).length > 0 && data.colores) {
+                    this.estado = {
+                        ...JSON.parse(JSON.stringify(this.def)),
+                        ...data,
+                        colores: { ...this.def.colores, ...(data.colores || {}) },
+                        fondoGlobal: { ...this.def.fondoGlobal, ...(data.fondoGlobal || {}) },
+                        secciones: { ...(data.secciones || {}) },
+                        transparenciasSecciones: { ...this.def.transparenciasSecciones, ...(data.transparenciasSecciones || {}) }
+                    };
+                    try {
+                        localStorage.setItem('prig_apariencia', JSON.stringify(this.estado));
+                    } catch (e) {}
+                    this.aplicar();
+                } else if (!localStorage.getItem('prig_apariencia')) {
+                    // Si el backend estaba vacío pero tenemos estado por defecto, guardarlo en backend
+                    this._guardarBackendInmediato();
+                }
+            }
+        } catch (e) {
+            // Silencioso si no hay conexión al backend
+        }
+    }
+
+    _guardarBackendInmediato() {
+        try {
+            fetch('/api/config/apariencia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.estado)
+            }).catch(() => {});
+        } catch (e) {}
+    }
+
     _guardar() {
+        // 1. Guardar en localStorage para respuesta visual a 0ms
         try {
             localStorage.setItem('prig_apariencia', JSON.stringify(this.estado));
         } catch (e) {
             console.warn("No se pudo guardar la configuración de apariencia en localStorage:", e);
         }
+
+        // 2. Guardar en backend (disco persistente) con debounce para optimizar rendimiento
+        if (this._guardarTimer) clearTimeout(this._guardarTimer);
+        this._guardarTimer = setTimeout(() => {
+            this._guardarBackendInmediato();
+        }, 200);
     }
 
     aplicar() {
@@ -617,6 +697,16 @@ class AparienciaManager {
 
         // 3. Iniciar o detener el motor de Canvas de Fondo
         this._sincronizarMotorCanvas();
+
+        // 4. Re-sincronizar los efectos de sintaxis personalizada para que Monaco no pierda estilos ni brillos
+        if (window.sintaxisMgr && typeof window.sintaxisMgr._inyectarEfectosEnMonacoMtk === 'function') {
+            window.sintaxisMgr._inyectarEfectosEnMonacoMtk();
+        }
+
+        // 5. Re-sincronizar estilos de luz del motor audio reactivo
+        if (window.audioReactivoMgr && typeof window.audioReactivoMgr._actualizarEstilosCss === 'function') {
+            window.audioReactivoMgr._actualizarEstilosCss();
+        }
     }
 
     _hexToRgba(hex, alpha = 1) {
@@ -710,11 +800,25 @@ class AparienciaManager {
             cssReglas.push(fg.codigoCss);
         }
 
-        // Fondos y efectos por sección
+        // Fondos y transparencias por sección
+        const c = this.estado.colores || {};
         const secciones = this.estado.secciones || {};
+        const transSec = this.estado.transparenciasSecciones || {};
+        const globalAlfa = this.estado.opacidad !== undefined ? this.estado.opacidad : 0.92;
+        const globalBlur = this.estado.desenfoque !== undefined ? this.estado.desenfoque : 10;
+
         SECCIONES_IDE.forEach(secDef => {
-            const secCfg = secciones[secDef.id];
-            if (!secCfg || secCfg.tipo === 'heredar') return;
+            const secCfg = secciones[secDef.id] || {};
+
+            // Determinar alfa de esta sección
+            let alfa = globalAlfa;
+            if (secCfg.alfa !== undefined) {
+                alfa = secCfg.alfa;
+            } else if (transSec[secDef.id] !== undefined) {
+                alfa = transSec[secDef.id];
+            } else if (secDef.defAlfa !== undefined) {
+                alfa = secDef.defAlfa;
+            }
 
             let propFondo = '';
             let propFiltro = '';
@@ -722,7 +826,10 @@ class AparienciaManager {
             let propSombra = '';
             let propAnim = '';
 
-            const alfa = secCfg.alfa !== undefined ? secCfg.alfa : this.estado.opacidad;
+            const blurVal = secCfg.blur !== undefined ? secCfg.blur : globalBlur;
+            if (blurVal > 0) {
+                propFiltro = `backdrop-filter: blur(${blurVal}px) !important; -webkit-backdrop-filter: blur(${blurVal}px) !important;`;
+            }
 
             if (secCfg.tipo === 'color' && secCfg.color) {
                 const rgba = this._hexToRgba(secCfg.color, alfa);
@@ -749,10 +856,11 @@ class AparienciaManager {
                         ${secCfg.codigoCss}
                     }
                 `);
-            }
-
-            if (secCfg.blur > 0) {
-                propFiltro = `backdrop-filter: blur(${secCfg.blur}px) !important; -webkit-backdrop-filter: blur(${secCfg.blur}px) !important;`;
+            } else {
+                // Modo estándar / heredar: aplicar color base del tema con la transparencia individual de la sección
+                const baseHex = (c && c[secDef.colorKey]) || (c && c.bg_panel) || '#181825';
+                const rgba = this._hexToRgba(baseHex, alfa);
+                propFondo = `background: ${rgba} !important;`;
             }
 
             if (secCfg.bordeColor) {
@@ -775,6 +883,13 @@ class AparienciaManager {
                 `);
             }
         });
+
+        // Garantizar que los contenedores internos de Monaco no acumulen capas oscuras adicionales
+        cssReglas.push(`
+            .monaco-editor, .monaco-editor-background, .monaco-container, .editor-col-body, .editor-col, #editor-cols-container, .monaco-editor .margin, .monaco-editor .overflow-guard, .monaco-editor-pane, .trabajo-vistas, .panel-trabajo, .trabajo-split-contenedor, #notebook-view-container {
+                background: transparent !important;
+            }
+        `);
 
         el.textContent = cssReglas.join('\n');
     }
@@ -807,6 +922,14 @@ class AparienciaManager {
         this.estado.temaActivo = nombreTema;
         this.estado.colores = Object.assign({}, tema.colores);
         this.estado.acento = tema.colores.accent_blue;
+        
+        // Si el fondo global actual es por defecto o un color sólido, sincronizarlo con el nuevo fondo oscuro del tema
+        if (this.estado.fondoGlobal) {
+            if (this.estado.fondoGlobal.tipo === 'color' || this.estado.fondoGlobal.tipo === 'defecto') {
+                this.estado.fondoGlobal.color = tema.colores.bg_dark;
+            }
+        }
+        
         this._guardar();
         this.aplicar();
     }
@@ -815,13 +938,66 @@ class AparienciaManager {
         if (!this.estado.colores) this.estado.colores = {};
         this.estado.colores[variable] = valorHex;
         if (variable === 'accent_blue') this.estado.acento = valorHex;
+        if (variable === 'bg_dark' && this.estado.fondoGlobal && (this.estado.fondoGlobal.tipo === 'color' || this.estado.fondoGlobal.tipo === 'defecto')) {
+            this.estado.fondoGlobal.color = valorHex;
+        }
         this.estado.temaActivo = 'personalizado';
         this._guardar();
         this.aplicar();
     }
 
+    setTransparenciaSeccion(seccionId, alfa) {
+        alfa = Math.max(0, Math.min(1, parseFloat(alfa)));
+        if (!this.estado.transparenciasSecciones) this.estado.transparenciasSecciones = {};
+        this.estado.transparenciasSecciones[seccionId] = alfa;
+        if (!this.estado.secciones) this.estado.secciones = {};
+        if (!this.estado.secciones[seccionId]) {
+            this.estado.secciones[seccionId] = { tipo: 'heredar', alfa: alfa };
+        } else {
+            this.estado.secciones[seccionId].alfa = alfa;
+        }
+        this._guardar();
+        this.aplicar();
+    }
+
+    setTransparenciaGlobal(alfa) {
+        alfa = Math.max(0.05, Math.min(1, parseFloat(alfa)));
+        this.estado.opacidad = alfa;
+        this._guardar();
+        this.aplicar();
+    }
+
+    setDesenfoqueGlobal(blurPx) {
+        blurPx = Math.max(0, Math.min(40, parseInt(blurPx, 10)));
+        this.estado.desenfoque = blurPx;
+        this._guardar();
+        this.aplicar();
+    }
+
+    aplicarPresetTransparencia(preset) {
+        let nivel = 0.92;
+        let blur = 10;
+        if (preset === 'solido') { nivel = 1.0; blur = 0; }
+        else if (preset === 'vidrio_suave') { nivel = 0.88; blur = 12; }
+        else if (preset === 'cristal') { nivel = 0.60; blur = 16; }
+        else if (preset === 'ultra_transparente') { nivel = 0.35; blur = 20; }
+        else if (preset === 'ghost') { nivel = 0.15; blur = 8; }
+
+        this.estado.opacidad = nivel;
+        this.estado.desenfoque = blur;
+        if (!this.estado.transparenciasSecciones) this.estado.transparenciasSecciones = {};
+        SECCIONES_IDE.forEach(s => {
+            this.estado.transparenciasSecciones[s.id] = nivel;
+            if (this.estado.secciones && this.estado.secciones[s.id]) {
+                this.estado.secciones[s.id].alfa = nivel;
+            }
+        });
+        this._guardar();
+        this.aplicar();
+    }
+
     setFondoGlobal(propiedad, valor) {
-        if (!this.estado.fondoGlobal) this.estado.fondoGlobal = {};
+        if (!this.estado.fondoGlobal) this.estado.fondoGlobal = JSON.parse(JSON.stringify(this.def.fondoGlobal));
         this.estado.fondoGlobal[propiedad] = valor;
         this._guardar();
         this.aplicar();
@@ -833,6 +1009,10 @@ class AparienciaManager {
             this.estado.secciones[seccionId] = { tipo: 'heredar', color: '#181825', alfa: 0.9, blur: 0 };
         }
         this.estado.secciones[seccionId][propiedad] = valor;
+        if (propiedad === 'alfa') {
+            if (!this.estado.transparenciasSecciones) this.estado.transparenciasSecciones = {};
+            this.estado.transparenciasSecciones[seccionId] = valor;
+        }
         this._guardar();
         this.aplicar();
     }
@@ -840,9 +1020,13 @@ class AparienciaManager {
     restablecerSeccion(seccionId) {
         if (this.estado.secciones && this.estado.secciones[seccionId]) {
             delete this.estado.secciones[seccionId];
-            this._guardar();
-            this.aplicar();
         }
+        if (this.estado.transparenciasSecciones && this.estado.transparenciasSecciones[seccionId] !== undefined) {
+            const secDef = SECCIONES_IDE.find(s => s.id === seccionId);
+            this.estado.transparenciasSecciones[seccionId] = secDef ? secDef.defAlfa : this.estado.opacidad;
+        }
+        this._guardar();
+        this.aplicar();
     }
 
     set(clave, valor) {
@@ -852,7 +1036,7 @@ class AparienciaManager {
     }
 
     ajustarOpacidad(delta) {
-        const v = Math.max(0.35, Math.min(1, +(this.estado.opacidad + delta).toFixed(2)));
+        const v = Math.max(0.15, Math.min(1, +(this.estado.opacidad + delta).toFixed(2)));
         this.set('opacidad', v);
         if (window.layoutMgr) {
             window.layoutMgr.mensajeEstado(`Opacidad de la interfaz: ${Math.round(v * 100)}%`, 1500);
@@ -865,12 +1049,13 @@ class AparienciaManager {
 
     exportarTema() {
         return JSON.stringify({
-            version: '2.5',
+            version: '2.6',
             creado: new Date().toISOString(),
             temaActivo: this.estado.temaActivo,
             colores: this.estado.colores,
             fondoGlobal: this.estado.fondoGlobal,
             secciones: this.estado.secciones,
+            transparenciasSecciones: this.estado.transparenciasSecciones,
             opacidad: this.estado.opacidad,
             desenfoque: this.estado.desenfoque,
             acento: this.estado.acento,
@@ -880,16 +1065,20 @@ class AparienciaManager {
 
     importarTema(jsonStr) {
         try {
-            const data = JSON.parse(jsonStr);
+            const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
             if (!data || typeof data !== 'object') throw new Error('Formato de tema inválido.');
-            if (data.colores) this.estado.colores = { ...this.estado.colores, ...data.colores };
-            if (data.fondoGlobal) this.estado.fondoGlobal = { ...this.estado.fondoGlobal, ...data.fondoGlobal };
-            if (data.secciones) this.estado.secciones = { ...data.secciones };
-            if (data.opacidad !== undefined) this.estado.opacidad = data.opacidad;
-            if (data.desenfoque !== undefined) this.estado.desenfoque = data.desenfoque;
-            if (data.acento) this.estado.acento = data.acento;
-            if (data.densidad) this.estado.densidad = data.densidad;
+            
+            // Reemplazo limpio y completo fusionando con los valores por defecto
+            this.estado.colores = { ...this.def.colores, ...(data.colores || {}) };
+            this.estado.fondoGlobal = { ...this.def.fondoGlobal, ...(data.fondoGlobal || {}) };
+            this.estado.secciones = { ...(data.secciones || {}) };
+            this.estado.transparenciasSecciones = { ...this.def.transparenciasSecciones, ...(data.transparenciasSecciones || {}) };
+            this.estado.opacidad = data.opacidad !== undefined ? data.opacidad : this.def.opacidad;
+            this.estado.desenfoque = data.desenfoque !== undefined ? data.desenfoque : this.def.desenfoque;
+            this.estado.acento = data.acento || this.estado.colores.accent_blue || this.def.acento;
+            this.estado.densidad = data.densidad || this.def.densidad;
             this.estado.temaActivo = data.temaActivo || 'personalizado';
+            
             this._guardar();
             this.aplicar();
             return { exito: true };

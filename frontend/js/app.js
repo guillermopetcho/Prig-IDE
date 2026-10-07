@@ -148,6 +148,19 @@ class App {
 
             window.editorMgr.markSaved(path, content);
             if (!silencioso) window.terminalMgr.appendLine(`[Guardado exitoso: ${path}]`, 'info');
+
+            // Disparar re-análisis completo en el Director IA y actualizar la memoria comprimida
+            try {
+                if (window.DIRECTOR_ASCII) {
+                    window.DIRECTOR_ASCII.dispararDecisionDirector('guardado_archivo');
+                }
+                if (window.CerebroMemoria && typeof window.CerebroMemoria.actualizarMemoria === 'function') {
+                    window.CerebroMemoria.actualizarMemoria(true);
+                }
+            } catch (errDirector) {
+                console.warn('Error al notificar guardado al Director IA:', errDirector);
+            }
+
             return true;
         } catch (e) {
             if (!silencioso) alert('Error al guardar archivo: ' + e);
@@ -227,16 +240,27 @@ class App {
 
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Orden importante: apariencia y atajos antes de pintar la barra, para que los
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Orden importante: apariencia y atajos antes de pintar la barra, para que los
     // menús muestren ya las teclas correctas y no haya un parpadeo de estilo.
-    window.aparienciaMgr.aplicar();
-    window.shortcutMgr.instalar();
-    window.menuBar.montar(document.getElementById('prig-menubar-mount'));
-    window.layoutMgr.init();
-    window.layoutMgr.initResizer();
-    window.workArea.init();
-    window.planActualMgr.init();
+    if (window.aparienciaMgr) window.aparienciaMgr.aplicar();
+    if (window.sintaxisMgr) window.sintaxisMgr.aplicar();
+    if (window.shortcutMgr) window.shortcutMgr.instalar();
+    if (window.menuBar) window.menuBar.montar(document.getElementById('prig-menubar-mount'));
+    if (window.layoutMgr) {
+        window.layoutMgr.init();
+        window.layoutMgr.initResizer();
+    }
+    if (window.workArea) window.workArea.init();
+    if (window.planActualMgr) window.planActualMgr.init();
+
+    // 2. Sincronizar configuraciones persistentes del backend
+    if (window.perfilesConfigMgr) {
+        window.perfilesConfigMgr.init();
+    }
+    if (window.globalConfigMgr) {
+        window.globalConfigMgr.sincronizarAccesibilidad();
+    }
 
     window.app = new App();
     
@@ -245,6 +269,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.editorMgr) {
             window.editorMgr.restoreSessionState();
         }
+        if (window.sintaxisMgr) {
+            window.sintaxisMgr.aplicar();
+        }
     }, 500);
 });
+
+// Asegurar que las configuraciones queden grabadas en disco antes de cerrar la ventana o salir
+window.addEventListener('beforeunload', () => {
+    if (window.aparienciaMgr && typeof window.aparienciaMgr._guardarBackendInmediato === 'function') {
+        window.aparienciaMgr._guardarBackendInmediato();
+    }
+    if (window.sintaxisMgr && typeof window.sintaxisMgr._guardarBackendInmediato === 'function') {
+        window.sintaxisMgr._guardarBackendInmediato();
+    }
+    if (window.motorMovimiento && typeof window.motorMovimiento._guardarBackendInmediato === 'function') {
+        window.motorMovimiento._guardarBackendInmediato();
+    }
+    if (window.perfilesConfigMgr && typeof window.perfilesConfigMgr.guardarTodo === 'function') {
+        window.perfilesConfigMgr.guardarTodo();
+    }
+});
+
 

@@ -90,6 +90,24 @@ class PerfilesConfigManager {
                     velocidad: 1.0,
                     interaccionMouse: true,
                     pausarEnSegundoPlano: true
+                },
+                sintaxis: {
+                    presetActivo: 'personalizado',
+                    tokens: {
+                        keyword: { color: '#cba6f7', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        type: { color: '#89b4fa', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        function: { color: '#89dceb', fontStyle: '', efectoRaro: 'ninguno' },
+                        string: { color: '#a6e3a1', fontStyle: '', efectoRaro: 'ninguno' },
+                        number: { color: '#fab387', fontStyle: '', efectoRaro: 'ninguno' },
+                        comment: { color: '#6c7086', fontStyle: 'italic', efectoRaro: 'ninguno' },
+                        operator: { color: '#89dceb', fontStyle: '', efectoRaro: 'ninguno' },
+                        variable: { color: '#cdd6f4', fontStyle: '', efectoRaro: 'ninguno' }
+                    },
+                    efectosGlobales: {
+                        lineasEscaneo: false,
+                        resplandorCursor: false,
+                        codigoCss: ''
+                    }
                 }
             },
             {
@@ -134,6 +152,24 @@ class PerfilesConfigManager {
                     velocidad: 1.2,
                     interaccionMouse: true,
                     pausarEnSegundoPlano: true
+                },
+                sintaxis: {
+                    presetActivo: 'cyberpunk_glitch',
+                    tokens: {
+                        keyword: { color: '#ff007f', fontStyle: 'bold', efectoRaro: 'glitch_rgb' },
+                        type: { color: '#00ffff', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        function: { color: '#00ff66', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        string: { color: '#ffe600', fontStyle: '', efectoRaro: 'ninguno' },
+                        number: { color: '#ff0055', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        comment: { color: '#a277ff', fontStyle: 'italic', efectoRaro: 'ninguno' },
+                        operator: { color: '#00f0ff', fontStyle: '', efectoRaro: 'ninguno' },
+                        variable: { color: '#00ffff', fontStyle: '', efectoRaro: 'ninguno' }
+                    },
+                    efectosGlobales: {
+                        lineasEscaneo: false,
+                        resplandorCursor: true,
+                        codigoCss: ''
+                    }
                 }
             },
             {
@@ -176,6 +212,24 @@ class PerfilesConfigManager {
                     velocidad: 0.8,
                     interaccionMouse: false,
                     pausarEnSegundoPlano: true
+                },
+                sintaxis: {
+                    presetActivo: 'monokai_bizarro',
+                    tokens: {
+                        keyword: { color: '#ff007f', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        type: { color: '#66d9ef', fontStyle: 'bold italic', efectoRaro: 'ninguno' },
+                        function: { color: '#a6e22e', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        string: { color: '#e6db74', fontStyle: '', efectoRaro: 'ninguno' },
+                        number: { color: '#ae81ff', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        comment: { color: '#88846f', fontStyle: 'italic', efectoRaro: 'ninguno' },
+                        operator: { color: '#f92672', fontStyle: '', efectoRaro: 'ninguno' },
+                        variable: { color: '#fd971f', fontStyle: '', efectoRaro: 'ninguno' }
+                    },
+                    efectosGlobales: {
+                        lineasEscaneo: false,
+                        resplandorCursor: true,
+                        codigoCss: ''
+                    }
                 }
             },
             {
@@ -220,6 +274,24 @@ class PerfilesConfigManager {
                     velocidad: 0.7,
                     interaccionMouse: true,
                     pausarEnSegundoPlano: true
+                },
+                sintaxis: {
+                    presetActivo: 'nord_aurora_mistica',
+                    tokens: {
+                        keyword: { color: '#88c0d0', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        type: { color: '#81a1c1', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        function: { color: '#8fbcbb', fontStyle: 'bold', efectoRaro: 'subrayado_onda' },
+                        string: { color: '#a3be8c', fontStyle: '', efectoRaro: 'ninguno' },
+                        number: { color: '#b48ead', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        comment: { color: '#616e88', fontStyle: 'italic', efectoRaro: 'ninguno' },
+                        operator: { color: '#81a1c1', fontStyle: '', efectoRaro: 'ninguno' },
+                        variable: { color: '#eceff4', fontStyle: '', efectoRaro: 'ninguno' }
+                    },
+                    efectosGlobales: {
+                        lineasEscaneo: false,
+                        resplandorCursor: true,
+                        codigoCss: ''
+                    }
                 }
             },
             {
@@ -264,6 +336,24 @@ class PerfilesConfigManager {
                     velocidad: 1.0,
                     interaccionMouse: true,
                     pausarEnSegundoPlano: true
+                },
+                sintaxis: {
+                    presetActivo: 'lava_arcade_8bit',
+                    tokens: {
+                        keyword: { color: '#ff3d00', fontStyle: 'bold', efectoRaro: 'fuego_retro' },
+                        type: { color: '#ff9100', fontStyle: 'bold', efectoRaro: 'resplandor_neon' },
+                        function: { color: '#ffea00', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        string: { color: '#00e676', fontStyle: '', efectoRaro: 'ninguno' },
+                        number: { color: '#d500f9', fontStyle: 'bold', efectoRaro: 'ninguno' },
+                        comment: { color: '#a1887f', fontStyle: 'italic', efectoRaro: 'ninguno' },
+                        operator: { color: '#ff3d00', fontStyle: '', efectoRaro: 'ninguno' },
+                        variable: { color: '#ffffff', fontStyle: '', efectoRaro: 'ninguno' }
+                    },
+                    efectosGlobales: {
+                        lineasEscaneo: false,
+                        resplandorCursor: true,
+                        codigoCss: ''
+                    }
                 }
             }
         ];
@@ -280,6 +370,15 @@ class PerfilesConfigManager {
                     this.perfiles = data.perfiles;
                     if (data.perfil_activo) this.perfilActivoId = data.perfil_activo;
                     this._guardarLocal();
+
+                    // Si no había tema personalizado previo en localStorage, aplicar el perfil activo guardado
+                    const tieneAparienciaLocal = !!localStorage.getItem('prig_apariencia');
+                    if (!tieneAparienciaLocal && this.perfilActivoId) {
+                        const p = this.perfiles.find(item => item.id === this.perfilActivoId);
+                        if (p && p.apariencia && window.aparienciaMgr) {
+                            window.aparienciaMgr.importarTema(JSON.stringify(p.apariencia));
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -332,19 +431,41 @@ class PerfilesConfigManager {
 
         this.perfilActivoId = id;
 
-        // 1. Aplicar apariencia completa
+        // 1. Aplicar apariencia completa (temas, colores, fondos, transparencias)
         if (window.aparienciaMgr && perfil.apariencia) {
             window.aparienciaMgr.importarTema(JSON.stringify(perfil.apariencia));
         }
 
-        // 2. Aplicar motor de movimiento
+        // 2. Aplicar configuración de motor de movimiento
         if (window.motorMovimiento && perfil.motorMovimiento) {
             window.motorMovimiento.config = { ...window.motorMovimiento.config, ...perfil.motorMovimiento };
             window.motorMovimiento.guardarConfig();
-            window.motorMovimiento.activarEfecto(perfil.motorMovimiento.efecto || 'particulas');
+            // Dejar que aparienciaMgr._sincronizarMotorCanvas decida iniciar o detener según el tipo de fondo
+            if (window.aparienciaMgr && typeof window.aparienciaMgr._sincronizarMotorCanvas === 'function') {
+                window.aparienciaMgr._sincronizarMotorCanvas();
+            }
+        }
+
+        // 3. Aplicar sintaxis personalizada y efectos del perfil
+        if (window.sintaxisMgr) {
+            if (perfil.sintaxis) {
+                window.sintaxisMgr.importarJSON(JSON.stringify(perfil.sintaxis));
+            } else {
+                window.sintaxisMgr.aplicar();
+            }
         }
 
         this.guardarTodo();
+
+        // 4. Actualizar la interfaz de configuración en vivo si está abierta
+        if (window.globalConfigMgr) {
+            if (typeof window.globalConfigMgr.initPerfiles === 'function') {
+                window.globalConfigMgr.initPerfiles();
+            }
+            if (typeof window.globalConfigMgr.initApariencia === 'function') {
+                window.globalConfigMgr.initApariencia();
+            }
+        }
 
         if (window.layoutMgr) {
             window.layoutMgr.mensajeEstado(`✨ Perfil activado: ${perfil.nombre}`, 2000);
@@ -356,9 +477,10 @@ class PerfilesConfigManager {
     guardarPerfilActual(nombre, icono = 'fa-sliders', desc = '', idSobrescribir = null) {
         const id = idSobrescribir || ('perfil_' + Date.now().toString(36));
         
-        // Extraer estado actual en vivo
+        // Extraer estado actual en vivo de apariencia, motor y sintaxis
         const estadoApariencia = window.aparienciaMgr ? JSON.parse(JSON.stringify(window.aparienciaMgr.estado)) : {};
         const configMotor = window.motorMovimiento ? JSON.parse(JSON.stringify(window.motorMovimiento.config)) : {};
+        const estadoSintaxis = window.sintaxisMgr ? JSON.parse(JSON.stringify(window.sintaxisMgr.estado)) : {};
 
         const nuevoPerfil = {
             id,
@@ -368,7 +490,8 @@ class PerfilesConfigManager {
             esPreset: false,
             fechaModificacion: new Date().toISOString(),
             apariencia: estadoApariencia,
-            motorMovimiento: configMotor
+            motorMovimiento: configMotor,
+            sintaxis: estadoSintaxis
         };
 
         const idx = this.perfiles.findIndex(p => p.id === id);

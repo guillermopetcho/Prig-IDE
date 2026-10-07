@@ -44,6 +44,18 @@ class MotorMovimientoFondo {
             ultimoMov: 0
         };
 
+        // Estado del cursor de texto / punto de mecanografía del IDE
+        this.cursorTexto = {
+            x: -9999,
+            y: -9999,
+            targetX: -9999,
+            targetY: -9999,
+            activo: false,
+            ultimoDisparo: 0,
+            ultimoMov: 0,
+            ultimoChar: ''
+        };
+
         // Telemetría de rendimiento
         this.telemetria = {
             fps: 60,
@@ -65,6 +77,9 @@ class MotorMovimientoFondo {
         // Cargar configuración guardada
         this._cargarConfig();
 
+        // Sincronizar con el backend
+        this.sincronizarBackend();
+
         // Registrar todos los efectos predeterminados
         this._registrarEfectosNativos();
 
@@ -85,12 +100,47 @@ class MotorMovimientoFondo {
         this._actualizarIntervaloFps();
     }
 
+    async sincronizarBackend() {
+        try {
+            const res = await fetch('/api/config/motor_movimiento');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && typeof data === 'object' && Object.keys(data).length > 0 && data.efecto) {
+                    this.config = { ...this.config, ...data };
+                    try {
+                        localStorage.setItem('prig_motor_movimiento', JSON.stringify(this.config));
+                    } catch (e) {}
+                    this._actualizarIntervaloFps();
+                } else if (!localStorage.getItem('prig_motor_movimiento')) {
+                    this._guardarBackendInmediato();
+                }
+            }
+        } catch (e) {
+            // Silencioso
+        }
+    }
+
+    _guardarBackendInmediato() {
+        try {
+            fetch('/api/config/motor_movimiento', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.config)
+            }).catch(() => {});
+        } catch (e) {}
+    }
+
     guardarConfig() {
         try {
             localStorage.setItem('prig_motor_movimiento', JSON.stringify(this.config));
         } catch (e) {
             console.warn("No se pudo guardar la configuración del motor de movimiento:", e);
         }
+
+        if (this._guardarTimer) clearTimeout(this._guardarTimer);
+        this._guardarTimer = setTimeout(() => {
+            this._guardarBackendInmediato();
+        }, 200);
     }
 
     _actualizarIntervaloFps() {
@@ -185,6 +235,54 @@ class MotorMovimientoFondo {
             this.mouse.x = -9999;
             this.mouse.y = -9999;
         }, { passive: true });
+
+        // Listener global de teclado para detectar mecanografía en cualquier campo de texto
+        window.addEventListener('keydown', (e) => {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+                const rect = e.target.getBoundingClientRect();
+                const screenX = rect.left + rect.width / 2;
+                const screenY = rect.top + rect.height / 2;
+                this.notificarPosicionCursor(screenX, screenY);
+                if (e.key && e.key.length === 1) {
+                    this.dispararHaciaCursor(screenX, screenY, e.key);
+                }
+            }
+        }, { passive: true });
+    }
+
+    // ==========================================
+    // SEGUIMIENTO DE CURSOR Y DISPARO AL ESCRIBIR
+    // ==========================================
+
+    notificarPosicionCursor(x, y) {
+        const escala = this.config.escalaRender || 0.75;
+        this.cursorTexto.x = x * escala;
+        this.cursorTexto.y = y * escala;
+        this.cursorTexto.targetX = x * escala;
+        this.cursorTexto.targetY = y * escala;
+        this.cursorTexto.activo = true;
+        this.cursorTexto.ultimoMov = performance.now();
+    }
+
+    dispararHaciaCursor(x, y, char = null) {
+        const escala = this.config.escalaRender || 0.75;
+        const targetX = x * escala;
+        const targetY = y * escala;
+        this.cursorTexto.x = targetX;
+        this.cursorTexto.y = targetY;
+        this.cursorTexto.targetX = targetX;
+        this.cursorTexto.targetY = targetY;
+        this.cursorTexto.activo = true;
+        this.cursorTexto.ultimoDisparo = performance.now();
+        this.cursorTexto.ultimoChar = char || 'λ';
+
+        // Enviar evento de disparo al efecto activo si cuenta con hook onDisparo
+        if (this._efectoActivo && this._efectosRegistrados.has(this._efectoActivo)) {
+            const def = this._efectosRegistrados.get(this._efectoActivo);
+            if (typeof def.onDisparo === 'function') {
+                def.onDisparo(targetX, targetY, char, this._estadoEfecto);
+            }
+        }
     }
 
     // ==========================================
@@ -202,7 +300,8 @@ class MotorMovimientoFondo {
             update: definicion.update || (() => {}),
             render: definicion.render || (() => {}),
             destroy: definicion.destroy || (() => {}),
-            onResize: definicion.onResize || null
+            onResize: definicion.onResize || null,
+            onDisparo: definicion.onDisparo || null
         });
     }
 
@@ -251,6 +350,11 @@ class MotorMovimientoFondo {
         const w = this.canvas.width;
         const h = this.canvas.height;
         const densidad = this._getMultiplicadorDensidad();
+
+        // Notificar al Director ASCII sobre el cambio de tema para que cargue el contexto correspondiente
+        if (window.DIRECTOR_ASCII) {
+            window.DIRECTOR_ASCII.inicializarEscenario(id);
+        }
 
         if (id === 'codigo_js') {
             this._iniciarCodigoUsuario(configExtra.codigoJs);
@@ -372,14 +476,27 @@ class MotorMovimientoFondo {
         const def = this._efectosRegistrados.get(this._efectoActivo);
         if (!def) return;
 
+        // Factores de modulación reactiva por audio (si está activo)
+        const audio = (window.audioReactivoMgr && typeof window.audioReactivoMgr.getFactoresMovimiento === 'function')
+            ? window.audioReactivoMgr.getFactoresMovimiento()
+            : { reactivo: false, boostVelocidad: 1.0, boostTamano: 1.0, boostBrillo: 1.0, energia: 0, energiaBass: 0, energiaTreble: 0 };
+
+        const dtEfectivo = dt * (audio.reactivo ? audio.boostVelocidad : 1.0);
+
         // 1. Update de la física
         if (typeof def.update === 'function') {
-            def.update(dt, w, h, this.mouse, this._estadoEfecto);
+            def.update(dtEfectivo, w, h, this.mouse, this._estadoEfecto, audio, this.cursorTexto);
         }
 
         // 2. Renderizado en el Canvas
         if (typeof def.render === 'function') {
-            def.render(this.ctx, w, h, dt, this.mouse, this._estadoEfecto, tiempoTotal);
+            def.render(this.ctx, w, h, dtEfectivo, this.mouse, this._estadoEfecto, tiempoTotal, audio, this.cursorTexto);
+        }
+
+        // 3. Renderizado universal del Director ASCII y Agentes Autónomos LLM en todos los efectos
+        if (window.DIRECTOR_ASCII && this._efectoActivo && !this._efectoActivo.startsWith('tema_')) {
+            window.DIRECTOR_ASCII.actualizar(dtEfectivo, this.cursorTexto, w, h);
+            window.DIRECTOR_ASCII.dibujar(this.ctx, w, h);
         }
     }
 
@@ -479,10 +596,12 @@ class MotorMovimientoFondo {
                     }
                 }
             },
-            render: (ctx, w, h, dt, mouse, state) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 ctx.clearRect(0, 0, w, h);
                 const p = state.particulas;
-                const distMax = state.distMax;
+                const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
+                const boostBri = (audio && audio.reactivo) ? audio.boostBrillo : 1.0;
+                const distMax = state.distMax * boostTam;
                 const distMaxSq = distMax * distMax;
 
                 // Conexiones de líneas (optimizado)
@@ -495,9 +614,9 @@ class MotorMovimientoFondo {
                         const distSq = dx * dx + dy * dy;
 
                         if (distSq < distMaxSq) {
-                            const alfa = (1 - Math.sqrt(distSq) / distMax) * 0.28;
-                            ctx.strokeStyle = `rgba(137, 180, 250, ${alfa})`;
-                            ctx.lineWidth = 1;
+                            const alfa = (1 - Math.sqrt(distSq) / distMax) * (0.28 * boostBri);
+                            ctx.strokeStyle = (audio && audio.reactivo && audio.energia > 0.45) ? audio.colorLuz : `rgba(137, 180, 250, ${Math.min(1.0, alfa)})`;
+                            ctx.lineWidth = (audio && audio.reactivo && audio.energia > 0.5) ? 1.8 : 1;
                             ctx.beginPath();
                             ctx.moveTo(p1.x, p1.y);
                             ctx.lineTo(p2.x, p2.y);
@@ -510,10 +629,10 @@ class MotorMovimientoFondo {
                 for (let i = 0; i < p.length; i++) {
                     const pt = p[i];
                     ctx.fillStyle = pt.col;
-                    ctx.shadowColor = pt.col;
-                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = (audio && audio.reactivo && audio.energia > 0.35) ? audio.colorLuz : pt.col;
+                    ctx.shadowBlur = 6 * boostBri;
                     ctx.beginPath();
-                    ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+                    ctx.arc(pt.x, pt.y, pt.r * boostTam, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -539,7 +658,7 @@ class MotorMovimientoFondo {
                 }
                 return { chars, colWidth, gotas, velocidades };
             },
-            update: (dt, w, h, mouse, state) => {
+            update: (dt, w, h, mouse, state, audio) => {
                 const gotas = state.gotas;
                 const vels = state.velocidades;
                 for (let i = 0; i < gotas.length; i++) {
@@ -549,7 +668,7 @@ class MotorMovimientoFondo {
                     }
                 }
             },
-            render: (ctx, w, h, dt, mouse, state) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 // Fondo con desvanecimiento para efecto estela
                 ctx.fillStyle = 'rgba(10, 10, 20, 0.09)';
                 ctx.fillRect(0, 0, w, h);
@@ -558,6 +677,7 @@ class MotorMovimientoFondo {
                 const gotas = state.gotas;
                 const chars = state.chars;
                 const colWidth = state.colWidth;
+                const boostBri = (audio && audio.reactivo) ? audio.boostBrillo : 1.0;
 
                 for (let i = 0; i < gotas.length; i++) {
                     const char = chars[Math.floor(Math.random() * chars.length)];
@@ -565,9 +685,9 @@ class MotorMovimientoFondo {
                     const y = gotas[i];
 
                     const esLider = Math.random() > 0.88;
-                    ctx.fillStyle = esLider ? '#a6e3a1' : '#00f0ff';
-                    ctx.shadowColor = esLider ? '#a6e3a1' : '#00f0ff';
-                    ctx.shadowBlur = esLider ? 8 : 4;
+                    ctx.fillStyle = esLider ? '#a6e3a1' : ((audio && audio.reactivo && audio.energia > 0.4) ? audio.colorLuz : '#00f0ff');
+                    ctx.shadowColor = esLider ? '#a6e3a1' : ((audio && audio.reactivo && audio.energia > 0.3) ? audio.colorLuz : '#00f0ff');
+                    ctx.shadowBlur = (esLider ? 8 : 4) * boostBri;
                     ctx.fillText(char, x, y);
                 }
             }
@@ -592,7 +712,7 @@ class MotorMovimientoFondo {
                 }
                 return { estrellas, velocidadZ: 300 };
             },
-            update: (dt, w, h, mouse, state) => {
+            update: (dt, w, h, mouse, state, audio) => {
                 const est = state.estrellas;
                 const vZ = (mouse.activo && mouse.isDown ? state.velocidadZ * 2.5 : state.velocidadZ) * dt;
 
@@ -606,13 +726,15 @@ class MotorMovimientoFondo {
                     }
                 }
             },
-            render: (ctx, w, h, dt, mouse, state) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 ctx.fillStyle = 'rgba(10, 10, 20, 0.25)';
                 ctx.fillRect(0, 0, w, h);
 
                 const est = state.estrellas;
                 const cx = w / 2;
                 const cy = h / 2;
+                const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
+                const boostBri = (audio && audio.reactivo) ? audio.boostBrillo : 1.0;
 
                 for (let i = 0; i < est.length; i++) {
                     const s = est[i];
@@ -621,11 +743,11 @@ class MotorMovimientoFondo {
                     const py = s.y * k + cy;
 
                     if (px >= 0 && px <= w && py >= 0 && py <= h) {
-                        const size = Math.max(0.6, (1 - s.z / w) * 3.5);
-                        const brillo = (1 - s.z / w);
-                        ctx.fillStyle = `rgba(205, 214, 244, ${brillo})`;
-                        ctx.shadowColor = '#89b4fa';
-                        ctx.shadowBlur = size > 2 ? 6 : 2;
+                        const size = Math.max(0.6, (1 - s.z / w) * 3.5) * boostTam;
+                        const brillo = Math.min(1.0, (1 - s.z / w) * boostBri);
+                        ctx.fillStyle = (audio && audio.reactivo && audio.energia > 0.45) ? audio.colorLuz : `rgba(205, 214, 244, ${brillo})`;
+                        ctx.shadowColor = (audio && audio.reactivo && audio.energia > 0.3) ? audio.colorLuz : '#89b4fa';
+                        ctx.shadowBlur = (size > 2 ? 6 : 2) * boostBri;
                         ctx.beginPath();
                         ctx.arc(px, py, size, 0, Math.PI * 2);
                         ctx.fill();
@@ -650,9 +772,10 @@ class MotorMovimientoFondo {
                     ]
                 };
             },
-            render: (ctx, w, h, dt, mouse, state, time) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 ctx.clearRect(0, 0, w, h);
                 const t = time * 0.001;
+                const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
 
                 state.capas.forEach(capa => {
                     ctx.fillStyle = capa.color;
@@ -660,9 +783,10 @@ class MotorMovimientoFondo {
                     ctx.moveTo(0, h);
 
                     const paso = 16;
+                    const ampMod = capa.amp * boostTam;
                     for (let x = 0; x <= w + paso; x += paso) {
                         const yBase = h * capa.yOff;
-                        const y = yBase + Math.sin(x * capa.freq + t * capa.speed) * capa.amp + Math.cos(x * capa.freq * 0.5 - t * 0.3) * (capa.amp * 0.5);
+                        const y = yBase + Math.sin(x * capa.freq + t * capa.speed) * ampMod + Math.cos(x * capa.freq * 0.5 - t * 0.3) * (ampMod * 0.5);
                         ctx.lineTo(x, y);
                     }
 
@@ -702,7 +826,7 @@ class MotorMovimientoFondo {
                 }
                 return { orbes };
             },
-            update: (dt, w, h, mouse, state) => {
+            update: (dt, w, h, mouse, state, audio) => {
                 const orbes = state.orbes;
                 for (let i = 0; i < orbes.length; i++) {
                     const o = orbes[i];
@@ -718,13 +842,14 @@ class MotorMovimientoFondo {
                     else if (o.x > w + o.r) o.x = -o.r;
                 }
             },
-            render: (ctx, w, h, dt, mouse, state) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 ctx.clearRect(0, 0, w, h);
                 const orbes = state.orbes;
+                const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
                 for (let i = 0; i < orbes.length; i++) {
                     const o = orbes[i];
                     const pulso = Math.sin(o.fase) * 0.2 + 0.8;
-                    const radioActual = o.r * pulso;
+                    const radioActual = o.r * pulso * boostTam;
 
                     const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, radioActual);
                     grad.addColorStop(0, o.col);
@@ -753,22 +878,25 @@ class MotorMovimientoFondo {
                     { col: '#f9e2af', speed: 1.4, freq: 0.003, amp: 55 }
                 ]
             }),
-            render: (ctx, w, h, dt, mouse, state, time) => {
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
                 ctx.fillStyle = 'rgba(10, 10, 20, 0.2)';
                 ctx.fillRect(0, 0, w, h);
 
                 const t = time * 0.001;
                 const centerY = h / 2;
+                const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
+                const boostBri = (audio && audio.reactivo) ? audio.boostBrillo : 1.0;
 
                 state.lineas.forEach(l => {
-                    ctx.strokeStyle = l.col;
-                    ctx.lineWidth = 2.2;
-                    ctx.shadowColor = l.col;
-                    ctx.shadowBlur = 10;
+                    ctx.strokeStyle = (audio && audio.reactivo && audio.energia > 0.4) ? audio.colorLuz : l.col;
+                    ctx.lineWidth = 2.2 * (audio && audio.reactivo ? Math.min(2.0, boostTam) : 1.0);
+                    ctx.shadowColor = (audio && audio.reactivo && audio.energia > 0.3) ? audio.colorLuz : l.col;
+                    ctx.shadowBlur = 10 * boostBri;
                     ctx.beginPath();
 
+                    const ampMod = l.amp * boostTam;
                     for (let x = 0; x <= w; x += 10) {
-                        const y = centerY + Math.sin(x * l.freq + t * l.speed) * l.amp + Math.cos(x * 0.002 - t * 0.5) * 20;
+                        const y = centerY + Math.sin(x * l.freq + t * l.speed) * ampMod + Math.cos(x * 0.002 - t * 0.5) * (20 * boostTam);
                         if (x === 0) ctx.moveTo(x, y);
                         else ctx.lineTo(x, y);
                     }
@@ -1064,9 +1192,2143 @@ class MotorMovimientoFondo {
                 ctx.fillRect(0, 0, w, h);
             }
         });
+
+        // -------------------------------------------------------------
+        // 13. ATRACTOR CAÓTICO DE LORENZ 3D
+        // -------------------------------------------------------------
+        this.registrarEfecto('atractor_lorentz', {
+            nombre: 'Atractor Caótico de Lorenz 3D',
+            icono: 'fa-infinity',
+            desc: 'Ecuaciones diferenciales trazando la mística mariposa del caos matemático en 3D.',
+            init: () => {
+                const puntos = [];
+                let x = 0.1, y = 0, z = 0;
+                const sigma = 10, rho = 28, beta = 8 / 3, dtMath = 0.008;
+                for (let i = 0; i < 900; i++) {
+                    const dx = sigma * (y - x) * dtMath;
+                    const dy = (x * (rho - z) - y) * dtMath;
+                    const dz = (x * y - beta * z) * dtMath;
+                    x += dx; y += dy; z += dz;
+                    puntos.push({ x, y, z });
+                }
+                return { puntos, angulo: 0 };
+            },
+            update: (dt, w, h, mouse, state) => {
+                state.angulo += dt * 0.4;
+            },
+            render: (ctx, w, h, dt, mouse, state) => {
+                ctx.fillStyle = 'rgba(10, 8, 20, 0.25)';
+                ctx.fillRect(0, 0, w, h);
+
+                const cx = w / 2;
+                const cy = h / 2;
+                const pts = state.puntos;
+                const cosA = Math.cos(state.angulo);
+                const sinA = Math.sin(state.angulo);
+                const escala = Math.min(w, h) / 75;
+
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 10;
+
+                for (let i = 1; i < pts.length; i++) {
+                    const p1 = pts[i - 1];
+                    const p2 = pts[i];
+
+                    // Rotación en eje Y
+                    const x1Rot = p1.x * cosA - p1.z * sinA;
+                    const z1Rot = p1.x * sinA + p1.z * cosA;
+                    const x2Rot = p2.x * cosA - p2.z * sinA;
+                    const z2Rot = p2.x * sinA + p2.z * cosA;
+
+                    const sx1 = cx + x1Rot * escala;
+                    const sy1 = cy + (p1.y - 25) * escala;
+                    const sx2 = cx + x2Rot * escala;
+                    const sy2 = cy + (p2.y - 25) * escala;
+
+                    const hue = (i * 0.4 + state.angulo * 40) % 360;
+                    ctx.strokeStyle = `hsla(${hue}, 90%, 65%, 0.55)`;
+                    ctx.shadowColor = `hsla(${hue}, 90%, 65%, 0.8)`;
+
+                    ctx.beginPath();
+                    ctx.moveTo(sx1, sy1);
+                    ctx.lineTo(sx2, sy2);
+                    ctx.stroke();
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 14. AGUJERO NEGRO INTERSTELLAR & DISCO DE ACRECIÓN
+        // -------------------------------------------------------------
+        this.registrarEfecto('agujero_negro_interstellar', {
+            nombre: 'Agujero Negro Interstellar',
+            icono: 'fa-circle-notch',
+            desc: 'Disco de acreción gravitacional con curvatura del espaciotiempo e interacción orbital.',
+            init: () => {
+                const particulas = [];
+                for (let i = 0; i < 180; i++) {
+                    const radio = Math.random() * 220 + 50;
+                    particulas.push({
+                        radio: radio,
+                        angulo: Math.random() * Math.PI * 2,
+                        velocidad: (350 / Math.sqrt(radio)) * (Math.random() * 0.2 + 0.9),
+                        tam: Math.random() * 2.5 + 1.2,
+                        hue: Math.random() * 45 + 15 // Naranja a oro brillante
+                    });
+                }
+                return { particulas, rotacion: 0 };
+            },
+            update: (dt, w, h, mouse, state) => {
+                const pts = state.particulas;
+                for (let i = 0; i < pts.length; i++) {
+                    const p = pts[i];
+                    p.angulo += (p.velocidad * 0.003) * dt * 60;
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state) => {
+                ctx.fillStyle = 'rgba(5, 5, 12, 0.28)';
+                ctx.fillRect(0, 0, w, h);
+
+                const cx = mouse.activo ? (w / 2 + (mouse.x - w / 2) * 0.15) : (w / 2);
+                const cy = mouse.activo ? (h / 2 + (mouse.y - h / 2) * 0.15) : (h / 2);
+
+                // Halo exterior brillante de lentes gravitacionales
+                const gradHalo = ctx.createRadialGradient(cx, cy, 35, cx, cy, 260);
+                gradHalo.addColorStop(0, 'rgba(255, 120, 0, 0.25)');
+                gradHalo.addColorStop(0.4, 'rgba(255, 60, 150, 0.12)');
+                gradHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = gradHalo;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 260, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Partículas del disco de acreción en elipse inclinada
+                const pts = state.particulas;
+                for (let i = 0; i < pts.length; i++) {
+                    const p = pts[i];
+                    const px = cx + Math.cos(p.angulo) * p.radio;
+                    const py = cy + Math.sin(p.angulo) * (p.radio * 0.38);
+
+                    const alfa = Math.sin(p.angulo) > 0 ? 0.9 : 0.4;
+                    ctx.fillStyle = `hsla(${p.hue}, 100%, 65%, ${alfa})`;
+                    ctx.shadowColor = `hsla(${p.hue}, 100%, 60%, 1)`;
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(px, py, p.tam, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Horizonte de Sucesos central (Negro absoluto impenetrable)
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = 'rgba(255, 180, 50, 0.9)';
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Anillo fotónico ultrafino
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 15. MICELIO ALIENÍGENA BIOLUMINISCENTE
+        // -------------------------------------------------------------
+        this.registrarEfecto('red_micelio_fungico', {
+            nombre: 'Micelio Alienígena Bioluminiscente',
+            icono: 'fa-dna',
+            desc: 'Ramificación biológica de hifas fosforescentes con emisión de esporas de plasma.',
+            init: () => {
+                const nodos = [];
+                for (let i = 0; i < 55; i++) {
+                    nodos.push({
+                        x: Math.random() * (window.innerWidth || 800),
+                        y: Math.random() * (window.innerHeight || 600),
+                        vx: (Math.random() - 0.5) * 18,
+                        vy: (Math.random() - 0.5) * 18,
+                        pulso: Math.random() * Math.PI * 2,
+                        r: Math.random() * 3 + 2,
+                        col: ['#00ffc2', '#78ffd6', '#a855f7', '#00d4ff'][i % 4]
+                    });
+                }
+                return { nodos };
+            },
+            update: (dt, w, h, mouse, state) => {
+                const nds = state.nodos;
+                for (let i = 0; i < nds.length; i++) {
+                    const n = nds[i];
+                    n.x += n.vx * dt;
+                    n.y += n.vy * dt;
+                    n.pulso += dt * 2.5;
+
+                    if (n.x < 0) n.x = w;
+                    else if (n.x > w) n.x = 0;
+                    if (n.y < 0) n.y = h;
+                    else if (n.y > h) n.y = 0;
+
+                    // Repulsión sutil con mouse
+                    if (mouse.activo) {
+                        const dx = n.x - mouse.x;
+                        const dy = n.y - mouse.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 120 && dist > 1) {
+                            n.x += (dx / dist) * 40 * dt;
+                            n.y += (dy / dist) * 40 * dt;
+                        }
+                    }
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state) => {
+                ctx.clearRect(0, 0, w, h);
+                const nds = state.nodos;
+
+                // Conexiones de hifas
+                for (let i = 0; i < nds.length; i++) {
+                    for (let j = i + 1; j < nds.length; j++) {
+                        const a = nds[i];
+                        const b = nds[j];
+                        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (dist < 135) {
+                            const alfa = (1 - dist / 135) * 0.45;
+                            ctx.strokeStyle = `rgba(0, 255, 194, ${alfa})`;
+                            ctx.lineWidth = 1.2;
+                            ctx.beginPath();
+                            ctx.moveTo(a.x, a.y);
+                            ctx.lineTo(b.x, b.y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // Esporas emisoras
+                for (let i = 0; i < nds.length; i++) {
+                    const n = nds[i];
+                    const escala = Math.sin(n.pulso) * 0.4 + 1.0;
+                    ctx.fillStyle = n.col;
+                    ctx.shadowColor = n.col;
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, n.r * escala, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 16. GLITCH CUÁNTICO CYBERPUNK
+        // -------------------------------------------------------------
+        this.registrarEfecto('glitch_cyber_digital', {
+            nombre: 'Glitch Cuántico Cyberpunk',
+            icono: 'fa-bug',
+            desc: 'Bloques de datos fragmentados y aberración cuántica con decodificación en tiempo real.',
+            init: () => {
+                return { bloques: [], timer: 0 };
+            },
+            update: (dt, w, h, mouse, state) => {
+                state.timer += dt;
+                if (state.timer > 0.08) {
+                    state.timer = 0;
+                    state.bloques = [];
+                    const cantidad = Math.floor(Math.random() * 12) + 6;
+                    for (let i = 0; i < cantidad; i++) {
+                        state.bloques.push({
+                            x: Math.random() * w,
+                            y: Math.random() * h,
+                            w: Math.random() * 180 + 30,
+                            h: Math.random() * 14 + 2,
+                            col: ['rgba(255,0,127,0.4)', 'rgba(0,255,255,0.4)', 'rgba(0,255,102,0.4)', 'rgba(255,230,0,0.35)'][i % 4]
+                        });
+                    }
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state) => {
+                ctx.fillStyle = 'rgba(10, 5, 20, 0.2)';
+                ctx.fillRect(0, 0, w, h);
+
+                const bq = state.bloques;
+                for (let i = 0; i < bq.length; i++) {
+                    const b = bq[i];
+                    ctx.fillStyle = b.col;
+                    ctx.fillRect(b.x, b.y, b.w, b.h);
+                }
+
+                // Líneas de ruido analógico
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.lineWidth = 1;
+                for (let y = 0; y < h; y += 8) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(w, y);
+                    ctx.stroke();
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 17. HIPERCUBO 4D TESSERACT
+        // -------------------------------------------------------------
+        this.registrarEfecto('hipercubo_4d_tesseract', {
+            nombre: 'Hipercubo 4D Tesseract',
+            icono: 'fa-cube',
+            desc: 'Proyección matemática tridimensional de un teseracto de 4 dimensiones rotando en el hiperespacio.',
+            init: () => {
+                const vertices = [];
+                for (let x = -1; x <= 1; x += 2) {
+                    for (let y = -1; y <= 1; y += 2) {
+                        for (let z = -1; z <= 1; z += 2) {
+                            for (let w = -1; w <= 1; w += 2) {
+                                vertices.push([x, y, z, w]);
+                            }
+                        }
+                    }
+                }
+                const aristas = [];
+                for (let i = 0; i < 16; i++) {
+                    for (let j = i + 1; j < 16; j++) {
+                        let diff = 0;
+                        for (let k = 0; k < 4; k++) {
+                            if (vertices[i][k] !== vertices[j][k]) diff++;
+                        }
+                        if (diff === 1) aristas.push([i, j]);
+                    }
+                }
+                return { vertices, aristas, angulo: 0 };
+            },
+            update: (dt, w, h, mouse, state) => {
+                state.angulo += dt * 0.6;
+            },
+            render: (ctx, w, h, dt, mouse, state) => {
+                ctx.clearRect(0, 0, w, h);
+                const cx = w / 2;
+                const cy = h / 2;
+                const escalaBase = Math.min(w, h) * 0.32;
+                const a = state.angulo;
+
+                const cosA = Math.cos(a);
+                const sinA = Math.sin(a);
+                const cosB = Math.cos(a * 0.7);
+                const sinB = Math.sin(a * 0.7);
+
+                // Proyección 4D -> 3D -> 2D
+                const proyectados = state.vertices.map(v => {
+                    let [x, y, z, w_coord] = v;
+
+                    // Rotación en plano XW
+                    let x1 = x * cosA - w_coord * sinA;
+                    let w1 = x * sinA + w_coord * cosA;
+
+                    // Rotación en plano YZ
+                    let y1 = y * cosB - z * sinB;
+                    let z1 = y * sinB + z * cosB;
+
+                    // Proyección perspectiva 4D -> 3D
+                    const dist4D = 2.5;
+                    const factor4D = 1 / (dist4D - w1);
+                    let x3D = x1 * factor4D;
+                    let y3D = y1 * factor4D;
+                    let z3D = z1 * factor4D;
+
+                    // Proyección perspectiva 3D -> 2D
+                    const dist3D = 3.0;
+                    const factor3D = 1 / (dist3D - z3D);
+
+                    return [
+                        cx + x3D * factor3D * escalaBase,
+                        cy + y3D * factor3D * escalaBase,
+                        w1
+                    ];
+                });
+
+                // Dibujar aristas con resplandor cian/magenta
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 10;
+
+                for (let i = 0; i < state.aristas.length; i++) {
+                    const [i1, i2] = state.aristas[i];
+                    const p1 = proyectados[i1];
+                    const p2 = proyectados[i2];
+
+                    const wProm = (p1[2] + p2[2]) / 2;
+                    const alfa = Math.max(0.2, (wProm + 1) * 0.45);
+
+                    ctx.strokeStyle = `rgba(137, 180, 250, ${alfa})`;
+                    ctx.shadowColor = '#cba6f7';
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1[0], p1[1]);
+                    ctx.lineTo(p2[0], p2[1]);
+                    ctx.stroke();
+                }
+
+                // Dibujar vértices
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 8;
+                for (let i = 0; i < proyectados.length; i++) {
+                    const p = proyectados[i];
+                    ctx.beginPath();
+                    ctx.arc(p[0], p[1], 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 18. ROBOT MATRIX ARTILLERO (MECANOGRAFÍA REACTIVA Y RASTREO)
+        // -------------------------------------------------------------
+        // -------------------------------------------------------------
+        // 18. ROBOT MATRIX ARTILLERO (MECANOGRAFÍA REACTIVA Y RASTREO)
+        // -------------------------------------------------------------
+        this.registrarEfecto('robot_matrix', {
+            nombre: 'Robot Matrix Artillero',
+            icono: 'fa-robot',
+            desc: 'Titán Mecha cibernético en arte ASCII hiperrealista que dispara caracteres de código únicamente al escribir.',
+            init: (canvas, w, h, densidad) => {
+                const chars = '0123456789ABCDEFｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜλΩ{}[]=>/*#$!+-%';
+                
+                // Lluvia Matrix de fondo ultra ligera
+                const numLluvia = Math.floor(18 * densidad);
+                const gotas = [];
+                for (let i = 0; i < numLluvia; i++) {
+                    gotas.push({
+                        x: (i / numLluvia) * w + (Math.random() - 0.5) * 30,
+                        y: Math.random() * -h,
+                        vel: Math.random() * 120 + 90,
+                        longitud: Math.floor(Math.random() * 8 + 6),
+                        chars: Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]),
+                        cambioTimer: 0
+                    });
+                }
+
+                // Estado del Robot Cibernético
+                const robot = {
+                    x: w * 0.5,
+                    y: h * 0.72,
+                    escala: Math.max(0.65, Math.min(1.3, Math.min(w, h) / 780)),
+                    anguloTorretaL: -Math.PI / 4,
+                    anguloTorretaR: -Math.PI * 3 / 4,
+                    anguloCabeza: 0,
+                    recoilL: 0,
+                    recoilR: 0,
+                    muzzleL: 0,
+                    muzzleR: 0,
+                    ultimoCanonFuego: 'L',
+                    targetX: -9999,
+                    targetY: -9999,
+                    apuntandoActivo: false
+                };
+
+                return {
+                    chars,
+                    gotas,
+                    robot,
+                    proyectiles: [],
+                    impactos: [],
+                    tiempoGlobal: 0
+                };
+            },
+            onResize: (w, h, state) => {
+                if (!state || !state.robot) return;
+                state.robot.x = w * 0.5;
+                state.robot.y = h * 0.72;
+                state.robot.escala = Math.max(0.65, Math.min(1.3, Math.min(w, h) / 780));
+            },
+            onDisparo: (targetX, targetY, char, state) => {
+                if (!state || !state.robot) return;
+                const r = state.robot;
+                r.targetX = targetX;
+                r.targetY = targetY;
+                r.apuntandoActivo = true;
+
+                const escala = r.escala || 1.0;
+                const canonL_x = r.x - 120 * escala;
+                const canonL_y = r.y - 30 * escala;
+                const canonR_x = r.x + 120 * escala;
+                const canonR_y = r.y - 30 * escala;
+
+                // Alternar entre cañones
+                const usarL = (r.ultimoCanonFuego === 'R');
+                r.ultimoCanonFuego = usarL ? 'L' : 'R';
+
+                const origenX = usarL ? canonL_x : canonR_x;
+                const origenY = usarL ? canonL_y : canonR_y;
+
+                if (usarL) {
+                    r.recoilL = 16 * escala;
+                    r.muzzleL = 1.0;
+                } else {
+                    r.recoilR = 16 * escala;
+                    r.muzzleR = 1.0;
+                }
+
+                // Generar proyectil láser de código
+                const dx = targetX - origenX;
+                const dy = targetY - origenY;
+                const dist = Math.hypot(dx, dy) || 1;
+                const vel = 1750; // Ultra rápido para respuesta instantánea
+
+                const tokensFallback = ['def', 'class', 'import', 'return', 'async', '=>', 'λ', '1', '0', '{}', 'fn', 'let', 'const'];
+                const tokenElegido = (char && char.trim() && char.length === 1) ? char.trim() : tokensFallback[Math.floor(Math.random() * tokensFallback.length)];
+
+                state.proyectiles.push({
+                    x: origenX,
+                    y: origenY,
+                    vx: (dx / dist) * vel,
+                    vy: (dy / dist) * vel,
+                    targetX,
+                    targetY,
+                    distTotal: dist,
+                    distRecorrida: 0,
+                    char: tokenElegido,
+                    color: usarL ? '#00ff66' : '#00ffff',
+                    rot: Math.atan2(dy, dx),
+                    vida: 0.9
+                });
+            },
+            update: (dt, w, h, mouse, state, audio, cursorTexto) => {
+                state.tiempoGlobal += dt;
+                const r = state.robot;
+                const boostVel = (audio && audio.reactivo) ? audio.boostVelocidad : 1.0;
+
+                // Determinar objetivo: solo cursor de texto o mouse activo
+                let objetivoX = r.targetX;
+                let objetivoY = r.targetY;
+
+                if (cursorTexto && cursorTexto.activo && (performance.now() - cursorTexto.ultimoDisparo < 3000)) {
+                    objetivoX = cursorTexto.targetX;
+                    objetivoY = cursorTexto.targetY;
+                    r.apuntandoActivo = true;
+                } else if (mouse && mouse.activo && (performance.now() - mouse.ultimoMov < 2000)) {
+                    objetivoX = mouse.x;
+                    objetivoY = mouse.y;
+                    r.apuntandoActivo = true;
+                } else {
+                    // Posición de reposo al frente
+                    objetivoX = w * 0.5;
+                    objetivoY = h * 0.25;
+                    r.apuntandoActivo = false;
+                }
+
+                r.targetX = objetivoX;
+                r.targetY = objetivoY;
+
+                const escala = r.escala || 1.0;
+                const canonL_x = r.x - 120 * escala;
+                const canonL_y = r.y - 30 * escala;
+                const canonR_x = r.x + 120 * escala;
+                const canonR_y = r.y - 30 * escala;
+
+                // Suavizar rotación de cañones
+                const angDeseadoL = Math.atan2(objetivoY - canonL_y, objetivoX - canonL_x);
+                const angDeseadoR = Math.atan2(objetivoY - canonR_y, objetivoX - canonR_x);
+                const angDeseadoCabeza = Math.atan2(objetivoY - (r.y - 110 * escala), objetivoX - r.x);
+
+                r.anguloTorretaL += (angDeseadoL - r.anguloTorretaL) * Math.min(1.0, dt * 18);
+                r.anguloTorretaR += (angDeseadoR - r.anguloTorretaR) * Math.min(1.0, dt * 18);
+                r.anguloCabeza += (angDeseadoCabeza - r.anguloCabeza) * Math.min(1.0, dt * 12);
+
+                // Recuperación de retroceso
+                r.recoilL = Math.max(0, r.recoilL - dt * 60 * escala);
+                r.recoilR = Math.max(0, r.recoilR - dt * 60 * escala);
+                r.muzzleL = Math.max(0, r.muzzleL - dt * 8);
+                r.muzzleR = Math.max(0, r.muzzleR - dt * 8);
+
+                // Lluvia Matrix ligera
+                for (let i = 0; i < state.gotas.length; i++) {
+                    const g = state.gotas[i];
+                    g.y += g.vel * dt * boostVel;
+                    g.cambioTimer += dt;
+                    if (g.cambioTimer > 0.2) {
+                        g.cambioTimer = 0;
+                        const idx = Math.floor(Math.random() * g.chars.length);
+                        g.chars[idx] = state.chars[Math.floor(Math.random() * state.chars.length)];
+                    }
+                    if (g.y > h + 100) {
+                        g.y = Math.random() * -100;
+                        g.x = Math.random() * w;
+                    }
+                }
+
+                // Actualizar proyectiles balísticos
+                for (let i = state.proyectiles.length - 1; i >= 0; i--) {
+                    const p = state.proyectiles[i];
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.distRecorrida += Math.hypot(p.vx * dt, p.vy * dt);
+                    p.vida -= dt;
+
+                    const dx = p.targetX - p.x;
+                    const dy = p.targetY - p.y;
+                    const distRestante = Math.hypot(dx, dy);
+
+                    if (distRestante < 35 || p.distRecorrida >= p.distTotal || p.vida <= 0) {
+                        const impX = (distRestante < 35) ? p.x : p.targetX;
+                        const impY = (distRestante < 35) ? p.y : p.targetY;
+
+                        // Chispas de impacto puramente ASCII
+                        const fragTokens = ['*', '+', 'x', '░', '▓', '·', '•'];
+                        const fragmentos = [];
+                        for (let f = 0; f < 8; f++) {
+                            const ang = (Math.PI * 2 * f) / 8 + (Math.random() - 0.5) * 0.4;
+                            const spd = Math.random() * 120 + 50;
+                            fragmentos.push({
+                                x: impX,
+                                y: impY,
+                                vx: Math.cos(ang) * spd,
+                                vy: Math.sin(ang) * spd,
+                                char: fragTokens[Math.floor(Math.random() * fragTokens.length)],
+                                color: p.color
+                            });
+                        }
+
+                        state.impactos.push({
+                            x: impX,
+                            y: impY,
+                            char: p.char,
+                            vida: 0.28,
+                            vidaMax: 0.28,
+                            fragmentos
+                        });
+
+                        state.proyectiles.splice(i, 1);
+                    }
+                }
+
+                // Actualizar impactos
+                for (let i = state.impactos.length - 1; i >= 0; i--) {
+                    const imp = state.impactos[i];
+                    imp.vida -= dt;
+
+                    for (let f = 0; f < imp.fragmentos.length; f++) {
+                        const fr = imp.fragmentos[f];
+                        fr.x += fr.vx * dt;
+                        fr.y += fr.vy * dt;
+                        fr.vx *= 0.88;
+                        fr.vy *= 0.88;
+                    }
+
+                    if (imp.vida <= 0) {
+                        state.impactos.splice(i, 1);
+                    }
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio, cursorTexto) => {
+                ctx.clearRect(0, 0, w, h);
+
+                const r = state.robot;
+                const escala = r.escala || 1.0;
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+
+                ctx.save();
+
+                // --- 1. Lluvia Matrix ligera de fondo ---
+                ctx.font = '11px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+                for (let i = 0; i < state.gotas.length; i++) {
+                    const g = state.gotas[i];
+                    for (let j = 0; j < g.longitud; j++) {
+                        const yChar = g.y - j * 14;
+                        if (yChar < -20 || yChar > h + 20) continue;
+                        const alpha = (1 - j / g.longitud) * 0.28;
+                        ctx.fillStyle = j === 0 ? 'rgba(255, 255, 255, 0.7)' : `rgba(0, 255, 102, ${alpha})`;
+                        ctx.fillText(g.chars[j % g.chars.length] || '0', g.x, yChar);
+                    }
+                }
+
+                // --- 2. Líneas láser guía hacia el cursor (Solo cuando apunta) ---
+                const canonL_x = r.x - 120 * escala;
+                const canonL_y = r.y - 30 * escala;
+                const canonR_x = r.x + 120 * escala;
+                const canonR_y = r.y - 30 * escala;
+
+                if (r.apuntandoActivo && r.targetX > 0) {
+                    ctx.strokeStyle = `rgba(0, 255, 150, ${0.15 + bass * 0.2})`;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 6]);
+                    ctx.beginPath();
+                    ctx.moveTo(canonL_x, canonL_y);
+                    ctx.lineTo(r.targetX, r.targetY);
+                    ctx.moveTo(canonR_x, canonR_y);
+                    ctx.lineTo(r.targetX, r.targetY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // --- 3. Titán Mecha Central en Arte ASCII Hiperrealista ---
+                ctx.save();
+                ctx.translate(r.x, r.y);
+                ctx.scale(escala, escala);
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 12px "Fira Code", monospace';
+
+                // A. Chasis Inferior y Blindaje Hidráulico
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.55)';
+                ctx.fillText('      ╔═════════════════════════════════════════════╗      ', 0, 110);
+                ctx.fillText('  ╔═══╝ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ ╚═══╗  ', 0, 96);
+                ctx.fillText('  ║ █║▓▓▓▓▓▓▓▓ [ TITAN-MECHA: MK-VII ] ▓▓▓▓▓▓▓▓║█ ║  ', 0, 82);
+                ctx.fillText('  ╚═══╦═════════════════════════════════════════╦═══╝  ', 0, 68);
+
+                // B. Torso Principal, Conduits y Placas de Blindaje
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.85)';
+                ctx.fillText('     / ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ \\     ', 0, 52);
+                ctx.fillText('    | █▓▓ [CORE:ONLINE] ▓▓▓▓▓▓▓▓▓▓▓ [PWR:100%] ▓▓█ |    ', 0, 38);
+                ctx.fillText('    | █║ /// [░░░░░░]  {λ} QUANTUM {Ω}  [░░░░░░] \\\\\\ ║█ |    ', 0, 24);
+                ctx.fillText('    | █║ /// ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ \\\\\\ ║█ |    ', 0, 10);
+                ctx.fillText('    | █║═══════════════════════════════════════║█ |    ', 0, -4);
+                ctx.fillText('     \\ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ /     ', 0, -18);
+                ctx.fillText('      \'=========================================\'      ', 0, -32);
+
+                // C. Cabeza / Yelmo Táctico Mecha con Antenas y Visor
+                ctx.save();
+                ctx.translate(0, -68);
+                ctx.rotate(r.anguloCabeza * 0.2);
+
+                ctx.fillStyle = 'rgba(0, 255, 200, 0.95)';
+                ctx.fillText('           /\\                            /\\           ', 0, -38);
+                ctx.fillText('          / /\\                          /\\ \\          ', 0, -26);
+                ctx.fillText('         / /  \\   .----------------.   /  \\ \\         ', 0, -14);
+                ctx.fillText('        / / /\\ \\ / ░░░░░░░░░░░░░░░░ \\ / /\\ \\ \\        ', 0, -2);
+                ctx.fillText('       ( ( (  \\ \\| █║████████████║█ |/ /  ) ) )       ', 0, 10);
+                ctx.fillText('        \\ \\ \\  \\/| [==[══VISOR══]==] |\\/  / / /        ', 0, 22);
+                ctx.fillText('         \'---\'   \\ ░░░░░░░░░░░░░░░░ /   \'---\'         ', 0, 34);
+                ctx.fillText('                  \'----------------\'                  ', 0, 46);
+
+                // Visor óptico luminoso
+                const ojoShift = Math.sin(r.anguloCabeza) * 8;
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText('==[►►]====', ojoShift, 22);
+
+                ctx.restore();
+                ctx.restore(); // Fin escala mecha
+
+                // --- 4. Cañones de Artillería Articulados en ASCII ---
+                const renderCanon = (cx, cy, angulo, recoil, muzzle, isLeft) => {
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(angulo);
+                    ctx.translate(-recoil, 0);
+
+                    ctx.font = 'bold 12px "Fira Code", monospace';
+                    ctx.textAlign = 'left';
+
+                    // Cañón de asalto
+                    ctx.fillStyle = 'rgba(0, 255, 136, 0.9)';
+                    ctx.fillText('╔══[TURRET]══╦══════════════════►►►', -20, -2);
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillText('║ ▓▓▓▓▓▓▓▓▓▓ ║====[PLASMA-BURST]===►', -20, 10);
+                    ctx.fillStyle = 'rgba(0, 255, 136, 0.9)';
+                    ctx.fillText('╚════════════╩══════════════════►►►', -20, 22);
+
+                    // Muzzle flash en ASCII
+                    if (muzzle > 0.1) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText('✦ █▓▒░ >>', 180, 10);
+                    }
+
+                    ctx.restore();
+                };
+
+                renderCanon(canonL_x, canonL_y, r.anguloTorretaL, r.recoilL, r.muzzleL, true);
+                renderCanon(canonR_x, canonR_y, r.anguloTorretaR, r.recoilR, r.muzzleR, false);
+
+                // --- 5. Proyectiles Balísticos de Código (Sin círculos) ---
+                for (let i = 0; i < state.proyectiles.length; i++) {
+                    const p = state.proyectiles[i];
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot);
+                    ctx.font = 'bold 13px "Fira Code", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = p.color;
+                    ctx.fillText(`==[ ${p.char} ]====►►`, 0, 4);
+                    ctx.restore();
+                }
+
+                // --- 6. Impactos en ASCII puro en el punto de mecanografía ---
+                for (let i = 0; i < state.impactos.length; i++) {
+                    const imp = state.impactos[i];
+                    const alpha = (imp.vida / imp.vidaMax);
+
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.font = 'bold 12px "Fira Code", monospace';
+
+                    // Token central que se desvanece
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.fillText(`[${imp.char}]`, imp.x, imp.y);
+
+                    // Chispas ASCII
+                    for (let f = 0; f < imp.fragmentos.length; f++) {
+                        const fr = imp.fragmentos[f];
+                        ctx.fillStyle = `rgba(0, 255, 200, ${alpha})`;
+                        ctx.fillText(fr.char, fr.x, fr.y);
+                    }
+
+                    ctx.restore();
+                }
+
+                // --- 7. Mira HUD Táctica en el Caret (Solo ASCII) ---
+                if (r.apuntandoActivo && r.targetX > 0) {
+                    ctx.save();
+                    ctx.translate(r.targetX, r.targetY);
+                    ctx.font = 'bold 11px "Fira Code", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = 'rgba(0, 255, 200, 0.85)';
+                    ctx.fillText('< + >', 0, 4);
+                    ctx.font = '9px "Fira Code", monospace';
+                    ctx.fillText('[TARGET: LOCKED]', 0, -10);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 19. MONOLITO CÓSMICO 3D (ASCII Obelisk & Geometric Orbit)
+        // -------------------------------------------------------------
+        this.registrarEfecto('ascii_monolito_cosmico', {
+            nombre: 'Monolito Cósmico ASCII',
+            icono: 'fa-cubes-stacked',
+            desc: 'Obelisco tridimensional en arte ASCII con sombreado de bloques dithered y anillos de runas giratorios.',
+            init: (canvas, w, h, densidad) => {
+                const estrellas = [];
+                const cantEstrellas = Math.floor(45 * densidad);
+                for (let i = 0; i < cantEstrellas; i++) {
+                    estrellas.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        char: ['·', '°', '+', '˙', '•'][Math.floor(Math.random() * 5)],
+                        alfa: Math.random() * 0.4 + 0.2,
+                        parpadeoVel: Math.random() * 2 + 1
+                    });
+                }
+                return { angulo: 0, tiempo: 0, estrellas };
+            },
+            update: (dt, w, h, mouse, state, audio) => {
+                state.tiempo += dt;
+                const boost = (audio && audio.reactivo) ? (1 + audio.energiaBass * 1.5) : 1.0;
+                state.angulo += dt * 0.75 * boost;
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                ctx.clearRect(0, 0, w, h);
+                const cx = w * 0.5;
+                const cy = h * 0.5;
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+                const a = state.angulo;
+
+                ctx.save();
+
+                // Estrellas de fondo
+                ctx.font = '12px "Fira Code", monospace';
+                for (let i = 0; i < state.estrellas.length; i++) {
+                    const e = state.estrellas[i];
+                    const alfa = e.alfa + Math.sin(state.tiempo * e.parpadeoVel + i) * 0.15;
+                    ctx.fillStyle = `rgba(218, 187, 120, ${Math.max(0.1, alfa)})`;
+                    ctx.fillText(e.char, e.x, e.y);
+                }
+
+                // Horizonte Geométrico
+                ctx.strokeStyle = 'rgba(218, 187, 120, 0.12)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, cy + 180);
+                ctx.lineTo(w, cy + 180);
+                ctx.stroke();
+
+                // Monolito Central 3D renderizado en slices ASCII
+                const numFilas = 18;
+                const sombraRamp = [' ', '░', '▒', '▓', '█'];
+                ctx.font = 'bold 13px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+
+                // Levitar suavemente
+                const flotacionY = Math.sin(state.tiempo * 1.6) * 12;
+
+                for (let i = 0; i < numFilas; i++) {
+                    const t = (i / numFilas) - 0.5; // -0.5 a 0.5
+                    const anchoFila = Math.floor(Math.cos(t * Math.PI * 0.6) * 16 + 8);
+                    const yFila = cy - 110 + i * 14 + flotacionY;
+
+                    // Calcular cara iluminada según ángulo de rotación
+                    const luz1 = Math.cos(a + t * 2.0);
+                    const luz2 = Math.sin(a + t * 2.0);
+                    
+                    let filaStr = '';
+                    for (let c = -anchoFila; c <= anchoFila; c++) {
+                        const u = c / anchoFila;
+                        const factorLuz = Math.max(0, Math.min(1, (u * luz1 + luz2 * 0.5 + 1) * 0.5));
+                        const charIdx = Math.floor(factorLuz * (sombraRamp.length - 1));
+                        filaStr += sombraRamp[charIdx];
+                    }
+
+                    // Tono ámbar / dorado retro
+                    const brilloFila = 0.5 + Math.sin(a + i * 0.3) * 0.3 + bass * 0.3;
+                    ctx.fillStyle = `rgba(249, 226, 175, ${Math.min(1.0, brilloFila)})`;
+                    ctx.shadowColor = '#d4af37';
+                    ctx.shadowBlur = (i === Math.floor(numFilas / 2)) ? (12 + bass * 15) : 0;
+
+                    ctx.fillText(`|${filaStr}|`, cx, yFila);
+                }
+
+                // Anillo Orbital 1 (Giro Horario)
+                const radioX1 = 150;
+                const radioY1 = 36;
+                const ang1 = state.tiempo * 1.2;
+                ctx.font = 'bold 11px "Fira Code", monospace';
+                const runas1 = ['[▲]', '[◆]', '[●]', '[★]', '[✚]', '[✦]', '[■]'];
+                for (let r = 0; r < runas1.length; r++) {
+                    const theta = ang1 + (r * Math.PI * 2) / runas1.length;
+                    const rx = cx + Math.cos(theta) * radioX1;
+                    const ry = (cy + flotacionY) + Math.sin(theta) * radioY1;
+                    const z = Math.sin(theta); // Profundidad
+
+                    const alfaRuna = (z + 1.2) * 0.45;
+                    ctx.fillStyle = `rgba(137, 180, 250, ${Math.min(1.0, alfaRuna)})`;
+                    ctx.shadowColor = '#89b4fa';
+                    ctx.shadowBlur = z > 0 ? 8 : 0;
+                    ctx.fillText(runas1[r], rx, ry);
+                }
+
+                // Anillo Orbital 2 (Giro Antihorario Inclinado)
+                const radioX2 = 120;
+                const radioY2 = 28;
+                const ang2 = -state.tiempo * 0.9;
+                ctx.font = '10px "Fira Code", monospace';
+                const runas2 = ['01', 'λ', 'Ω', '::', '{}', '=>', '10'];
+                for (let r = 0; r < runas2.length; r++) {
+                    const theta = ang2 + (r * Math.PI * 2) / runas2.length;
+                    const rx = cx + Math.cos(theta) * radioX2;
+                    const ry = (cy - 30 + flotacionY) + Math.sin(theta) * radioY2;
+                    const z = Math.sin(theta);
+
+                    const alfaRuna = (z + 1.2) * 0.4;
+                    ctx.fillStyle = `rgba(203, 166, 247, ${Math.min(1.0, alfaRuna)})`;
+                    ctx.shadowColor = '#cba6f7';
+                    ctx.shadowBlur = z > 0 ? 6 : 0;
+                    ctx.fillText(runas2[r], rx, ry);
+                }
+
+                ctx.restore();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 20. SANTUARIO TORII & PAGODA ZEN (ASCII Architecture & Sakura)
+        // -------------------------------------------------------------
+        this.registrarEfecto('ascii_santuario_torii', {
+            nombre: 'Santuario Torii & Pagoda Zen',
+            icono: 'fa-torii-gate',
+            desc: 'Arquitectura tradicional japonesa en arte ASCII minimalista con caída suave de flores de cerezo.',
+            init: (canvas, w, h, densidad) => {
+                const petalos = [];
+                const cantPetalos = Math.floor(35 * densidad);
+                for (let i = 0; i < cantPetalos; i++) {
+                    petalos.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        vx: Math.random() * 25 + 15,
+                        vy: Math.random() * 30 + 20,
+                        char: ['*', '°', '·', '❀', '✿', '~'][Math.floor(Math.random() * 6)],
+                        oscilacion: Math.random() * Math.PI * 2,
+                        oscVel: Math.random() * 2 + 1,
+                        alfa: Math.random() * 0.5 + 0.35
+                    });
+                }
+                return { petalos, tiempo: 0 };
+            },
+            update: (dt, w, h, mouse, state, audio) => {
+                state.tiempo += dt;
+                const boostVel = (audio && audio.reactivo) ? audio.boostVelocidad : 1.0;
+
+                for (let i = 0; i < state.petalos.length; i++) {
+                    const p = state.petalos[i];
+                    p.oscilacion += dt * p.oscVel;
+                    p.x += (p.vx + Math.sin(p.oscilacion) * 15) * dt * boostVel;
+                    p.y += (p.vy + Math.cos(p.oscilacion) * 8) * dt * boostVel;
+
+                    if (mouse && mouse.activo) {
+                        const dx = p.x - mouse.x;
+                        const dy = p.y - mouse.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 100 && dist > 1) {
+                            p.x += (dx / dist) * 80 * dt;
+                            p.y += (dy / dist) * 80 * dt;
+                        }
+                    }
+
+                    if (p.x > w + 20) p.x = -20;
+                    if (p.y > h + 20) {
+                        p.y = -20;
+                        p.x = Math.random() * w;
+                    }
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                ctx.clearRect(0, 0, w, h);
+                const cx = w * 0.5;
+                const cy = h * 0.58;
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+
+                ctx.save();
+
+                // 1. Luna Llena de Fondo en ASCII
+                ctx.font = '10px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+                const moonLines = [
+                    '   .---.   ',
+                    '  / ░░░ \\  ',
+                    ' | ░░▒░░ | ',
+                    '  \\ ░░░ /  ',
+                    '   \'---\'   '
+                ];
+                ctx.fillStyle = 'rgba(255, 240, 200, 0.4)';
+                ctx.shadowColor = '#f9e2af';
+                ctx.shadowBlur = 10 + bass * 12;
+                for (let m = 0; m < moonLines.length; m++) {
+                    ctx.fillText(moonLines[m], cx + 160, cy - 170 + m * 12);
+                }
+
+                // 2. Nubes Dithered en ASCII
+                ctx.shadowBlur = 0;
+                ctx.font = '11px "Fira Code", monospace';
+                ctx.fillStyle = 'rgba(166, 227, 161, 0.18)';
+                const cloudOffset = (state.tiempo * 10) % (w + 200);
+                ctx.fillText('  ░░▒▒▓▓▒▒░░        ░░▒▒░░  ', (cloudOffset - 100), cy - 130);
+                ctx.fillText('░░▒▒▓▓██▓▓▒▒░░    ░░▒▒▓▓▒▒░░', (cloudOffset + 180) % (w + 200) - 100, cy - 90);
+
+                // 3. Gran Torii Gate Central (Patrick Louis Venam Style)
+                ctx.font = 'bold 12px "Fira Code", monospace';
+                ctx.fillStyle = 'rgba(166, 227, 161, 0.85)';
+                ctx.shadowColor = '#a6e3a1';
+                ctx.shadowBlur = 6 + bass * 8;
+
+                const torii = [
+                    '  .==============================================.  ',
+                    ' /================================================\\ ',
+                    '\'------|------|----------------------|------|------\'',
+                    '       |      |     [ ⛩ 禅 ZEN ]     |      |       ',
+                    '       |      |                      |      |       ',
+                    '   .===|======|======================|======|===.   ',
+                    '   \'---|------|----------------------|------|---\'   ',
+                    '       | ▓▓▓▓ |                      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |                      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |       .------.       | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |      /  ░▒░   \\      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |     |  ( ☼ )  |      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |      \\  ░▒░   /      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |       \'--||--\'       | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |          ||          | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |                      | ▓▓▓▓ |       ',
+                    '       | ▓▓▓▓ |                      | ▓▓▓▓ |       ',
+                    '     /========\\                      /========\\     ',
+                    '    /__________\\                    /__________\\    ',
+                    '   [============]                  [============]   '
+                ];
+
+                for (let i = 0; i < torii.length; i++) {
+                    ctx.fillText(torii[i], cx, cy - 100 + i * 14);
+                }
+
+                // 4. Suelo Dithered & Bambú Lateral
+                ctx.font = '11px "Fira Code", monospace';
+                ctx.fillStyle = 'rgba(148, 226, 213, 0.45)';
+                ctx.shadowBlur = 0;
+                ctx.fillText('░░▒▒▓▓██████████████████████████████████████████▓▓▒▒░░', cx, cy + 188);
+                ctx.fillText('//////////////////////////////////////////////////////', cx, cy + 200);
+
+                // 5. Pétalos de Sakura Flotantes
+                ctx.font = '12px "Fira Code", monospace';
+                for (let i = 0; i < state.petalos.length; i++) {
+                    const p = state.petalos[i];
+                    ctx.fillStyle = `rgba(243, 139, 168, ${p.alfa})`;
+                    ctx.shadowColor = '#f38ba8';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(p.char, p.x, p.y);
+                }
+
+                ctx.restore();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 21. GUARDIÁN ONI CYBERPUNK (ASCII Mask & Data Runes)
+        // -------------------------------------------------------------
+        this.registrarEfecto('ascii_oni_cyberpunk', {
+            nombre: 'Guardián Oni Cyberpunk',
+            icono: 'fa-mask',
+            desc: 'Máscara cibernética Oni en arte ASCII venam con visor de barrido óptico y corrientes de datos.',
+            init: (canvas, w, h, densidad) => {
+                const columnasData = [];
+                const cantCols = 8;
+                for (let i = 0; i < cantCols; i++) {
+                    columnasData.push({
+                        x: i < 4 ? 40 + i * 28 : w - 140 + (i - 4) * 28,
+                        y: Math.random() * -h,
+                        vel: Math.random() * 40 + 30,
+                        items: ['0xFE', 'SYS', '░▒▓', 'ON1', 'HEX', '>>', '01', 'λ8', '[OK]']
+                    });
+                }
+                return { tiempo: 0, columnasData, scanY: 0 };
+            },
+            update: (dt, w, h, mouse, state, audio) => {
+                state.tiempo += dt;
+                const boost = (audio && audio.reactivo) ? audio.boostVelocidad : 1.0;
+                state.scanY = Math.sin(state.tiempo * 2.2) * 24;
+
+                for (let i = 0; i < state.columnasData.length; i++) {
+                    const c = state.columnasData[i];
+                    c.y += c.vel * dt * boost;
+                    if (c.y > h + 100) c.y = -60;
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                ctx.clearRect(0, 0, w, h);
+                const cx = w * 0.5;
+                const cy = h * 0.5;
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+
+                ctx.save();
+
+                // 1. Columnas de Telemetría Lateral
+                ctx.font = '10.5px "Fira Code", monospace';
+                ctx.textAlign = 'left';
+                for (let i = 0; i < state.columnasData.length; i++) {
+                    const col = state.columnasData[i];
+                    for (let j = 0; j < col.items.length; j++) {
+                        const yItem = col.y + j * 16;
+                        if (yItem < -20 || yItem > h + 20) continue;
+                        const alfa = (1 - j / col.items.length) * 0.35;
+                        ctx.fillStyle = `rgba(203, 166, 247, ${alfa})`;
+                        ctx.fillText(col.items[j], col.x, yItem);
+                    }
+                }
+
+                // 2. Máscara Oni Central en Arte ASCII
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 12px "Fira Code", monospace';
+                ctx.fillStyle = 'rgba(243, 139, 168, 0.85)';
+                ctx.shadowColor = '#f38ba8';
+                ctx.shadowBlur = 8 + bass * 12;
+
+                // Parallax suave al cursor
+                const offsetX = mouse && mouse.activo ? (mouse.x - cx) * 0.03 : 0;
+                const offsetY = mouse && mouse.activo ? (mouse.y - cy) * 0.03 : 0;
+
+                const oni = [
+                    '               /\\                   /\\               ',
+                    '              /  \\  ░░░░░░░░░░░░░  /  \\              ',
+                    '             / /\\ \\/             \\/ /\\ \\             ',
+                    '            / /  \\/   ▲       ▲   \\/  \\ \\            ',
+                    '           / /    \\  / \\     / \\  /    \\ \\           ',
+                    '          ( (      ) ) █)   (█ ( (      ) )          ',
+                    '           \\ \\    / /             \\ \\    / /         ',
+                    '            \\ \\  / /  .=========.  \\ \\  / /          ',
+                    '             \\ \\/ /  /   ░░░░░   \\  \\ \\/ /           ',
+                    '       .======\\  /==/  [ 0xON1 ]  \\==\\  /======.     ',
+                    '      / ░░░░░░ \\/  |  ===========  |  \\/ ░░░░░░ \\    ',
+                    '     |  ▓▓▓▓▓▓     |  |==[VIS]==|  |     ▓▓▓▓▓▓  |   ',
+                    '      \\ ░░░░░░ /\\  |  ===========  |  /\\ ░░░░░░ /    ',
+                    '       \'======/  \\==\\             /==/  \\======\'     ',
+                    '             / /\\ \\  \\   ▓▓▓▓▓   /  / /\\ \\           ',
+                    '            / /  \\ \\  \'=========\'  / /  \\ \\          ',
+                    '           / /    \\ \\  | | | | |  / /    \\ \\         ',
+                    '          ( (      ) ) \\_|_|_|_/ ( (      ) )        ',
+                    '           \\_\\    /_/   \\▼▼▼▼▼/   \\_\\    /_/         ',
+                    '              \\  /       \\___/       \\  /            ',
+                    '               \\/                     \\/             '
+                ];
+
+                for (let i = 0; i < oni.length; i++) {
+                    ctx.fillText(oni[i], cx + offsetX, cy - 130 + offsetY + i * 13);
+                }
+
+                // 3. Visor Láser de Escaneo Óptico
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 14 + bass * 10;
+                ctx.fillRect(cx - 50 + offsetX, cy - 2 + offsetY + state.scanY, 100, 2);
+
+                ctx.restore();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 22. OLAS JAPONESAS & SOLSTICIO (Minimalist Dithered Wave)
+        // -------------------------------------------------------------
+        this.registrarEfecto('ascii_paisaje_zen', {
+            nombre: 'Olas Japonesas & Solsticio',
+            icono: 'fa-water',
+            desc: 'Olas matemáticas dithered estilo Ukiyo-e en arte ASCII minimalista con gran sol naciente.',
+            init: () => ({ tiempo: 0 }),
+            update: (dt, w, h, mouse, state, audio) => {
+                state.tiempo += dt;
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                ctx.clearRect(0, 0, w, h);
+                const cx = w * 0.5;
+                const cy = h * 0.52;
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+                const t = state.tiempo;
+
+                ctx.save();
+
+                // 1. Gran Sol Naciente en ASCII
+                ctx.font = 'bold 11px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(250, 179, 135, 0.45)';
+                ctx.shadowColor = '#fab387';
+                ctx.shadowBlur = 12 + bass * 16;
+
+                const sol = [
+                    '          .---.          ',
+                    '       .-\' ░░░ \'-.       ',
+                    '     .\'  ░░▒▒▒░░  \'.     ',
+                    '    /  ░░▒▒▓▓▓▒▒░░  \\    ',
+                    '   |  ░░▒▒▓▓█▓▓▒▒░░  |   ',
+                    '   |  ░░▒▒▓▓█▓▓▒▒░░  |   ',
+                    '    \\  ░░▒▒▓▓▓▒▒░░  /    ',
+                    '     \'.  ░░▒▒▒░░  .\'     ',
+                    '       \'-. ░░░ .-\'       ',
+                    '          \'---\'          '
+                ];
+                for (let s = 0; s < sol.length; s++) {
+                    ctx.fillText(sol[s], cx, cy - 140 + s * 13);
+                }
+
+                // 2. Grullas en Vuelo (Minimalist ASCII Birds)
+                ctx.font = '11px "Fira Code", monospace';
+                ctx.fillStyle = 'rgba(249, 226, 175, 0.6)';
+                ctx.shadowBlur = 0;
+                const birdX1 = ((t * 25) % (w + 100)) - 50;
+                const birdX2 = (((t + 4) * 20) % (w + 100)) - 50;
+                ctx.fillText('__/^\\__', birdX1, cy - 170 + Math.sin(t * 2) * 8);
+                ctx.fillText(' __/\\__ ', birdX2, cy - 195 + Math.cos(t * 1.8) * 6);
+
+                // 3. Tres Capas de Olas Dithered en Movimiento Paralaje
+                const charRamp = [' ', '░', '▒', '▓', '█'];
+                const pasoX = 14;
+                const numCols = Math.floor(w / pasoX) + 2;
+
+                const renderCapaOla = (yBase, amp, freq, vel, color, blur) => {
+                    ctx.fillStyle = color;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = blur;
+                    ctx.textAlign = 'center';
+
+                    for (let c = 0; c < numCols; c++) {
+                        const x = c * pasoX;
+                        const y = yBase + Math.sin(x * freq + t * vel) * amp + Math.cos(x * freq * 0.5 - t * vel * 0.4) * (amp * 0.5);
+                        
+                        // Generar cresta vertical
+                        const hCresta = 4;
+                        for (let k = 0; k < hCresta; k++) {
+                            const ch = (k === 0) ? '^' : (k === 1 ? '░' : (k === 2 ? '▒' : '▓'));
+                            ctx.fillText(ch, x, y + k * 12);
+                        }
+                    }
+                };
+
+                // Capa de fondo
+                renderCapaOla(cy + 30, 16, 0.008, 1.2, 'rgba(137, 180, 250, 0.35)', 0);
+                // Capa media
+                renderCapaOla(cy + 75, 22, 0.012, -1.8, 'rgba(137, 220, 235, 0.55)', 4);
+                // Capa frontal con espuma
+                renderCapaOla(cy + 125, 28, 0.015, 2.2, 'rgba(166, 227, 161, 0.8)', 6 + bass * 6);
+
+                ctx.restore();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 23. CAZA ESPACIAL INTERCEPTOR (ASCII Starship Cruiser)
+        // -------------------------------------------------------------
+        this.registrarEfecto('ascii_nave_interceptor', {
+            nombre: 'Caza Espacial Interceptor',
+            icono: 'fa-jet-fighter',
+            desc: 'Nave espacial geométrica retro en arte ASCII venam cruzando el hiperespacio con estelas de plasma.',
+            init: (canvas, w, h, densidad) => {
+                const estrellas = [];
+                const cant = Math.floor(65 * densidad);
+                for (let i = 0; i < cant; i++) {
+                    estrellas.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        vel: Math.random() * 220 + 80,
+                        char: ['·', '•', '+', 'x', '✦'][Math.floor(Math.random() * 5)],
+                        alfa: Math.random() * 0.6 + 0.2
+                    });
+                }
+                return { tiempo: 0, estrellas, naveX: w * 0.5, naveY: h * 0.52 };
+            },
+            update: (dt, w, h, mouse, state, audio) => {
+                state.tiempo += dt;
+                const boost = (audio && audio.reactivo) ? (1 + audio.energiaBass * 1.6) : 1.0;
+
+                // Suave seguimiento del mouse
+                if (mouse && mouse.activo) {
+                    state.naveX += (mouse.x - state.naveX) * Math.min(1.0, dt * 3.5);
+                    state.naveY += (mouse.y - state.naveY) * Math.min(1.0, dt * 3.5);
+                } else {
+                    state.naveX = w * 0.5 + Math.sin(state.tiempo * 1.2) * (w * 0.15);
+                    state.naveY = h * 0.52 + Math.cos(state.tiempo * 0.9) * (h * 0.08);
+                }
+
+                // Desplazar campo estelar hacia la izquierda
+                for (let i = 0; i < state.estrellas.length; i++) {
+                    const e = state.estrellas[i];
+                    e.x -= e.vel * dt * boost;
+                    if (e.x < -20) {
+                        e.x = w + 20;
+                        e.y = Math.random() * h;
+                    }
+                }
+            },
+            render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                ctx.clearRect(0, 0, w, h);
+                const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+
+                ctx.save();
+
+                // 1. Campo Estelar en Parallax
+                ctx.font = '12px "Fira Code", monospace';
+                for (let i = 0; i < state.estrellas.length; i++) {
+                    const e = state.estrellas[i];
+                    ctx.fillStyle = `rgba(137, 180, 250, ${e.alfa})`;
+                    ctx.fillText(e.char, e.x, e.y);
+                }
+
+                // 2. Nave Interceptor Central (Venam Isometric Fighter)
+                const nx = state.naveX;
+                const ny = state.naveY;
+
+                ctx.font = 'bold 12px "Fira Code", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(137, 220, 235, 0.9)';
+                ctx.shadowColor = '#89dceb';
+                ctx.shadowBlur = 8 + bass * 12;
+
+                const ship = [
+                    '                    /\\                    ',
+                    '                   /  \\                   ',
+                    '                  / /\\ \\                  ',
+                    '                 / /  \\ \\                 ',
+                    '                / /    \\ \\                ',
+                    '               / /  /\\  \\ \\               ',
+                    '  .===========/ /  /  \\  \\ \\===========.  ',
+                    ' / ░░░░░░░░░░/ /  / /\\ \\  \\ \\░░░░░░░░░░ \\ ',
+                    '|  ▓▓▓▓▓▓▓▓▓/ /  / /  \\ \\  \\ \\▓▓▓▓▓▓▓▓▓  |',
+                    '|  [01-PRIG] /  / / == \\ \\  \\ [INTERCP]  |',
+                    ' \\ ░░░░░░░░░/  / /  ||  \\ \\  \\░░░░░░░░░ / ',
+                    '  \'========/  / /   ||   \\ \\  \\========\'  ',
+                    '          /  / /    ||    \\ \\  \\          ',
+                    '         /  / /     ||     \\ \\  \\         ',
+                    '        /__/ /      ||      \\ \\__\\        ',
+                    '       [====]      [==]      [====]       '
+                ];
+
+                for (let i = 0; i < ship.length; i++) {
+                    ctx.fillText(ship[i], nx, ny - 100 + i * 13);
+                }
+
+                // 3. Estelas de Plasma Propulsor (Dithered Heat Trail)
+                const thrusterLen = 6 + Math.floor(Math.random() * 4 + bass * 8);
+                const plumas = ['█', '▓', '▒', '░', '·', ' '];
+                ctx.font = '11px "Fira Code", monospace';
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 14 + bass * 14;
+
+                const tOffset1 = nx - 34;
+                const tOffset2 = nx;
+                const tOffset3 = nx + 34;
+                const baseThrustY = ny + 110;
+
+                for (let p = 0; p < thrusterLen; p++) {
+                    const ch = plumas[Math.min(p, plumas.length - 1)];
+                    const yP = baseThrustY + p * 12;
+                    ctx.fillText(ch, tOffset1, yP);
+                    ctx.fillText(ch, tOffset2, yP + 4);
+                    ctx.fillText(ch, tOffset3, yP);
+                }
+
+                ctx.restore();
+            }
+        });
+
+        // ====================================================================
+        // TEMAS DINÁMICOS ASCII CON PAISAJES ESTRUCTURADOS EN LOS COSTADOS
+        // ====================================================================
+
+        // ====================================================================
+        // TEMAS DINÁMICOS ASCII CON PAISAJES ESTRUCTURADOS EN LOS COSTADOS
+        // ====================================================================
+
+        const PAISAJES_LATERALES = {
+            tema_mecha_patrol: {
+                cielo: [
+                    "✦ ·  °   .  [ORBITAL-DEFENSE-GRID • SECTOR-ALPHA-01]  .   °  · ✦",
+                    "      ▲═══▲                    ▲═══▲                    ▲═══▲      ",
+                    "    --[•]--                  --[•]--                  --[•]--    "
+                ],
+                izq: [
+                    "╔══════[MECHA-BASTION-ALPHA]══════╗",
+                    "║ █║ ░░░░░░░░░░░░░░░░░░░░░░░░ ║█ ║",
+                    "║ █║ [CORE-REACTOR: 99.8%]   ║█ ║",
+                    "║ █║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║█ ║",
+                    "╠══════╦════════════════╦══════╣",
+                    "║ ///  ║ RADAR-ARRAY-01 ║  \\\\\\ ║",
+                    "║ |||  ║ [SCAN: MONITOR]║  ||| ║",
+                    "║ \\\\\\  ║ ░░░░░░░░░░░░░░ ║  /// ║",
+                    "╠══════╩════════════════╩══════╣",
+                    "║ █║ /// BARRACKS-SUB-LEVEL\\\\║█║",
+                    "║ █║ █║█║█║█║█║█║█║█║█║█║█║█ ║█ ║",
+                    "╠══════════════════════════════╣",
+                    "║ ▓▓▓▓ [HEAVY-PLASMA-TURRET]   ║",
+                    "║ █║======►►►► [CALIBER: 120]  ║",
+                    "║ █║ ░░░░░░░░░░░░░░░░░░░░░░░ ║█ ║",
+                    "╠══════╦════════════════╦══════╣",
+                    "║ █║   ║ [AMMO-SILO-04] ║  ║█  ║",
+                    "║ █║   ║ ▓▓▓▓ ▓▓▓▓ ▓▓▓▓ ║  ║█  ║",
+                    "║ █║   ║ ░░░░ ░░░░ ░░░░ ║  ║█  ║",
+                    "╠══════╩════════════════╩══════╣",
+                    "║ [COOLANT-INJECTOR: NORMAL]   ║",
+                    "║ █║ █║█║█║ ░░░░░░░ █║█║█║   ║█║",
+                    "║ █║ ▓▓▓▓▓▓ ░░░░░░░ ▓▓▓▓▓▓   ║█║",
+                    "╚══════════════════════════════╝"
+                ],
+                der: [
+                    "╔══════[TOWER-BEACON-OMEGA]══════╗",
+                    "║ █║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║█ ║",
+                    "║ █║ {Ω} QUANTUM-LINK: 100%  ║█ ║",
+                    "║ █║ ░░░░░░░░░░░░░░░░░░░░░░░ ║█ ║",
+                    "╠══════╦════════════════╦══════╣",
+                    "║  ║   ║ [BATTERY-ARRAY]║   ║  ║",
+                    "║  ║   ║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║   ║  ║",
+                    "║  ║   ║ [PWR: 100% OK] ║   ║  ║",
+                    "╠══╩═══╩════════════════╩═══╩══╣",
+                    "║ █║ /// SHIELD-GEN-STAGE-2\\\\║█║",
+                    "║ █║ ░░░░░░░░░░░░░░░░░░░░░░░ ║█ ║",
+                    "║ █║ █║█║█║█║█║█║█║█║█║█║█║█ ║█ ║",
+                    "╠══════════════════════════════╣",
+                    "║ [DEFENSE-PERIMETER-STATION]  ║",
+                    "║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║",
+                    "║ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ ║",
+                    "╠══════╦════════════════╦══════╣",
+                    "║ █║   ║ [SUB-CARRIER]  ║  ║█  ║",
+                    "║ █║   ║ ░░░░░ ▓▓▓▓▓    ║  ║█  ║",
+                    "╚══════╩════════════════╩══════╝"
+                ],
+                horizonte: "══[BASE-GRID-01]═══════════════════════════════════════════════════════════════════════════[PERIMETER-SECURE]══"
+            },
+            tema_cyber_netrunner: {
+                cielo: [
+                    "010101  .---. [NEO-CYBERSPACE • 128-QUBIT FIBER-NET] .---.  101010",
+                    "      // 01 \\\\                                      // 10 \\\\      ",
+                    "     <[DATA-BUS]>                                  <[NODE-BUS]>    "
+                ],
+                izq: [
+                    "┌───[NET-MEGATOWER-SECTOR-0]───┐",
+                    "│ 0101 1100 0011 1010 0101 110 │",
+                    "│ [ROOT-ACCESS: GRANTED-L4]    │",
+                    "│ ░▒▓█ 128-QUBIT-HYPER-SOC █▓▒ │",
+                    "├──────────────────────────────┤",
+                    "│ > INJECT: PAYLOAD-STREAM [OK]│",
+                    "│ > MEM-MAP: 0x7FFF_A800_C204  │",
+                    "│ > CRYPTO-ROUTER: ENCRYPTED   │",
+                    "│ ▓▓▓▓ ░░░░ ▒▒▒▒ █║█║█║█ ▓▓▓▓  │",
+                    "├──────────────────────────────┤",
+                    "│ > SYS-CORE: KERNEL-SECURE    │",
+                    "│ 0110 1001 0101 1100 1101 001 │",
+                    "│ █║█║█║█║█║█║█║█║█║█║█║█║█║█║ │",
+                    "├──────────────────────────────┤",
+                    "│ [NEURAL-FIBER-BUFFER-STACK]  │",
+                    "│ ░░░░░░░░ ▓▓▓▓▓▓▓▓ █║█║█║ ▒▒▒ │",
+                    "│ 1101 0010 1110 0101 0011 101 │",
+                    "│ > PACKET-LOSS: 0.000%        │",
+                    "│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │",
+                    "└──────────────────────────────┘"
+                ],
+                der: [
+                    "┌───[CORP-MAINFRAME-VAULT-X]───┐",
+                    "│ █║█║█║█║█║█║█║█║█║█║█║█║█║█║ │",
+                    "│ [QUANTUM-PROCESSOR-ARRAY-V]  │",
+                    "│ {λ} HYPERCORE-PIPELINE: LIVE │",
+                    "├──────────────────────────────┤",
+                    "│ > PORT: 8080 [LISTENING-TCP] │",
+                    "│ > LATENCY: 0.08ms ULTRA-FAST │",
+                    "│ ░░░░ ▓▓▓▓ █║█║█ ▒▒▒▒▒▒ ░░░░  │",
+                    "├──────────────────────────────┤",
+                    "│ [CYBER-STACK-MONITOR-07]     │",
+                    "│ 1101 0010 1110 0101 1100 010 │",
+                    "│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │",
+                    "├──────────────────────────────┤",
+                    "│ [FIREWALL-GATE-ALPHA]        │",
+                    "│ █║█ ░░░░ ▓▓▓▓ █║█ ░░░░ █║█   │",
+                    "└──────────────────────────────┘"
+                ],
+                horizonte: "──[OPTICAL-FIBER-BUS]───────────────────────────────────────────────────────────────────────────[QUANTUM-LAYER]──"
+            },
+            tema_dragon_sanctuary: {
+                cielo: [
+                    "   (~~~-._   .---.   ZEN MIST & CELESTIAL DRAGON SHRINE   .---.   _.-~~~)   ",
+                    "          '-(  ●  )-'                                   '-(  ●  )-'         ",
+                    "            / | \\                                           / | \\           "
+                ],
+                izq: [
+                    "           /\\           ",
+                    "          /__\\          ",
+                    "          |  |          ",
+                    "        .------.        ",
+                    "      //________\\\\      ",
+                    "         | || |         ",
+                    "       .--------.       ",
+                    "     //__________\\\\     ",
+                    "         | || |         ",
+                    "       .--------.       ",
+                    "     //__________\\\\     ",
+                    "         | || |         ",
+                    "      .------------.    ",
+                    "    //______________\\\\  ",
+                    "        | ||  || |      ",
+                    "     .================. ",
+                    "     |  ░░ ▓▓ ░░  ▓▓  | ",
+                    "     |  ( ☯ ZEN ☯ )   | ",
+                    "     [================] ",
+                    "    ==================== "
+                ],
+                der: [
+                    "           /\\           ",
+                    "         .//\\\\.         ",
+                    "        //______\\\\      ",
+                    "          | || |        ",
+                    "        .--------.      ",
+                    "      //__________\\\\    ",
+                    "          | || |        ",
+                    "        .--------.      ",
+                    "      //__________\\\\    ",
+                    "          | || |        ",
+                    "        .--------.      ",
+                    "      //__________\\\\    ",
+                    "        [========]      ",
+                    "       ============     "
+                ],
+                horizonte: "~~*~~~~~*~~~~~~~~~*~~~~~~~~~~~~~~~~~~~[ SANCTUARIO ZEN DE LOS ARCES ]~~~~~~~~~~~~~~~~~~~~~~~~~*~~~~~~*~~~~~~"
+            },
+            tema_deep_space: {
+                cielo: [
+                    "✦  ·   °    ✦   [DEEP SPACE ODYSSEY • ANDROMEDA GATEWAY]   ✦    °   ·  ✦",
+                    "     .---.                      ( ● )                      .---.     ",
+                    "    / SAT \\                    [SOL-0]                    / SAT \\    "
+                ],
+                izq: [
+                    "       .-----.       ",
+                    "     .' ░░░░░ '.     ",
+                    "    / ▓▓ [O] ▓▓ \\    ",
+                    "   | █║ ( ● ) ║█ |   ",
+                    "    \\ ▓▓ [=] ▓▓ /    ",
+                    "     '. ░░░░░ .'     ",
+                    "    ==◄◄ '---' ►►==  ",
+                    "        / | \\        ",
+                    "       |  |  |       ",
+                    "      [=======]      ",
+                    "     / ░░░░░░░ \\     ",
+                    "    | ▓▓▓▓▓▓▓▓▓ |    ",
+                    "    | █║█║█║█║█ |    ",
+                    "     \\ ░░░░░░░ /     ",
+                    "      [=======]      ",
+                    "        / | \\        ",
+                    "     /=========\\     ",
+                    "    =============    "
+                ],
+                der: [
+                    "         |         ",
+                    "       --+--       ",
+                    "         |         ",
+                    "     .---|---.     ",
+                    "     | ORBIT |     ",
+                    "     | ░░░░░ |     ",
+                    "     | ▓▓▓▓▓ |     ",
+                    "     '-------'     ",
+                    "       / | \\       ",
+                    "      | █║█ |      ",
+                    "       \\ | /       ",
+                    "     '-------'     ",
+                    "       |   |       ",
+                    "      =======      "
+                ],
+                horizonte: "·······✦····················[ SECTOR GALÁCTICO 07 • VELOCIDAD WARP ]··························✦·············"
+            },
+            tema_dungeon_crawler: {
+                cielo: [
+                    "  † †   (  DARK CITADEL & ANCIENT RUNIC CATACOMBS  )   † †  ",
+                    "      /\\  /\\                                         /\\  /\\      "
+                ],
+                izq: [
+                    "      /\\     /\\      ",
+                    "     /__\\   /__\\     ",
+                    "     |  |   |  |     ",
+                    "     |  |___|  |     ",
+                    "     |  [░░░]  |     ",
+                    "     |  [▓▓▓]  |     ",
+                    "     |  [███]  |     ",
+                    "    .--------------. ",
+                    "    |  (†)  (†)    | ",
+                    "    |  [GARGOYLE]  | ",
+                    "    |  [░░░ ▓▓▓]   | ",
+                    "    '--------------' ",
+                    "     |  ||   ||  |   ",
+                    "     |  ||   ||  |   ",
+                    "     |  [░░░░░]  |   ",
+                    "     |  [▓▓▓▓▓]  |   ",
+                    "    [=============]  ",
+                    "   ================= "
+                ],
+                der: [
+                    "        /\\        ",
+                    "       /__\\       ",
+                    "       |  |       ",
+                    "      .----.      ",
+                    "      |(†) |      ",
+                    "      |RUNA|      ",
+                    "      |    |      ",
+                    "      .----.      ",
+                    "      | █║ |      ",
+                    "      | ▓▓ |      ",
+                    "      |    |      ",
+                    "      [====]      ",
+                    "       |  |       ",
+                    "     ========     "
+                ],
+                horizonte: "††††††††††††††††††††††††††††[ CATACUMBA ANCESTRAL DE LAS RUNAS ]†††††††††††††††††††††††††††††††††††††††††††"
+            },
+            tema_wild_nature: {
+                cielo: [
+                    "  ▲▲▲  (~~~  MYSTIC ENCHANTED FOREST & MOUNTAINS  ~~~)  ▲▲▲  ",
+                    "        /\\                                             /\\        "
+                ],
+                izq: [
+                    "       /\\       ",
+                    "      /  \\      ",
+                    "     / /\\ \\     ",
+                    "      /  \\      ",
+                    "     / /\\ \\     ",
+                    "    / /  \\ \\    ",
+                    "      /  \\      ",
+                    "     / /\\ \\     ",
+                    "    / /  \\ \\    ",
+                    "   / / /\\ \\ \\   ",
+                    "      /  \\      ",
+                    "     / /\\ \\     ",
+                    "    / /  \\ \\    ",
+                    "   / / /\\ \\ \\   ",
+                    "       ||       ",
+                    "       ||       ",
+                    "      ====      "
+                ],
+                der: [
+                    "       /\\       ",
+                    "      //\\\\      ",
+                    "     ///\\\\\\     ",
+                    "      //\\\\      ",
+                    "     ///\\\\\\     ",
+                    "    ////\\\\\\\\    ",
+                    "      //\\\\      ",
+                    "     ///\\\\\\     ",
+                    "    ////\\\\\\\\    ",
+                    "       ||       ",
+                    "       ||       ",
+                    "      ====      "
+                ],
+                horizonte: "▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲[ BOSQUE MÍSTICO • CORRIENTE DE VIDA ]▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲"
+            },
+            tema_retro_arcade: {
+                cielo: [
+                    "★ ★  ╔═[ 8-BIT RETRO ARCADE CHAMPIONSHIP • 1989 ]═╗  ★ ★",
+                    "     ║  HIGH-SCORE: 999990     STAGE-MAX: 99    ║      "
+                ],
+                izq: [
+                    "╔═════[CABINET-01]═════╗",
+                    "║  1-UP       2-UP     ║",
+                    "║  99990      88420    ║",
+                    "║ ★ ★ ★      ★ ★ ★     ║",
+                    "╠══════════════════════╣",
+                    "║    [PAC-MAN-PRO]     ║",
+                    "║        (• •)         ║",
+                    "║        \\___/         ║",
+                    "╠══════════════════════╣",
+                    "║  [JOYSTICK-ACTIVE]   ║",
+                    "║        (O)           ║",
+                    "║         |            ║",
+                    "╠══════════════════════╣",
+                    "║  [INSERT-COIN-1]     ║",
+                    "║  [CREDITS: 04]       ║",
+                    "╚══════════════════════╝"
+                ],
+                der: [
+                    "╔═════[CABINET-02]═════╗",
+                    "║   [SPACE-INVADERS]   ║",
+                    "║    888880  HI-SCR    ║",
+                    "╠══════════════════════╣",
+                    "║       ▲  ▲  ▲        ║",
+                    "║       ■  ■  ■        ║",
+                    "║       ●  ●  ●        ║",
+                    "╠══════════════════════╣",
+                    "║   [READY-PLAYER-1]   ║",
+                    "║   [PUSH-START-BTN]   ║",
+                    "╚══════════════════════╝"
+                ],
+                horizonte: "■■■■■■■■■■■■■■■■■■■■■■■■■■■■[ RETRO 8-BIT ARCADE ZONE • 1989 ]■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+            },
+            tema_quantum_void: {
+                cielo: [
+                    "λ Ω  [4D HYPERDIMENSIONAL TESSERACT & DIRAC TENSORS]  Ω λ",
+                    "      /\\ /\\                                           /\\ /\\      "
+                ],
+                izq: [
+                    "      /\\ /\\      ",
+                    "     /  X  \\     ",
+                    "    / /░░░\\ \\    ",
+                    "    \\ \\▓▓▓/ /    ",
+                    "     \\  X  /     ",
+                    "      \\/ \\/      ",
+                    "      /\\ /\\      ",
+                    "     /  █  \\     ",
+                    "    / / λ \\ \\    ",
+                    "    \\ \\ ░ / /    ",
+                    "     \\  ▓  /     ",
+                    "      \\/ \\/      ",
+                    "      /\\ /\\      ",
+                    "     /  Ω  \\     ",
+                    "    / / █ \\ \\    ",
+                    "    \\_______/    "
+                ],
+                der: [
+                    "       /\\       ",
+                    "      /  \\      ",
+                    "     / 4D \\     ",
+                    "     \\ ░░ /     ",
+                    "      \\  /      ",
+                    "       \\/       ",
+                    "       /\\       ",
+                    "      / Ω \\     ",
+                    "     /  █  \\    ",
+                    "     \\ ░░ /     ",
+                    "      \\  /      ",
+                    "       \\/       ",
+                    "     /______\\   "
+                ],
+                horizonte: "⠁⠃⠇⠏⠟⠿░▒▓█[ TENSORES HIPERDIMENSIONALES • ESPACIO CUÁNTICO EN 4D ]█▓▒░⠿⠟⠏⠇⠃⠁⠁⠃⠇⠏⠟⠿░▒▓█"
+            },
+            tema_neural_cybergrid: {
+                cielo: [
+                    "0101  ⚡  [NEURAL DATA HIGHWAY • SYNAPSE MATRIX 2088]  ⚡  1010",
+                    "      <==[NODE-ALPHA]==>                      <==[NODE-OMEGA]==>      "
+                ],
+                izq: [
+                    "╔════[SYNAPSE-DATA-ROUTER]════╗",
+                    "║ █║ 0101 1100 0011 1010 ║█ ║",
+                    "║ █║ [THROUGHPUT: 120 TB/s] ║█ ║",
+                    "║ █║ ░▒▓█ OPTICAL-FIBER █▓▒ ║█ ║",
+                    "╠════╦════════════════════╦════╣",
+                    "║ >> ║ LATENCY: 0.04ms    ║ << ║",
+                    "║ >> ║ [ASYNC-COROUTINES] ║ << ║",
+                    "╠════╩════════════════════╩════╣",
+                    "║ [NEURAL-CORE-PROCESSOR-X]   ║",
+                    "║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║",
+                    "║ █║█║█║█║█║█║█║█║█║█║█║█║█║█║ ║",
+                    "╠══════════════════════════════╣",
+                    "║ > MEM-BUFFER: ZERO-COPY      ║",
+                    "║ > PACKET-LOSS: 0.000%        ║",
+                    "╚══════════════════════════════╝"
+                ],
+                der: [
+                    "╔════[HYPER-SERVER-STATION]═══╗",
+                    "║ █║█║█║█║█║█║█║█║█║█║█║█║█║█║ ║",
+                    "║ [MICROSERVICE-MESH: OK]     ║",
+                    "╠══════════════════════════════╣",
+                    "║ 0110 1001 0101 1100 1101 001 ║",
+                    "║ ░░░░ ▓▓▓▓ █║█║█ ▒▒▒▒ ░░░░    ║",
+                    "╠══════════════════════════════╣",
+                    "║ [DISTRIBUTED-CACHE-CLUSTER]  ║",
+                    "║ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ║",
+                    "╚══════════════════════════════╝"
+                ],
+                horizonte: "══[FIBER-OPTIC-HIGHWAY]═══════════════════════════════════════════════════════════════════════════[SYNAPSE-SECURE]══"
+            },
+            tema_steampunk_observatory: {
+                cielo: [
+                    "⚙ ☼  ( VICTORIAN CELESTIAL CLOCKWORK OBSERVATORY )  ☼ ⚙",
+                    "      /===\\                                          /===\\      "
+                ],
+                izq: [
+                    "        .-------.        ",
+                    "      .'  ( ☼ )  '.      ",
+                    "     /  ░░ ▓▓ ░░   \\     ",
+                    "    | [ASTROLABE]   |    ",
+                    "     \\  ░░ ▓▓ ░░   /     ",
+                    "      '.  ( ⚙ )  .'      ",
+                    "     ---'=======`---     ",
+                    "        / | | | \\        ",
+                    "       |  █ █ █  |       ",
+                    "      [===========]      ",
+                    "     /  BRASS-GEAR \\     ",
+                    "    |  (o) (o) (o)  |    ",
+                    "    | ▓▓▓▓▓▓▓▓▓▓▓▓▓ |    ",
+                    "     \\  ░░░░░░░░░  /     ",
+                    "      [===========]      ",
+                    "        / | | | \\        ",
+                    "       =============     "
+                ],
+                der: [
+                    "         |===|         ",
+                    "        ( ⚙-⚙ )        ",
+                    "      .---|-|---.      ",
+                    "      | CLOCK-V |      ",
+                    "      | ░░░ ▓▓▓ |      ",
+                    "      '---------'      ",
+                    "        / | | \\        ",
+                    "       | █║ ║█ |       ",
+                    "      '---------'      ",
+                    "        / | | \\        ",
+                    "       =========       "
+                ],
+                horizonte: "⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙[ OBSERVATORIO VICTORIANO DE ENGRANAJES ]⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙⚙"
+            },
+            tema_bioluminescent_abyss: {
+                cielo: [
+                    "≈ ≈  ~  ( DEEP SEA BIOLUMINESCENT TRENCH & HYDROTHERMAL VENTS )  ~  ≈ ≈",
+                    "      ( o )                                          ( o )      "
+                ],
+                izq: [
+                    "          .-''''-.          ",
+                    "        .'  o  o  '.        ",
+                    "       /  ( ░░░ )   \\       ",
+                    "      |  BIOLUM-JELLY|      ",
+                    "       \\  ▓▓▓▓▓▓▓▓  /       ",
+                    "        '.        .'        ",
+                    "       / / / \\ \\ \\ \\        ",
+                    "      ( ( (   ) ) ) )       ",
+                    "       \\ \\ \\ / / / /        ",
+                    "      ( ( (   ) ) ) )       ",
+                    "       \\ \\ \\ / / / /        ",
+                    "        ||||||||||||        ",
+                    "     .================.     ",
+                    "     | CORAL-CATHEDRAL|     ",
+                    "     | ░░ ▓▓ ░░ ▓▓ ░░ |     ",
+                    "    ====================    "
+                ],
+                der: [
+                    "         .-''''-.         ",
+                    "       .'  ~  ~  '.       ",
+                    "      /   [ABYSS]  \\      ",
+                    "     |  ░░ ▓▓ ░░ ▓▓ |     ",
+                    "      \\  ( ∘ ∘ )   /      ",
+                    "       '.        .'       ",
+                    "        / / \\ \\ \\         ",
+                    "       ( (   ) ) )        ",
+                    "        \\ \\ / / /         ",
+                    "       ==========         "
+                ],
+                horizonte: "~~~~~~~~~~~~~~~~~~~~~~~~~~~~[ FOSA MARINA ABISAL • CORRIENTES LUMINISCENTES ]~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            },
+            tema_alchemist_laboratory: {
+                cielo: [
+                    "✧ 🜂  ⚗  [ ARCANUM ALCHEMICAL LABORATORY & TRANSMUTATION CIRCLE ]  ⚗  🜂 ✧",
+                    "      /\\  /\\                                          /\\  /\\      "
+                ],
+                izq: [
+                    "         .-----.         ",
+                    "        /  ⚗-⚗  \\        ",
+                    "       | ALEMBIQUE|      ",
+                    "       | ░░ ▓▓ ░░ |      ",
+                    "        \\  (🜂)   /       ",
+                    "      ---'====='---      ",
+                    "         |  |  |         ",
+                    "      .------------.     ",
+                    "      | TRANSMUTAR |     ",
+                    "      | ░░░ ▓▓▓ █║ |     ",
+                    "      | [RUNA-GOLD]|     ",
+                    "      '------------'     ",
+                    "       /  ||  ||  \\      ",
+                    "      [============]     ",
+                    "     /  CRISTAL-ARC \\    ",
+                    "    | ▓▓▓▓▓▓▓▓▓▓▓▓▓▓ |   ",
+                    "    ==================   "
+                ],
+                der: [
+                    "         .----.         ",
+                    "        /  🜁  \\        ",
+                    "       | HERMET |       ",
+                    "       | ░░  ▓▓ |       ",
+                    "        \\  (✧) /        ",
+                    "        '------'        ",
+                    "         / || \\         ",
+                    "       .--------.       ",
+                    "       | RUNA-X |       ",
+                    "       '--------'       ",
+                    "        /  ||  \\        ",
+                    "       ==========       "
+                ],
+                horizonte: "✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧[ LABORATORIO ALQUÍMICO DE TRANSMUTACIÓN ]✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧✧"
+            }
+        };
+
+        const registrarTemaDirectorLLM = (temaId, configTema) => {
+            this.registrarEfecto(temaId, {
+                init: (canvas, w, h) => {
+                    const width = (typeof w === 'number' && w > 0) ? w : (canvas && canvas.width ? canvas.width : window.innerWidth);
+                    const height = (typeof h === 'number' && h > 0) ? h : (canvas && canvas.height ? canvas.height : window.innerHeight);
+                    if (window.DIRECTOR_ASCII) {
+                        window.DIRECTOR_ASCII.inicializarEscenario(temaId);
+                    }
+
+                    // Generar partículas concentradas en los costados periféricos
+                    const particulas = [];
+                    const count = configTema.particulasCount || 32;
+                    for (let i = 0; i < count; i++) {
+                        const enCostados = Math.random() < 0.88;
+                        let posX;
+                        if (enCostados) {
+                            posX = Math.random() < 0.5 ? Math.random() * (width * 0.16) : width * 0.84 + Math.random() * (width * 0.16);
+                        } else {
+                            posX = width * 0.18 + Math.random() * (width * 0.64);
+                        }
+
+                        particulas.push({
+                            x: posX,
+                            y: Math.random() * height,
+                            velX: (Math.random() - 0.5) * (configTema.velX || 15),
+                            velY: (Math.random() * 0.8 + 0.2) * (configTema.velY || 25),
+                            char: configTema.simbolos[Math.floor(Math.random() * configTema.simbolos.length)],
+                            alfa: enCostados ? (Math.random() * 0.28 + 0.12) : (Math.random() * 0.06 + 0.02),
+                            tam: 9 + Math.random() * 2.5
+                        });
+                    }
+                    return { tiempo: 0, particulas };
+                },
+                update: (dt, w, h, mouse, state, audio) => {
+                    state.tiempo += dt;
+                    const boost = (audio && audio.reactivo) ? (1 + audio.energiaBass * 1.5) : 1.0;
+
+                    for (let i = 0; i < state.particulas.length; i++) {
+                        const p = state.particulas[i];
+                        p.x += p.velX * dt * boost;
+                        p.y += p.velY * dt * boost;
+
+                        if (p.y > h + 20) { p.y = -20; }
+                        if (p.x < -20) p.x = w * 0.15;
+                        if (p.x > w + 20) p.x = w * 0.85;
+                    }
+
+                    if (window.DIRECTOR_ASCII) {
+                        window.DIRECTOR_ASCII.actualizar(dt, this.cursorTexto, w, h);
+                    }
+                },
+                render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                    ctx.clearRect(0, 0, w, h);
+                    const bass = (audio && audio.reactivo) ? audio.energiaBass : 0;
+                    const tRel = (time || performance.now()) * 0.001;
+
+                    ctx.save();
+
+                    // 1. MÁSCARA CENTRAL DE ALTO CONTRASTE (Zona del Editor Monaco con visibilidad cristalina)
+                    const gradCentro = ctx.createLinearGradient(0, 0, w, 0);
+                    gradCentro.addColorStop(0, 'rgba(6, 9, 17, 0.10)');
+                    gradCentro.addColorStop(0.18, 'rgba(6, 9, 17, 0.55)');
+                    gradCentro.addColorStop(0.50, 'rgba(6, 9, 17, 0.65)');
+                    gradCentro.addColorStop(0.82, 'rgba(6, 9, 17, 0.55)');
+                    gradCentro.addColorStop(1, 'rgba(6, 9, 17, 0.10)');
+                    ctx.fillStyle = gradCentro;
+                    ctx.fillRect(0, 0, w, h);
+
+                    // 2. RENDERIZAR PAISAJES EN PERSPECTIVA PROFUNDA (Alejados en el fondo con micro-escala)
+                    const paisaje = PAISAJES_LATERALES[temaId];
+                    if (paisaje) {
+                        // Cielo lejano en movimiento de deriva horizontal suave
+                        if (paisaje.cielo) {
+                            ctx.font = '6.5px "Fira Code", monospace';
+                            ctx.textAlign = 'center';
+                            const alfaCielo = 0.14 + Math.sin(tRel * 0.8) * 0.04 + bass * 0.08;
+                            ctx.fillStyle = configTema.colorParticulas.replace('__A__', Math.min(0.35, Math.max(0.06, alfaCielo)).toFixed(2));
+
+                            const shiftCielo = Math.sin(tRel * 0.35) * 14;
+                            for (let s = 0; s < paisaje.cielo.length; s++) {
+                                ctx.fillText(paisaje.cielo[s], w * 0.5 + shiftCielo * (s % 2 === 0 ? 1 : -0.7), 12 + s * 9.5);
+                            }
+                        }
+
+                        // Columna lateral izquierda (arquitectura en perspectiva lejana: 6.2px)
+                        ctx.font = '6.2px "Fira Code", monospace';
+                        if (paisaje.izq) {
+                            ctx.textAlign = 'left';
+                            const inicioYIzq = Math.max(25, h * 0.06);
+                            for (let j = 0; j < paisaje.izq.length; j++) {
+                                const pulsoFila = 0.18 + Math.sin(tRel * 2.0 + j * 0.25) * 0.05 + bass * 0.10;
+                                const swayX = Math.sin(tRel * 0.5 + j * 0.12) * 1.2;
+                                const swayY = Math.cos(tRel * 0.8 + j * 0.18) * 0.8;
+                                ctx.fillStyle = configTema.colorParticulas.replace('__A__', Math.min(0.40, Math.max(0.06, pulsoFila)).toFixed(2));
+                                ctx.fillText(paisaje.izq[j], 6 + swayX, inicioYIzq + j * 8.2 + swayY);
+                            }
+                        }
+
+                        // Columna lateral derecha (perspectiva lejana: 6.2px)
+                        if (paisaje.der) {
+                            ctx.textAlign = 'right';
+                            const inicioYDer = Math.max(25, h * 0.06);
+                            for (let k = 0; k < paisaje.der.length; k++) {
+                                const pulsoDer = 0.18 + Math.cos(tRel * 2.0 + k * 0.25) * 0.05 + bass * 0.10;
+                                const swayDerX = Math.cos(tRel * 0.5 + k * 0.12) * 1.2;
+                                const swayDerY = Math.sin(tRel * 0.8 + k * 0.18) * 0.8;
+                                ctx.fillStyle = configTema.colorParticulas.replace('__A__', Math.min(0.40, Math.max(0.06, pulsoDer)).toFixed(2));
+                                ctx.fillText(paisaje.der[k], w - 6 + swayDerX, inicioYDer + k * 8.2 + swayDerY);
+                            }
+                        }
+
+                        // Línea de horizonte inferior lejana con flujo de escaneo continuo
+                        if (paisaje.horizonte) {
+                            ctx.textAlign = 'center';
+                            const alfaHoriz = 0.15 + Math.sin(tRel * 1.6) * 0.04 + bass * 0.08;
+                            const shiftHoriz = Math.sin(tRel * 0.4) * 8;
+                            ctx.fillStyle = configTema.colorParticulas.replace('__A__', Math.min(0.35, Math.max(0.05, alfaHoriz)).toFixed(2));
+                            ctx.fillText(paisaje.horizonte, w * 0.5 + shiftHoriz, h - 6);
+                        }
+                    }
+
+                    // 3. Partículas sutiles en la lejanía periférica
+                    ctx.font = '7.5px "Fira Code", monospace';
+                    ctx.textAlign = 'center';
+                    for (let i = 0; i < state.particulas.length; i++) {
+                        const p = state.particulas[i];
+                        ctx.fillStyle = configTema.colorParticulas.replace('__A__', (p.alfa * 0.65 + bass * 0.08).toFixed(2));
+                        ctx.fillText(p.char, p.x, p.y);
+                    }
+
+                    // 4. Renderizar cuadro de diálogo fijo ampliado y personaje en la zona inferior derecha
+                    if (window.DIRECTOR_ASCII) {
+                        window.DIRECTOR_ASCII.dibujar(ctx, w, h);
+                    }
+
+                    ctx.restore();
+                }
+            });
+        };
+
+        // 1. Mecha Titan Defense
+        registrarTemaDirectorLLM('tema_mecha_patrol', {
+            simbolos: ['·', '░', '▓', '▲', '⚡', '►'],
+            colorParticulas: 'rgba(166, 227, 161, __A__)',
+            particulasCount: 30,
+            velY: 20,
+            velX: 10
+        });
+
+        // 2. Netrunner 2077
+        registrarTemaDirectorLLM('tema_cyber_netrunner', {
+            simbolos: ['0', '1', 'λ', 'Ω', '░', '▒', '▓'],
+            colorParticulas: 'rgba(243, 139, 168, __A__)',
+            particulasCount: 35,
+            velY: 35,
+            velX: 0
+        });
+
+        // 3. Santuario del Dragón
+        registrarTemaDirectorLLM('tema_dragon_sanctuary', {
+            simbolos: ['*', '🌸', '·', '°', '░', '✧'],
+            colorParticulas: 'rgba(245, 194, 231, __A__)',
+            particulasCount: 25,
+            velY: 15,
+            velX: 15
+        });
+
+        // 4. Odisea Interestelar
+        registrarTemaDirectorLLM('tema_deep_space', {
+            simbolos: ['·', '•', '+', '✦', '✧', '°'],
+            colorParticulas: 'rgba(137, 180, 250, __A__)',
+            particulasCount: 30,
+            velY: -12,
+            velX: -8
+        });
+
+        // 5. Catacumba Rúnica
+        registrarTemaDirectorLLM('tema_dungeon_crawler', {
+            simbolos: ['░', '▒', '†', '‡', '§', '¶'],
+            colorParticulas: 'rgba(203, 166, 247, __A__)',
+            particulasCount: 25,
+            velY: -18,
+            velX: 8
+        });
+
+        // 6. Bosque Místico
+        registrarTemaDirectorLLM('tema_wild_nature', {
+            simbolos: ['·', '˚', '°', '🍃', '░', '✦'],
+            colorParticulas: 'rgba(148, 226, 213, __A__)',
+            particulasCount: 25,
+            velY: 12,
+            velX: 20
+        });
+
+        // 7. Arcade 1989
+        registrarTemaDirectorLLM('tema_retro_arcade', {
+            simbolos: ['■', '▲', '▼', '★', '♦', '●'],
+            colorParticulas: 'rgba(249, 226, 175, __A__)',
+            particulasCount: 30,
+            velY: 30,
+            velX: 0
+        });
+
+        // 8. Vacío Isométrico
+        registrarTemaDirectorLLM('tema_quantum_void', {
+            simbolos: ['⠁', '⠃', '⠇', '⠏', '⠟', '⠿', '░', '▒'],
+            colorParticulas: 'rgba(186, 194, 222, __A__)',
+            particulasCount: 25,
+            velY: 15,
+            velX: 15
+        });
+
+        // 9. Autopista Cybergrid Neuronal
+        registrarTemaDirectorLLM('tema_neural_cybergrid', {
+            simbolos: ['1', '0', '╢', '╟', '█', '░', '⚡'],
+            colorParticulas: 'rgba(137, 220, 235, __A__)',
+            particulasCount: 35,
+            velY: 38,
+            velX: 0
+        });
+
+        // 10. Observatorio Steampunk
+        registrarTemaDirectorLLM('tema_steampunk_observatory', {
+            simbolos: ['⚙', '✦', '·', '░', '▓', '☼'],
+            colorParticulas: 'rgba(249, 226, 175, __A__)',
+            particulasCount: 28,
+            velY: 14,
+            velX: 14
+        });
+
+        // 11. Abismo Bioluminiscente
+        registrarTemaDirectorLLM('tema_bioluminescent_abyss', {
+            simbolos: ['~', '≈', '∘', '°', '░', '✦'],
+            colorParticulas: 'rgba(116, 199, 236, __A__)',
+            particulasCount: 28,
+            velY: -16,
+            velX: 10
+        });
+
+        // 12. Laboratorio del Alquimista
+        registrarTemaDirectorLLM('tema_alchemist_laboratory', {
+            simbolos: ['⚗', '☿', '🜂', '░', '▓', '✧'],
+            colorParticulas: 'rgba(203, 166, 247, __A__)',
+            particulasCount: 28,
+            velY: 18,
+            velX: -10
+        });
     }
 }
 
 // Instanciar motor global
 window.MotorMovimientoFondo = MotorMovimientoFondo;
 window.motorMovimiento = new MotorMovimientoFondo();
+
+

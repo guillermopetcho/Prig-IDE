@@ -40,18 +40,22 @@ class EditorManager {
     initMonaco() {
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
         require(['vs/editor/editor.main'], () => {
-            monaco.editor.defineTheme('prig-dark', {
-                base: 'vs-dark',
-                inherit: true,
-                rules: [],
-                colors: {
-                    'editor.background': '#1e1e1e',
-                    'editor.lineHighlightBackground': '#2a2d2e',
-                    'editorLineNumber.foreground': '#858585',
-                    'editorLineNumber.activeForeground': '#cccccc',
-                    'editorIndentGuide.background': '#333333'
-                }
-            });
+            if (window.sintaxisMgr) {
+                window.sintaxisMgr.aplicar();
+            } else {
+                monaco.editor.defineTheme('prig-dark', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [],
+                    colors: {
+                        'editor.background': '#1e1e1e',
+                        'editor.lineHighlightBackground': '#2a2d2e',
+                        'editorLineNumber.foreground': '#858585',
+                        'editorLineNumber.activeForeground': '#cccccc',
+                        'editorIndentGuide.background': '#333333'
+                    }
+                });
+            }
 
             // Enlazar contenedores DOM de cada panel
             this.panes[0].containerEl = document.getElementById('monaco-editor-container');
@@ -181,7 +185,7 @@ class EditorManager {
         const ed = monaco.editor.create(containerEl, {
             value: '',
             language: 'python',
-            theme: localStorage.getItem('prig_editor_theme') || 'prig-dark',
+            theme: window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'),
             automaticLayout: true,
             fontSize: parseInt(localStorage.getItem('prig_editor_font_size') || '14', 10),
             fontFamily: "'Fira Code', monospace",
@@ -193,6 +197,54 @@ class EditorManager {
         // Evento de foco: actualizar la columna activa
         ed.onDidFocusEditorWidget(() => {
             this.setActivePane(colIndex);
+        });
+
+        // Sincronización del cursor y mecanografía con el motor de efectos de fondo (Robot Matrix Artillero)
+        let _ultimoDisparoTiempo = 0;
+        const obtenerCoordsCursor = () => {
+            const pos = ed.getPosition();
+            if (!pos) return null;
+            const coords = ed.getScrolledVisiblePosition(pos);
+            const domNode = ed.getDomNode();
+            if (!coords || !domNode) return null;
+            const rect = domNode.getBoundingClientRect();
+            return {
+                x: rect.left + coords.left,
+                y: rect.top + coords.top + (coords.height ? coords.height / 2 : 10)
+            };
+        };
+
+        ed.onDidChangeCursorPosition(() => {
+            if (!window.motorMovimiento) return;
+            const pt = obtenerCoordsCursor();
+            if (pt) window.motorMovimiento.notificarPosicionCursor(pt.x, pt.y);
+        });
+
+        ed.onKeyDown((e) => {
+            if (!window.motorMovimiento) return;
+            const ahora = performance.now();
+            if (ahora - _ultimoDisparoTiempo < 35) return; // Throttling 35ms para evitar saturación
+            _ultimoDisparoTiempo = ahora;
+
+            const key = (e.browserEvent && e.browserEvent.key && e.browserEvent.key.length === 1) ? e.browserEvent.key : '1';
+            const pt = obtenerCoordsCursor();
+            if (pt) {
+                window.motorMovimiento.dispararHaciaCursor(pt.x, pt.y, key);
+            }
+        });
+
+        // Disparo de evaluación de código por el Evaluador ASCII e impulso físico de resortes
+        let _timerEvaluacionCodigo = null;
+        ed.onDidChangeModelContent(() => {
+            if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.aplicarImpulso === 'function') {
+                window.DIRECTOR_ASCII.evaluador.aplicarImpulso((Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 0.8);
+            }
+            if (_timerEvaluacionCodigo) clearTimeout(_timerEvaluacionCodigo);
+            _timerEvaluacionCodigo = setTimeout(() => {
+                if (window.DIRECTOR_ASCII) {
+                    window.DIRECTOR_ASCII.dispararDecisionDirector('pausa_escritura');
+                }
+            }, 6000);
         });
 
         // --- Atajos Nativos VS Code Registrados Directamente en Monaco ---
