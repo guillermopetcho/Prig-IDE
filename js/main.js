@@ -1,14 +1,14 @@
 /**
  * ============================================================================
  * PRIG IDE · JAVASCRIPT PRINCIPAL PARA GITHUB PAGES
- * Interacciones: Canvas de Partículas, Personaje ASCII en Vivo, Lightbox y Demos
+ * Interacciones: Canvas de Partículas, Personaje ASCII en Vivo, Tabs Interactivos, Lightbox y Demos
  * ============================================================================
  */
 
 (function () {
     'use strict';
 
-    // 1. LIENZO DE FONDO CON CONSTELACIÓN DE PARTÍCULAS
+    // 1. LIENZO DE FONDO CON CONSTELACIÓN DE PARTÍCULAS (60 FPS)
     function initBackgroundCanvas() {
         const canvas = document.getElementById('bg-canvas');
         if (!canvas) return;
@@ -16,7 +16,7 @@
         let w = canvas.width = window.innerWidth;
         let h = canvas.height = window.innerHeight;
 
-        const numParticles = Math.min(75, Math.floor(w * 0.05));
+        const numParticles = Math.min(80, Math.floor(w * 0.05));
         const particles = [];
         const mouse = { x: -1000, y: -1000, radius: 140 };
 
@@ -44,7 +44,6 @@
         function animate() {
             ctx.clearRect(0, 0, w, h);
 
-            // Dibujar y conectar partículas
             for (let i = 0; i < particles.length; i++) {
                 const p = particles[i];
                 p.x += p.vx;
@@ -53,7 +52,6 @@
                 if (p.x < 0 || p.x > w) p.vx *= -1;
                 if (p.y < 0 || p.y > h) p.vy *= -1;
 
-                // Interacción suave con mouse
                 const dx = mouse.x - p.x;
                 const dy = mouse.y - p.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -72,12 +70,12 @@
                 for (let j = i + 1; j < particles.length; j++) {
                     const p2 = particles[j];
                     const distP = Math.hypot(p.x - p2.x, p.y - p2.y);
-                    if (distP < 110) {
+                    if (distP < 115) {
                         ctx.beginPath();
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(p2.x, p2.y);
                         ctx.strokeStyle = '#89b4fa';
-                        ctx.globalAlpha = (1.0 - (distP / 110)) * 0.15;
+                        ctx.globalAlpha = (1.0 - (distP / 115)) * 0.16;
                         ctx.lineWidth = 0.8;
                         ctx.stroke();
                     }
@@ -187,16 +185,16 @@
             ctx.fill();
 
             // Bocadillo de diálogo del modelo
-            const bubbleY = 28;
+            const bubbleY = 24;
             ctx.fillStyle = 'rgba(24, 24, 37, 0.9)';
-            ctx.fillRect(w * 0.1, bubbleY, w * 0.8, 28);
+            ctx.fillRect(w * 0.08, bubbleY, w * 0.84, 30);
             ctx.strokeStyle = '#cba6f7';
             ctx.lineWidth = 1;
-            ctx.strokeRect(w * 0.1, bubbleY, w * 0.8, 28);
+            ctx.strokeRect(w * 0.08, bubbleY, w * 0.84, 30);
 
             ctx.font = 'bold 8.5px "Fira Code", monospace';
             ctx.fillStyle = '#cdd6f4';
-            ctx.fillText('💬 7B DIRECTOR: "Analizando AST, CFG y telemetría en tiempo real."', charX, bubbleY + 18);
+            ctx.fillText('💬 7B DIRECTOR: "Analizando AST, CFG y telemetría en tiempo real."', charX, bubbleY + 19);
 
             requestAnimationFrame(renderCharacter);
         }
@@ -204,7 +202,31 @@
         renderCharacter();
     }
 
-    // 3. LIGHTBOX DE CAPTURAS
+    // 3. TABS INTERACTIVOS PARA SHOWCASE DE 4 MODOS
+    function initShowcaseTabs() {
+        const tabs = document.querySelectorAll('.showcase-tab');
+        const contents = document.querySelectorAll('.showcase-content');
+
+        if (!tabs.length || !contents.length) return;
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = tab.dataset.tab;
+                if (!targetId) return;
+
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                const targetContent = document.getElementById(targetId);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            });
+        });
+    }
+
+    // 4. LIGHTBOX DE CAPTURAS
     function initLightbox() {
         const modal = document.getElementById('lightbox-modal');
         const modalImg = document.getElementById('lightbox-img');
@@ -237,7 +259,7 @@
         });
     }
 
-    // 4. COPIAR COMANDOS AL PORTAPAPELES
+    // 5. COPIAR COMANDOS AL PORTAPAPELES
     function initCopyButtons() {
         document.querySelectorAll('.btn-copy').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -263,15 +285,16 @@
         document.addEventListener('DOMContentLoaded', () => {
             initBackgroundCanvas();
             initHeroCharacter();
+            initShowcaseTabs();
             initLightbox();
             initCopyButtons();
         });
     } else {
         initBackgroundCanvas();
         initHeroCharacter();
+        initShowcaseTabs();
         initLightbox();
         initCopyButtons();
     }
 
 })();
-
