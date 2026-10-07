@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prig: GitHub Hub · Explorador y Auditor de Repositorios Remotos Asistido por IA</title>
+    <meta name="description" content="Prig GitHub Hub: Busca, inspecciona y lee repositorios de GitHub sin clonar previamente, auditoría de arquitectura con Director IA 7B, visor de árboles de código y exportador a PDF.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .gh-hero-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 40px;
+            align-items: center;
+            padding: 30px 0 50px;
+        }
+        .gh-mock-card {
+            background: #090b14;
+            border: 1px solid var(--neon-purple);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(203, 166, 247, 0.25);
+        }
+        .gh-mock-header {
+            background: #11111b;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .gh-search-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(203, 166, 247, 0.3);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-family: var(--font-code);
+            font-size: 12px;
+            color: #cdd6f4;
+            margin: 14px;
+        }
+        .gh-repo-tree-mock {
+            background: rgba(18, 22, 38, 0.85);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 0 14px 10px;
+            font-family: var(--font-code);
+            font-size: 11.5px;
+            color: #cdd6f4;
+            line-height: 1.6;
+        }
+        .gh-stat-tag {
+            font-size: 10.5px;
+            font-family: var(--font-code);
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(203, 166, 247, 0.15);
+            color: var(--neon-purple);
+            border: 1px solid rgba(203, 166, 247, 0.3);
+        }
+        .gh-ai-explainer-box {
+            background: rgba(9, 11, 20, 0.9);
+            border-left: 3px solid var(--neon-green);
+            padding: 14px;
+            border-radius: 6px;
+            font-family: var(--font-code);
+            font-size: 11px;
+            color: #cdd6f4;
+            line-height: 1.6;
+            margin: 0 14px 14px;
+        }
+        @media (max-width: 1024px) {
+            .gh-hero-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fondo de Partículas Dinámicas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="site-wrapper">
+        <!-- Barra de Navegación -->
+        <header class="navbar">
+            <a href="index.html" class="nav-brand">
+                <div class="brand-icon" style="border-color:var(--neon-purple); color:var(--neon-purple); background:rgba(203, 166, 247, 0.2);">
+                    <i class="fa-brands fa-github"></i>
+                </div>
+                <div>
+                    <span class="brand-name">PRIG: GITHUB</span>
+                    <span class="brand-tag" style="background:rgba(203, 166, 247, 0.15); color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3);">CODE EXPLORER</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="index.html" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Volver al IDE</a></li>
+                <li><a href="#capacidades" class="nav-link">Capacidades</a></li>
+                <li><a href="#lectura-ia" class="nav-link">Lectura sin Clonar</a></li>
+                <li><a href="#capturas" class="nav-link">Capturas Reales</a></li>
+                <li><a href="kaggle.html" class="nav-link" style="color:var(--neon-cyan);"><i class="fa-brands fa-kaggle"></i> Kaggle</a></li>
+                <li><a href="youtube.html" class="nav-link" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> YouTube</a></li>
+            </ul>
+
+            <a href="index.html#instalacion" class="btn-primary" style="background:linear-gradient(135deg, var(--neon-purple), var(--neon-blue)); padding:8px 18px; font-size:13px;">
+                <i class="fa-solid fa-download"></i> Probar en Prig
+            </a>
+        </header>
+
+        <!-- HERO SECTION GITHUB HUB -->
+        <section class="gh-hero-grid">
+            <div>
+                <div class="hero-badge" style="background:rgba(203, 166, 247, 0.12); border-color:rgba(203, 166, 247, 0.35); color:var(--neon-purple);">
+                    <i class="fa-brands fa-github"></i> INSPECCIÓN REMOTA &amp; AUDITORÍA ARQUITECTURAL
+                </div>
+                <h1 class="hero-title">
+                    Audita y Lee Cualquier Repositorio de GitHub <span style="background:linear-gradient(135deg, var(--neon-purple), var(--neon-cyan), var(--neon-blue)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Sin Clonar Previamente</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Prig GitHub Hub permite explorar el árbol de código completo de cualquier proyecto open-source, renderizar el README, <strong>analizar la arquitectura de software con el Director IA 7B</strong> y exportar compendios de "Código Explicado" en Markdown o PDF.
+                </p>
+                <div class="hero-actions">
+                    <a href="#capturas" class="btn-primary" style="background:linear-gradient(135deg, var(--neon-purple), var(--neon-blue));">
+                        <i class="fa-solid fa-images"></i> Ver Capturas Reales
+                    </a>
+                    <a href="index.html" class="btn-secondary">
+                        <i class="fa-solid fa-laptop-code"></i> Explorar el IDE
+                    </a>
+                </div>
+            </div>
+
+            <!-- MOCKUP DEL EXPLORADOR GITHUB -->
+            <div class="gh-mock-card">
+                <div class="gh-mock-header">
+                    <div class="hcc-dots">
+                        <div class="hcc-dot red"></div>
+                        <div class="hcc-dot yellow"></div>
+                        <div class="hcc-dot green"></div>
+                    </div>
+                    <span style="font-family:var(--font-code); font-size:11px; color:var(--neon-purple); font-weight:700;">
+                        <i class="fa-brands fa-github"></i> GITHUB REPO INSPECTOR &amp; AUDITOR
+                    </span>
+                </div>
+
+                <div class="gh-search-input">
+                    <i class="fa-solid fa-magnifying-glass" style="color:var(--neon-purple);"></i>
+                    <span>karpathy/nanoGPT · stars: >10k language:python</span>
+                </div>
+
+                <div class="gh-repo-tree-mock">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-weight:700; color:#ffffff;"><i class="fa-solid fa-book-bookmark"></i> karpathy/nanoGPT</span>
+                        <span class="gh-stat-tag"><i class="fa-solid fa-star"></i> 34.2k stars</span>
+                    </div>
+                    <div style="color:var(--text-dim); font-size:11px;">
+                        ├── 📄 <span style="color:var(--neon-cyan);">model.py</span> (Arquitectura GPT &amp; Multi-Head Attention)<br>
+                        ├── 📄 <span style="color:var(--neon-cyan);">train.py</span> (Bucle de entrenamiento DDP &amp; Cosine Decay)<br>
+                        ├── 📄 <span style="color:var(--neon-cyan);">sample.py</span> (Inferencia autoregresiva)<br>
+                        └── 📄 <span style="color:var(--text-dim);">README.md</span> (Guía de reproducción)
+                    </div>
+                </div>
+
+                <div class="gh-ai-explainer-box">
+                    <span style="color:var(--neon-green); font-weight:700;"><i class="fa-solid fa-robot"></i> AUDITORÍA ARQUITECTURAL [Director 7B]:</span><br>
+                    <em>"nanoGPT implementa la arquitectura Transformer Decoder-Only en ~300 líneas. El módulo <code>model.py</code> encapsula FlashAttention y RoPE embeddings sin dependencias pesadas."</em>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAPACIDADES CLAVE -->
+        <section id="capacidades" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.3); background:rgba(203, 166, 247, 0.1);">CARACTERÍSTICAS INTEGRALES</span>
+                <h2 class="section-title">El Ecosistema para Explorar Código Open-Source</h2>
+                <p class="section-desc">Diseñado para estudiar bases de código complejas, auditar dependencias y aprender de los mejores repositorios del mundo.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon purple">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                    </div>
+                    <h3 class="card-title">Inspección sin Clonar</h3>
+                    <p class="card-desc">
+                        Navega por la jerarquía de directorios, abre cualquier archivo y lee el README con sintaxis enriquecida sin ocupar gigabytes en tu disco duro.
+                    </p>
+                    <span class="card-tag">REMOTE TREE VIEWER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon cyan">
+                        <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <h3 class="card-title">Lectura Guiada por IA</h3>
+                    <p class="card-desc">
+                        El Director IA 7B resume el propósito del repositorio, identifica los puntos de entrada clave (<code>main.py</code>, <code>index.ts</code>, <code>Cargo.toml</code>) y explica funciones complejas.
+                    </p>
+                    <span class="card-tag">ARCHITECTURE AUDITOR</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon green">
+                        <i class="fa-solid fa-file-pdf"></i>
+                    </div>
+                    <h3 class="card-title">Exportador de Código Explicado</h3>
+                    <p class="card-desc">
+                        Genera compendios en PDF o Markdown con el código fuente del repositorio y las explicaciones didácticas de la IA integradas debajo de cada bloque.
+                    </p>
+                    <span class="card-tag">PDF / MD EXPORTER</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon blue">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <h3 class="card-title">Buscador Potente por Filtros</h3>
+                    <p class="card-desc">
+                        Filtra por estrellas, forks, fecha de última actualización, lenguaje de programación y tópicos específicos directamente desde la barra de Prig.
+                    </p>
+                    <span class="card-tag">GITHUB SEARCH API</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon yellow">
+                        <i class="fa-solid fa-hard-drive"></i>
+                    </div>
+                    <h3 class="card-title">Caché Inteligente de 24 Horas</h3>
+                    <p class="card-desc">
+                        Las consultas de metadatos se guardan localmente para garantizar velocidad instantánea y evitar consumir los límites de la API de GitHub.
+                    </p>
+                    <span class="card-tag">SMART DISK CACHE</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon pink">
+                        <i class="fa-solid fa-download"></i>
+                    </div>
+                    <h3 class="card-title">Descarga al Workspace en 1 Clic</h3>
+                    <p class="card-desc">
+                        ¿Quieres trabajar en el repositorio? Descárgalo descomprimido directamente en <code>&lt;proyecto&gt;/github_repos/</code> y comienza a editar en el Editor Prig.
+                    </p>
+                    <span class="card-tag">1-CLICK WORKSPACE IMPORT</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN LECTURA CON MODELO AL LADO -->
+        <section id="lectura-ia" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-green); border-color:rgba(166, 227, 161, 0.3); background:rgba(166, 227, 161, 0.1);">METODOLOGÍA DIDÁCTICA</span>
+                <h2 class="section-title">Comprende Arquitecturas Complejas en Minutos</h2>
+                <p class="section-desc">Cómo el Director IA descompone el código open-source en explicaciones asimilables.</p>
+            </div>
+
+            <div class="benchmark-box">
+                <div>
+                    <h4 style="color:#ffffff; font-size:16px; margin-bottom:10px;">
+                        <i class="fa-solid fa-diagram-project" style="color:var(--neon-purple);"></i> Análisis Topológico de Módulos
+                    </h4>
+                    <p style="font-size:13.5px; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">
+                        En lugar de abrumarte con miles de líneas, Prig prioriza los archivos neurálgicos del proyecto y crea un mapa mental de dependencias y flujos de ejecución.
+                    </p>
+                    <p style="font-size:13.5px; color:var(--text-muted); line-height:1.6;">
+                        Puedes hacer preguntas específicas al Cerebro IA sobre patrones de diseño, algoritmos de concurrencia o APIs utilizadas en el código.
+                    </p>
+                </div>
+
+                <div style="background:#090b14; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px; font-family:var(--font-code); font-size:11px; color:#cdd6f4; line-height:1.7;">
+                    <span style="color:var(--neon-purple); font-weight:700;"><i class="fa-solid fa-code"></i> RESUMEN ESTRUCTURAL:</span><br>
+                    <span style="color:var(--neon-yellow);"># Repositorio:</span> <code>vllm-project/vllm</code><br>
+                    <span style="color:var(--neon-yellow);"># PagedAttention:</span> Algoritmo de gestión de memoria KV-Cache inspirado en memoria virtual del SO.<br>
+                    <span style="color:var(--neon-yellow);"># Puntos de Entrada:</span> <code>vllm/engine/async_llm_engine.py</code><br>
+                    <span style="color:var(--neon-green);">&gt;&gt;&gt; Ficha exportable a PDF con código fuente y notas explicativas.</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAPTURAS REALES DE LA SECCIÓN GITHUB -->
+        <section id="capturas" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-cyan); border-color:rgba(137, 220, 235, 0.3); background:rgba(137, 220, 235, 0.1);">CAPTURAS EN ALTA RESOLUCIÓN</span>
+                <h2 class="section-title">La Sección GitHub en Acción</h2>
+                <p class="section-desc">Haz clic en cualquier imagen para ampliarla con el visor Lightbox.</p>
+            </div>
+
+            <div class="gallery-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <!-- Captura 1: Búsqueda de Repositorios -->
+                <div class="gallery-card">
+                    <div class="gallery-img-wrap" style="height:260px;">
+                        <img src="assets/github-buscar.png" alt="Búsqueda de Repositorios de GitHub en Prig IDE" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-magnifying-glass"></i> BÚSQUEDA DE REPOS</span>
+                    </div>
+                    <div class="gallery-info">
+                        <h4 class="gallery-title">Búsqueda y Filtros de Repositorios</h4>
+                        <p class="gallery-caption">
+                            Búsqueda instantánea conectada a la API de GitHub con filtros por estrellas, forks, lenguajes y temas.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Captura 2: Explorador de Repositorios y Árbol de Código -->
+                <div class="gallery-card">
+                    <div class="gallery-img-wrap" style="height:260px;">
+                        <img src="assets/github-repositorio.png" alt="Árbol de Archivos y Lectura de Código GitHub en Prig IDE" class="gallery-img">
+                        <span class="gallery-overlay-badge"><i class="fa-solid fa-folder-tree"></i> EXPLORADOR REMOTO</span>
+                    </div>
+                    <div class="gallery-info">
+                        <h4 class="gallery-title">Árbol de Archivos &amp; Lectura Remota</h4>
+                        <p class="gallery-caption">
+                            Inspección de código fuente, visualización de README y auditoría didáctica asistida por el Director IA 7B.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: GITHUB HUB</span>
+                <span>— Explorador de Código Open-Source y Repositorios</span>
+            </div>
+            <ul class="footer-links">
+                <li><a href="index.html">Página Principal</a></li>
+                <li><a href="kaggle.html" style="color:var(--neon-cyan);"><i class="fa-brands fa-kaggle"></i> Prig: Kaggle</a></li>
+                <li><a href="youtube.html" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> Prig: YouTube</a></li>
+                <li><a href="index.html#pilares">Pilares Técnicos</a></li>
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+            <p style="font-size:11.5px; color:var(--text-dim);">
+                Integración con GitHub REST API v3, Editor Prig, modelos LLM 7B locales y exportador PDF.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Modal Lightbox para Zoom de Capturas -->
+    <div id="lightbox-modal" class="lightbox-modal">
+        <button id="lightbox-close" class="lightbox-close" title="Cerrar (Esc)">&times;</button>
+        <img id="lightbox-img" class="lightbox-content" src="" alt="Captura ampliada">
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+</body>
+</html>
