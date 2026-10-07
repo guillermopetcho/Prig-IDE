@@ -1032,52 +1032,55 @@ class AnalizadorSintacticoAST:
                         dependencias.append(dep_name)
 
         # 2. Análisis de funciones y clases
+        def _procesar_funcion(nodo_fn, clase_padre: str = ""):
+            nonlocal complejidad_max
+            comp = 1
+            for sub in ast.walk(nodo_fn):
+                if isinstance(sub, (ast.If, ast.While, ast.For, ast.ExceptHandler, ast.With, ast.Assert)):
+                    comp += 1
+                elif isinstance(sub, ast.BoolOp):
+                    comp += len(sub.values) - 1
+
+            complejidad_max = max(complejidad_max, comp)
+
+            args_lista = []
+            for a in nodo_fn.args.args:
+                arg_str = a.arg
+                if a.annotation:
+                    try:
+                        arg_str += f": {ast.unparse(a.annotation)}"
+                    except Exception:
+                        arg_str += ": Any"
+                args_lista.append(arg_str)
+
+            retorno_str = ""
+            if nodo_fn.returns:
+                try:
+                    retorno_str = f" -> {ast.unparse(nodo_fn.returns)}"
+                except Exception:
+                    pass
+
+            prefijo_async = "async " if isinstance(nodo_fn, ast.AsyncFunctionDef) else ""
+            firma = f"{prefijo_async}def {nodo_fn.name}({', '.join(args_lista)}){retorno_str}:"
+            l_ini = getattr(nodo_fn, 'lineno', 1)
+            l_fin = getattr(nodo_fn, 'end_lineno', l_ini + 3)
+
+            simbolos.append({
+                "tipo": "metodo" if clase_padre else "funcion",
+                "nombre": nodo_fn.name,
+                "clase_padre": clase_padre,
+                "firma": firma,
+                "linea_inicio": l_ini,
+                "linea_fin": l_fin,
+                "complejidad": f"O(N)" if comp > 2 else "O(1)",
+                "ciclomatica": comp
+            })
+
+            pasos_cfg.extend(AnalizadorSintacticoAST._construir_cfg_funcion(nodo_fn, total_lineas))
+
         for nodo in arbol.body:
             if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                # Cálculo de complejidad ciclomática de la función
-                comp = 1
-                for sub in ast.walk(nodo):
-                    if isinstance(sub, (ast.If, ast.While, ast.For, ast.ExceptHandler, ast.With, ast.Assert)):
-                        comp += 1
-                    elif isinstance(sub, ast.BoolOp):
-                        comp += len(sub.values) - 1
-
-                complejidad_max = max(complejidad_max, comp)
-
-                # Extraer parámetros con anotaciones de tipo
-                args_lista = []
-                for a in nodo.args.args:
-                    arg_str = a.arg
-                    if a.annotation:
-                        try:
-                            arg_str += f": {ast.unparse(a.annotation)}"
-                        except Exception:
-                            arg_str += ": Any"
-                    args_lista.append(arg_str)
-
-                retorno_str = ""
-                if nodo.returns:
-                    try:
-                        retorno_str = f" -> {ast.unparse(nodo.returns)}"
-                    except Exception:
-                        pass
-
-                firma = f"{'async ' if isinstance(nodo, ast.AsyncFunctionDef) else ''}def {nodo.name}({', '.join(args_lista)}){retorno_str}:"
-                l_ini = getattr(nodo, 'lineno', 1)
-                l_fin = getattr(nodo, 'end_lineno', l_ini + 3)
-
-                simbolos.append({
-                    "tipo": "funcion",
-                    "nombre": nodo.name,
-                    "firma": firma,
-                    "linea_inicio": l_ini,
-                    "linea_fin": l_fin,
-                    "complejidad": f"O(N)" if comp > 2 else "O(1)",
-                    "ciclomatica": comp
-                })
-
-                # Generar Grafo de Flujo de Control (CFG) para esta función
-                pasos_cfg.extend(AnalizadorSintacticoAST._construir_cfg_funcion(nodo, total_lineas))
+                _procesar_funcion(nodo)
 
             elif isinstance(nodo, ast.ClassDef):
                 bases = []
@@ -1097,6 +1100,11 @@ class AnalizadorSintacticoAST:
                     "linea_fin": l_fin,
                     "bases": bases
                 })
+
+                # Extraer métodos dentro de la clase
+                for sub_item in nodo.body:
+                    if isinstance(sub_item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        _procesar_funcion(sub_item, clase_padre=nodo.name)
 
         # 3. Puntos críticos globales
         for nodo in ast.walk(arbol):
@@ -1253,9 +1261,19 @@ class AnalizadorSintacticoAST:
 
         for idx, l in enumerate(lineas):
             s = l.strip()
+            # Remover export default / export para normalizar declaraciones
+            s_decl = s
+            if s_decl.startswith("export default "):
+                s_decl = s_decl[15:].strip()
+            elif s_decl.startswith("export "):
+                s_decl = s_decl[7:].strip()
+
             num_l = idx + 1
-            if s.startswith("function ") or s.startswith("const ") and " = (" in s or s.startswith("fn ") or s.startswith("def "):
-                nombre_fn = s.split("(")[0].replace("function ", "").replace("const ", "").replace("fn ", "").replace("def ", "").replace("export ", "").strip()
+            es_arrow_fn = ("=>" in s_decl or "= function" in s_decl or "= async" in s_decl) and ("const " in s_decl or "let " in s_decl or "var " in s_decl)
+            es_fn_estandar = s_decl.startswith("function ") or s_decl.startswith("async function ") or s_decl.startswith("fn ") or s_decl.startswith("def ")
+
+            if es_fn_estandar or es_arrow_fn:
+                nombre_fn = s_decl.split("=")[0].split("(")[0].replace("function ", "").replace("async ", "").replace("const ", "").replace("let ", "").replace("var ", "").replace("fn ", "").replace("def ", "").strip()
                 if " " in nombre_fn:
                     nombre_fn = nombre_fn.split(" ")[-1]
                 simbolos.append({
@@ -1265,8 +1283,8 @@ class AnalizadorSintacticoAST:
                     "linea_inicio": num_l,
                     "linea_fin": min(total_lineas, num_l + 4)
                 })
-            elif s.startswith("class ") or s.startswith("interface ") or s.startswith("struct "):
-                nombre_cl = s.split("{")[0].replace("class ", "").replace("interface ", "").replace("struct ", "").replace("export ", "").strip()
+            elif s_decl.startswith("class ") or s_decl.startswith("interface ") or s_decl.startswith("struct "):
+                nombre_cl = s_decl.split("{")[0].split("extends")[0].split("implements")[0].replace("class ", "").replace("interface ", "").replace("struct ", "").strip()
                 simbolos.append({
                     "tipo": "clase",
                     "nombre": nombre_cl,
@@ -1463,7 +1481,7 @@ class MemoriaArchivosDirector:
             "total_archivos_memorizados": len(self.archivos_memorizados),
             "total_tokens_crudos_evitados": total_crudo,
             "total_tokens_comprimidos_usados": total_comprimido,
-            "ahorro_global_porcentaje": ahorro_pct,
+            "ahorro_global_porcentaje": max(0.0, ahorro_pct),
             "tokens_netos_ahorrados": max(0, total_crudo - total_comprimido)
         }
 
