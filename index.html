@@ -31,10 +31,12 @@
 
             <ul class="nav-links">
                 <li><a href="#ecosistema" class="nav-link" style="color:var(--neon-cyan); font-weight:600;"><i class="fa-solid fa-layer-group"></i> Ecosistema</a></li>
-                <li><a href="#pilares" class="nav-link">Pilares Técnicos</a></li>
-                <li><a href="#modos-interactivos" class="nav-link">Showcase</a></li>
-                <li><a href="#benchmark" class="nav-link">Compresión AST</a></li>
-                <li><a href="#galeria" class="nav-link">Capturas</a></li>
+                <li><a href="#motor-moe" class="nav-link">Motor MoE</a></li>
+                <li><a href="#control-hardware" class="nav-link">Hardware C</a></li>
+                <li><a href="#lentes-analiticas" class="nav-link">Lentes CoT</a></li>
+                <li><a href="#memoria-consulta" class="nav-link">Grafo CPG</a></li>
+                <li><a href="#benchmark" class="nav-link">Memoria AST</a></li>
+                <li><a href="#faq" class="nav-link">FAQ</a></li>
                 <li><a href="#instalacion" class="nav-link">Instalación</a></li>
             </ul>
 
@@ -309,8 +311,314 @@
             </div>
         </section>
 
-        <!-- SHOWCASE INTERACTIVO DE 4 MODOS -->
-        <section id="modos-interactivos" class="section">
+        <!-- SECCIÓN: MOTOR MOE HÍBRIDO (35B EN 6GB VRAM) -->
+        <section id="motor-moe" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-cyan); border-color:rgba(137, 220, 235, 0.35); background:rgba(137, 220, 235, 0.1);">INFERENCIA MOE DE ALTO RENDIMIENTO</span>
+                <h2 class="section-title">Motor MoE Nativo: Qwen3.6-35B en GPU de 6 GB a 68 tok/s</h2>
+                <p class="section-desc">Partición matemática por expertos individuales y decodificación especulativa MTP con cero estrangulamiento térmico.</p>
+            </div>
+
+            <div class="deepdive-card">
+                <div class="deepdive-header">
+                    <div class="deepdive-title">
+                        <i class="fa-solid fa-microchip" style="color:var(--neon-cyan);"></i>
+                        <span>Mediciones Reales: RTX 4050 Laptop (6 GB VRAM) + Intel i5-13420H</span>
+                    </div>
+                    <span class="card-tag" style="color:var(--neon-green); border:1px solid rgba(166, 227, 161, 0.3);">40 CAPAS · 256 EXPERTOS (8 ACTIVOS)</span>
+                </div>
+
+                <div class="deepdive-grid-2">
+                    <div>
+                        <p style="font-size:13.5px; color:var(--text-muted); line-height:1.65; margin-bottom:14px;">
+                            Ollama tradicional solo permite repartir modelos dividiendo <strong>capas enteras</strong> entre GPU y RAM. En una GPU de 6 GB, apenas caben 7 capas, obligando a la CPU a calcular el resto a 27 tok/s mientras se dispara a más de 93 °C.
+                        </p>
+                        <p style="font-size:13.5px; color:var(--text-muted); line-height:1.65; margin-bottom:16px;">
+                            El motor MoE de Prig integra un <code>llama-server</code> con parche nativo C++ (<code>prig-moe.diff</code>) que copia a la VRAM los <strong>expertos más calientes de cada capa</strong> y deja los fríos en RAM. CPU y GPU computan de manera simultánea sin esperas ociosas.
+                        </p>
+
+                        <div class="tech-callout">
+                            <strong><i class="fa-solid fa-bolt"></i> Decodificación Especulativa con MTP:</strong> El archivo GGUF incorpora un cabezal MTP que propone 2 tokens por paso y el modelo los verifica en una sola pasada. Tasa de acierto comprobada del <strong>80% al 92%</strong> en código estructurado.
+                        </div>
+                    </div>
+
+                    <div>
+                        <!-- Tabla de Benchmarks MoE -->
+                        <div class="ast-table-wrap" style="margin-top:0;">
+                            <table class="ast-table">
+                                <thead>
+                                    <tr>
+                                        <th>Configuración del Motor</th>
+                                        <th>Velocidad</th>
+                                        <th>CPU por Token</th>
+                                        <th>Temp. CPU</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Ollama (7 capas GPU, turbo on)</td>
+                                        <td style="color:#f38ba8;">27.7 tok/s</td>
+                                        <td>—</td>
+                                        <td style="color:#f38ba8;">83–93 °C</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Calientes en VRAM (48/capa)</td>
+                                        <td style="color:var(--neon-blue);">36.9 tok/s</td>
+                                        <td>58 ms</td>
+                                        <td style="color:var(--neon-green);">57 °C</td>
+                                    </tr>
+                                    <tr>
+                                        <td>+ MTP · <strong>Modo Exacto</strong></td>
+                                        <td style="color:var(--neon-cyan); font-weight:700;">53.0 tok/s</td>
+                                        <td>51 ms</td>
+                                        <td style="color:var(--neon-green);">55 °C</td>
+                                    </tr>
+                                    <tr>
+                                        <td>+ Poda Fríos &lt; 0.08 · <strong>Equilibrado</strong></td>
+                                        <td style="color:var(--neon-green); font-weight:700;">59.6 tok/s</td>
+                                        <td>42 ms</td>
+                                        <td style="color:var(--neon-green);">55 °C</td>
+                                    </tr>
+                                    <tr>
+                                        <td>+ Poda Fríos &lt; 0.10 · <strong>Rápido</strong></td>
+                                        <td style="color:var(--neon-yellow); font-weight:700;">68.1 tok/s</td>
+                                        <td>33 ms</td>
+                                        <td style="color:var(--neon-green);">55 °C</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <ul class="tech-feature-list" style="margin-top:16px;">
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-green);"></i> <strong>AIPC_COLD_SKIP:</strong> La CPU ignora los expertos que la GPU ya resolvió en VRAM.</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-green);"></i> <strong>AIPC_NO_PAD:</strong> Elimina ceros de padding recuperando ~570 MB de memoria gráfica.</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-green);"></i> <strong>Caché de Proyectos:</strong> Restaura 16.957 tokens de proyecto en 0.08 s frente a 21 s de relectura.</li>
+                            <li><i class="fa-solid fa-check" style="color:var(--neon-green);"></i> <strong>Gramática GBNF "Solo Código":</strong> Generaciones directas sin prosa explicativa en ~3 s.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: INGENIERÍA DE HARDWARE Y C NATIVO -->
+        <section id="control-hardware" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-pink); border-color:rgba(243, 139, 168, 0.35); background:rgba(243, 139, 168, 0.1);">INGENIERÍA NATIVA EN C &amp; SENSORES</span>
+                <h2 class="section-title">Control Térmico de Precisión, C Nativo y Audio FFT</h2>
+                <p class="section-desc">Bibliotecas interceptoras LD_PRELOAD, dosificación por milisegundos y espectrograma reactivo de 32 bandas.</p>
+            </div>
+
+            <div class="deepdive-grid-2">
+                <!-- Tarjeta 1: Interceptor C prig_suave.so -->
+                <div class="deepdive-card" style="margin-bottom:0;">
+                    <div class="deepdive-header">
+                        <div class="deepdive-title">
+                            <i class="fa-solid fa-shield-halved" style="color:var(--neon-pink);"></i>
+                            <span>Interceptor C: prig_suave.so</span>
+                        </div>
+                        <span class="card-tag">LD_PRELOAD / CUDA SYNC</span>
+                    </div>
+                    <p style="font-size:13px; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">
+                        El motor tradicional pasaba ~90% de su tiempo girando en un bucle continuo de <code>cudaStreamSynchronize</code> (~800 llamadas/s en CPU). Esta carga falsa disparaba el turbo de la CPU de 48 °C a 97 °C en segundos.
+                    </p>
+                    <ul class="tech-feature-list">
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-green);"></i>
+                            <div>
+                                <strong style="color:#fff;">cudaEventBlockingSync:</strong> Reemplaza el sondeo rotativo por espera con evento bloqueante en el controlador. La CPU cae del 250% al <strong>5% de uso</strong> y la temperatura media de 85.6 °C a <strong>55 °C</strong> manteniendo la misma tasa de tokens.
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-green);"></i>
+                            <div>
+                                <strong style="color:#fff;">Dosificación de GPU (~20 ms):</strong> Suaviza el salto de potencia. La GPU opera en 21 W estables en lugar de saltar a picos de 40 W con +8 °C instantáneos.
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-green);"></i>
+                            <div>
+                                <strong style="color:#fff;">Modo Frío por pidfd:</strong> Pausas en ciclos de 50 ms (<code>SIGSTOP</code> / <code>SIGCONT</code>) para modelos en RAM (32B–40B) anclados a núcleos de eficiencia (E-cores).
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-green);"></i>
+                            <div>
+                                <strong style="color:#fff;">Gobernanza Polkit:</strong> Regulación de frecuencias CPU e Intel RAPL sin requerir ejecución root del IDE.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Tarjeta 2: Audio FFT en tiempo real -->
+                <div class="deepdive-card" style="margin-bottom:0;">
+                    <div class="deepdive-header">
+                        <div class="deepdive-title">
+                            <i class="fa-solid fa-wave-pulse" style="color:var(--neon-cyan);"></i>
+                            <span>Audio FFT en Tiempo Real (Pulse/PipeWire)</span>
+                        </div>
+                        <span class="card-tag">32 BANDAS LOGARÍTMICAS</span>
+                    </div>
+                    <p style="font-size:13px; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">
+                        Prig se conecta de forma directa al servidor de sonido del sistema (PulseAudio / PipeWire) sin requerir micrófonos ni dependencias externas. Analiza cualquier flujo que reproduzca música, conferencias o podcasts en el equipo.
+                    </p>
+                    <ul class="tech-feature-list">
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-cyan);"></i>
+                            <div>
+                                <strong style="color:#fff;">FFT Cooley-Tukey Radix-2:</strong> Implementación analítica en ventana Hann de 512 muestras a 16.000 Hz (~32 ms de latencia con resolución de ~31.25 Hz).
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-cyan);"></i>
+                            <div>
+                                <strong style="color:#fff;">32 Bandas Logarítmicas:</strong> Rango de 30 Hz a 6.000 Hz desglosado en métricas de <em>Bass</em>, <em>Mids</em>, <em>Treble</em> y <em>Energy RMS</em>.
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-cyan);"></i>
+                            <div>
+                                <strong style="color:#fff;">WebSocket a 60 FPS:</strong> Transmisión local al frontend modulando partículas, distorsión láser de los agentes ASCII y halos de enfoque visual.
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" style="color:var(--neon-cyan);"></i>
+                            <div>
+                                <strong style="color:#fff;">Selector de Fuente:</strong> Permite alternar entre el audio global del sistema o aislar una pestaña de navegador específica (YouTube, Spotify, etc.).
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: LAS 6 LENTES ANALÍTICAS DEL DIRECTOR IA -->
+        <section id="lentes-analiticas" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-purple); border-color:rgba(203, 166, 247, 0.35); background:rgba(203, 166, 247, 0.1);">SUPERVISIÓN COGNITIVA MULTIDIMENSIONAL</span>
+                <h2 class="section-title">Director IA con 6 Lentes Analíticas en Tiempo Real</h2>
+                <p class="section-desc">Rotación estocástica y anti-repetición que audita el código desde seis perspectivas de ingeniería fundamentales.</p>
+            </div>
+
+            <div class="lenses-grid">
+                <!-- Lente 1 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 01</span>
+                        <i class="fa-solid fa-sitemap" style="color:var(--neon-purple);"></i>
+                    </div>
+                    <h3 class="lens-title">Arquitectura y Modularidad Limpia</h3>
+                    <p class="lens-desc">Evalúa el Principio de Responsabilidad Única (SRP), la cohesión interna y el desacoplamiento estructural entre subsistemas.</p>
+                    <div class="lens-question">"¿Cómo puede desacoplarse la lógica para hacerla más extensible y testeable?"</div>
+                </div>
+
+                <!-- Lente 2 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 02</span>
+                        <i class="fa-solid fa-chart-line" style="color:var(--neon-cyan);"></i>
+                    </div>
+                    <h3 class="lens-title">Complejidad Asintótica y Rendimiento</h3>
+                    <p class="lens-desc">Analiza complejidad temporal O(N) y espacial O(M), sustitución de iteraciones redundantes por generadores y tablas hash.</p>
+                    <div class="lens-question">"¿Hay bucles o búsquedas lineales O(N) que puedan reducirse a O(1)?"</div>
+                </div>
+
+                <!-- Lente 3 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 03</span>
+                        <i class="fa-solid fa-shield-halved" style="color:var(--neon-pink);"></i>
+                    </div>
+                    <h3 class="lens-title">Resiliencia y Cláusulas de Guarda</h3>
+                    <p class="lens-desc">Detecta posibles excepciones silenciosas, aplica validaciones tempranas (early return) y previene errores por valores nulos o NoneType.</p>
+                    <div class="lens-question">"¿Qué sucede ante colecciones vacías, fallos de red o valores nulos?"</div>
+                </div>
+
+                <!-- Lente 4 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 04</span>
+                        <i class="fa-solid fa-arrows-split-up-and-left" style="color:var(--neon-yellow);"></i>
+                    </div>
+                    <h3 class="lens-title">Asincronía y Flujo Reactivo</h3>
+                    <p class="lens-desc">Supervisa la ejecución no bloqueante, condiciones de carrera en corrutinas, pipelines reactivos y liberación de recursos.</p>
+                    <div class="lens-question">"¿El flujo asíncrono libera correctamente los descriptores y evita bloqueos?"</div>
+                </div>
+
+                <!-- Lente 5 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 05</span>
+                        <i class="fa-solid fa-cube" style="color:var(--neon-green);"></i>
+                    </div>
+                    <h3 class="lens-title">Invariantes Lógicas y Tipado Fuerte</h3>
+                    <p class="lens-desc">Verifica la pureza funcional de las rutinas, inmutabilidad de estructuras y contratos estrictos mediante type hints estáticos.</p>
+                    <div class="lens-question">"¿Las funciones son puras y deterministas o mutan estados globales?"</div>
+                </div>
+
+                <!-- Lente 6 -->
+                <div class="lens-card">
+                    <div class="lens-header">
+                        <span class="lens-num">LENTE 06</span>
+                        <i class="fa-solid fa-code" style="color:var(--neon-blue);"></i>
+                    </div>
+                    <h3 class="lens-title">Expresividad Semántica y Clean Code</h3>
+                    <p class="lens-desc">Optimiza nombres de identificadores, reduce complejidad ciclomática y asegura que el código sea auto-documentado sin comentarios redundantes.</p>
+                    <div class="lens-question">"¿El código se lee como prosa técnica clara y elimina ambigüedades?"</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: MEMORIA DE CONSULTA Y GRAFO CPG -->
+        <section id="memoria-consulta" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-green); border-color:rgba(166, 227, 161, 0.35); background:rgba(166, 227, 161, 0.1);">CONSULTAS DETERMINISTAS SOBRE REPOSITORIOS</span>
+                <h2 class="section-title">Memoria de Consulta &amp; Grafo de Código (CPG)</h2>
+                <p class="section-desc">Contexto ilimitado para el modelo: el repositorio completo expuesto como un entorno ejecutable en Python.</p>
+            </div>
+
+            <div class="deepdive-card">
+                <div class="deepdive-header">
+                    <div class="deepdive-title">
+                        <i class="fa-solid fa-database" style="color:var(--neon-green);"></i>
+                        <span>Arquitectura CodeAct: El Objeto <code>P</code> en Sandbox Aislado</span>
+                    </div>
+                    <span class="card-tag">37.600 HECHOS ESTRUCTURALES EN &lt; 8s</span>
+                </div>
+
+                <div class="deepdive-grid-2">
+                    <div>
+                        <p style="font-size:13.5px; color:var(--text-muted); line-height:1.65; margin-bottom:14px;">
+                            Un modelo de IA no necesita que le vuelques cientos de archivos en su ventana de contexto. En Prig, el proyecto se indexa en una base de datos local SQLite y se le entrega al modelo como un objeto ejecutable <code>P</code> dentro de una consola Python aislada.
+                        </p>
+                        <p style="font-size:13.5px; color:var(--text-muted); line-height:1.65; margin-bottom:14px;">
+                            Mediante la herramienta <code>consola</code>, el LLM escribe código para recorrer millones de tokens con bucles y extraer únicamente los datos exactos. Los resultados intermedios residen en variables fuera de la ventana de contexto.
+                        </p>
+
+                        <div class="tech-callout">
+                            <strong><i class="fa-solid fa-terminal"></i> Grafo CPG Multidimensional:</strong> Relaciona <code>define</code>, <code>llama</code>, <code>importa</code>, <code>hereda</code>, <code>atributo</code>, <code>lanza</code>, <code>captura</code>, <code>lee_config</code>, <code>expone</code> y <code>llama_api</code> (conectando las funciones fetch del frontend con los endpoints del backend).
+                        </div>
+                    </div>
+
+                    <div style="background:rgba(0, 0, 0, 0.6); border:1px solid rgba(255, 255, 255, 0.08); border-radius:12px; padding:18px; font-family:var(--font-code); font-size:12px; color:#cdd6f4;">
+                        <div style="color:var(--text-dim); margin-bottom:8px;"># Ejemplo: El modelo ejecutando consultas en P</div>
+                        <span style="color:var(--neon-purple);">def</span> <span style="color:var(--neon-cyan);">auditar_endpoints_huerfanos</span>():<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text-dim);"># Consulta directa al grafo de llamadas relacional</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;endpoints = P.sql(<span style="color:var(--neon-green);">"SELECT nombre, ruta FROM hechos WHERE relacion = 'expone'"</span>)<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;huerfanos = []<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--neon-purple);">for</span> ep <span style="color:var(--neon-purple);">in</span> endpoints:<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;llamadas = P.sql(<span style="color:var(--neon-green);">"SELECT COUNT(*) FROM hechos WHERE relacion = 'llama_api' AND destino = ?"</span>, (ep[<span style="color:var(--neon-yellow);">'nombre'</span>],))<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--neon-purple);">if</span> llamadas[<span style="color:var(--neon-pink);">0</span>][<span style="color:var(--neon-pink);">0</span>] == <span style="color:var(--neon-pink);">0</span>:<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;huerfanos.append(ep)<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--neon-purple);">return</span> huerfanos<br><br>
+                        <span style="color:var(--text-dim);">&gt;&gt;&gt; Ejecutado en proceso aislado (RLIMIT_AS 2GB, SIGALRM 30s)</span><br>
+                        <span style="color:var(--neon-green);">&gt;&gt;&gt; 0 tokens desperdiciados en contexto</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN INTERACTIVA DE SHOWCASE -->
+        <section id="showcase" class="section">
             <div class="section-header">
                 <span class="section-badge">INTERACTIVIDAD EN VIVO</span>
                 <h2 class="section-title">Explora las Vistas del Ecosistema</h2>
@@ -644,6 +952,83 @@
                         <h4 class="gallery-title">Notebooks y Competencias Kaggle</h4>
                         <p class="gallery-caption">Inspección de soluciones de la comunidad y modelos de alto rendimiento.</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: PREGUNTAS FRECUENTES DE INGENIERÍA (FAQ) -->
+        <section id="faq" class="section">
+            <div class="section-header">
+                <span class="section-badge" style="color:var(--neon-blue); border-color:rgba(137, 180, 250, 0.35); background:rgba(137, 180, 250, 0.1);">RESPUESTAS TÉCNICAS</span>
+                <h2 class="section-title">Preguntas Frecuentes de Ingeniería</h2>
+                <p class="section-desc">Detalles sobre arquitectura local, compatibilidad de hardware, privacidad y funcionamiento interno.</p>
+            </div>
+
+            <div class="faq-grid">
+                <!-- FAQ 1 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span>¿Qué hardware necesito para ejecutar modelos 7B y 35B?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Para modelos 7B (ej. Qwen 2.5 Coder 7B), cualquier GPU con 6 GB de VRAM (como RTX 3050 o 4050 Laptop) o incluso CPU con 8 GB de RAM es suficiente. Para modelos de 35B (Qwen 3.6 MoE), el motor MoE de Prig aloja los 48 expertos calientes por capa en 5.5 GB de VRAM y el resto en 16 GB de RAM, alcanzando 53 a 68 tok/s a solo 55 °C.
+                    </p>
+                </div>
+
+                <!-- FAQ 2 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>¿Mi código o datos salen de mi computadora en algún momento?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Cero por ciento. Prig funciona de manera 100% offline y privada. Las solicitudes de inferencia van a tu servidor local de Ollama o al binario llama-server interno. No existen telemetrías ocultas ni subidas a servidores en la nube; el acceso web (Kaggle/GitHub/YouTube) solo ocurre cuando solicitas importar un recurso público específico.
+                    </p>
+                </div>
+
+                <!-- FAQ 3 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-code-compare"></i>
+                        <span>¿Cómo funciona la reescritura virtual de rutas de Kaggle?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Prig analiza el script o cuaderno en ejecución e intercepta rutas absolutas que comiencen con <code>/kaggle/input/&lt;dataset&gt;/</code>. Automáticamente mapea esas llamadas al directorio local donde se descargó el dataset, permitiendo ejecutar kernels competitivos directamente en Linux sin modificar rutas a mano.
+                    </p>
+                </div>
+
+                <!-- FAQ 4 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>¿En qué se diferencia de Cursor, Copilot o plugins de VS Code?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Las herramientas habituales hacen RAG superficial enviando archivos planos que saturan la ventana de contexto y dependen de suscripciones cloud. Prig indexa un Grafo de Propiedades de Código (CPG) con 37.600 hechos, comprime símbolos con AST (&gt;91% ahorro de tokens), previene sobrecalentamiento con C nativo (<code>prig_suave.c</code>) y ofrece 4 hubs especializados sin costo.
+                    </p>
+                </div>
+
+                <!-- FAQ 5 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-temperature-low"></i>
+                        <span>¿Cómo evita el sobrecalentamiento y throttling en laptops?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Mediante la biblioteca nativa <code>prig_suave.so</code> precargada con <code>LD_PRELOAD</code>. Sustituye la rotación continua de CUDA por <code>cudaEventBlockingSync</code>, bajando la CPU del 250% al 5% y la temperatura de 97 °C a 55 °C. Para modelos en RAM, el modo frío pausa el motor en ciclos de 50 ms mediante <code>pidfd</code> anclado a núcleos E.
+                    </p>
+                </div>
+
+                <!-- FAQ 6 -->
+                <div class="faq-card">
+                    <h3 class="faq-q">
+                        <i class="fa-solid fa-cube"></i>
+                        <span>¿Qué es Prig Hub y cómo se sincroniza el progreso?</span>
+                    </h3>
+                    <p class="faq-a">
+                        Es un protocolo abierto descentralizado basado en repositorios Git y texto plano (<code>YAML</code> y <code>Markdown</code>). Tus rutas de estudio, notas y desafíos con tests unitarios se guardan en un repositorio bajo tu propio control (con manifiesto <code>prig.yaml</code>), sincronizable con GitHub, GitLab o Codeberg mediante <code>git push</code> y <code>git pull</code>.
+                    </p>
                 </div>
             </div>
         </section>
