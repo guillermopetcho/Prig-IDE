@@ -79,10 +79,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 24px;
-    background: rgba(13, 16, 28, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    padding: 10px 20px;
+    background: rgba(13, 16, 28, 0.88);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     border: 1px solid var(--border-card);
     border-radius: 14px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(137, 180, 250, 0.08);
@@ -92,31 +92,34 @@ body {
 .nav-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .brand-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
     background: linear-gradient(135deg, rgba(203, 166, 247, 0.25), rgba(137, 180, 250, 0.25));
     border: 1px solid var(--neon-purple);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--neon-purple);
-    font-size: 18px;
+    font-size: 16px;
     box-shadow: 0 0 15px rgba(203, 166, 247, 0.35);
 }
 
 .brand-name {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
     background: linear-gradient(135deg, #ffffff 30%, var(--neon-cyan) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    white-space: nowrap;
 }
 
 .brand-tag {
@@ -129,13 +132,16 @@ body {
     color: var(--neon-green);
     border: 1px solid rgba(166, 227, 161, 0.3);
     margin-left: 6px;
+    white-space: nowrap;
 }
 
 .nav-links {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 .nav-link {
@@ -144,11 +150,167 @@ body {
     font-size: 13.5px;
     font-weight: 500;
     transition: var(--transition);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .nav-link:hover {
     color: #ffffff;
     text-shadow: 0 0 8px rgba(137, 180, 250, 0.6);
+}
+
+/* Dropdown para submenús en Navbar */
+.nav-dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.nav-dropdown-trigger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 6px 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.nav-dropdown-trigger .chevron {
+    font-size: 10px;
+    transition: transform 0.25s ease;
+}
+
+.nav-dropdown:hover .nav-dropdown-trigger,
+.nav-dropdown:focus-within .nav-dropdown-trigger {
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(137, 180, 250, 0.6);
+}
+
+.nav-dropdown:hover .nav-dropdown-trigger .chevron,
+.nav-dropdown:focus-within .nav-dropdown-trigger .chevron {
+    transform: rotate(180deg);
+    color: var(--neon-cyan);
+}
+
+.nav-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    min-width: 290px;
+    background: rgba(13, 16, 28, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-card);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(203, 166, 247, 0.15);
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nav-dropdown-menu::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    width: 100%;
+    height: 12px;
+}
+
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+    display: flex;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+.nav-dropdown-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: #cdd6f4;
+    text-decoration: none;
+    font-size: 13px;
+    transition: var(--transition);
+}
+
+.nav-dropdown-item:hover {
+    background: rgba(203, 166, 247, 0.12);
+    color: #ffffff;
+    transform: translateX(3px);
+}
+
+.nav-dropdown-item i {
+    font-size: 15px;
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.nav-dropdown-item-title {
+    font-weight: 600;
+    color: #ffffff;
+    display: block;
+    line-height: 1.3;
+}
+
+.nav-dropdown-item-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    display: block;
+    line-height: 1.3;
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.nav-mobile-actions {
+    display: none;
+}
+
+.nav-toggle {
+    display: none;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    color: #ffffff;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.nav-toggle:hover {
+    background: rgba(203, 166, 247, 0.15);
+    border-color: var(--neon-purple);
+    color: var(--neon-purple);
 }
 
 .btn-github {
@@ -164,6 +326,7 @@ body {
     font-size: 13px;
     font-weight: 600;
     transition: var(--transition);
+    white-space: nowrap;
 }
 
 .btn-github:hover {
@@ -1595,6 +1758,84 @@ body {
    RESPONSIVE BREAKPOINTS
    ============================================================================ */
 @media (max-width: 1024px) {
+    .nav-toggle {
+        display: flex;
+    }
+
+    .nav-actions {
+        display: none;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 76px;
+        left: 20px;
+        right: 20px;
+        background: rgba(13, 16, 28, 0.98);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--border-card);
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(137, 180, 250, 0.2);
+        padding: 20px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        display: none;
+        max-height: calc(100vh - 96px);
+        overflow-y: auto;
+        z-index: 1200;
+    }
+
+    .nav-links.open {
+        display: flex;
+        animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .nav-link {
+        font-size: 14.5px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .nav-dropdown {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .nav-dropdown-trigger {
+        font-size: 14.5px;
+        padding: 10px 14px;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 8px;
+        width: 100%;
+    }
+
+    .nav-dropdown-menu {
+        position: static;
+        transform: none !important;
+        box-shadow: none;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(0, 0, 0, 0.35);
+        margin-top: 6px;
+        padding: 6px;
+        min-width: 100%;
+        display: flex;
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .nav-mobile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border-card);
+    }
+
     .hero { grid-template-columns: 1fr; }
     .grid-3 { grid-template-columns: repeat(2, 1fr); }
     .ecosystem-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1610,7 +1851,6 @@ body {
 }
 
 @media (max-width: 640px) {
-    .nav-links { display: none; }
     .grid-3 { grid-template-columns: 1fr; }
     .ecosystem-grid { grid-template-columns: 1fr; }
     .lenses-grid { grid-template-columns: 1fr; }
@@ -1619,6 +1859,17 @@ body {
     .gallery-grid { grid-template-columns: 1fr; }
     .hero-title { font-size: 32px; }
     .hero-actions { flex-direction: column; align-items: stretch; }
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 
