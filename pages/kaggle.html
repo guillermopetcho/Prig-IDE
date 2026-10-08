@@ -385,23 +385,67 @@
             </div>
         </section>
 
-        <!-- FOOTER -->
-        <footer class="footer">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: KAGGLE HUB</span>
-                <span>— Workstation de Machine Learning y Data Science</span>
+        <!-- FOOTER PRO -->
+        <footer class="footer-pro">
+            <div class="footer-pro-grid">
+                <!-- Columna 1: Brand & Propósito -->
+                <div class="footer-pro-brand">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="brand-icon" style="width:32px; height:32px; font-size:15px; border-color:var(--kaggle-cyan); color:var(--kaggle-cyan); background:rgba(32, 190, 255, 0.2);">
+                            <i class="fa-brands fa-kaggle"></i>
+                        </div>
+                        <span style="font-size:18px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">PRIG: KAGGLE</span>
+                        <span class="brand-tag" style="background:rgba(32, 190, 255, 0.15); color:var(--kaggle-cyan); border-color:rgba(32, 190, 255, 0.3);">ML HUB</span>
+                    </div>
+                    <p style="font-size:12.5px; color:var(--text-muted); line-height:1.6;">
+                        Workstation nativa para Data Science y Machine Learning en Linux. Descarga datasets oficiales, ejecuta notebooks y compite con remapeo transparente de rutas.
+                    </p>
+                    <div style="margin-top:6px;">
+                        <span class="system-status-badge">
+                            <span class="pulse-dot"></span> Motor Local 100% Offline
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Columna 2: Ecosistema -->
+                <div>
+                    <h4 class="footer-pro-title">Ecosistema</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="index.html"><i class="fa-solid fa-laptop-code" style="color:var(--neon-blue);"></i> Prig IDE Principal</a></li>
+                        <li><a href="hub.html"><i class="fa-solid fa-cube" style="color:var(--neon-teal);"></i> Prig Hub (Git)</a></li>
+                        <li><a href="github.html"><i class="fa-brands fa-github" style="color:var(--neon-purple);"></i> Prig: GitHub Hub</a></li>
+                        <li><a href="youtube.html"><i class="fa-brands fa-youtube" style="color:var(--neon-pink);"></i> Prig: YouTube Hub</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 3: Características Kaggle -->
+                <div>
+                    <h4 class="footer-pro-title">Kaggle Workstation</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="#capacidades"><i class="fa-solid fa-database" style="color:var(--kaggle-cyan);"></i> Explorador de Datasets</a></li>
+                        <li><a href="#reescritura-rutas"><i class="fa-solid fa-shuffle" style="color:var(--neon-purple);"></i> Remapeo /kaggle/input/</a></li>
+                        <li><a href="#capacidades"><i class="fa-solid fa-terminal" style="color:var(--neon-green);"></i> IPython Kernels Locales</a></li>
+                        <li><a href="#capturas"><i class="fa-solid fa-images" style="color:var(--neon-yellow);"></i> Capturas del Sistema</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 4: Proyecto & Comunidad -->
+                <div>
+                    <h4 class="footer-pro-title">Proyecto</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> Repositorio GitHub</a></li>
+                        <li><a href="index.html#instalacion"><i class="fa-solid fa-download"></i> Guía de Instalación</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-scale-balanced"></i> Licencia MIT</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/issues" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-bug"></i> Reportar Issue</a></li>
+                    </ul>
+                </div>
             </div>
-            <ul class="footer-links">
-                <li><a href="index.html">Página Principal</a></li>
-                <li><a href="hub.html" style="color:var(--neon-teal); font-weight:700;"><i class="fa-solid fa-cube"></i> Prig: Hub</a></li>
-                <li><a href="github.html" style="color:var(--neon-purple); font-weight:700;"><i class="fa-brands fa-github"></i> Prig: GitHub</a></li>
-                <li><a href="youtube.html" style="color:var(--neon-pink);"><i class="fa-brands fa-youtube"></i> Prig: YouTube</a></li>
-                <li><a href="index.html#pilares">Pilares Técnicos</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-            </ul>
-            <p style="font-size:11.5px; color:var(--text-dim);">
-                Conectado con la API oficial de Kaggle v1, Editor Prig, IPython Kernels y modelos LLM 7B locales.
-            </p>
+
+            <!-- Barra Inferior de Copyright -->
+            <div class="footer-pro-bottom">
+                <span>© 2026 PRIG IDE. Conectado con la API oficial de Kaggle v1 y ejecución nativa en Linux.</span>
+                <span>Construido con FastAPI, Editor Prig, IPython Kernels y Motor MoE Híbrido Local.</span>
+            </div>
         </footer>
     </div>
 

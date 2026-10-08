@@ -630,23 +630,67 @@
             </div>
         </section>
 
-        <!-- FOOTER -->
-        <footer class="footer">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#fff; font-size:16px;">PRIG: YOUTUBE HUB</span>
-                <span>— Ecosistema Educativo de Prig IDE</span>
+        <!-- FOOTER PRO -->
+        <footer class="footer-pro">
+            <div class="footer-pro-grid">
+                <!-- Columna 1: Brand & Propósito -->
+                <div class="footer-pro-brand">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="brand-icon" style="width:32px; height:32px; font-size:15px; border-color:var(--neon-pink); color:var(--neon-pink); background:rgba(243, 139, 168, 0.2);">
+                            <i class="fa-brands fa-youtube"></i>
+                        </div>
+                        <span style="font-size:18px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">PRIG: YOUTUBE</span>
+                        <span class="brand-tag" style="background:rgba(243, 139, 168, 0.15); color:var(--neon-pink); border-color:rgba(243, 139, 168, 0.3);">EDUCATION HUB</span>
+                    </div>
+                    <p style="font-size:12.5px; color:var(--text-muted); line-height:1.6;">
+                        Entorno inmersivo de aprendizaje sin distracciones. Transcribe lecciones técnicas, genera resúmenes y resuelve ejercicios en el Editor Prig en paralelo.
+                    </p>
+                    <div style="margin-top:6px;">
+                        <span class="system-status-badge">
+                            <span class="pulse-dot"></span> Motor Local 100% Offline
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Columna 2: Ecosistema -->
+                <div>
+                    <h4 class="footer-pro-title">Ecosistema</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="index.html"><i class="fa-solid fa-laptop-code" style="color:var(--neon-blue);"></i> Prig IDE Principal</a></li>
+                        <li><a href="hub.html"><i class="fa-solid fa-cube" style="color:var(--neon-teal);"></i> Prig Hub (Git)</a></li>
+                        <li><a href="github.html"><i class="fa-brands fa-github" style="color:var(--neon-purple);"></i> Prig: GitHub Hub</a></li>
+                        <li><a href="kaggle.html"><i class="fa-brands fa-kaggle" style="color:var(--kaggle-cyan);"></i> Prig: Kaggle Hub</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 3: Características YouTube -->
+                <div>
+                    <h4 class="footer-pro-title">YouTube Hub</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="#capacidades"><i class="fa-solid fa-play" style="color:var(--neon-pink);"></i> Reproductor MPV Integrado</a></li>
+                        <li><a href="#transcripcion-ia"><i class="fa-solid fa-closed-captioning" style="color:var(--neon-cyan);"></i> Transcripción Whisper Local</a></li>
+                        <li><a href="#catalogo"><i class="fa-solid fa-graduation-cap" style="color:var(--neon-yellow);"></i> Cursos Universitarios Curados</a></li>
+                        <li><a href="#flujo"><i class="fa-solid fa-lightbulb" style="color:var(--neon-green);"></i> Generador de Notas Markdown</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 4: Proyecto & Comunidad -->
+                <div>
+                    <h4 class="footer-pro-title">Proyecto</h4>
+                    <ul class="footer-pro-list">
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> Repositorio GitHub</a></li>
+                        <li><a href="index.html#instalacion"><i class="fa-solid fa-download"></i> Guía de Instalación</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-scale-balanced"></i> Licencia MIT</a></li>
+                        <li><a href="https://github.com/guillermopetcho/Prig-IDE/issues" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-bug"></i> Reportar Issue</a></li>
+                    </ul>
+                </div>
             </div>
-            <ul class="footer-links">
-                <li><a href="index.html">Página Principal</a></li>
-                <li><a href="hub.html" style="color:var(--neon-teal); font-weight:700;"><i class="fa-solid fa-cube"></i> Prig: Hub</a></li>
-                <li><a href="github.html" style="color:var(--neon-purple); font-weight:700;"><i class="fa-brands fa-github"></i> Prig: GitHub Hub</a></li>
-                <li><a href="kaggle.html" style="color:var(--kaggle-cyan); font-weight:700;"><i class="fa-brands fa-kaggle"></i> Prig: Kaggle Hub</a></li>
-                <li><a href="index.html#pilares">Pilares Técnicos</a></li>
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-            </ul>
-            <p style="font-size:11.5px; color:var(--text-dim);">
-                Desarrollado para programadores que buscan formación continua de alto nivel sin fricción ni anuncios.
-            </p>
+
+            <!-- Barra Inferior de Copyright -->
+            <div class="footer-pro-bottom">
+                <span>© 2026 PRIG IDE. Educación interactiva y reproducción acelerada sin anuncios.</span>
+                <span>Construido con FastAPI, Editor Prig, Whisper C++, MPV IPC y Motor MoE Híbrido Local.</span>
+            </div>
         </footer>
     </div>
 
