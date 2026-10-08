@@ -299,6 +299,52 @@
         });
     }
 
+    // 7. CONTROL DEL MENÚ MÓVIL Y DROPDOWNS EN NAVBAR
+    function initNavbarToggle() {
+        const toggle = document.getElementById('nav-toggle');
+        const navLinks = document.querySelector('.nav-links');
+        if (!toggle || !navLinks) return;
+
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = navLinks.classList.toggle('open');
+            toggle.innerHTML = isOpen ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-bars"></i>';
+        });
+
+        // Cerrar menú al hacer clic en un enlace de navegación
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 1024) {
+                    navLinks.classList.remove('open');
+                    toggle.innerHTML = '<i class="fa-solid fa-bars"></i>';
+                }
+            });
+        });
+
+        // Cerrar menú al hacer clic fuera del navbar
+        document.addEventListener('click', (e) => {
+            if (!navLinks.contains(e.target) && !toggle.contains(e.target) && navLinks.classList.contains('open')) {
+                navLinks.classList.remove('open');
+                toggle.innerHTML = '<i class="fa-solid fa-bars"></i>';
+            }
+        });
+
+        // Soporte táctil / clic para dropdown triggers en móviles
+        const dropdownTriggers = document.querySelectorAll('.nav-dropdown-trigger');
+        dropdownTriggers.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (window.innerWidth <= 1024) {
+                    e.preventDefault();
+                    const menu = btn.nextElementSibling;
+                    if (menu) {
+                        const isHidden = window.getComputedStyle(menu).display === 'none';
+                        menu.style.display = isHidden ? 'flex' : 'none';
+                    }
+                }
+            });
+        });
+    }
+
     // Inicializar todo al cargar el DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -308,6 +354,7 @@
             initLightbox();
             initCopyButtons();
             initInstallTabs();
+            initNavbarToggle();
         });
     } else {
         initBackgroundCanvas();
@@ -316,6 +363,7 @@
         initLightbox();
         initCopyButtons();
         initInstallTabs();
+        initNavbarToggle();
     }
 
 })();
