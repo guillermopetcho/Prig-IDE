@@ -158,6 +158,11 @@
             <legend style="color:var(--text-muted); font-size:11px;">Contexto por pregunta</legend>
             <label>Código y memoria <input id="banco-presupuesto" type="number" min="1000" max="100000" step="500" value="${estado.presupuesto}" style="width:80px;"> tokens</label>
             <label style="margin-left:14px;">Mapa del proyecto <input id="banco-mapa" type="number" min="0" max="30000" step="500" value="${estado.mapa}" style="width:80px;"> tokens</label>
+            <label style="margin-left:14px;" title="Automático: usa la lectura guardada de la parte del proyecto que toca, si la hay; si no, arma el contexto desde el banco. General: siempre desde el banco (no usa lecturas guardadas). Unidad: lee esa parte si no está guardada (≈30–40 s la primera vez). docs/plan-texto-primero.md">Modo
+              <select id="banco-modo">
+                ${[['auto', 'Automático (lectura guardada si la hay)'], ['general', 'General (siempre desde el banco)'], ['unidad', 'Unidad (leerla si hace falta)']]
+                  .map(([v, t]) => `<option value="${v}" ${(estado.modo || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}
+              </select></label>
             ${boton('banco-guardar-ajustes', 'Guardar')}
             <div style="color:var(--text-muted); margin-top:4px;">El motor MoE lee ~800 tokens/s: 6.000 tokens son ~7 s por pregunta. El mapa se reaprovecha entre preguntas;
               lo que no entra, el modelo lo pide con sus herramientas.</div>
@@ -175,7 +180,7 @@
             pintarEstado();
         };
         $('banco-guardar-ajustes').onclick = async () => {
-            try { await post('/api/banco/ajustes', { presupuesto: +$('banco-presupuesto').value, mapa: +$('banco-mapa').value }); }
+            try { await post('/api/banco/ajustes', { presupuesto: +$('banco-presupuesto').value, mapa: +$('banco-mapa').value, modo: $('banco-modo').value }); }
             catch (e) { error(e); }
         };
         if (a.activo || b.vectores_pendientes) sondeo = setInterval(() => { if ($('modal-banco').style.display === 'flex') pintarEstado(); }, 4000);

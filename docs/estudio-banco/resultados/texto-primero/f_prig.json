@@ -1,0 +1,250 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 31
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 57
+  },
+  "segundos": 447,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "0b5f93c17f28·m1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en este orden:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5876`) — El endpoint recibe la petición DELETE.\n2. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`) — Llamada dentro del endpoint para obtener la ruta de modelos.\n3. **`estado`** (`backend/recursos/servidor.py:123`) — Llamada dentro de `_carpeta_modelos_servidor` para leer la configuración del servidor.\n4. **`librerias_disponibles`** (`backend/recursos/servidor.py:72`) — Llamada dentro de `estado` para listar los motores disponibles.\n\nEl camino es:\n```\nmodelos_borrar_parciales → _carpeta_modelos_servidor → estado → librerias_disponibles\n```\n\nAunque `modelos_borrar_parciales` solo usa el resultado de `librerias_disponibles` de forma indirecta (a través de `estado`), la función se ejecuta porque `estado` la invoca en su línea 141 para incluir las librerías en el diccionario de respuesta.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2381,
+   "tokens": 269,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 46.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "f46b5c0819d3·a1",
+   "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto con función pasada como argumento y lambda",
+   "base": "f46b5c0819d3",
+   "modo": "unidad",
+   "respuesta": "Basándome en el grafo de llamadas del proyecto, modificar `historial` en `backend/progreso.py` afecta directamente o indirectamente a los siguientes **endpoints HTTP del backend**:\n\n1. **`POST /api/progreso/analisis`** (y `GET /api/progreso/analisis`) — La función `progreso_analisis` (app.py:6402) llama a `progreso.historial()` para obtener el historial de desafíos que alimenta el análisis.\n\n2. **`GET /api/inicio`** — La función `inicio_resumen` (app.py:6350) incluye en su respuesta una llamada a `progreso.historial(desafios_almacen, limite=30)` para devolver el historial reciente.\n\n3. **`GET /api/progreso/resumen`** — La función `progreso_resumen` (app.py:6336) invoca a `progreso.resumen()`, que a su vez llama internamente a `historial()` (en progreso.py:236) como paso fundamental para construir el resumen del alumno.\n\n4. **`GET /api/progreso/historial`** — La función `progreso_historial` (app.py:6391) pasa directamente `progreso.historial` como referencia para devolver los desafíos filtrados.\n\nEn resumen, los 4 endpoints afectados son: **`POST /api/progreso/analisis`**, **`GET /api/progreso/analisis`**, **`GET /api/inicio`**, **`GET /api/progreso/resumen`** y **`GET /api/progreso/historial`**.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: almacen, ejecucion, progreso",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 360,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"progreso.historial\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"progreso_analisis\\\"))\\nprint(\\\"---\\\")\\nprint(P.llamadores(\\\"resumen\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver los endpoints que exponen progreso_analisis, inicio_resumen, progreso_resumen\\nprint(P.api(\\\"/api/progreso/analisis\\\"))\\nprint(\\\"===\\\")\\nprint(P.api(\\\"/api/inicio\\\"))\\nprint(\\\"===\\\")\\nprint(P.api(\\\"/api/progreso/resumen\\\"))\"}",
+     "resultado_caracteres": 869
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# También verificar si hay endpoint para historial directo\\nprint(P.api(\\\"/api/progreso/historial\\\"))\"}",
+     "resultado_caracteres": 228
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 98.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·m2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "No hay llamadas directas ni transitivas entre `modelos_borrar_parciales` y `librerias_disponibles`.\n\n- `modelos_borrar_parciales` (backend/app.py:5876) llama a `gestor_modelos.borrar_parciales(_carpeta_modelos_servidor())`.\n- `_carpeta_modelos_servidor` (backend/app.py:5863) llama a `recursos_srv.estado()` para leer `OLLAMA_MODELS`.\n- `estado` (backend/recursos/servidor.py:123) llama a `librerias_disponibles()` (backend/recursos/servidor.py:141).\n\nPor lo tanto, la ruta es:\n\n1. `modelos_borrar_parciales`\n2. `_carpeta_modelos_servidor`\n3. `estado`\n4. `librerias_disponibles`\n\nLa clave es que `_carpeta_modelos_servidor` invoca `estado()` para obtener el entorno actual de Ollama, y `estado()` incluye `librerias_disponibles()` en su diccionario de retorno.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2381,
+   "tokens": 248,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 29.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "8caebf27e7ba·a1",
+   "pregunta": "¿Cuánto vale la constante `MESETA_S` en `backend/recursos/termico.py`?",
+   "prueba": "control: constante (correcta en E7)",
+   "base": "8caebf27e7ba",
+   "modo": "unidad",
+   "respuesta": "En `backend/recursos/termico.py`, la constante `MESETA_S` vale `20.0`.\n\nSe define en la línea 60 del módulo con el comentario: `# sin bajar 1 °C en este tiempo, no va a enfriar más`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/recursos: motor_suave, ritmo, termico",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 61,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 9.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "d408dee5873f·m1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe (2)",
+   "base": "d408dee5873f",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en este orden:\n\n1. `recursos_ritmo` (`backend/app.py:5420`): El endpoint GET `/api/recursos/ritmo` se ejecuta.\n2. `gobernador` (`backend/recursos/termico.py:711`): Dentro de `recursos_ritmo`, se llama a `recursos_termico.gobernador()` para obtener el gobernador térmico singleton.\n3. `Gobernador.__init__` (`backend/recursos/termico.py:341`): Si el gobernador no existía, `gobernador()` lo crea llamando a `Gobernador(m)`.\n4. `ControladorFrio.__init__` (`backend/recursos/frio.py:257`): Dentro de `Gobernador.__init__`, se instancia `frio.ControladorFrio(...)` (línea 365 de `termico.py`) para gestionar el modo frío.\n\nEl camino es: `recursos_ritmo` → `gobernador` → `Gobernador.__init__` → `ControladorFrio.__init__`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2495,
+   "tokens": 255,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 30.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "f46b5c0819d3·a2",
+   "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto con función pasada como argumento y lambda",
+   "base": "f46b5c0819d3",
+   "modo": "unidad",
+   "respuesta": "Con base en el grafo de llamadas y los endpoints expuestos, cambiar el comportamiento de `historial` (en `backend/progreso.py`) afecta a los siguientes **endpoints HTTP del backend**:\n\n1. **`GET /api/inicio`** (expuesto en `inicio_resumen`, `backend/app.py:6350`) — llama a `progreso.historial(desafios_almacen, limite=30)` para incluir el historial de desafíos en la pantalla de inicio.\n\n2. **`GET /api/progreso/historial`** (expuesto en `progreso_historial`, `backend/app.py:6391`) — devuelve el historial de desafíos con filtros opcionales (`estado`, `concepto`, `fuente`, `limite`). Usa directamente `progreso.historial`.\n\n3. **`POST /api/progreso/analisis`** (expuesto en `progreso_analisis`, `backend/app.py:6402`) — genera un análisis del progreso. Llama a `progreso.historial(desafios_almacen, limite=progreso.MAX_HISTORIAL)` como paso intermedio para obtener las filas de desafíos, que luego usa `resumen()` y `contexto_para_modelo()`.\n\n4. **`GET /api/progreso/resumen`** (expuesto en `progreso_resumen`, `backend/app.py:6336`) — devuelve el resumen completo del progreso. Llama a `progreso.resumen()`, que a su vez invoca internamente a `progreso.historial()` como primer paso para obtener las filas de desafíos.\n\nEn resumen, los 4 endpoints afectados son:\n\n- **`GET /api/inicio`**\n- **`GET /api/progreso/historial`**\n- **`GET /api/progreso/resumen`**\n- **`POST /api/progreso/analisis`**",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: almacen, ejecucion, progreso",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 414,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/progreso/analisis\\\"))\\nprint(P.api(\\\"/api/progreso/resumen\\\"))\\nprint(P.api(\\\"/api/progreso/historial\\\"))\\nprint(P.api(\\\"/api/inicio\\\"))\"}",
+     "resultado_caracteres": 1090
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"progreso_analisis\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"inicio_resumen\\\"))\"}",
+     "resultado_caracteres": 247
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar si inicio_resumen llama a progreso.historial\\nprint(P.grep(r'historial.*progreso|progreso.*historial', rutas=['backend/app.py'], maximo=20))\"}",
+     "resultado_caracteres": 644
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar qué hace inicio_resumen con historial\\nprint(P.leer('backend/app.py', desde=6349, hasta=6380))\"}",
+     "resultado_caracteres": 1913
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar si hay otros llamadores de progreso.historial\\nprint(P.grep(r'progreso\\\\.historial', rutas=['backend/app.py'], maximo=10))\"}",
+     "resultado_caracteres": 413
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 114.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·m3",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en orden:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5876`)\n2. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`)\n3. **`estado`** (`backend/recursos/servidor.py:123`)\n4. **`librerias_disponibles`** (`backend/recursos/servidor.py:72`)\n\nEl camino se explica así:\n\n- `modelos_borrar_parciales` llama a `_carpeta_modelos_servidor()` en la línea 5878.\n- `_carpeta_modelos_servidor` llama a `recursos_srv.estado()` en la línea 5865.\n- `estado` llama a `librerias_disponibles()` en la línea 141.\n\n```\nmodelos_borrar_parciales\n  → _carpeta_modelos_servidor (app.py:5878)\n    → estado (app.py:5865)\n      → librerias_disponibles (servidor.py:141)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2381,
+   "tokens": 257,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 30.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "cte_margen·a1",
+   "base": "cte_margen",
+   "modo": "unidad",
+   "pregunta": "¿Cuánto vale `MARGEN_MB` y en qué línea de `backend/ai_engine/motor_moe.py` está definida?",
+   "respuesta": "`MARGEN_MB` vale 250 y está definido en la línea 53 de `backend/ai_engine/motor_moe.py`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: motor_moe, __init__, frio, termostato",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 33,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 8.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·t1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "think": true,
+   "respuesta": "La ejecución pasa por estas dos funciones intermedias, en este orden:\n\n1. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`)\n2. **`estado`** (`backend/recursos/servidor.py:123`)\n\n### Rastro de llamadas (con líneas literales)\n\n| Llamador | Línea de llamada | Llamado |\n|---|---|---|\n| `modelos_borrar_parciales` (`app.py:5876`) | `backend/app.py:5878` | `_carpeta_modelos_servidor()` |\n| `_carpeta_modelos_servidor` (`app.py:5863`) | `backend/app.py:5865` | `recursos_srv.estado()` |\n| `estado` (`servidor.py:123`) | `backend/recursos/servidor.py:141` | `librerias_disponibles()` |\n\n**Detalle de cada paso:**\n- `_carpeta_modelos_servidor` lee el entorno actual del servidor para obtener la carpeta de modelos (`OLLAMA_MODELS`). Para ello invoca a `recursos_srv.estado()`.\n- `estado` construye el diccionario de configuración actual y, dentro del retorno (línea 141), incluye una llamada a `librerias_disponibles()` para informar al frontend qué motores de cálculo (CUDA, Vulkan, CPU) están instalados junto al binario de Ollama.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2381,
+   "tokens": 1988,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 79.7,
+   "memoria_del_modelo": null
+  }
+ ]
+}

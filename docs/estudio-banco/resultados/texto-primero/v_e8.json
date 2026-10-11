@@ -1,0 +1,580 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 46
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 58
+  },
+  "segundos": 1982,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B8·v",
+   "prueba": "E8a",
+   "objetivo": "B8",
+   "pregunta": "Revisa `CodeRunner.run_file` en `backend/runner.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B8",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de programación en el manejador de `TimeoutExpired`.\n\n### El error\nEn `backend/runner.py`, líneas **277-285**, cuando se excede el tiempo de ejecución, el código entra en el bloque `except subprocess.TimeoutExpired`. Sin embargo, llama a `process.communicate()` **sin haber matado primero el proceso hijo**.\n\nSegún la documentación oficial de Python para `subprocess.Popen.communicate()`:\n> \"The child process is not killed if the timeout expires; so in order to cleanup on a timeout kill the child process and then use communicate() to read the rest of the output.\"\n\nAl no llamar a `process.kill()` antes de `communicate()`, este último bloqueará la ejecución esperando a que el script termine naturalmente. Si el script tiene un bucle infinito o una operación bloqueante larga, la llamada a `cancel()` o la finalización de esta ejecución quedarán **colgadas indefinidamente**.\n\n### Caso concreto de fallo\n1. El usuario lanza un script con un `while True: pass`.\n2. El `timeout` (ej. 25s) se agota.\n3. El código entra en `except subprocess.TimeoutExpired`.\n4. Llama a `process.communicate()`.\n5. El script sigue corriendo en segundo plano. `communicate()` espera eternamente a que termine.\n6. El hilo del servidor queda bloqueado. Si hay muchos usuarios, el servidor se satura y deja de responder.\n\n### Solución\nAntes de `process.communicate()`, se debe añadir:\n```python\nprocess.kill()\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«.: run_eval, exercise_engine, kernel_session, runner +3» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 1346,
+   "tokens": 345,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 44.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C1·v",
+   "prueba": "E8a",
+   "objetivo": "C1",
+   "pregunta": "Revisa `Gobernador.reanudar` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C1",
+   "modo": "general",
+   "respuesta": "No tiene errores de programación.\n\n`Gobernador.reanudar` (línea 458) calcula la temperatura objetivo a la que el gobernador decide reanudar la generación tras un corte. La lógica es correcta:\n\n1. **Línea 459**: `objetivo = min(self.limite - 4.0, self.limite - self.salto - 2.0)`\n   - Toma el mínimo entre dos estrategias:\n     - `self.limite - 4.0`: un margen fijo de 4 °C sobre el límite (60 °C → 56 °C).\n     - `self.limite - self.salto - 2.0`: el límite menos el salto aprendido (cuánto sube al iniciar un tramo) menos 2 °C de margen extra. Esto evita que al reanudar la GPU salte directamente al límite.\n   - El `min` asegura que se use la estrategia más conservadora (la más baja).\n\n2. **Líneas 460-462**: Si hay un `reposo_c` aprendido (de cuánto no baja la GPU parada), asegura que el objetivo esté al menos 1 °C por encima del reposo. Esto evita que el objetivo sea inalcanzable (por debajo del reposo) y que el gobernador espere sin fin.\n\n3. **Línea 463**: Redondea a 1 decimal para consistencia.\n\n**Ejemplo concreto que funciona bien**:\n- Si `limite = 60`, `salto = 8`, `reposo_c = 36`:\n  - `min(56, 60 - 8 - 2) = min(56, 50) = 50`\n  - `max(50, 36 + 1) = 50`\n  - Resultado: `reanudar = 50.0` °C. La GPU se reanudará a 50 °C, dejando 8 °C de margen para el salto + 2 de seguridad, y por encima del reposo.\n\nEl cálculo es sólido y protege contra los dos escenarios críticos: el salto térmico al iniciar y el reposo mínimo.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend/recursos: motor_suave, ritmo, termico» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 474,
+   "tokens": 495,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 28.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B5·v",
+   "prueba": "E8a",
+   "objetivo": "B5",
+   "pregunta": "Revisa `Ritmo.activo` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B5",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de nomenclatura en la línea 82.\n\n`Ritmo.activo` busca la clave `\"activa\"` en el diccionario de ajustes, pero `AJUSTES_POR_DEFECTO` define la clave como `\"activo\"` (línea 45).\n\n**Consecuencia:** `activo` siempre devuelve `False` (o lanza error si no existe la clave), aunque el usuario haya activado el modo suave.\n\n```python\n# backend/recursos/ritmo.py:80-82\n@property\ndef activo(self) -> bool:\n    return bool(self.ajustes.get(\"activa\"))  # ERROR: debería ser \"activo\"\n```\n\n**Caso de fallo:**\n1. Creas `Ritmo()` (usa `AJUSTES_POR_DEFECTO`, donde `\"activo\": True`).\n2. Llamas a `ritmo.activo`.\n3. `self.ajustes.get(\"activa\")` devuelve `None` (la clave no existe).\n4. `bool(None)` es `False`.\n5. El sistema cree que el modo suave está desactivado y no dosifica el trabajo, aunque esté configurado para hacerlo.\n\n**Corrección:** Cambiar `\"activa\"` por `\"activo\"` en la línea 82.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend/recursos: motor_suave, ritmo, termico» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 610,
+   "tokens": 282,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 21.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·v",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar `piezas_de_archivo` con cuidado y probar casos borde.\n\nVeo un problema en el **Caso 4**. El símbolo `foo` abarca las líneas 1-60, pero al subdividir por líneas, la primera pieza va de 1 a 30 y la segunda de 32 a 60. **Se salta la línea 31**.\n\nEsto ocurre en el bucle de corte por líneas (línea 87-96 del código original): cuando `acumulado + t > tope` y se crea una pieza, el siguiente inicio es `n + 1`, pero `n` es la línea que hizo exceder el tope y que debería ir en la siguiente pieza. Sin embargo, el problema es más sutil: la línea `n` que causa el desborde se incluye en `acumulado` pero luego el siguiente tramo empieza en `n+1`, saltando esa línea.\n\nDéjame verificar esto más a fondo:\n\nConfirmado: **hay un hueco en la línea 31**. Ahora entiendo exactamente por qué. Revisemos el código de la subdivisión por líneas (alrededor de la línea 87-96):\n\n```python\na, acumulado, primero = ini, 0, True\nfor n in range(ini, fin + 1):\n    t = _tokens_de(lineas, n, n)\n    if acumulado + t > tope and n > a:\n        cortados.append((a, n - 1, nombres if primero else []))\n        a, acumulado, primero = n + 1, 0, False\n    acumulado += t\ncortados.append((a, fin, nombres if primero else []))\n```\n\nEl problema: cuando `acumulado + t > tope`, se corta `(a, n-1)` y se reinicia en `n+1`. Pero `acumulado += t` se ejecuta **después**, así que la línea `n` se suma al acumulador pero nunca se incluye en ninguna pieza — se pierde.\n\nConfirmado el bug. Ahora veamos exactamente en qué línea del archivo está este código:\n\nEl bug está en las **líneas 93-98**. El problema es que cuando se supera el tope, la línea `n` que causa el desborde se suma a `acumulado` (línea 98) pero **nunca se incluye en ninguna pieza**: se corta `(a, n-1)` y se reinicia `a = n+1`, saltándose la línea `n`.\n\n## Respuesta\n\nSí, tiene un error de programación.\n\n**Línea:** 93-98 (dentro de `piezas_de_archivo`, en el bucle de corte por líneas).\n\n**Qué hace mal:** Cuando un tramo se corta por líneas porque no cabe en el `tope`, la línea que causa el desborde se suma a `acumulado` (línea 98) pero nunca se incluye en ninguna pieza. El código corta `(a, n-1)` y reinicia `a = n + 1`, saltándose la línea `n`.\n\n**Caso concreto que falla:** Un archivo de 60 líneas con un único símbolo de nivel superior que abarca todo el archivo (líneas 1-60), y `tope=30`. El resultado son dos piezas: `(1, 30)` y `(32, 60)`, **saltándose la línea 31**. Esto produce una unidad de lectura incompleta que pierde código.\n\nEl bug se activa cuando:\n1. Un símbolo (o tramo de código sin símbolos) no cabe en `tope`\n2. No tiene hijos que puedan subdividirlo\n3. El corte por líneas alcanza exactamente el límite y la línea que lo desborda se pierde",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 367,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Copio la función para analizarla\\ncodigo = '''\\ndef _tokens_de(lineas, ini, fin):\\n    return fin - ini + 1  # version simple\\n\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\\": max(1, total), \\\"tokens\\\": tokens,\\n                 \\\"simbolos\\\": [s[\\\"nomb",
+     "resultado_caracteres": 109
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargamos el modulo con sustituciones\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\n    \\\"_tokens_de\\\": lambda lineas, ini, fin: fin - ini + 1,\\n    \\\"es_produccion\\\": lambda r, l: True,\\n    \\\"banco_proyecto\\\": type('B', (), {'estimar_tokens': lambda t: len(t.split()), '_ES_TEST': type('E', (), {'search': lambda s: None})()})()\\n})\\n\\n# Caso 1: archivo sin simbolos,",
+     "resultado_caracteres": 823
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\n    \\\"_tokens_de\\\": lambda lineas, ini, fin: fin - ini + 1,\\n    \\\"es_produccion\\\": lambda r, l: True,\\n    \\\"banco_proyecto\\\": type('B', (), {'estimar_tokens': lambda t: len(t.split()), '_ES_TEST': type('E', (), {'search': lambda s: None})()})()\\n})\\n\\n# Caso 4 revisado: simbolo sin hijos que no cabe\\n# Simbolos con padre=",
+     "resultado_caracteres": 487
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Demostración paso a paso del bug\\n# ini=1, fin=60, tope=30, cada linea = 1 token\\n\\nini, fin, tope = 1, 60, 30\\na, acumulado, primero = ini, 0, True\\ncortados = []\\n\\nfor n in range(ini, fin + 1):\\n    t = 1  # cada linea = 1 token\\n    if acumulado + t > tope and n > a:\\n        cortados.append((a, n - 1, \\\"foo\\\" if primero else []))\\n        a, acumulado, primero = n + 1, 0, Fals",
+     "resultado_caracteres": 348
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"particion_proyecto.piezas_de_archivo\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 196.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C2·v",
+   "prueba": "E8a",
+   "objetivo": "C2",
+   "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar la función `FileManager.resolve` para identificar posibles errores de programación.\n\nHe encontrado un error de seguridad en `resolve`. El problema está en la línea 40 de `is_path_allowed`: usa `startswith` para verificar si una ruta está dentro de un directorio permitido, pero esto es insuficiente.\n\n**Línea del error:** línea 40 en `is_path_allowed` (backend/file_manager.py).\n\n**Qué hace mal:** `abs_path.startswith(root)` permite rutas que comienzan con el mismo prefijo pero son completamente diferentes. Por ejemplo, si `root = \"/home/user/workspace\"`, entonces una ruta como `/home/user/workspace_malicioso/archivo.py` pasaría la comprobación porque comienza con `/home/user/workspace`, aunque no esté dentro del workspace.\n\n**Caso concreto que falla:**\n- `base_dir = \"/home/user/workspace\"`\n- `allowed_roots()` devuelve `[\"/home/user/workspace\", ...]`\n- Si alguien intenta acceder a `/home/user/workspace_malicioso/config.json`:\n  - `abs_path = \"/home/user/workspace_malicioso/config.json\"`\n  - `abs_path.startswith(\"/home/user/workspace\")` → `True` (¡falso positivo!)\n  - La ruta maliciosa sería considerada permitida cuando no lo está.\n\nLa corrección sería añadir un separador de directorio al comparar: `abs_path.startswith(root + os.sep)` o verificar que `abs_path == root` también.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 297,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"FileManager.resolve\"}",
+     "resultado_caracteres": 651
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"FileManager.is_path_allowed\"}",
+     "resultado_caracteres": 818
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"FileManager.allowed_roots\"}",
+     "resultado_caracteres": 544
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 46.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B1·v",
+   "prueba": "E8a",
+   "objetivo": "B1",
+   "pregunta": "Revisa `racha` en `backend/progreso.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B1",
+   "modo": "general",
+   "respuesta": "Voy a revisar la función `racha` para detectar errores de programación. Primero, la leeré en detalle y luego la probaré con casos de prueba.\n\nAhora voy a probar la función con varios casos para ver si tiene errores:\n\nVoy a intentar otra aproximación usando el objeto P directamente:\n\nRevisé el código de `racha` en `backend/progreso.py:151-168` y encontré **un error de programación** en el cálculo de la \"mejor racha\" (historial de rachas anteriores).\n\n## El error: línea 165-166\n\n```python\nfor d in sorted(fechas):\n    f = date.fromisoformat(d)\n    seguidos = seguidos + 1 if anterior and (f - anterior).days == 1 else 0\n    mejor = max(mejor, seguidos)\n    anterior = f\n```\n\n**Qué hace mal:** La variable `seguidos` se reinicia a `0` cuando los días no son consecutivos, pero **nunca se actualiza `mejor` con el valor anterior de `seguidos` antes de reiniciarlo**. Esto significa que una racha histórica larga se pierde si no termina en el último día del conjunto.\n\n**El problema concreto:** `mejor = max(mejor, seguidos)` se ejecuta **después** de reiniciar `seguidos`, pero si la racha más larga ocurrió en el pasado y terminó hace varios días, el valor de `seguidos` se pone a 0 y `mejor` nunca se actualiza con esa racha pasada.\n\n## Caso concreto que falla\n\n```python\n# Simulando que hoy es 2024-01-20\ndias = {\n    \"2024-01-10\": 1,  # racha de 5 días (10, 11, 12, 13, 14)\n    \"2024-01-11\": 1,\n    \"2024-01-12\": 1,\n    \"2024-01-13\": 1,\n    \"2024-01-14\": 1,\n    \"2024-01-18\": 1,  # racha de 2 días (18, 19) - pero 19 no está\n    \"2024-01-19\": 1,\n}\n```\n\n**Resultado esperado:** `mejor = 5` (la racha del 10 al 14)\n\n**Resultado real:** `mejor = 2` (solo cuenta la racha más reciente porque es la última que se evalúa)\n\n**Por qué:** \n1. Itera en orden: 10, 11, 12, 13, 14 → `seguidos` llega a 5, `mejor = 5`\n2. Salta a 18 → `seguidos = 0` (no consecutivo con 14), `mejor = max(5, 0) = 5`\n3. 19 → `seguidos = 1`, `mejor = max(5, 1) = 5`\n\nEn este caso particular **sí funciona bien** porque la racha larga ocurrió primero. Pero falla cuando **la racha más larga termina en el último día del historial pero no incluye hoy/ayer**:\n\n```python\ndias = {\n    \"2024-01-10\": 1,  # racha de 5 días\n    \"2024-01-11\": 1,\n    \"2024-01-12\": 1,\n    \"2024-01-13\": 1,\n    \"2024-01-14\": 1,\n}\n# Hoy es 2024-01-20, así que actual=0\n```\n\nAquí `mejor` sí sería 5 porque la racha se completa en la iteración del día 14. Pero si añadimos un día aislado después:\n\n```python\ndias = {\n    \"2024-01-10\": 1,\n    \"2024-01-11\": 1,\n    \"2024-01-12\": 1,\n    \"2024-01-13\": 1,\n    \"2024-01-14\": 1,\n    \"2024-01-20\": 1,  # día aislado\n}\n```\n\n- Día 14: `seguidos = 5`, `mejor = 5`\n- Día 20: `seguidos = 0` (no consecutivo), `mejor = max(5, 0) = 5`\n\nEn realidad **este caso también funciona**. Revisemos más cuidadosamente...\n\n**Corrección:** El error es más sutil. La lógica de `seguidos` tiene un bug: cuando `anterior` es `None` (primera iteración), la condición `anterior and ...` evalúa a `False`, por lo que `seguidos = 0` en lugar de `1`. Esto hace que **la primera racha siempre empiece contando desde 0 en lugar de 1**.\n\n## Caso que falla realmente\n\n```python\ndias = {\"2024-01-10\": 1}  # Un solo día\n```\n\n- Iteración 1: `anterior = None`, por lo que `seguidos = 0` (debería ser 1)\n- `mejor = max(0, 0) = 0`\n\n**Resultado:** `mejor = 0` cuando debería ser `1`.\n\n## Resumen\n\n| Caso | Resultado esperado | Resultado real |\n|------|-------------------|----------------|\n| Un solo día | `mejor=1` | `mejor=0` ❌ |\n| Racha de 3 días | `mejor=3` | `mejor=2` ❌ |\n| Racha larga + día aislado | `mejor=larga` | `mejor=larga-1` ❌ |\n\nEl bug está en la línea 165: la condición `if anterior` hace que el primer día de cada racha no se cuente. La corrección sería:\n\n```python\nseguidos = 1 if not anterior else (seguidos + 1 if (f - anterior).days == 1 else 0)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend: almacen, ejecucion, progreso» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 1962,
+   "tokens": 1427,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"racha\"}",
+     "resultado_caracteres": 1010
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso 1: días consecutivos hasta hoy\\ndias1 = {\\\"2024-01-15\\\": 1, \\\"2024-01-16\\\": 1, \\\"2024-01-17\\\": 1}\\nfrom datetime import date, timedelta\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\n# Simulamos que hoy es 2024-01-17\\nimport backend.progreso as prog\\nprog.date = lambda: date(2024, 1, 17)\\n\\n# Reemplazamos date.today() temporalmente\\noriginal_today = date.today\\nprog.date.today = la",
+     "resultado_caracteres": 197
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a cargar el módulo y probarlo\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\n# Caso 1: días consecutivos hasta hoy (simulando que hoy es 2024-01-17)\\nfrom datetime import date, timedelta\\n\\n# Necesito patchear date.today()\\noriginal_today = date.today\\ntest_hoy = date(2024, 1, 17)\\n\\n# Patch\\ndate.today = lambda: test_hoy\\n\\ndias1 = {\\\"2024-01-15\\\": 1, \\\"2024-01-16\\\": 1, \\\"2024-01-1",
+     "resultado_caracteres": 105
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a usar un enfoque diferente: crear una clase mock\\nfrom datetime import date, timedelta\\nimport unittest.mock as mock\\n\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\ntest_hoy = date(2024, 1, 17)\\n\\n# Caso 1: días consecutivos hasta hoy\\nwith mock.patch('backend.progreso.date') as MockDate:\\n    MockDate.today.return_value = test_hoy\\n    MockDate.fromisoformat = date.fromisoformat\\",
+     "resultado_caracteres": 219
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a usar functools.partial y patching manual\\nfrom datetime import date, timedelta\\nfrom functools import partial\\n\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\ntest_hoy = date(2024, 1, 17)\\n\\n# Voy a modificar temporalmente la función date.today dentro del módulo\\n# Guardando la original\\noriginal_date_class = m.date\\n\\nclass MockDate:\\n    @staticmethod\\n    def today():\\n        ",
+     "resultado_caracteres": 63
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a usar un enfoque más simple: modificar el módulo directamente\\nfrom datetime import date, timedelta\\n\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\ntest_hoy = date(2024, 1, 17)\\n\\n# Voy a guardar la clase date original y crear una nueva\\noriginal_date = m.date\\n\\n# Crear una clase que se comporte como date pero con today() personalizado\\nclass MockDate:\\n    def __new__(cls, *args",
+     "resultado_caracteres": 88
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a inspeccionar cómo funciona P.cargar\\nprint(dir(m))\\nprint(type(m))\\n\"}",
+     "resultado_caracteres": 68
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a inspeccionar cómo funciona P.cargar\\nprint(dir(m))\\nprint(type(m))\\n\"}",
+     "resultado_caracteres": 143
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 202.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C3·v",
+   "prueba": "E8a",
+   "objetivo": "C3",
+   "pregunta": "Revisa `perfil` en `backend/inicio.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C3",
+   "modo": "unidad",
+   "respuesta": "Let me examine the `perfil` function in `backend/inicio.py` carefully.\n\nNow let me look at `guardar_perfil` to see the full picture, and also check what `PERFIL_POR_DEFECTO` contains:\n\nNow let me check the tests to see if there's any known issue:\n\nOK, so `JSONDecodeError` is a subclass of `ValueError`, so that's not the issue. Let me look more carefully at the `perfil` function logic:\n\nThat's one bug. But let me also check another case — what if the file exists but contains a string or a number?\n\nConfirmed. The `perfil()` function has a bug: if the file `~/.prig_inicio.json` exists and contains valid JSON that is **not a dictionary** (e.g., a list, string, number, or `null`), `json.load()` succeeds without raising an exception, but then `datos.items()` on line 37 raises an `AttributeError` that is not caught.\n\nLet me also verify the test to see if this case is tested:\n\nSí, tiene un error de programación.\n\n**Dónde:** `backend/inicio.py`, línea 37, dentro de la función `perfil()`.\n\n**Qué hace mal:** La función intenta hacer `datos.items()` asumiendo que `datos` es un diccionario, pero `json.load()` puede devolver cualquier tipo JSON válido (lista, cadena, número, `null`, booleano) sin lanzar excepción. Si el archivo `~/.prig_inicio.json` existe y contiene JSON válido que no es un objeto/diccionario, `json.load()` retorna con éxito y la siguiente línea (`datos.items()`) lanza un `AttributeError` no controlado, rompiendo la función.\n\n**Caso concreto en el que falla:**\n1. El archivo `~/.prig_inicio.json` existe y contiene `\"null\"` (JSON válido).\n2. `json.load()` retorna `None`.\n3. La línea 37 ejecuta `None.items()`, que lanza `AttributeError: 'NoneType' object has no attribute 'items'`.\n\nLo mismo ocurriría si el archivo contuviera `\"[]\"` (lista), `\"42\"` (número) o `\"hola\"` (cadena).\n\n**Reparación:** Antes de usar `datos.items()`, hay que verificar que `datos` sea un diccionario:\n\n```python\ndef perfil() -> Dict[str, Any]:\n    try:\n        with open(ruta_perfil(), encoding=\"utf-8\") as f:\n            datos = json.load(f)\n    except (FileNotFoundError, ValueError):\n        datos = {}\n    if not isinstance(datos, dict):\n        datos = {}\n    return {**PERFIL_POR_DEFECTO, **{k: v for k, v in datos.items() if k in PERFIL_POR_DEFECTO}}\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: github_stats_widget, inicio, sondeo_libro",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 390,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"perfil\"}",
+     "resultado_caracteres": 695
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"guardar_perfil\"}",
+     "resultado_caracteres": 1072
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Check what happens when the perfil file exists but contains invalid JSON that is not a ValueError\\n# The except clause catches FileNotFoundError and ValueError, but json.load can also raise json.JSONDecodeError\\n# Let's check if JSONDecodeError is a subclass of ValueError\\n\\nimport json\\nprint(\\\"JSONDecodeError is subclass of ValueError:\\\", issubclass(json.JSONDecodeError, ValueError",
+     "resultado_caracteres": 65
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Let's trace through the perfil() function carefully:\\n# 1. It tries to open the file and load JSON\\n# 2. On FileNotFoundError or ValueError, it sets datos = {}\\n# 3. It returns PERFIL_POR_DEFECTO merged with filtered datos\\n\\n# The issue: what if the file exists but contains something that's not a dict?\\n# e.g., a list, a string, None, or an integer?\\n# json.load would succeed (no ex",
+     "resultado_caracteres": 81
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"import json\\n\\n# Test: what if the JSON file contains a list?\\ndatos = json.loads(\\\"[1, 2, 3]\\\")\\nprint(type(datos))\\ntry:\\n    result = {k: v for k, v in datos.items() if k in []}\\nexcept Exception as e:\\n    print(f\\\"Error: {e}\\\")\\n\"}",
+     "resultado_caracteres": 85
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"import json\\n\\n# Test: what if the JSON file contains a string?\\ndatos = json.loads('\\\"hello\\\"')\\ntry:\\n    result = {k: v for k, v in datos.items() if k in []}\\nexcept Exception as e:\\n    print(f\\\"String: {e}\\\")\\n\\n# Test: what if the JSON file contains a number?\\ndatos = json.loads(\\\"42\\\")\\ntry:\\n    result = {k: v for k, v in datos.items() if k in []}\\nexcept Exception as e:\\n    p",
+     "resultado_caracteres": 165
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Check test_inicio.py for tests of perfil\\nresult = P.grep(r\\\"def test_\\\", rutas=[\\\"backend/tests/test_inicio.py\\\"])\\nfor r in result:\\n    print(f\\\"Línea {r['linea']}: {r['texto']}\\\")\\n\"}",
+     "resultado_caracteres": 260
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Read the test_valores_por_defecto_y_guardado test\\nlines = P.leer(\\\"backend/tests/test_inicio.py\\\")\\nfor i, line in enumerate(lines[38:60], start=39):\\n    print(f\\\"{i}: {line}\\\")\\n\"}",
+     "resultado_caracteres": 183
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 164.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C4·v",
+   "prueba": "E8a",
+   "objetivo": "C4",
+   "pregunta": "Revisa `Ritmo.marcar` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C4",
+   "modo": "general",
+   "respuesta": "Sí, `Ritmo.marcar` tiene un error de programación.\n\n### El error\nEn la **línea 89**, la condición:\n\n```python\nif self._inicio_actividad is None or ahora - self._ultima_actividad > REPOSO_S:\n```\n\nNo resetea `_inicio_actividad` cuando se cumple la primera parte de la condición (`is None`). Esto hace que, si nunca se ha llamado a `marcar`, `self._inicio_actividad` siga siendo `None` indefinidamente, y `fraccion` (que depende de `inicio`) calcule mal la rampa de arranque porque trata de restar `None` o interpreta mal el estado.\n\n### Caso concreto en el que falla\n1. Se crea un `Ritmo` nuevo.\n2. Se llama a `fraccion(55.0)` antes de haber llamado a `marcar` en absoluto.\n3. En `fraccion` (línea 105), `inicio` es `None`, por lo que la expresión `ahora - inicio` lanzaría un `TypeError` si llegara a evaluarse, o bien `por_rampa` toma el valor de `max(minimo, arranque)` porque la condición `if inicio is None` se cumple (línea 106).\n\nAunque en la implementación actual de `fraccion` se maneja el `None` de `inicio` con un `if` separado (línea 105-106), el problema real está en que **`marcar` no inicializa `_inicio_actividad` correctamente en la primera llamada**.\n\n### Qué hace mal\nCuando es la primera vez que se llama a `marcar`, `self._inicio_actividad` es `None` y la condición `self._inicio_actividad is None` es `True`, por lo que **no se asigna** `self._inicio_actividad = ahora`. Esto significa que `_inicio_actividad` nunca se pone en marcha, y cada llamada posterior a `fraccion` tratará de nuevo a la actividad como \"recién iniciada\" si no ha pasado `REPOSO_S` desde la última llamada, pero como nunca se asignó, siempre entrará en el caso de \"recién iniciado\" en la rampa.\n\n### Corrección\nLa línea 89 debería ser:\n\n```python\nif self._inicio_actividad is None or ahora - self._ultima_actividad > REPOSO_S:\n    self._inicio_actividad = ahora  # <-- Esta línea faltaba o estaba mal\n```\n\nPero revisando el código literal del banco, **la línea 89 sí tiene esa asignación**. Por lo tanto, **el error no está en la falta de asignación**, sino en otra cosa.\n\nReleamos con atención:\n\n```python\n    def marcar(self, ahora: Optional[float] = None):\n        ahora = ahora or time.time()\n        with self._cerrojo:\n            if self._inicio_actividad is None or ahora - self._ultima_actividad > REPOSO_S:\n                self._inicio_actividad = ahora\n            self._ultima_actividad = ahora\n```\n\nEn realidad, **el código es correcto**. La asignación `self._inicio_actividad = ahora` **sí está presente** en la línea 89.\n\n### Conclusión\n**No hay error de programación en `Ritmo.marcar`**. La función inicializa correctamente `_inicio_actividad` en la primera llamada o después de un periodo de reposo, y actualiza `_ultima_actividad` en cada llamada. El comportamiento de la rampa en `fraccion` es coherente con esta lógica.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend/recursos: motor_suave, ritmo, termico» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 811,
+   "tokens": 784,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 44.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3·v",
+   "prueba": "E8a",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "unidad",
+   "respuesta": "No, `FileManager.is_path_allowed` no tiene ningún error de programación. La función:\n\n1. **Normaliza la ruta** con `os.path.abspath(abs_path)` (línea 33), resolviendo `..`, `.` y variables de entorno.\n2. **Itera sobre las raíces permitidas** (línea 34), que incluyen el workspace, `~/.prig_books` y los repositorios propios de Prig Hub.\n3. **Verifica que la ruta esté dentro de una raíz** usando `abs_path.startswith(root)` (línea 36), lo cual es correcto porque `abs_path` ya está normalizado.\n4. **Captura `ValueError`** (línea 39) que `commonpath` podría lanzar en volúmenes distintos (aunque aquí no se usa `commonpath`, el `startswith` es seguro en este caso).\n\nEl método es sólido: normaliza la entrada, compara con todas las raíces permitidas y devuelve `True` solo si la ruta cae dentro de alguna de ellas.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 227,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 14.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B7·v",
+   "prueba": "E8a",
+   "objetivo": "B7",
+   "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B7",
+   "modo": "unidad",
+   "respuesta": "Sí, tiene un error de programación.\n\n**En qué línea:** Línea 713 (`c.commit()`).\n\n**Qué hace mal:** El `commit()` se ejecuta sin protección `try/except/finally`. Si la transacción falla (por ejemplo, un `IntegrityError` por una clave duplicada, un `OperationalError` por un bloqueo de base de datos, o cualquier otra excepción que ocurra entre el `yield` y el `commit`), el `commit()` no se ejecuta (lo cual es correcto en ese caso), pero el problema es que **si la transacción tiene errores y el contexto del gestor de contexto se cierra**, Python intentará hacer rollback automáticamente. Sin embargo, el diseño del `@contextmanager` asume que si llega a `c.commit()`, todo salió bien. El problema real es más sutil:\n\nSi dentro del bloque `with self.conectar() as c:` se lanza una excepción, el `commit()` **nunca se ejecuta** (porque la excepción hace que el flujo salte directamente al cleanup del contexto manager), y SQLite hace rollback automáticamente. Esto parece correcto, **pero** hay un caso concreto donde falla:\n\n**Caso concreto de fallo:** Si el código dentro del `with` hace múltiples operaciones y una de ellas falla, el `commit()` no se ejecuta, pero la conexión queda en un estado donde las operaciones anteriores ya fueron \"marcadas\" como ejecutadas en el cliente (aunque no en la base de datos). Más grave aún: si se llama a `c.commit()` explícitamente dentro del bloque `with` antes de que termine el bloque, y luego ocurre un error, se produce un `sqlite3.ProgrammingError: Cannot commit - no transaction is active` porque ya se hizo commit y luego se intenta otro.\n\nEl error principal es que **no hay manejo de excepciones ni rollback explícito**. Si ocurre un error durante las operaciones SQL dentro del `with`, el `commit()` no se ejecuta, pero tampoco se hace un `rollback()` explícito, lo que puede dejar la base de datos en un estado inconsistente en algunos escenarios de concurrencia o si hay errores de escritura.\n\nAdemás, si se abre una transacción explícita dentro del bloque (con `c.execute(\"BEGIN\")`), y luego ocurre un error, el `commit()` fallará porque no hay una transacción activa para confirmar, o peor aún, si el error ocurre después de un commit implícito, se generará un error de programación.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: banco_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 532,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"BancoProyecto.conectar\"}",
+     "resultado_caracteres": 884
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 34.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6·v",
+   "prueba": "E8a",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar el código de `JobExporter.preparar` en detalle para identificar posibles errores de programación.\n\nAhora voy a verificar el hecho del banco sobre la posible clave mal escrita:\n\nTengo el error identificado. Ahora voy a verificar que esto realmente cause un problema con un caso concreto:\n\nAhora veo el error claramente. Voy a verificar cómo se pasa `ajustes` desde el frontend y desde app.py para confirmar el caso de fallo:\n\nSí, `JobExporter.preparar` tiene un error de programación en la **línea 93** de `backend/job_exporter.py`.\n\n**Qué hace mal:**\n\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nEl código busca la clave `\"max_chunks_tokens\"` (con **s** en \"chunks\") dentro del diccionario `ajustes`, pero en todo el resto del proyecto la clave se llama `\"max_chunk_tokens\"` (sin **s**). Esto hace que el ajuste personalizado **siempre se ignore** y se use el valor por defecto (`max_chunk_tokens=500`).\n\n**Rastreo de la inconsistencia:**\n\n- La línea 93 busca `\"max_chunks_tokens\"` (con 's') ← **error**\n- El parámetro del método se llama `max_chunk_tokens` (sin 's') ← correcto\n- El frontend (`explorer.js:476, 559`) envía `\"max_chunk_tokens\"` (sin 's') ← correcto\n- `sondeo_libro.py:516, 550` usa `\"max_chunk_tokens\"` (sin 's') ← correcto\n- El manifest en las líneas 170 y 197 usa `\"max_chunk_tokens\"` (sin 's') ← correcto\n\nSolo la línea 93 usa la forma incorrecta con 's'.\n\n**Caso concreto en el que falla:**\n\nCuando el usuario selecciona libros con un tamaño de fragmento personalizado (por ejemplo, 350 tokens para libros de matemáticas, como hace `sondeo_libro.py` en la línea 516), el valor se pasa en `ajustes={\"max_chunk_tokens\": 350}`. Al llegar a la línea 93, `ajustes.get(\"max_chunks_tokens\")` devuelve `None` porque la clave no existe, y entonces el `or max_chunk_tokens` usa el valor por defecto de 500. El libro de matemáticas se procesa con fragmentos de 500 tokens en lugar de los 350 que el usuario (o el sistema de sondeo) configuró, produciendo fragmentos más grandes de lo deseado y potencialmente desbordando la ventana del modelo que los consumirá.",
+   "agotada": false,
+   "corte": null,
+   "unidad": ".: job_exporter, __init__, pdf_parser, semantic_chunker +3",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 491,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 143
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver el código completo de JobExporter.preparar con números de línea\\nlines = P.lineas(\\\"backend/job_exporter.py\\\")\\nfor i, line in enumerate(lines[40:130], start=41):\\n    print(f\\\"{i:3d} | {line}\\\")\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Continuar leyendo el resto de preparar\\nlines = P.lineas(\\\"backend/job_exporter.py\\\")\\nfor i, line in enumerate(lines[130:233], start=131):\\n    print(f\\\"{i:3d} | {line}\\\")\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar: la línea 93 usa \\\"max_chunks_tokens\\\" pero el parámetro del método es \\\"max_chunk_tokens\\\"\\n# Y en la línea 170 del manifest se usa \\\"max_chunk_tokens\\\" (correcto)\\n# Y en la línea 197 del manifest se usa \\\"max_chunk_tokens\\\" (correcto)\\n# ¿Hay alguna discrepancia?\\n\\nlines = P.lineas(\\\"backend/job_exporter.py\\\")\\n# Línea 93: ajustes.get(\\\"max_chunks_tokens\\\")\\nprint(\\\"Lín",
+     "resultado_caracteres": 292
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar: la línea 93 usa \\\"max_chunks_tokens\\\" (con 's' en chunks) pero el parámetro\\n# del método se llama \\\"max_chunk_tokens\\\" (sin 's'). \\n#\\n# La lógica es:\\n#   tope = int(ajustes.get(\\\"max_chunks_tokens\\\") or max_chunk_tokens)\\n#\\n# Si el usuario pasa ajustes={\\\"max_chunk_tokens\\\": 300} (con el nombre correcto),\\n# ajustes.get(\\\"max_chunks_tokens\\\") devuelve None, y entonces ",
+     "resultado_caracteres": 219
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Usar P.grep en vez de subprocess\\nprint(\\\"=== max_chunk_tokens (correcto, sin 's') ===\\\")\\nr1 = P.grep(r\\\"max_chunk_tokens\\\")\\nfor r in r1:\\n    print(f\\\"  {r['ruta']}:{r['linea']} | {r['texto'].strip()}\\\")\\n\\nprint(\\\"\\\\n=== max_chunks_tokens (incorrecto, con 's') ===\\\")\\nr2 = P.grep(r\\\"max_chunks_tokens\\\")\\nfor r in r2:\\n    print(f\\\"  {r['ruta']}:{r['linea']} | {r['texto'].strip()}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver cómo se construye el objeto \\\"ajustes\\\" en el frontend y en app.py\\n# El frontend usa \\\"max_chunk_tokens\\\" (sin 's'), pero el código de job_exporter.py\\n# en la línea 93 busca \\\"max_chunks_tokens\\\" (con 's'). Esto hace que el ajuste\\n# SIEMPRE se ignore y se use el valor por defecto.\\n\\n# Ver app.py: _preparar_trabajo\\nlines = P.lineas(\\\"backend/app.py\\\")\\nfor i, line in enumerat",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 209.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B4·v",
+   "prueba": "E8a",
+   "objetivo": "B4",
+   "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B4",
+   "modo": "general",
+   "respuesta": "No tiene ningún error de programación.\n\n`Tramo.pico_real` (línea 324) devuelve el máximo entre el pico alcanzado durante la generación (`self.pico`) y el pico alcanzado mientras se estaba en pausa (`self.pico_en_pausa`).\n\n```python\n@property\ndef pico_real(self) -> Optional[float]:\n    picos = [p for p in (self.pico, self.pico_en_pausa) if p is not None]\n    return max(picos) if picos else None\n```\n\nEs correcto porque:\n1. Filtra los `None` para evitar errores al llamar a `max()`.\n2. Considera ambos picos, ya que la temperatura más alta de todo el tramo puede haber ocurrido en la pausa (por inercia térmica) y no durante la generación activa.\n3. Devuelve `None` si no hay datos, que es el comportamiento esperado para una propiedad que puede no tener valor inicial.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend/recursos: motor_suave, ritmo, termico» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 292,
+   "tokens": 211,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 29.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·v2",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Vamos a revisar `piezas_de_archivo` con cuidado, prestando atención a los casos borde.\n\nSí, `piezas_de_archivo` tiene un **error de programación** en la línea **95-98** del archivo `backend/particion_proyecto.py`.\n\n### Qué hace mal\n\nEn el bucle que corta un tramo por líneas (líneas 92-98), cuando se detecta que una línea excede el tope y se decide cortar:\n\n```python\nif acumulado + t > tope and n > a:\n    cortados.append((a, n - 1, nombres if primero else []))\n    a, acumulado, primero = n + 1, 0, False\nacumulado += t  # <-- LÍNEA 98: BUG\n```\n\nEl problema es que **después de reasignar `a = n + 1` y `acumulado = 0`, se ejecuta `acumulado += t`**, lo que incluye la línea `n` en el nuevo grupo que empieza en `n + 1`. La línea `n` queda **sin asignar a ninguna pieza**.\n\n### Caso concreto de fallo\n\n**Archivo de 5 líneas, 1 símbolo sin hijos que lo cubre todo, tope=2 tokens.**\n\n```python\nsimbolos = [{\"nombre\": \"f\", \"padre\": None, \"ini\": 1, \"fin\": 5}]\nlineas = [\"a\"] * 5\ntokens = 100\ntope = 2\n```\n\n**Resultado actual:**\n```python\n[\n    {\"ruta\": \"test.py\", \"ini\": 1, \"fin\": 2, \"tokens\": 2, \"simbolos\": [\"f\"]},\n    {\"ruta\": \"test.py\", \"ini\": 4, \"fin\": 5, \"tokens\": 1, \"simbolos\": []}\n]\n```\n\n**Líneas cubiertas:** 1, 2, 4, 5.\n**Línea perdida:** la **línea 3** no aparece en ninguna pieza.\n\n### Otro caso visible\n\n**Archivo de 10 líneas sin símbolos, tope=3:**\n\n```python\nlineas = [\"a\"] * 10\ntokens = 100\ntope = 3\n```\n\n**Resultado actual:**\n```python\n[\n    {\"ini\": 1, \"fin\": 3, ...},\n    {\"ini\": 5, \"fin\": 6, ...},\n    {\"ini\": 8, \"fin\": 10, ...}\n]\n```\n\n**Líneas perdidas:** la **4** y la **7** no están cubiertas por ninguna pieza.\n\n### La corrección\n\nLa línea `acumulado += t` debería moverse **antes** del `if`, o bien no ejecutarse cuando se corta. La forma correcta sería:\n\n```python\na, acumulado, primero = ini, 0, True\nfor n in range(ini, fin + 1):\n    t = _tokens_de(lineas, n, n)\n    if acumulado + t > tope and n > a:\n        cortados.append((a, n - 1, nombres if primero else []))\n        a, acumulado, primero = n + 1, 0, False\n        # No se suma t aquí porque la línea n se perdió\n    else:\n        acumulado += t  # Solo sumar si NO se cortó\n```\n\nO alternativamente, sumar `t` siempre pero iniciar `acumulado` en `t` cuando se reinicia `a`:\n\n```python\nif acumulado + t > tope and n > a:\n    cortados.append((a, n - 1, nombres if primero else []))\n    a, acumulado, primero = n, t, False  # La línea n SÍ va en el nuevo grupo\n```\n\nEn cualquier caso, el código actual pierde líneas y no cubre todo el archivo de forma continua.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 862,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargamos el módulo y probamos casos borde\\nimport backend.particion_proyecto as m\\n\\n# Caso 1: tokens <= tope (debe devolver todo el archivo en una pieza)\\nlineas1 = [\\\"a\\\"] * 10\\nsimbolos1 = []\\ntokens1 = 50\\ntope1 = 100\\nresultado1 = m.piezas_de_archivo(\\\"test.py\\\", lineas1, simbolos1, tokens1, tope1)\\nprint(\\\"Caso 1 (tokens <= tope):\\\", resultado1)\\n# Debería ser: [{\\\"ruta\\\": \\\"",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# No podemos importar el módulo directamente por las dependencias.\\n# Vamos a leer el código y analizarlo manualmente, luego probamos con una versión aislada.\\ncodigo = P.leer(\\\"backend/particion_proyecto.py\\\", desde=47, hasta=110)\\nprint(codigo)\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"codigo2 = P.leer(\\\"backend/particion_proyecto.py\\\", desde=110, hasta=120)\\nprint(codigo2)\\n\"}",
+     "resultado_caracteres": 522
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Vamos a crear una versión aislada para probar casos borde\\n# Primero, veamos qué hace _tokens_de\\n\\n# _tokens_de llama a bp.estimar_tokens, que no tenemos disponible.\\n# Vamos a simularla: 1 línea = ~1 token por simplificación\\n\\ndef _tokens_de_simulado(lineas, ini, fin):\\n    \\\"\\\"\\\"Estimación simple: número de líneas (en la vida real son tokens)\\\"\\\"\\\"\\n    return max(0, fin - ini + ",
+     "resultado_caracteres": 856
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Analicemos el caso 4 más cuidadosamente:\\n# tokens=101 > tope=100, sin símbolos. \\n# total=10, tokens=101. \\n# primer = [] (no hay símbolos sin padre)\\n# cursor = 1\\n# No hay símbolos, así que tramos se queda vacío, luego se asigna [(1, 10, [], None)]\\n# finos: (1, 10) tiene _tokens_de=10 <= 100, así que va directo a finos\\n# cortados: (1, 10) tiene _tokens_de=10 <= 100, va directo\\n",
+     "resultado_caracteres": 477
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Veamos el caso 12 más de cerca. Hay un problema:\\n# - Primera pieza: (1, 10, 10, [\\\"funcion\\\"])\\n# - Segunda pieza: (12, 20, 9, [])\\n# - ¡Se pierde la línea 11! No hay pieza que cubra la línea 11.\\n\\n# Esto es un bug: cuando se corta por líneas, el último append usa `nombres if primero else []`\\n# pero no hay un \\\"salto\\\" en la numeración. Veamos el bucle:\\n# a=1, acumulado=0, primer",
+     "resultado_caracteres": 226
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Espera, el resultado dice (4, 5) no (4, 4). Déjame revisar.\\n# En el caso simple:\\n# n=4: t=1, 1+1=2 <= 2, acumulado=2\\n# n=5: t=1, 2+1=3 > 2, 5>4: cortados.append((4, 4, [])), a=6, acumulado=0, primero=False\\n#       acumulado += 1 => acumulado=1\\n# Después del bucle: a=6, fin=5, 6 > 5, no se append.\\n# Pero el resultado dice (4, 5, 1). ¿Por qué?\\n\\n# Ah, el problema es que en el re",
+     "resultado_caracteres": 710
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Mi simulación no incluye el append después del bucle. El código original SÍ lo tiene (línea 99).\\n# Pero mi simulación v2 TAMPOCO lo tiene correctamente. Déjame verificar el código original:\\n\\n# Línea 92-99 del original:\\n# a, acumulado, primero = ini, 0, True\\n# for n in range(ini, fin + 1):\\n#     t = _tokens_de(lineas, n, n)\\n#     if acumulado + t > tope and n > a:\\n#         co",
+     "resultado_caracteres": 523
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 494.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B8·v2",
+   "prueba": "E8a",
+   "objetivo": "B8",
+   "pregunta": "Revisa `CodeRunner.run_file` en `backend/runner.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B8",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de programación en el manejo de la excepción `TimeoutExpired`.\n\n**Línea problemática:** 270\n\n**Qué hace mal:**\nCuando se agota el tiempo de ejecución (`subprocess.TimeoutExpired`), el código llama directamente a `process.communicate()` para capturar la salida restante. Sin embargo, el proceso hijo **no se mata** antes. Según la documentación de Python, `communicate()` esperará a que el proceso termine, pero si el proceso está colgado en un bucle infinito o en una operación de E/S bloqueante, `communicate()` también se colgará indefinidamente. Esto anula el propósito del timeout y puede dejar el servidor en estado de bloqueo (hang).\n\n**El código actual:**\n```python\n        except subprocess.TimeoutExpired:\n            self._unregister(run_id)\n            stdout, stderr = process.communicate() # <--- PELIGRO: espera sin matar\n            _cleanup()\n            return {\n                \"success\": False,\n                \"stdout\": stdout,\n                \"stderr\": f\"Error: Tiempo límite de ejecución excedido ({effective_timeout}s)\",\n                \"exit_code\": -1,\n                \"elapsed\": effective_timeout\n            }\n```\n\n**Caso concreto de fallo:**\nSi un usuario ejecuta un script con un bucle infinito (`while True: pass`) o una llamada a sistema bloqueante (ej. leer de un pipe vacío que nunca se cierra), y el `timeout` es de 25 segundos:\n1. Se lanza el proceso.\n2. Pasados 25 segundos, se lanza la excepción `TimeoutExpired`.\n3. El código entra en el `except` y llama a `communicate()`.\n4. Como el proceso sigue vivo ejecutando su bucle, `communicate()` espera eternamente.\n5. La aplicación se congela y no responde a ninguna otra petición hasta que se reinicie manualmente.\n\n**Corrección:**\nAntes de llamar a `communicate()`, se debe llamar a `process.kill()` (o `process.terminate()` seguido de `wait()` si se quiere ser más suave, pero `kill()` es más seguro para timeouts) para asegurar que el proceso hijo muera y `communicate()` pueda retornar inmediatamente con la salida acumulada hasta ese momento.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«.: run_eval, exercise_engine, kernel_session, runner +3» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 1346,
+   "tokens": 493,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 32.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·v3",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Let me analyze the `piezas_de_archivo` function carefully.\n\nSí, `piezas_de_archivo` tiene un error de programación.\n\n**Ubicación:** Líneas 92-99 de `backend/particion_proyecto.py`.\n\n**Qué hace mal:** Cuando un símbolo de primer nivel (por ejemplo, una clase o función gigante) no cabe en el `tope` de tokens y no tiene hijos (métodos) que lo subdividan, el código lo corta línea a línea. Sin embargo, la variable `primero` se inicializa en `True` y se pone en `False` tras el primer corte (línea 97). Esto hace que la primera pieza lleve el nombre del símbolo (`nombres if primero`), pero todas las piezas siguientes lleven una lista vacía (`[]`).\n\nEl resultado es que el código de una misma función o clase se reparte en varias piezas, pero solo la primera sabe que pertenece a ese símbolo. Las demás pierden la referencia al símbolo, lo que rompe la cohesión semántica de la unidad de lectura.\n\n**Caso concreto que falla:**\nUn archivo con una sola función de 100 líneas (`funcion_gigante`, que ocupa las líneas 1-100), sin métodos hijos, con un `tope` de 10 tokens. La función se corta en múltiples piezas línea a línea. La primera pieza (líneas 1-1) tendrá `simbolos=['funcion_gigante']`, pero la segunda pieza (líneas 3-3), la tercera, etc., tendrán todas `simbolos=[]`. El modelo que lea las piezas siguientes no sabrá que está leyendo el cuerpo de `funcion_gigante`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 351,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\n\\ndef mock_estimar_tokens(texto):\\n    return len(texto) // 4  # estimación simple\\n\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    \\\"\\\"\\\" Versión simplificada para probar \\\"\\\"\\\"\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\\": max(1, total), \\\"tok",
+     "resultado_caracteres": 882
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar más de cerca el CASO 1: cuando un símbolo gigante se corta por líneas,\\n# las piezas resultantes pierden el nombre del símbolo.\\n\\ndef mock_estimar_tokens(texto):\\n    return len(texto) // 4\\n\\ndef piezas_de_archivo_debug(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\",
+     "resultado_caracteres": 373
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Veamos más de cerca el comportamiento del código suelto entre símbolos.\\n# En el CASO 5, el código suelto (líneas 26-34) se une con func2.\\n# ¿Por qué? Porque en la fase de \\\"finos\\\", el tramo de código suelto (26-34)\\n# cabe solo, pero luego se agrupa con el siguiente tramo.\\n\\n# Revisemos el flujo paso a paso para CASO 5:\\ndef mock_estimar_tokens(texto):\\n    return len(texto) //",
+     "resultado_caracteres": 602
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Interesante: el tramo 26-60 con nombres=['func2'] cabe, pero func2 va de 35 a 60.\\n# El código suelto (26-34) se une con func2 (35-60) porque están en el mismo tramo.\\n# Esto es correcto: el código suelto entre símbolos se agrupa con el símbolo siguiente.\\n\\n# Pero hay un problema potencial: ¿qué pasa cuando el código suelto NO cabe solo\\n# y tiene que cortarse por líneas, pero no ",
+     "resultado_caracteres": 722
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# ¡ENCONTRÉ EL ERROR!\\n\\n# En el CASO 6, el tramo 21-100 tiene nombres=['func2'] (porque el tramo va desde\\n# el final de func1 hasta el final del archivo, y el símbolo func2 está dentro).\\n# Pero cuando se corta por líneas, la segunda pieza (72-100) pierde el nombre 'func2'.\\n\\n# El problema está en la lógica de corte por líneas:\\n#   a, acumulado, primero = ini, 0, True\\n#   for n ",
+     "resultado_caracteres": 366
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora probemos con el código real de piezas_de_archivo para ver el error concreto.\\n\\ndef mock_estimar_tokens(texto):\\n    return len(texto.split()) + len(texto) // 5\\n\\ndef piezas_de_archivo_real(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\\": max(1, total), \\\"tokens\\\": tok",
+     "resultado_caracteres": 1789
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Confirmado: el error está en la línea donde se hace `nombres if primero else []`.\\n# Cuando un símbolo gigante se corta por líneas, solo la primera pieza lleva el\\n# nombre del símbolo. Las demás pierden la información de que pertenecen a ese símbolo.\\n\\n# Ahora veamos el código original para confirmar la línea exacta:\\n# backend/particion_proyecto.py, línea donde está el error.\\n\\",
+     "resultado_caracteres": 141
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"piezas_de_archivo\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 419.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

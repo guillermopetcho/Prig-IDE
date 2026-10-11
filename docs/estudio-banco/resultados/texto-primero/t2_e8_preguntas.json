@@ -1,0 +1,34 @@
+[
+ {
+  "id": "E8a_B3·g2",
+  "prueba": "seguridad: startswith en vez de commonpath",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "general"
+ },
+ {
+  "id": "E8a_B3·u2",
+  "prueba": "seguridad: startswith en vez de commonpath",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "unidad"
+ },
+ {
+  "id": "E8a_B3·g3",
+  "prueba": "seguridad: startswith en vez de commonpath",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "general"
+ },
+ {
+  "id": "E8a_B3·u3",
+  "prueba": "seguridad: startswith en vez de commonpath",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "unidad"
+ }
+]

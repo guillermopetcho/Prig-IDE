@@ -27,6 +27,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import time
 from datetime import datetime
@@ -44,6 +45,14 @@ SISTEMA_LECTOR = (
 )
 
 
+_CASTELLANO = re.compile(r"[¿¡ñáéíóú]|\b(?:qué|cómo|cuál|cuáles|dónde|cuánto|por qué|funciones|métodos|llaman?|"
+                         r"revisa|tiene|hace|devuelve|lee|leen|cuando|si cambio)\b", re.I)
+
+
+def _parece_castellano(texto: str) -> bool:
+    return bool(_CASTELLANO.search(texto or ""))
+
+
 def guia_consola() -> str:
     import memoria_consulta
     return (
@@ -56,7 +65,11 @@ def guia_consola() -> str:
         "  where is X / what to change for X (config key, endpoint, env var, DOM id, data file) → P.donde(\"X\")\n"
         "  who reads config/env key K → P.hechos(r=\"lee_config\", o=\"K\") (or lee_entorno)\n"
         "  endpoint E → P.api(\"E\") · value of a constant elsewhere → P.grep(r\"^NAME\\s*=\")\n"
-        "Conclude after at most 3 tool calls.\n\n" + memoria_consulta.AYUDA
+        "Conclude after at most 3 tool calls. If FACTS FROM THE PROJECT BANK come with the question, start from "
+        "them. The graph misses calls made through module-level instances, factories, lambdas or functions "
+        "passed as arguments: before saying that nobody calls or reads something, check the \"possible callers "
+        "found by text\" or run P.grep. For an endpoint always give its HTTP method and exact path, not only "
+        "the function. Reply in the language of the QUESTION.\n\n" + memoria_consulta.AYUDA
     )
 PEDIDO_RESUMEN = (
     "Write the gist of this unit for later lookup: 5-8 terse bullet lines covering purpose, main entry "
@@ -169,10 +182,26 @@ class LectorUnidades:
         return [{"role": "system", "content": SISTEMA_LECTOR},
                 {"role": "user", "content": f"{self.tarjeta_global()}\n\n{self.codigo_unidad(u)}"}]
 
-    def pregunta_con_contexto(self, u: Dict[str, Any], texto: str) -> str:
+    def pregunta_con_contexto(self, u: Dict[str, Any], texto: str, hechos: bool = False) -> str:
         """ Lo variable, después del prefijo guardado: el contexto del grafo, la guía de la consola y la
-        pregunta (~1-2K tokens de lectura, ~2 s) """
-        return f"{self.contexto_unidad(u)}\n\n{guia_consola()}\n\nQUESTION: {texto}"
+        pregunta (~1-2K tokens de lectura, ~2 s). Con `hechos` (el chat), además lo que el banco sabe de lo
+        que nombra la pregunta (memoria_consulta.hechos_de_la_pregunta): sin eso el modo unidad acertaba
+        86 % frente a 97 % del general (docs/estudio-banco.md) """
+        partes = [self.contexto_unidad(u)]
+        if hechos:
+            import memoria_consulta
+            try:
+                bloque = memoria_consulta.hechos_de_la_pregunta(self.banco, texto)
+            except Exception:
+                bloque = ""
+            if bloque:
+                partes.append(bloque)
+        partes.append(guia_consola())
+        # El pedido de idioma de la guía queda lejos (antes de la ayuda de la consola): con una unidad de código en
+        # inglés, una pregunta en castellano se respondió en inglés 2 de 2 veces (docs/estudio-banco.md, T7)
+        # «desde la primera línea»: con «(Responde en castellano.)», algunas abrían en inglés («Let me examine…»)
+        recordatorio = "\n(Responde en castellano desde la primera línea.)" if _parece_castellano(texto) else ""
+        return "\n\n".join(partes) + f"\n\nQUESTION: {texto}{recordatorio}"
 
     def llave(self, u: Dict[str, Any]) -> Dict[str, Any]:
         """ Todo lo que, si cambia, invalida la lectura guardada """
@@ -387,36 +416,14 @@ class LectorUnidades:
         pregunta nombra (las más fuertes), los fragmentos que encuentra la búsqueda del banco y los
         hechos del grafo (claves, endpoints). Devuelve la ganadora solo si se despega de la segunda:
         si la pregunta reparte su peso entre varias, mejor el modo general (paquete + consola). """
-        import banco_proyecto as bp
-        puntos: Dict[int, float] = {}
-
-        def sumar(orden: Optional[int], p: float):
-            if orden is not None:
-                puntos[orden] = puntos.get(orden, 0.0) + p
-        with self.banco.conectar() as c:
-            for nombre in bp.identificadores_nombrados(pregunta):
-                for f in c.execute("SELECT ruta, ini FROM simbolos WHERE nombre = ? OR corto = ?", (nombre, nombre.split(".")[-1])):
-                    sumar(self.unidad_de(f["ruta"], f["ini"]), 3.0)
-                for f in c.execute("SELECT ruta, linea FROM hechos WHERE o = ? OR o LIKE ?", (nombre, f"% {nombre}")):
-                    sumar(self.unidad_de(f["ruta"], f["linea"]), 1.5)
-            for ruta in self.banco._rutas_mencionadas(c, pregunta):
-                for orden, u in self._unidades.items():
-                    if ruta in u["rutas"]:
-                        sumar(orden, 2.0 / max(1, sum(1 for p in u["piezas"] if p["ruta"] == ruta)))
-        for rango, f in enumerate(self.banco.buscar(pregunta, k=12)):
-            sumar(self.unidad_de(f["ruta"], f["ini"]), 1.0 / (1 + rango * 0.5))
-        if not puntos:
-            return {"orden": None, "motivo": "ninguna unidad coincide"}
-        orden_puntos = sorted(puntos.items(), key=lambda x: -x[1])
-        total = sum(puntos.values())
-        mejor, p1 = orden_puntos[0]
-        p2 = orden_puntos[1][1] if len(orden_puntos) > 1 else 0.0
-        cuota = p1 / total
-        alternativas = [{"orden": o, "nombre": self._unidades[o]["nombre"], "puntos": round(p, 2)} for o, p in orden_puntos[:4]]
-        if cuota < minimo or p1 < 1.5 * p2:
-            return {"orden": None, "motivo": f"repartida entre unidades (la mejor tiene {cuota:.0%})", "alternativas": alternativas}
-        return {"orden": mejor, "nombre": self._unidades[mejor]["nombre"], "cuota": round(cuota, 2),
-                "vigente": self.vigente(mejor), "alternativas": alternativas}
+        # Los puntos los cuenta el motor del banco (Rust, banco_motor.py); lo que mira el motor MoE (vigente), aquí
+        from banco_motor import rust
+        r = rust().elegir_unidad(self.banco._rs, list(self._unidades.values()), pregunta, minimo,
+                                 self.banco._vector_consulta(pregunta))
+        if r.get("orden") is None:
+            return r
+        return {"orden": r["orden"], "nombre": r["nombre"], "cuota": r["cuota"], "vigente": self.vigente(r["orden"]),
+                "alternativas": r["alternativas"]}
 
 
 def main():

@@ -1,0 +1,108 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 36
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5229,
+   "temp_c": 54
+  },
+  "segundos": 90,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "a84a7fe1bad7·r1",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Las funciones que leen la clave de configuración `truncar` son:\n\n1. **`IndiceSemantico._ajustes`** (línea 92 de `backend/indice_semantico.py`): la lee como valor por defecto (`e.get(\"truncar\", True)`) al construir el diccionario de ajustes.\n2. **`IndiceSemantico.embeber`** (línea 101 de `backend/indice_semantico.py`): la lee para decidir si pasa o no el parámetro `truncate` al embebedor.\n3. **`IndiceSemantico.estado`** (línea 265 de `backend/indice_semantico.py`): la lee para devolver el estado actual de la configuración en el diccionario de resultado.\n\nTodas están en la clase `IndiceSemantico` del archivo `backend/indice_semantico.py`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 201,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nprint(P.hechos(r=\\\"lee_config\\\", o=\\\"truncar\\\"))\\n\"}",
+     "resultado_caracteres": 416
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 46.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·r2",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Las funciones que leen la clave `truncar` son:\n\n1. **`IndiceSemantico._ajustes`** (línea 92 de `backend/indice_semantico.py`): lee `e.get(\"truncar\", True)` para obtener el valor configurado.\n2. **`IndiceSemantico.embeber`** (línea 101 de `backend/indice_semantico.py`): lee `ajustes[\"truncar\"]` para decidir si pasa `truncate: False` a la API de Ollama.\n3. **`IndiceSemantico.estado`** (línea 265 de `backend/indice_semantico.py`): lee `ajustes[\"truncar\"]` para devolver el estado actual de la configuración.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 175,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nhechos = P.hechos(r=\\\"lee_config\\\", o=\\\"truncar\\\")\\nfor h in hechos:\\n    print(f\\\"{h['ruta']}:{h['linea']} {h['s']}\\\")\\n\"}",
+     "resultado_caracteres": 189
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 21.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·r3",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Tres métodos de `backend/indice_semantico.py` leen la clave `truncar`:\n\n1. **`IndiceSemantico._ajustes`** (línea 92): la lee con `e.get(\"truncar\", True)` para devolver el valor configurado (o `True` por defecto).\n2. **`IndiceSemantico.embeber`** (línea 101): comprueba `if not ajustes[\"truncar\"]:` para decidir si pasa `truncate: False` al embebedor.\n3. **`IndiceSemantico.estado`** (línea 265): la incluye en el diccionario de estado que devuelve información sobre la configuración actual del índice.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 162,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nprint(P.hechos(r=\\\"lee_config\\\", o=\\\"truncar\\\", limite=50))\\n\"}",
+     "resultado_caracteres": 416
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 21.6,
+   "memoria_del_modelo": null
+  }
+ ]
+}

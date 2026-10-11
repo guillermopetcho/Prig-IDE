@@ -70,6 +70,18 @@
           .bm-localizar .mod-titulo { margin-bottom:6px; }
           .bm-variantes tr.bm-destacada td { background:rgba(137,180,250,.16); }
           .bm-variantes tr.bm-destacada td:first-child { box-shadow: inset 3px 0 0 var(--accent-blue); }
+          .bm-modal-overlay { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(11,11,18,.85); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:2500; }
+          .bm-modal-caja { background:var(--bg-panel, #1e1e2e); border:1px solid var(--border-color, rgba(255,255,255,.15)); border-radius:10px; box-shadow:0 16px 40px rgba(0,0,0,.6); width:640px; max-width:95vw; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
+          .bm-modal-cab { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); }
+          .bm-modal-cab h3 { margin:0; font-size:13.5px; color:#fff; display:flex; align-items:center; gap:8px; font-weight:600; }
+          .bm-modal-cuerpo { padding:16px; overflow-y:auto; font-size:11.5px; line-height:1.5; color:var(--text-color, #cdd6f4); }
+          .bm-modal-pie { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.2); }
+          .bm-archivos-lista { max-height:130px; overflow-y:auto; background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.06); border-radius:6px; padding:6px 10px; font-family:'Fira Code',monospace; font-size:11px; margin-top:6px; }
+          .bm-archivos-lista div { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dashed rgba(255,255,255,.04); }
+          .bm-opcion-respaldo { display:flex; gap:10px; align-items:flex-start; padding:9px 12px; border-radius:6px; border:1px solid rgba(255,255,255,.08); margin-bottom:8px; cursor:pointer; background:rgba(0,0,0,.14); transition:border-color .15s, background .15s; }
+          .bm-opcion-respaldo:hover { border-color:rgba(137,180,250,.35); background:rgba(137,180,250,.06); }
+          .bm-opcion-respaldo input[type="radio"] { margin-top:3px; cursor:pointer; }
+          .bm-opcion-respaldo.activo { border-color:var(--accent-blue); background:rgba(137,180,250,.12); }
         `;
         document.head.appendChild(css);
     }
@@ -201,6 +213,7 @@
               ${(m.capacidades || []).map(c => `<span class="bm-mini">${esc(CAP[c] || c)}</span>`).join('')}
               ${(m.tamanos || []).map(t => `<span class="bm-mini" style="color:var(--accent-blue);">${esc(t)}</span>`).join('')}
               <span style="flex:1"></span>
+              ${m.fuente === 'huggingface' ? `<button class="mod-boton" data-respaldo-tarjeta title="Descargar modelo completo con todas las configuraciones para respaldo offline (por si se borra de Hugging Face)"><i class="fa-solid fa-box-archive" style="color:var(--accent-yellow);"></i> Respaldo HF</button>` : ''}
               <button class="mod-boton" data-seguir title="Avisar cuando tenga variantes nuevas o cambios">${m.seguido ? '<i class="fa-solid fa-star" style="color:var(--accent-yellow);"></i> Siguiendo' : '<i class="fa-regular fa-star"></i> Seguir'}</button>
               <button class="mod-boton" data-ver>${abierto ? 'Ocultar' : 'Variantes'}</button>
             </div>
@@ -213,6 +226,10 @@
     function conectarTarjetas(cont) {
         cont.querySelectorAll('.bm-tarjeta').forEach(t => {
             const fuente = t.dataset.fuente, id = t.dataset.id, k = t.dataset.tarjeta;
+            t.querySelectorAll('[data-respaldo-tarjeta]').forEach(b => b.onclick = (e) => {
+                e.stopPropagation();
+                dialogoRespaldoHF(id);
+            });
             t.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
                 const panel = t.querySelector('[data-variantes]');
                 if (estado.abiertos.has(k)) { estado.abiertos.delete(k); panel.hidden = true; t.querySelector('button[data-ver]').textContent = 'Variantes'; return; }
@@ -242,14 +259,28 @@
         try { d = await json(`/api/buscador/variantes?fuente=${fuente}&id=${encodeURIComponent(id)}`); }
         catch (e) { panel.innerHTML = `<div class="mod-error">${esc(e.message)}</div>`; return; }
         if (!panel.isConnected) return;
-        if (!d.variantes.length) { panel.innerHTML = '<div class="mod-ayuda">No tiene archivos GGUF que Ollama pueda usar.</div>'; return; }
+        const esHf = fuente === 'huggingface';
+        if (!d.variantes.length) {
+            if (esHf) {
+                panel.innerHTML = `
+                  <div class="mod-ayuda" style="margin-bottom:8px;">No tiene archivos GGUF directos para Ollama, pero puedes descargar el repositorio completo con todas sus configuraciones y pesos para tener un respaldo offline independiente:</div>
+                  <button class="mod-boton ok" data-respaldo-todo><i class="fa-solid fa-box-archive"></i> Descargar modelo completo con configs</button>`;
+                panel.querySelector('[data-respaldo-todo]').onclick = () => dialogoRespaldoHF(id);
+                return;
+            }
+            panel.innerHTML = '<div class="mod-ayuda">No tiene archivos GGUF que Ollama pueda usar.</div>';
+            return;
+        }
         const descargables = d.variantes.filter(v => v.descargable).length;
         panel.innerHTML = `
-          <div class="mod-ayuda" style="margin-bottom:4px;">${d.variantes.length} variantes · ${descargables} descargables con Ollama
-            ${d.requiere_licencia ? ' · <span style="color:var(--accent-yellow);">requiere aceptar la licencia en Hugging Face</span>' : ''}
-            ${d.vision ? ' · incluye proyector de visión' : ''}</div>
-          <table><tr><th>Variante</th><th>Tamaño</th><th>Contexto</th><th>Entrada</th><th>Estado</th><th>¿Cómo iría aquí?</th><th></th></tr>
-          ${d.variantes.map(v => `<tr data-ref="${esc(v.ref)}">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <div class="mod-ayuda">${d.variantes.length} variantes · ${descargables} descargables con Ollama
+              ${d.requiere_licencia ? ' · <span style="color:var(--accent-yellow);">requiere aceptar la licencia en Hugging Face</span>' : ''}
+              ${d.vision ? ' · incluye proyector de visión' : ''}</div>
+            ${esHf ? `<button class="mod-boton" data-respaldo-todo title="Descarga todas las configuraciones (config.json, tokenizer, etc.) y pesos seleccionados para respaldo offline"><i class="fa-solid fa-box-archive" style="color:var(--accent-yellow);"></i> Descargar completo con configs</button>` : ''}
+          </div>
+          <table><tr><th>Variante</th><th>Tamaño</th><th>Contexto</th><th>Entrada</th><th>Estado</th><th>¿Cómo iría aquí?</th><th>Acciones</th></tr>
+          ${d.variantes.map(v => `<tr data-ref="${esc(v.ref)}" data-etiqueta="${esc(v.etiqueta)}">
               <td style="font-family:'Fira Code',monospace;">${esc(v.etiqueta)}${v.predeterminada ? ' <span class="bm-mini">por defecto</span>' : ''}</td>
               <td>${gb(v.bytes)}${v.partes > 1 ? ` <span class="bm-mini">${v.partes} partes</span>` : ''}</td>
               <td>${esc(v.contexto || (d.contexto ? cifra(d.contexto) : ''))}</td>
@@ -257,7 +288,10 @@
               <td>${v.instalado ? '<span class="bm-mini ok">instalado</span>' : v.descargable ? '<span class="bm-mini ok">descargable</span>'
                 : `<span class="bm-mini mal" title="${esc(v.nota || '')}">no disponible</span><div class="mod-ayuda">${esc(v.nota || '')}</div>`}</td>
               <td data-veredicto>${v.descargable ? '<button class="mod-boton" data-analizar title="Lee solo la cabecera del modelo y calcula memoria y velocidad en tu máquina">Calcular</button>' : ''}</td>
-              <td>${v.descargable && !v.instalado ? `<button class="mod-boton ok" data-descargar><i class="fa-solid fa-download"></i> Descargar</button>` : ''}</td>
+              <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
+                ${v.descargable && !v.instalado ? `<button class="mod-boton ok" data-descargar><i class="fa-solid fa-download"></i> Descargar</button>` : ''}
+                ${esHf ? `<button class="mod-boton" data-descargar-completo title="Descarga este archivo junto con todas las configuraciones, tokenizador y metadatos"><i class="fa-solid fa-box-archive"></i> Completo + configs</button>` : ''}
+              </div></td>
             </tr>`).join('')}</table>`;
         if (destacar) {
             // La variante que traía el enlace o el nombre (8b, Q4_K_M…): marcada y a la vista
@@ -287,6 +321,14 @@
             try { await Descargas.encolar(ref); b.innerHTML = '<i class="fa-solid fa-clock"></i> En cola'; }
             catch (e) { b.disabled = false; alert(e.message); }
         });
+        if (esHf) {
+            panel.querySelectorAll('[data-respaldo-todo]').forEach(b => b.onclick = () => dialogoRespaldoHF(id));
+            panel.querySelectorAll('[data-descargar-completo]').forEach(b => b.onclick = () => {
+                const fila = b.closest('tr');
+                const etiqueta = fila.dataset.etiqueta || (fila.dataset.ref.includes(':') ? fila.dataset.ref.split(':').pop() : null);
+                dialogoRespaldoHF(id, etiqueta);
+            });
+        }
     }
 
     // ================================================================== encontrar un modelo concreto
@@ -415,10 +457,196 @@
         if ($('bm-todo')) $('bm-todo').onclick = () => cont.querySelectorAll('[data-actualizar]:not([disabled])').forEach(b => b.click());
     }
 
+    // ================================================================== diálogo de respaldo completo HF
+    async function dialogoRespaldoHF(repoId, varianteInicial = null) {
+        let modal = $('bm-modal-respaldo');
+        if (modal) modal.remove();
+
+        modal = document.createElement('div');
+        modal.id = 'bm-modal-respaldo';
+        modal.className = 'bm-modal-overlay';
+        modal.innerHTML = `
+          <div class="bm-modal-caja">
+            <div class="bm-modal-cab">
+              <h3><i class="fa-solid fa-box-archive" style="color:var(--accent-yellow);"></i> Descargar modelo completo con configuraciones</h3>
+              <button class="mod-boton" id="bm-modal-cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="bm-modal-cuerpo" id="bm-modal-cuerpo">
+              <div class="mod-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Inspeccionando repositorio en Hugging Face…</div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        const cerrar = () => modal.remove();
+        modal.querySelector('#bm-modal-cerrar').onclick = cerrar;
+        modal.onclick = (e) => { if (e.target === modal) cerrar(); };
+
+        const repoLimpio = String(repoId || '').replace(/^https?:\/\//i, '').replace(/^(huggingface\.co|hf\.co)\//i, '');
+        const repoParte = repoLimpio.includes(':') ? repoLimpio.split(':')[0] : repoLimpio;
+        const varExtraida = varianteInicial || (repoLimpio.includes(':') ? repoLimpio.split(':')[1] : null);
+
+        let d;
+        try {
+            const q = new URLSearchParams({ repo: repoParte });
+            if (varExtraida) q.set('variante', varExtraida);
+            d = await json(`/api/buscador/hf/inspeccionar_completo?${q}`);
+        } catch (err) {
+            const cuerpo = modal.querySelector('#bm-modal-cuerpo');
+            if (cuerpo) {
+                cuerpo.innerHTML = `
+                  <div class="mod-error">${esc(err.message)}</div>
+                  <div class="mod-ayuda" style="margin-top:8px;">Verifica que el repositorio existe y no requiere token o permisos especiales.</div>
+                  <div style="text-align:right; margin-top:14px;"><button class="mod-boton" id="bm-modal-err-cerrar">Cerrar</button></div>
+                `;
+                cuerpo.querySelector('#bm-modal-err-cerrar').onclick = cerrar;
+            }
+            return;
+        }
+
+        const cuerpo = modal.querySelector('#bm-modal-cuerpo');
+        if (!cuerpo) return;
+
+        const hayVariantes = d.variantes_gguf && d.variantes_gguf.length > 0;
+        const varianteActiva = d.variante_elegida || (hayVariantes ? d.variantes_gguf[0].etiqueta : '');
+
+        cuerpo.innerHTML = `
+          <div class="mod-ayuda" style="margin-bottom:12px; background:rgba(249,226,175,0.08); border-left:3px solid var(--accent-yellow); padding:8px 10px; border-radius:4px;">
+            <b>Respaldo independiente offline:</b> Guarda todas las configuraciones esenciales (<code>config.json</code>, <code>tokenizer</code>, metadatos y plantilla) junto con los pesos en una carpeta local de tu espacio de trabajo. Si el modelo es borrado o privatizado en Hugging Face, tu copia seguirá 100% funcional y operable con Ollama.
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div><b>Repositorio:</b> <span style="font-family:'Fira Code',monospace; color:#fff;">${esc(d.repo_id)}</span></div>
+            <div class="mod-ayuda">Archivos detectados: ${d.total_archivos_repo} archivos · ${d.archivos_config.length} configuraciones (${gb(d.bytes_configs)})</div>
+          </div>
+
+          <div style="font-weight:600; margin-bottom:6px; color:#fff;">¿Qué deseas descargar?</div>
+
+          ${hayVariantes ? `
+            <label class="bm-opcion-respaldo activo" id="bm-opc-var-label">
+              <input type="radio" name="bm_modo_respaldo" value="variante" checked>
+              <div style="flex:1;">
+                <div style="font-weight:600; color:#fff;">Variante específica + todas las configuraciones (Recomendado)</div>
+                <div class="mod-ayuda">Descarga los pesos de la variante elegida junto con todo el paquete de configuraciones y tokenizador.</div>
+                <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                  <span>Variante:</span>
+                  <select id="bm-respaldo-sel-var" class="mod-campo" style="font-family:'Fira Code',monospace; font-size:11px;">
+                    ${d.variantes_gguf.map(v => `<option value="${esc(v.etiqueta)}" ${v.etiqueta.toLowerCase() === (varianteActiva || '').toLowerCase() ? 'selected' : ''}>${esc(v.etiqueta)} (${gb(v.bytes)})</option>`).join('')}
+                  </select>
+                  <span id="bm-calc-tamano" class="bm-mini ok"></span>
+                </div>
+              </div>
+            </label>
+          ` : d.archivos_pesos_seleccionados.length ? `
+            <label class="bm-opcion-respaldo activo" id="bm-opc-var-label">
+              <input type="radio" name="bm_modo_respaldo" value="variante" checked>
+              <div style="flex:1;">
+                <div style="font-weight:600; color:#fff;">Pesos del modelo + configuraciones (${gb(d.total_bytes_respaldo)})</div>
+                <div class="mod-ayuda">Descarga los archivos de pesos del repositorio junto con todas las configuraciones.</div>
+              </div>
+            </label>
+          ` : ''}
+
+          <label class="bm-opcion-respaldo ${!hayVariantes && !d.archivos_pesos_seleccionados.length ? 'activo' : ''}">
+            <input type="radio" name="bm_modo_respaldo" value="solo_configs" ${!hayVariantes && !d.archivos_pesos_seleccionados.length ? 'checked' : ''}>
+            <div style="flex:1;">
+              <div style="font-weight:600; color:#fff;">Solo archivos de configuración y metadatos (${d.archivos_config.length} archivos, ${gb(d.bytes_configs)})</div>
+              <div class="mod-ayuda">Ideal si ya descargaste el archivo GGUF por separado o solo necesitas tokenizer, templates y parámetros para tu registro offline.</div>
+            </div>
+          </label>
+
+          <label class="bm-opcion-respaldo">
+            <input type="radio" name="bm_modo_respaldo" value="todo">
+            <div style="flex:1;">
+              <div style="font-weight:600; color:#fff;">Espejo completo del repositorio (${d.total_archivos_repo} archivos)</div>
+              <div class="mod-ayuda">Descarga todos los archivos y variantes disponibles en el repositorio para un respaldo exhaustivo.</div>
+            </div>
+          </label>
+
+          <div style="margin-top:12px;">
+            <label style="font-weight:600; display:block; margin-bottom:4px; color:#fff;">Carpeta de destino en tu espacio de trabajo:</label>
+            <input id="bm-respaldo-destino" class="mod-campo" style="width:100%; font-family:'Fira Code',monospace; font-size:11px;" value="${esc(d.carpeta_sugerida)}">
+            <div class="mod-ayuda" style="margin-top:2px;">La carpeta se creará dentro del espacio de trabajo y aparecerá en el explorador de archivos.</div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <details>
+              <summary style="cursor:pointer; color:var(--accent-blue); font-size:11px;"><i class="fa-solid fa-list-check"></i> Ver archivos de configuración que se incluirán (${d.archivos_config.length})</summary>
+              <div class="bm-archivos-lista">
+                ${d.archivos_config.map(f => `<div><span>${esc(f.nombre)}</span><span style="color:var(--text-muted);">${gb(f.bytes)}</span></div>`).join('')}
+              </div>
+            </details>
+          </div>
+          <div class="mod-ayuda" style="margin-top:8px;">
+            <i class="fa-solid fa-file-circle-check" style="color:var(--accent-green);"></i> Prig creará <b>prig_backup_manifest.json</b> (con sumas SHA-256) y un <b>Modelfile</b> listo para Ollama.
+          </div>
+        `;
+
+        const pie = document.createElement('div');
+        pie.className = 'bm-modal-pie';
+        pie.innerHTML = `
+          <button class="mod-boton" id="bm-respaldo-btn-cancelar">Cancelar</button>
+          <button class="mod-boton ok" id="bm-respaldo-btn-iniciar"><i class="fa-solid fa-cloud-arrow-down"></i> Iniciar descarga completa</button>
+        `;
+        modal.querySelector('.bm-modal-caja').appendChild(pie);
+
+        pie.querySelector('#bm-respaldo-btn-cancelar').onclick = cerrar;
+
+        const radios = cuerpo.querySelectorAll('input[name="bm_modo_respaldo"]');
+        radios.forEach(r => r.onchange = () => {
+            cuerpo.querySelectorAll('.bm-opcion-respaldo').forEach(op => op.classList.remove('activo'));
+            const contenedor = r.closest('.bm-opcion-respaldo');
+            if (contenedor) contenedor.classList.add('activo');
+        });
+
+        const selVar = cuerpo.querySelector('#bm-respaldo-sel-var');
+        const calcSpan = cuerpo.querySelector('#bm-calc-tamano');
+        const actualizarTam = () => {
+            if (!selVar || !calcSpan) return;
+            const elegida = selVar.value;
+            const match = (d.variantes_gguf || []).find(v => v.etiqueta.toLowerCase() === elegida.toLowerCase());
+            const tamBytes = (match ? match.bytes : 0) + (d.bytes_configs || 0);
+            calcSpan.textContent = `Total: ~${gb(tamBytes)}`;
+        };
+        if (selVar) {
+            selVar.onchange = actualizarTam;
+            actualizarTam();
+        }
+
+        pie.querySelector('#bm-respaldo-btn-iniciar').onclick = async () => {
+            const btn = pie.querySelector('#bm-respaldo-btn-iniciar');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Encolando…';
+
+            const modo = cuerpo.querySelector('input[name="bm_modo_respaldo"]:checked')?.value || 'variante';
+            let varianteParam = null;
+            if (modo === 'variante' && selVar) {
+                varianteParam = selVar.value;
+            } else if (modo === 'solo_configs') {
+                varianteParam = 'solo_configs';
+            } else if (modo === 'todo') {
+                varianteParam = 'todo';
+            }
+
+            const destino = (cuerpo.querySelector('#bm-respaldo-destino')?.value || '').trim() || d.carpeta_sugerida;
+            const titulo = `Respaldo ${d.repo_id}${varianteParam === 'solo_configs' ? ' (configs)' : varianteParam === 'todo' ? ' (completo)' : varianteParam ? ` (${varianteParam})` : ''}`;
+
+            try {
+                await Descargas.encolar(d.repo_id, titulo, 'hf_completo', varianteParam, destino);
+                cerrar();
+                if (window.layoutMgr) window.layoutMgr.mensajeEstado(`Encolado respaldo completo de ${d.repo_id}`, 5000);
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Iniciar descarga completa';
+                alert('No se pudo encolar el respaldo: ' + err.message);
+            }
+        };
+    }
+
     // ================================================================== descargas
     const Descargas = {
-        async encolar(ref, titulo) {
-            const r = await post('/api/descargas', { ref, titulo });
+        async encolar(ref, titulo, tipo = 'ollama', variante = null, destino = null) {
+            const r = await post('/api/descargas', { ref, titulo, tipo, variante, destino });
             this.sondear();
             return r;
         },
@@ -456,9 +684,11 @@
           ${estado.descargas.map(d => {
               const activo = ['en_cola', 'comprobando', 'descargando'].includes(d.estado);
               const color = { completado: 'var(--accent-green)', error: 'var(--accent-red)', cancelado: 'var(--text-muted)' }[d.estado] || 'var(--accent-blue)';
+              const esHfCompleto = d.tipo === 'hf_completo';
               return `<div class="bm-descarga">
                 <div><div style="font-family:'Fira Code',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(d.ref)}">${esc(d.titulo)}</div>
-                  <div class="mod-ayuda">${FUENTES[d.fuente][0]} · <span style="color:${color};">${esc(d.fase || d.estado)}</span></div></div>
+                  <div class="mod-ayuda">${FUENTES[d.fuente][0]} · <span style="color:${color};">${esc(d.fase || d.estado)}</span>${esHfCompleto ? ' · <span class="bm-mini" style="color:var(--accent-yellow); border:1px solid rgba(249,226,175,.4);"><i class="fa-solid fa-box-archive"></i> respaldo completo</span>' : ''}</div>
+                  ${d.carpeta_guardada ? `<div class="mod-ayuda" style="margin-top:2px; font-size:10px; color:var(--accent-green);"><i class="fa-solid fa-folder-check"></i> ${esc(d.carpeta_guardada)}</div>` : ''}</div>
                 <div>${d.estado === 'error' ? `<div style="color:var(--accent-red);">${esc(d.error)}</div>`
                   : `<div class="mod-barra"><div style="width:${d.porcentaje || (d.estado === 'completado' ? 100 : 0)}%; background:${color};"></div></div>
                      <div class="mod-ayuda">${d.porcentaje != null ? `${d.porcentaje}% · ` : ''}${gb(d.completado)} de ${gb(d.total)} ${velocidad(d.velocidad) ? '· ' + velocidad(d.velocidad) : ''} ${d.restante_s ? '· quedan ' + resto(d.restante_s) : ''}</div>`}</div>
@@ -518,7 +748,8 @@
 
     window.BuscadorModelos = {
         abrir: () => window.Modelos && window.Modelos.abrir('buscar'),
-        encolar: (ref, t) => Descargas.encolar(ref, t),
+        encolar: (ref, t, tipo, v, d) => Descargas.encolar(ref, t, tipo, v, d),
+        respaldoHF: (repo, variante) => dialogoRespaldoHF(repo, variante),
         /** Abre la pestaña y busca un nombre o enlace concreto */
         encontrar: async (texto) => { estado.localizar.texto = texto; await window.Modelos.abrir('buscar'); return localizar(texto); },
     };

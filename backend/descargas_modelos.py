@@ -50,11 +50,13 @@ def explicar_error(texto: str, codigo: Optional[int] = None) -> str:
 class Descargas:
     def __init__(self, base_url_fn: Callable[[], str], carpeta_modelos_fn: Callable[[], str],
                  al_terminar: Optional[Callable[[Dict[str, Any]], None]] = None,
-                 comprobar=buscador.comprobar):
+                 comprobar=buscador.comprobar,
+                 workspace_dir_fn: Optional[Callable[[], str]] = None):
         self._base = base_url_fn
         self._carpeta = carpeta_modelos_fn
         self._al_terminar = al_terminar
         self._comprobar = comprobar
+        self._workspace_dir_fn = workspace_dir_fn or (lambda: os.getcwd())
         self._cerrojo = threading.RLock()
         self._hay_trabajo = threading.Event()
         self._items: List[Dict[str, Any]] = []
@@ -62,13 +64,17 @@ class Descargas:
         self._hilo: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------ cola
-    def encolar(self, ref: str, titulo: Optional[str] = None) -> Dict[str, Any]:
+    def encolar(self, ref: str, titulo: Optional[str] = None, tipo: str = "ollama",
+                variante: Optional[str] = None, destino: Optional[str] = None) -> Dict[str, Any]:
         ref = buscador.validar_ref(ref)
         with self._cerrojo:
-            activo = next((i for i in self._items if i["ref"] == ref and i["estado"] in ("en_cola", "comprobando", "descargando")), None)
+            clave_ref = f"{tipo}:{ref}" if tipo != "ollama" else ref
+            activo = next((i for i in self._items if (i.get("clave_ref") or i["ref"]) == clave_ref
+                           and i["estado"] in ("en_cola", "comprobando", "descargando")), None)
             if activo:
                 return self._publico(activo)
-            item = {"id": next(self._ids), "ref": ref, "titulo": titulo or ref, "fuente": buscador.fuente_de_ref(ref),
+            item = {"id": next(self._ids), "ref": ref, "clave_ref": clave_ref, "titulo": titulo or ref,
+                    "fuente": buscador.fuente_de_ref(ref), "tipo": tipo, "variante": variante, "destino": destino,
                     "estado": "en_cola", "completado": 0, "total": None, "velocidad": None, "restante_s": None,
                     "fase": None, "error": None, "creado": time.time(), "terminado": None, "_cancelar": threading.Event()}
             self._items.append(item)
@@ -92,7 +98,8 @@ class Descargas:
             item = self._buscar(id_)
             if item["estado"] not in ("error", "cancelado"):
                 return self._publico(item)
-            return self.encolar(item["ref"], item["titulo"])
+            return self.encolar(item["ref"], item["titulo"], tipo=item.get("tipo", "ollama"),
+                                variante=item.get("variante"), destino=item.get("destino"))
 
     def limpiar_terminadas(self) -> int:
         with self._cerrojo:
@@ -145,7 +152,35 @@ class Descargas:
         with self._cerrojo:
             item.update(cambios)
 
+    def _descargar_hf_completo(self, item: Dict[str, Any]):
+        from descargas_hf_completo import ejecutar_descarga_completa_hf, limpiar_repo_hf
+        repo_id, var_ref = limpiar_repo_hf(item["ref"])
+        variante = item.get("variante") or var_ref
+        destino = item.get("destino")
+        try:
+            self._fijar(item, estado="descargando", fase="Iniciando respaldo completo de Hugging Face")
+            ws = self._workspace_dir_fn() if hasattr(self, "_workspace_dir_fn") else None
+            resultado = ejecutar_descarga_completa_hf(
+                repo_id=repo_id,
+                variante=variante,
+                carpeta_destino=destino,
+                workspace_dir=ws,
+                item=item,
+                actualizar_fn=self._fijar
+            )
+            self._fijar(item, estado="completado", carpeta_guardada=resultado.get("carpeta"))
+            self._terminar(item, "completado")
+        except Exception as e:
+            if item.get("_cancelar") and item["_cancelar"].is_set():
+                self._terminar(item, "cancelado")
+            else:
+                self._terminar(item, "error", error=str(e))
+
     def _descargar(self, item: Dict[str, Any]):
+        if item.get("tipo") == "hf_completo":
+            self._descargar_hf_completo(item)
+            return
+
         self._fijar(item, estado="comprobando", fase="Comprobando en el registro")
         c = self._comprobar(item["ref"])
         if not c.get("descargable"):

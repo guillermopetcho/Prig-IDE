@@ -344,6 +344,8 @@ class AIChatRequest(BaseModel):
     # False: sin la memoria de respuestas anteriores (ni se inyectan ni se guarda esta). Para medir: si no,
     # cada corrida del examen ve las respuestas de la anterior (docs/estudio-banco.md, E1)
     memoria: bool = True
+    # auto | general | unidad (None: el de la configuración, banco_modo). docs/plan-texto-primero.md
+    banco_modo: Optional[str] = None
 
 class AIInlinePromptRequest(BaseModel):
     prompt: str
@@ -3999,9 +4001,36 @@ INSTRUCCION_BANCO = (
     "5. Sé breve: lo esencial en 150-400 palabras, salvo que te pidan más detalle. Primero consulta lo que "
     "necesites y después responde una sola vez; no narres lo que vas a hacer."
 )
+# Con la memoria del chat desactivada no se le pide guardar nada (y anotar no escribe: herramientas_chat.py)
+_REGLA_ANOTAR = ("4. Si descubres algo que valga para futuras preguntas (una definición del dominio, una decisión de "
+                 "diseño, teoría que explica el código), guárdalo con anotar.\n")
+assert _REGLA_ANOTAR in INSTRUCCION_BANCO
+INSTRUCCION_BANCO_SIN_MEMORIA = INSTRUCCION_BANCO.replace(_REGLA_ANOTAR, "").replace("\n5. Sé breve", "\n4. Sé breve")
+
+# Tope de la respuesta en el chat con banco. Sin él, una respuesta en bucle (texto que se repite) seguía hasta
+# llenar el contexto, el motor lo agrandaba y la volvía a empezar desde cero: medido 31.937 tokens en 17 min y
+# 11.459 hasta llenar 32K (docs/estudio-banco.md). 4096 es lo que el motor ya reserva para la salida al elegir el
+# contexto (motor_moe.estimar_tokens), así que no cambia su elección; la respuesta correcta más larga medida
+# rondaba los 1.500. Cortada por el tope, se puede «Continuar».
+TOPE_RESPUESTA_BANCO = 4096
+# Con «Pensar», el razonamiento cuenta dentro del tope: con 4096, revisar una función gastaba todo en razonar y la
+# respuesta salía vacía (2 de 2; docs/estudio-banco.md, «Corrige los fallos»). Este tope deja lugar a razonar y responder;
+# el motor reserva ese espacio al elegir el contexto (motor_moe.estimar_tokens) y el bucle sigue acotado
+TOPE_RESPUESTA_BANCO_PENSANDO = 16384
+# Rondas de herramientas con el banco: en la última se le pide responder (ai_engine_class.chat_eventos), así que son 8
+# de consultas y una para responder. Medido: con 9 o más consultas, 1 de 5 respuestas correctas.
+RONDAS_BANCO = 9
 
 
 EMPUJONES_MAX = 2
+# Revisando una función que se puede ejecutar (memoria_consulta.sugiere_ejecutar), si respondió sin ejecutarla: una vez.
+# Con la pista sola, B2 de E8 (la línea perdida al cortar) lo encontraron las que la ejecutaron, y la ejecutó 1 de 3
+EJECUTALA = ("Antes de cerrar: ejecuta la función con P.cargar, como indican los hechos, con casos borde (vacío, un "
+             "elemento, justo en el límite, apenas por encima) y compara lo que devuelve con lo que debería devolver. "
+             "Después confirma o corrige tu conclusión, en pocas líneas.")
+# Con «Pensar», si el razonamiento llena el tope sin llegar a responder, se responde sin razonar (B2 de E8: 16.384
+# tokens de razonamiento y una respuesta vacía)
+SIN_RAZONAR = "El razonamiento llenó el tope sin llegar a responder: se responde ahora sin razonar."
 EMPUJON = ("Continúa: haz ahora con las herramientas la consulta que anunciaste y termina la respuesta. "
            "No anuncies lo que vas a hacer: hazlo.")
 _ANUNCIO = re.compile(r"(?:^|[\n.:!?]\s*)(?:ahora|voy a|vamos a|veamos|veo si|busco|buscaré|reviso|revisaré|consulto|"
@@ -4054,24 +4083,47 @@ def _generador_subllamadas(modelo: str):
     return generar
 
 
-def _unidad_para(req: "AIChatRequest", modelo: str, banco) -> Optional[Dict[str, Any]]:
-    """ La unidad ya leída a restaurar para esta pregunta (lectura_unidades.py), o None para el modo
-    general. Solo con el motor MoE, eventos y herramientas, y sin archivos enganchados ni código del
-    editor (cambiarían el prefijo guardado). """
+BANCO_MODOS = ("auto", "general", "unidad")
+
+
+def _unidad_para(req: "AIChatRequest", modelo: str, banco) -> Tuple[Optional[Dict[str, Any]], str]:
+    """ (unidad, motivo): la unidad cuya lectura usa esta pregunta (lectura_unidades.py), o None para el modo
+    general, y por qué. El modo sale de la petición o de la configuración (banco_modo; docs/plan-texto-primero.md):
+      auto     la unidad solo si su lectura está guardada; si no, modo general
+      general  siempre modo general: el contexto se arma con el texto del banco, sin estados del motor
+      unidad   la unidad aunque no tenga lectura guardada: se lee antes de responder (_chat_eventos)
+    El modo unidad pide el motor MoE, eventos y herramientas, y nada de archivos enganchados ni código del editor
+    (cambiarían el prefijo guardado). """
     from ai_engine import motor_moe as motor_moe_mod
-    if (banco is None or not req.eventos or not motor_moe_mod.es_moe(modelo) or req.solo_codigo
-            or req.hooked_files or req.code_context or req.continuar or req.think):
-        return None
+    if banco is None:
+        return None, "sin banco"
+    modo = str(req.banco_modo or ai_engine.config.get("banco_modo") or "auto").strip().lower()
+    if modo not in BANCO_MODOS:
+        modo = "auto"
+    if modo == "general":
+        return None, "forzado: modo general"
+    for falla, razon in ((not req.eventos, "sin eventos"), (not motor_moe_mod.es_moe(modelo), "no es el motor MoE"),
+                         (req.solo_codigo, "solo código"), (req.hooked_files, "archivos enganchados"),
+                         (req.code_context, "código del editor"), (req.continuar, "continuación"),
+                         (req.think, "con razonamiento")):
+        if falla:
+            return None, f"modo unidad no disponible: {razon}"
     try:
         lector = lectura_unidades.LectorUnidades(banco, ai_engine, modelo=modelo, generar_sub=_generador_subllamadas(modelo))
         if not lector._unidades:
-            return None
+            return None, "el proyecto todavía no está partido en unidades"
         eleccion = lector.elegir_unidad(req.prompt)
-        if eleccion.get("orden") is None or not eleccion.get("vigente"):
-            return None
-        return {**eleccion, "lector": lector, "datos": lector._unidades[eleccion["orden"]]}
-    except Exception:
-        return None
+        if eleccion.get("orden") is None:
+            return None, f"la pregunta reparte su peso entre unidades: {eleccion.get('motivo') or 'ninguna se destaca'}"
+        unidad = {**eleccion, "lector": lector, "datos": lector._unidades[eleccion["orden"]]}
+        nombre = eleccion.get("nombre") or f"unidad {eleccion['orden']}"
+        if not eleccion.get("vigente"):
+            if modo == "unidad":
+                return {**unidad, "leer_antes": True}, f"forzado: «{nombre}» no tiene lectura guardada; se lee ahora"
+            return None, f"«{nombre}» no tiene lectura guardada: modo general"
+        return unidad, "lectura guardada de la unidad"
+    except Exception as e:
+        return None, f"no se pudo elegir unidad: {type(e).__name__}"
 
 
 def _presupuesto_banco(modelo: str) -> Tuple[int, int]:
@@ -4160,10 +4212,27 @@ def ai_chat(req: AIChatRequest):
     banco, banco_info, unidad = None, None, None
     if req.banco:
         banco, banco_info, mapa, contexto_banco = _preparar_banco(req, modelo)
-        unidad = _unidad_para(req, modelo, banco)
+        unidad, motivo_modo = _unidad_para(req, modelo, banco)
+        if banco is not None and banco_info is not None:
+            banco_info.update({"modo": "unidad" if unidad is not None else "general", "motivo": motivo_modo})
         if unidad is not None and banco_info is not None:
-            banco_info.update({"modo": "unidad", "unidad": unidad["nombre"], "unidad_orden": unidad["orden"],
+            banco_info.update({"unidad": unidad["nombre"], "unidad_orden": unidad["orden"],
                                "unidad_cuota": unidad.get("cuota")})
+        if banco is not None and unidad is None:
+            # Modo general, el camino normal desde el plan «texto primero»: los mismos hechos del banco que recibe el
+            # modo unidad (definición, llamadores, rutas, configuración…). En el estudio, el general era el más fiable
+            # (97 % frente a 86 %; docs/plan-texto-primero.md)
+            try:
+                hechos = memoria_consulta.hechos_de_la_pregunta(banco, req.prompt)
+            except Exception:
+                hechos = ""
+            if hechos:
+                # Después del paquete, pegados a la pregunta (como en el modo unidad). Arriba de todo quedaban a ~21.000
+                # caracteres de la pregunta y el modelo los ignoraba o descartaba; pegados a ella, el general acertó 3 de
+                # 3 y verificó lo «sin resolver» (T7, docs/estudio-banco.md, «Texto primero: medición corta»)
+                contexto_banco = f"{contexto_banco}\n\n{hechos}" if contexto_banco else hechos
+            if banco_info is not None:
+                banco_info["hechos_caracteres"] = len(hechos)
         if banco is not None:
             if contexto_banco:
                 prompt = f"{contexto_banco}\n\n{prompt}"
@@ -4174,7 +4243,7 @@ def ai_chat(req: AIChatRequest):
                 else:
                     prompt = f"{mapa}\n\n{prompt}"
             if not (req.solo_codigo and solo_lo_pedido):
-                sys_prompt = f"{sys_prompt}\n\n{INSTRUCCION_BANCO}"
+                sys_prompt = f"{sys_prompt}\n\n{INSTRUCCION_BANCO if req.memoria else INSTRUCCION_BANCO_SIN_MEMORIA}"
     if req.code_context:
         prompt = f"```\n{req.code_context}\n```\n\n{prompt}"
 
@@ -4210,6 +4279,31 @@ def ai_chat(req: AIChatRequest):
     return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 
+def _leer_unidad_antes(unidad: Dict[str, Any]):
+    """ Modo «unidad» forzado y la unidad sin lectura guardada (docs/plan-texto-primero.md, T5). Con caché, se lee antes
+    de responder (LectorUnidades.leer: el motor guarda su estado si cabe y queda registrada, así que las preguntas
+    siguientes la restauran en ~0,3 s). Con el caché apagado (moe_cache_gb = 0) no: leería el prefijo dos veces sin
+    poder guardarlo; se lee junto con la pregunta. Emite los avisos para el chat """
+    def aviso(texto: str) -> str:
+        return json.dumps({"t": "aviso", "v": texto}, ensure_ascii=False) + "\n"
+    try:
+        tope = ai_engine.config.get("moe_cache_gb")
+        tope = None if tope in (None, "") else float(tope)
+    except (TypeError, ValueError):
+        tope = None
+    nombre = unidad.get("nombre") or f"unidad {unidad.get('orden')}"
+    if tope == 0:
+        yield aviso(f"«{nombre}» no tiene lectura guardada y el caché está apagado: se lee junto con la pregunta "
+                    "(≈30 s más).")
+        return
+    yield aviso(f"Leyendo «{nombre}» antes de responder (≈30–40 s; queda guardada para las próximas preguntas)…")
+    try:
+        r = unidad["lector"].leer(unidad["orden"]) or {}
+        yield aviso(f"Unidad leída: {int(r.get('tokens') or 0):,} tokens en {r.get('segundos') or 0} s.".replace(",", "."))
+    except Exception as e:
+        yield aviso(f"No se pudo leer antes ({type(e).__name__}): se lee junto con la pregunta.")
+
+
 def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None,
                   contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None,
                   unidad: Optional[Dict[str, Any]] = None, referencias: Optional[List[Dict[str, Any]]] = None):
@@ -4243,18 +4337,22 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
     # memoria de consulta: una consola aislada donde el proyecto entero es el objeto P
     if (req.herramientas or banco is not None) and not solo_codigo:   # la gramática de solo código no admite llamadas
         if banco is not None and "tools" in ai_engine.capacidades(mod):
-            consola = memoria_consulta.Consola(banco, generar=_generador_subllamadas(mod))
+            consola = memoria_consulta.Consola(banco, generar=_generador_subllamadas(mod), escribir=req.memoria)
             mensajes[0]["content"] = f"{mensajes[0]['content']}\n\n{INSTRUCCION_CONSOLA}"
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
                                     permitir_codigo=req.permitir_codigo, timeout=_exec_timeout(), banco=banco,
-                                    consola=consola)
+                                    consola=consola, escribir=req.memoria)
     if unidad is not None and consola is not None:
         # Modo unidad: la conversación empieza exactamente con el prefijo de la lectura guardada de esa
         # unidad (sistema del lector + tarjeta + contexto + código) y sus herramientas fijas; el motor la
-        # restaura en ~0,3 s con sus expertos, y la consola cubre el resto del proyecto
+        # restaura en ~0,3 s con sus expertos, y la consola cubre el resto del proyecto. Con la pregunta van
+        # los hechos del banco sobre lo que nombra (lo que el modo general ya recibe)
         mensajes = unidad["lector"].mensajes(unidad["datos"]) + [
-            {"role": "user", "content": unidad["lector"].pregunta_con_contexto(unidad["datos"], req.prompt)}]
-        herramientas = Herramientas(banco=banco, consola=consola, solo=list(lectura_unidades.HERRAMIENTAS_UNIDAD))
+            {"role": "user", "content": unidad["lector"].pregunta_con_contexto(unidad["datos"], req.prompt, hechos=True)}]
+        herramientas = Herramientas(banco=banco, consola=consola, solo=list(lectura_unidades.HERRAMIENTAS_UNIDAD),
+                                    escribir=req.memoria)
+        if unidad.get("leer_antes"):
+            yield from _leer_unidad_antes(unidad)
     extra_moe = None
     if solo_codigo:
         extra_moe = {motor_moe_mod.SOLO_CODIGO: True}
@@ -4262,23 +4360,43 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
         # Con el banco la respuesta debe ceñirse al código: muestreo «preciso» (ai_engine/motor_moe.py)
         extra_moe = {motor_moe_mod.PERFIL: "preciso"}
     respuesta = []
+    hubo_aviso = False
     with _chats_lock:
         _chats_usuario[0] += 1
     try:
         conversacion = mensajes
-        for intento in range(1 + (EMPUJONES_MAX if consola is not None else 0)):
+        pensar = bool(req.think) and not solo_codigo
+        try:
+            ejecutar = consola is not None and banco is not None and memoria_consulta.sugiere_ejecutar(banco, req.prompt)
+        except Exception:
+            ejecutar = False
+        cargo = False                       # ¿alguna consulta ejecutó código del proyecto (P.cargar)?
+        for intento in range(1 + (EMPUJONES_MAX if consola is not None else 0) + int(pensar) + int(ejecutar)):
             inicio_ronda = len(respuesta)
-            for evento in ai_engine.chat_eventos(conversacion, mod, "tutor", think=False if solo_codigo else req.think,
+            pensado = False
+            for evento in ai_engine.chat_eventos(conversacion, mod, "tutor", think=pensar,
                                                  logprobs=max(0, min(int(req.logprobs or 0), 5)),
                                                  herramientas=herramientas,
-                                                 max_rondas=16 if banco is not None else 6,
+                                                 max_rondas=RONDAS_BANCO if banco is not None else 6,
                                                  gobernador=recursos_termico.gobernador(),
-                                                 extra=extra_moe):
+                                                 extra=extra_moe,
+                                                 max_tokens=None if banco is None else (
+                                                     TOPE_RESPUESTA_BANCO_PENSANDO if pensar else TOPE_RESPUESTA_BANCO)):
                 if evento.get("t") == "herramienta":
                     evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
+                    if "P.cargar(" in json.dumps(evento.get("argumentos") or {}, ensure_ascii=False):
+                        cargo = True
+                elif evento.get("t") == "pensando":
+                    pensado = True
                 elif evento.get("t") == "texto":
                     respuesta.append(str(evento.get("v") or ""))
+                elif evento.get("t") in ("error", "aviso"):
+                    hubo_aviso = True
                 yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+            if pensar and pensado and not "".join(respuesta[inicio_ronda:]).strip():
+                pensar = False
+                yield json.dumps({"t": "aviso", "v": SIN_RAZONAR}, ensure_ascii=False) + "\n"
+                continue
             # Con herramientas, el modelo a veces anuncia la próxima consulta («Ahora busco qué
             # endpoints…») y cierra el turno sin hacerla (visto en el examen del proyecto). Se le pide
             # que la haga, con lo que ya dijo delante.
@@ -4297,11 +4415,25 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
                 del respuesta[inicio_ronda:]
                 continue
             if not anuncia_sin_hacer("".join(respuesta)):
+                if ejecutar and not cargo and "".join(respuesta).strip():
+                    ejecutar = False
+                    yield json.dumps({"t": "aviso", "v": "Se le pide que ejecute la función con un caso antes de "
+                                                         "cerrar (P.cargar)."}, ensure_ascii=False) + "\n"
+                    conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
+                                                   {"role": "user", "content": EJECUTALA}]
+                    respuesta.append("\n\n")
+                    yield json.dumps({"t": "texto", "v": "\n\n"}, ensure_ascii=False) + "\n"
+                    continue
                 break
             conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
                                            {"role": "user", "content": EMPUJON}]
             respuesta.append("\n\n")
             yield json.dumps({"t": "texto", "v": "\n\n"}, ensure_ascii=False) + "\n"
+        if not "".join(respuesta).strip() and not hubo_aviso:
+            # Ni texto ni aviso: el motor pudo detenerse a mitad (visto en el estudio del banco: respuestas
+            # vacías en 1 s mientras el vigía lo relanzaba). Mejor decirlo que devolver nada
+            yield json.dumps({"t": "error", "v": "El modelo no devolvió ninguna respuesta (el motor pudo haberse "
+                                                 "reiniciado). Vuelve a intentarlo."}, ensure_ascii=False) + "\n"
     finally:
         with _chats_lock:
             _chats_usuario[0] -= 1
@@ -4338,6 +4470,7 @@ class BancoAnalizarRequest(BaseModel):
 class BancoAjustesRequest(BaseModel):
     presupuesto: Optional[int] = None
     mapa: Optional[int] = None
+    modo: Optional[str] = None          # auto | general | unidad (docs/plan-texto-primero.md)
 
 
 def _banco_actual(crear: bool = True) -> "banco_proyecto.BancoProyecto":
@@ -4370,6 +4503,7 @@ def banco_estado():
                              "embebedor": {"modelo": embebedor_banco.modelo, "disponible": embebedor_banco.disponible()},
                              "presupuesto": int(ai_engine.config.get("banco_presupuesto") or 6000),
                              "mapa": int(ai_engine.config.get("banco_mapa") or 3000),
+                             "modo": ai_engine.config.get("banco_modo") or "auto",
                              "modelo_analisis": _modelo_analisis(None), "error": bancos.ultimo_error}
     if existe:
         datos["banco"] = bancos.para(raiz).estado()
@@ -4397,9 +4531,15 @@ def banco_ajustes(req: BancoAjustesRequest):
         cambios["banco_presupuesto"] = max(1000, min(int(req.presupuesto), 100000))
     if req.mapa is not None:
         cambios["banco_mapa"] = max(0, min(int(req.mapa), 30000))
+    if req.modo is not None:
+        modo = str(req.modo).strip().lower()
+        if modo not in BANCO_MODOS:
+            raise HTTPException(status_code=400, detail="modo: auto, general o unidad")
+        cambios["banco_modo"] = modo
     if cambios:
         ai_engine.update_config(cambios)
-    return {"presupuesto": ai_engine.config.get("banco_presupuesto"), "mapa": ai_engine.config.get("banco_mapa")}
+    return {"presupuesto": ai_engine.config.get("banco_presupuesto"), "mapa": ai_engine.config.get("banco_mapa"),
+            "modo": ai_engine.config.get("banco_modo") or "auto"}
 
 
 @app.get("/api/banco/buscar")
@@ -5688,6 +5828,10 @@ class MoeRequest(BaseModel):
     nucleo: Optional[str] = None        # q8 (más calidad) | q4 (más rápido)
     detener: bool = False
     olvidar_proyectos: bool = False     # borra los proyectos guardados en disco
+    # Caché de estados en disco (docs/plan-texto-primero.md): tope en GB (0 = no se guarda ninguno) y disco libre
+    # que nunca toca
+    cache_gb: Optional[float] = None
+    cache_reserva_gb: Optional[float] = None
 
 
 def _moe_estado() -> Dict[str, Any]:
@@ -5696,7 +5840,8 @@ def _moe_estado() -> Dict[str, Any]:
     return {**ai_engine.motor_moe().estado(),
             "ajustes": {"contexto": cfg.get("moe_contexto"), "hilos": cfg.get("moe_hilos"),
                         "calientes": cfg.get("moe_calientes"), "modo": cfg.get("moe_modo"),
-                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo")},
+                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo"),
+                        "cache_gb": cfg.get("moe_cache_gb"), "cache_reserva_gb": cfg.get("moe_cache_reserva_gb")},
             "modos": list(motor_moe_mod.MODOS)}
 
 
@@ -5740,8 +5885,21 @@ def recursos_moe_ajustar(req: MoeRequest):
         if req.nucleo not in motor_moe_mod.NUCLEOS:
             raise HTTPException(status_code=400, detail="nucleo: q8 o q4")
         cambios["moe_nucleo"] = req.nucleo
+    if req.cache_gb is not None:
+        if not 0 <= float(req.cache_gb) <= 2000:
+            raise HTTPException(status_code=400, detail="cache_gb: entre 0 y 2000 GB (0 = no guardar)")
+        cambios["moe_cache_gb"] = float(req.cache_gb)
+    if req.cache_reserva_gb is not None:
+        if not 0 <= float(req.cache_reserva_gb) <= 1000:
+            raise HTTPException(status_code=400, detail="cache_reserva_gb: entre 0 y 1000 GB")
+        cambios["moe_cache_reserva_gb"] = float(req.cache_reserva_gb)
     if cambios:
         ai_engine.update_config(cambios)
+    if req.cache_gb is not None or req.cache_reserva_gb is not None:
+        try:
+            ai_engine.motor_moe().podar()            # el tope nuevo se aplica ya, no en el próximo guardado
+        except Exception:
+            pass
     if req.detener:
         ai_engine.motor_moe().detener()
     if req.olvidar_proyectos:
@@ -6135,7 +6293,8 @@ def _al_terminar_descarga(item):
 
 descargas = Descargas(lambda: ai_engine.base_url.rstrip("/"),
                       lambda: _carpeta_modelos_servidor() or gestor_modelos.carpeta_modelos(),
-                      al_terminar=_al_terminar_descarga)
+                      al_terminar=_al_terminar_descarga,
+                      workspace_dir_fn=lambda: file_mgr.base_dir)
 seguimiento = buscador_modelos.Seguimiento()
 
 
@@ -6237,11 +6396,27 @@ def buscador_visto(req: SeguirRequest):
 class DescargaModeloRequest(BaseModel):
     ref: str
     titulo: Optional[str] = None
+    tipo: Optional[str] = "ollama"
+    variante: Optional[str] = None
+    destino: Optional[str] = None
 
 
 @app.post("/api/descargas")
 def descargas_encolar(req: DescargaModeloRequest):
-    return _buscador(descargas.encolar, req.ref, req.titulo)
+    return _buscador(descargas.encolar, req.ref, req.titulo, tipo=req.tipo or "ollama",
+                     variante=req.variante, destino=req.destino)
+
+
+@app.get("/api/buscador/hf/inspeccionar_completo")
+def buscador_hf_inspeccionar_completo(repo: Optional[str] = None, repo_id: Optional[str] = None, variante: Optional[str] = None):
+    """Inspecciona los archivos de configuración y pesos de un repositorio de Hugging Face
+    para preparar una descarga y respaldo completo contra borrado."""
+    ident = repo or repo_id
+    if not ident:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Falta el identificador del repositorio ('repo' o 'repo_id').")
+    from descargas_hf_completo import inspeccionar_modelo_hf
+    return _buscador(inspeccionar_modelo_hf, ident, variante=variante)
 
 
 @app.get("/api/descargas")
@@ -7380,6 +7555,95 @@ def limpiar_memoria_cerebro():
         return {"ok": True, "mensaje": "Memoria del cerebro reiniciada"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ============================================================================
+# API MOTOR DE APRENDIZAJE POR GRAFO DE NODOS (YouTube, GitHub, Kaggle, Prig Hub)
+# ============================================================================
+from motor_aprendizaje_nodos import motor_aprendizaje
+
+class EjecutarTareaAprendizajeRequest(BaseModel):
+    codigo: Optional[str] = ""
+    usar_solucion: bool = False
+
+class ProgresoNodoAprendizajeRequest(BaseModel):
+    completado: bool = True
+
+@app.get("/api/aprendizaje/grafo")
+def obtener_grafo_aprendizaje(nivel: Optional[str] = None):
+    """Retorna el árbol de conocimiento estructurado en DAG con dependencias y estado."""
+    try:
+        return motor_aprendizaje.obtener_grafo(filtro_nivel=nivel)
+    except Exception as e:
+        logger.error(f"Error obteniendo grafo de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/nodo/{nodo_id}")
+def obtener_nodo_aprendizaje(nodo_id: str):
+    """Retorna el detalle conceptual, recursos de 4 herramientas y tarea pre-respondida."""
+    try:
+        nodo = motor_aprendizaje.obtener_nodo(nodo_id)
+        if not nodo:
+            raise HTTPException(status_code=404, detail=f"Nodo '{nodo_id}' no encontrado")
+        return {"ok": True, "nodo": nodo}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo nodo de aprendizaje {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/buscar")
+def buscar_aprendizaje(q: str = "", limite: int = 15):
+    """Búsqueda semántica ultra-rápida (<5ms) a través de nodos, teoría, videos y datasets."""
+    try:
+        resultados = motor_aprendizaje.buscar(query=q, limite=limite)
+        return {"ok": True, "total": len(resultados), "resultados": resultados}
+    except Exception as e:
+        logger.error(f"Error en búsqueda de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/ejecutar")
+def ejecutar_tarea_nodo(nodo_id: str, req: EjecutarTareaAprendizajeRequest):
+    """Ejecuta de manera segura la solución y verifica contra tests unitarios en <50ms."""
+    try:
+        return motor_aprendizaje.ejecutar_tarea(
+            nodo_id=nodo_id,
+            codigo_usuario=req.codigo or "",
+            usar_solucion=req.usar_solucion
+        )
+    except Exception as e:
+        logger.error(f"Error ejecutando tarea del nodo {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/abrir_en_editor")
+def abrir_nodo_en_editor(nodo_id: str):
+    """Genera los archivos locales en el workspace y los abre en el Editor Prig."""
+    try:
+        return motor_aprendizaje.abrir_en_editor(nodo_id=nodo_id)
+    except Exception as e:
+        logger.error(f"Error abriendo nodo {nodo_id} en editor: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/progreso")
+def actualizar_progreso_nodo(nodo_id: str, req: ProgresoNodoAprendizajeRequest):
+    """Marca manualmente un nodo como completado o pendiente."""
+    try:
+        motor_aprendizaje.marcar_progreso(nodo_id=nodo_id, completado=req.completado)
+        return {"ok": True, "nodo_id": nodo_id, "completado": req.completado}
+    except Exception as e:
+        logger.error(f"Error actualizando progreso del nodo {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/estadisticas")
+def obtener_estadisticas_aprendizaje():
+    """Retorna métricas globales de avance pedagógico por nivel (Junior a Senior)."""
+    try:
+        stats = motor_aprendizaje.obtener_estadisticas_progreso()
+        return {"ok": True, "estadisticas": stats}
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
 
 
 

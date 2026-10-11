@@ -22,8 +22,13 @@ La configuración del usuario no se toca (contexto «auto» y carpeta de trabajo
 import asyncio, atexit, contextlib, glob, hashlib, json, os, random, re, sqlite3, subprocess, sys, time
 ACCION, QUE = sys.argv[1], sys.argv[2]
 REPETICION = "--rep" in sys.argv
+# Medición del plan «texto primero» (docs/plan-texto-primero/T7-medicion.md): el modo del banco forzado y una etiqueta
+# para que los informes no pisen los de E7 (prig_lote03_general.json, prig_lote03_unidad.json…)
+MODO = sys.argv[sys.argv.index("--modo") + 1] if "--modo" in sys.argv else None
+ETIQUETA = sys.argv[sys.argv.index("--etiqueta") + 1] if "--etiqueta" in sys.argv else None
 os.environ["PRIG_BANCOS"] = os.path.expanduser("~/.cache/prig-estudio/bancos")     # antes de crear cualquier banco
-SISTEMA = "/home/ama-gi/Prig"
+# El sistema bajo prueba: el repositorio de trabajo, o una copia congelada (docs/estudio-banco/congelar_sistema.py)
+SISTEMA = os.environ.get("PRIG_SISTEMA") or "/home/ama-gi/Prig"
 sys.path.insert(0, os.path.join(SISTEMA, "backend"))
 RAIZ = os.path.expanduser("~/.cache/prig-estudio/repos/" + ("Prig" if QUE == "prig" else "full-stack-fastapi-template"))
 DIR = os.path.expanduser("~/.cache/prig-estudio/e7"); os.makedirs(DIR, exist_ok=True)
@@ -178,7 +183,7 @@ if ACCION == "plan":
 
 plan = json.load(open(PLAN))
 def informe_de(n, rep=False):
-    return os.path.join(DIR, f"{QUE}_lote{n:02d}{'_rep' if rep else ''}.json")
+    return os.path.join(DIR, f"{QUE}_lote{n:02d}{'_rep' if rep else ''}{'_' + ETIQUETA if ETIQUETA else ''}.json")
 
 if ACCION == "estado":
     for n in range(1, len(plan["lotes"]) + 1):
@@ -238,6 +243,9 @@ os.chdir(os.path.join(SISTEMA, "backend"))
 import app as A
 A.bancos.embebedor_listo = lambda: False
 A.file_mgr.base_dir = RAIZ; A.ai_engine.config["moe_contexto"] = "auto"
+# Solo en memoria: la medición nunca poda lecturas guardadas (con el tope de la configuración podría; T7)
+A.ai_engine.config["moe_cache_gb"] = float(os.environ.get("PRIG_CACHE_GB", 60))
+condiciones.update({"modo": MODO or "auto", "etiqueta": ETIQUETA, "cache_gb": A.ai_engine.config["moe_cache_gb"]})
 atexit.register(A.ai_engine.unload_models)
 modos, herramientas, agotadas = {}, {}, set()
 # Tope por pregunta. El chat con banco no limita los tokens de la respuesta: el 03/10 (lote 4) una respuesta entró en
@@ -292,7 +300,8 @@ def preguntar(texto):
         limpiar_memoria_escrita(texto)
 
 def _preguntar(texto):
-    req = A.AIChatRequest(prompt=texto, model="qwen3.6-35b-moe:prig", eventos=True, banco=True, think=False, memoria=False)
+    req = A.AIChatRequest(prompt=texto, model="qwen3.6-35b-moe:prig", eventos=True, banco=True, think=False, memoria=False,
+                          banco_modo=MODO)
     res = A.ai_chat(req)
     trozos = []
     async def leer():
@@ -337,7 +346,8 @@ ids_examen = [i for i in ids if not i.startswith("ind_")]
 ids_indep = [i for i in ids if i.startswith("ind_")]
 resultados = []
 if ids_examen:
-    r = ex.correr(almacen, f"e7_{QUE}_lote{n:02d}{'_rep' if REPETICION else ''}", preguntar, ids=ids_examen,
+    r = ex.correr(almacen, f"e7_{QUE}_lote{n:02d}{'_rep' if REPETICION else ''}{'_' + ETIQUETA if ETIQUETA else ''}",
+                  preguntar, ids=ids_examen,
                   progreso=lambda p: print(f"{time.strftime('%H:%M:%S')} {p['n']}/{p['total']} {p['tipo']} {p['puntaje']}", flush=True))
     with almacen.conectar() as c:
         resultados = [dict(f) for f in c.execute("SELECT * FROM examen_resultados WHERE corrida = ?", (r["corrida"],))]

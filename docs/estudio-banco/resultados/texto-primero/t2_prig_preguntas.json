@@ -1,0 +1,106 @@
+[
+ {
+  "id": "ind_15·g2",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+  "base": "ind_15",
+  "modo": "general"
+ },
+ {
+  "id": "ind_15·gf",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+  "base": "ind_15",
+  "modo": "general",
+  "hechos_al_final": true
+ },
+ {
+  "id": "ind_15·u2",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+  "base": "ind_15",
+  "modo": "unidad"
+ },
+ {
+  "id": "ind_16·g2",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "prueba": "hueco del grafo: llamada por fábrica",
+  "base": "ind_16",
+  "modo": "general"
+ },
+ {
+  "id": "ind_16·gf",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "prueba": "hueco del grafo: llamada por fábrica",
+  "base": "ind_16",
+  "modo": "general",
+  "hechos_al_final": true
+ },
+ {
+  "id": "ind_16·u2",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "prueba": "hueco del grafo: llamada por fábrica",
+  "base": "ind_16",
+  "modo": "unidad"
+ },
+ {
+  "id": "12bb842411c5·g2",
+  "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: ruta HTTP inventada",
+  "base": "12bb842411c5",
+  "modo": "general"
+ },
+ {
+  "id": "12bb842411c5·gf",
+  "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: ruta HTTP inventada",
+  "base": "12bb842411c5",
+  "modo": "general",
+  "hechos_al_final": true
+ },
+ {
+  "id": "12bb842411c5·u2",
+  "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: ruta HTTP inventada",
+  "base": "12bb842411c5",
+  "modo": "unidad"
+ },
+ {
+  "id": "ind_27·g2",
+  "pregunta": "¿Cómo decide el motor MoE cuántos expertos calientes cargar, y qué hace si al arrancar no caben en la GPU?",
+  "prueba": "diseño: bucle de 28 consultas sin responder",
+  "base": "ind_27",
+  "modo": "general"
+ },
+ {
+  "id": "ind_27·u2",
+  "pregunta": "¿Cómo decide el motor MoE cuántos expertos calientes cargar, y qué hace si al arrancar no caben en la GPU?",
+  "prueba": "diseño: bucle de 28 consultas sin responder",
+  "base": "ind_27",
+  "modo": "unidad"
+ },
+ {
+  "id": "a84a7fe1bad7·gf",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+  "base": "a84a7fe1bad7",
+  "modo": "general",
+  "hechos_al_final": true
+ },
+ {
+  "id": "29b468d8a2cb·gf",
+  "pregunta": "Si cambio el comportamiento de `rebind_workspace` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: nombró la función, no la ruta HTTP",
+  "base": "29b468d8a2cb",
+  "modo": "general",
+  "hechos_al_final": true
+ },
+ {
+  "id": "02bd1db0d170·gf",
+  "pregunta": "¿Qué funciones o métodos llaman a `escribir_manifiesto` (definida en `backend/hub/formato.py`)?",
+  "prueba": "llamadores: salida degenerada («...»)",
+  "base": "02bd1db0d170",
+  "modo": "general",
+  "hechos_al_final": true
+ }
+]

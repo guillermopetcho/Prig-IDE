@@ -2,6 +2,8 @@
 Uso: .venv/bin/python docs/estudio-banco/particion.py"""
 import sys, os, json, random, zlib, sqlite3, subprocess, collections, copy, re, statistics
 sys.path.insert(0, "/home/ama-gi/Prig/backend")
+# Las piezas, pesos y agrupamiento de Python quedaron en la referencia congelada (el motor de Prig es Rust)
+sys.path.insert(0, os.path.expanduser("~/prig-memoria/referencia"))
 import particion_proyecto as pp
 DB = "/home/ama-gi/.prig_bancos/Prig-ac5380d79d/banco.db"
 c = sqlite3.connect(f"file:{DB}?mode=ro", uri=True); c.row_factory = sqlite3.Row

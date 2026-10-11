@@ -1,0 +1,160 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "general",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 58
+  },
+  "segundos": 233,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B6·g1",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de programación.\n\n### El error: variable mal escrita en la línea 93\n\nEn `backend/job_exporter.py:93`, el código intenta leer `max_chunks_tokens` (con \"chunks\" en plural):\n\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nSin embargo, el parámetro del método se llama `max_chunk_tokens` (singular \"chunk\"), y así se define en la firma en la línea 41 y se usa en todas las demás llamadas y en el manifiesto final.\n\n### Qué hace mal\n\nSi el usuario pasa `ajustes` con la clave `max_chunk_tokens` (la correcta), `ajustes.get(\"max_chunks_tokens\")` devuelve `None`, y luego se usa el valor por defecto `max_chunk_tokens` del parámetro. El usuario **puede pensar que su ajuste se está aplicando** cuando en realidad se ignora.\n\nSi el usuario pasa `ajustes` con la clave `max_chunks_tokens` (la incorrecta), se usa ese valor, pero es una clave que nadie más en el código reconoce, lo que genera inconsistencia.\n\n### Caso concreto en que falla\n\n```python\nexporter = JobExporter()\nexporter.preparar(\n    rutas=[\"libro.pdf\"],\n    destino=\"/tmp/job\",\n    max_chunk_tokens=300,  # quiero trozos de 300 tokens\n    progreso=None\n)\n```\n\nEsto funciona bien porque no se pasa `ajustes`.\n\nPero si se pasa:\n\n```python\nexporter.preparar(\n    rutas=[{\"path\": \"libro.pdf\", \"ajustes\": {\"max_chunk_tokens\": 200}}],\n    destino=\"/tmp/job\",\n    max_chunk_tokens=300,\n)\n```\n\nEl usuario espera que el libro se trocee con 200 tokens, pero como la clave buscada es `\"max_chunks_tokens\"` (plural), no la encuentra, y se usa 300. El ajuste se ignora silenciosamente.\n\n### Solución\n\nCambiar la línea 93 a:\n\n```python\ntope = int(ajustes.get(\"max_chunk_tokens\") or max_chunk_tokens)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 802,
+   "tokens": 485,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 46.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6·u1",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar cuidadosamente el método `JobExporter.preparar` para identificar posibles errores de programación.\n\nAhora veo claramente el problema. En la línea 93 de `backend/job_exporter.py`:\n\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nEl código busca `\"max_chunks_tokens\"` (con \"s\" en \"chunks\") dentro del diccionario `ajustes`, pero en todas las demás partes del proyecto la clave se llama `\"max_chunk_tokens\"` (sin \"s\" en \"chunk\"). \n\nLos datos que vienen del frontend (`explorador.js`) y de `sondeo_libro.py` usan la clave `\"max_chunk_tokens\"`, por lo que `ajustes.get(\"max_chunks_tokens\")` siempre devuelve `None` y nunca se aplica el ajuste personalizado: se usa siempre el `max_chunk_tokens` del parámetro de la función.\n\n**Error: línea 93.** La clave `\"max_chunks_tokens\"` está mal escrita; debería ser `\"max_chunk_tokens\"`. Esto hace que los ajustes personalizados de tamaño de fragmento que el usuario o el explorador recomiendan nunca se apliquen, y siempre se use el valor por defecto de 500 tokens.",
+   "agotada": false,
+   "corte": null,
+   "unidad": ".: job_exporter, __init__, pdf_parser, semantic_chunker +3",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 241,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 143
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver la línea 93 y su contexto completo\\nlines = P.lineas(\\\"backend/job_exporter.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if i >= 90 and i <= 100:\\n        print(f\\\"{i}: {line}\\\")\"}",
+     "resultado_caracteres": 775
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver cuántas veces aparece max_chunk_tokens vs max_chunks_tokens en el proyecto\\nimport re\\nresultados = P.grep(r\\\"max_chunk_tokens|max_chunks_tokens\\\")\\nfor r in resultados:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['texto']}\\\")\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 85.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6·g2",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de programación en la línea 93.\n\nEl parámetro se llama `max_chunk_tokens` (sin \"s\" en \"chunk\"), pero en la línea 93 se lee del diccionario `ajustes` con la clave `max_chunks_tokens` (con \"s\" en \"chunks\").\n\n```python\n# Línea 93:\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nEsto hace que `ajustes.get(\"max_chunks_tokens\")` siempre devuelva `None` (porque la clave correcta sería `\"max_chunk_tokens\"`), por lo que el valor por defecto del parámetro `max_chunk_tokens` se usa siempre, ignorando cualquier ajuste personalizado pasado en el diccionario.\n\n**Caso concreto de fallo:**\nSi llamas a `preparar` con un diccionario como:\n```python\nrutas = [{\"path\": \"libro.pdf\", \"ajustes\": {\"max_chunk_tokens\": 300}}]\n```\n\nEsperarías que los fragmentos tuvieran máximo 300 tokens, pero el código usará el valor por defecto (500) porque la clave `\"max_chunks_tokens\"` no existe en el diccionario `ajustes`.\n\nLa corrección sería cambiar la línea 93 a:\n```python\ntope = int(ajustes.get(\"max_chunk_tokens\") or max_chunk_tokens)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 802,
+   "tokens": 308,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 25.6,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6·u2",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "unidad",
+   "respuesta": "Vamos a revisar `JobExporter.preparar` en `backend/job_exporter.py`.\n\nEl resultado anterior estaba recortado. Veamos el resto del método:\n\nAhora veo claramente el error. En la línea **93**:\n\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nLa clave que se lee es `\"max_chunks_tokens\"` (con \"chunks\" en plural), pero el parámetro del método se llama `max_chunk_tokens` (singular \"chunk\") y es exactamente la misma idea. Además, el FACTS FROM THE PROJECT BANK ya lo señala: `max_chunks_tokens` aparece solo en la línea 93, mientras que `max_chunk_tokens` aparece en 26 lugares.\n\n**Error en la línea 93:**\n\nLa clave `\"max_chunks_tokens\"` nunca coincide con nada que el usuario o el código pasen en `ajustes`, porque la convención en todo el proyecto es `\"max_chunk_tokens\"` (singular). Esto significa que `ajustes.get(\"max_chunks_tokens\")` siempre devuelve `None`, y por lo tanto **siempre se usa el valor por defecto de `max_chunk_tokens`**, ignorando cualquier ajuste que se haya pasado en el diccionario.\n\n**Caso concreto de fallo:**\n\nSi alguien llama:\n\n```python\nJobExporter().preparar(\n    rutas=[\"libro.pdf\"],\n    destino=\"/tmp/job\",\n    max_chunk_tokens=500,\n)\n```\n\ncon un item que es un diccionario como:\n\n```python\n[{\"path\": \"libro.pdf\", \"ajustes\": {\"max_chunk_tokens\": 300}}]\n```\n\nEl código lee `ajustes.get(\"max_chunks_tokens\")` (clave incorrecta), obtiene `None`, y usa `max_chunk_tokens=500` en lugar de `300`. El libro se fragmenta con el tope equivocado, produciendo fragmentos más grandes de lo deseado.\n\n**Corrección:** Cambiar la línea 93 para que use la clave correcta:\n\n```python\ntope = int(ajustes.get(\"max_chunk_tokens\") or max_chunk_tokens)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": ".: job_exporter, __init__, pdf_parser, semantic_chunker +3",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 433,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 143
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.codigo(\\\"JobExporter.preparar\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"codigo = P.codigo(\\\"JobExporter.preparar\\\")\\n# Imprimir solo la parte que falta\\nlines = codigo.split('\\\\n')\\nfor i, line in enumerate(lines):\\n    if i > 100:\\n        print(line)\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 75.7,
+   "memoria_del_modelo": null
+  }
+ ]
+}

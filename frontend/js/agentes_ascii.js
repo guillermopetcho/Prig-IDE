@@ -454,10 +454,19 @@
             this.inspeccion.tipo_relacion = paso.tipo || 'flujo';
         }
 
-        aplicarRefactorEnMonaco(sugerencia, lineaInicio, lineaFin) {
+        notificarCursor(linea, columna) {
+            if (typeof linea === 'number' && linea > 0) {
+                this.lineaActiva = linea;
+                if (this.inspeccion) {
+                    this.inspeccion.lineaCursorUsuario = linea;
+                }
+            }
+        }
+
+        aplicarRefactorEnPrig(sugerencia, lineaInicio, lineaFin) {
             if (!sugerencia) return;
             if (typeof window === 'undefined' || !window.editorMgr || !window.editorMgr.editor) {
-                console.warn("Editor Monaco no disponible para refactor.");
+                console.warn("Editor Prig no disponible para refactor.");
                 return;
             }
             const ed = window.editorMgr.editor;
@@ -485,8 +494,12 @@
                     this.inspeccion.tipo_relacion = 'buenas_practicas';
                 }
             } catch (err) {
-                console.error("Error aplicando refactor en Monaco:", err);
+                console.error("Error aplicando refactor en Prig:", err);
             }
+        }
+
+        aplicarRefactorEnMonaco(sugerencia, lineaInicio, lineaFin) {
+            return this.aplicarRefactorEnPrig(sugerencia, lineaInicio, lineaFin);
         }
 
         manejarClick(clickX, clickY, w, h) {
@@ -980,10 +993,44 @@
         _dibujarHazInspeccion(ctx, w, h) {
             if (!this.inspeccion || !this.inspeccion.activo) return;
 
-            const focoX = w * (this.inspeccion.currentX_foco || this.inspeccion.x_foco || 0.35);
-            const focoY = h * (this.inspeccion.currentY_foco || this.inspeccion.y_foco || 0.40);
-            const linea = this.inspeccion.linea || 1;
-            const lineaFin = this.inspeccion.linea_fin || linea;
+            const linea = Math.max(1, parseInt(this.inspeccion.linea) || 1);
+            const lineaFin = Math.max(linea, parseInt(this.inspeccion.linea_fin) || linea);
+
+            let focoX = null;
+            let focoY = null;
+            let altoLinea = 19;
+            let esVisibleEnViewport = true;
+
+            // Resolución de coordenadas hiperprecisas directamente en el Editor Prig
+            if (typeof window !== 'undefined' && window.editorMgr && window.editorMgr.editor) {
+                const ed = window.editorMgr.editor;
+                const domNode = (typeof ed.getDomNode === 'function') ? ed.getDomNode() : null;
+                if (domNode) {
+                    const rect = domNode.getBoundingClientRect();
+                    const visiblePos = (typeof ed.getScrolledVisiblePosition === 'function')
+                        ? ed.getScrolledVisiblePosition({ lineNumber: linea, column: 1 })
+                        : null;
+                    if (visiblePos) {
+                        altoLinea = visiblePos.height || 19;
+                        focoX = rect.left + 54; // Directamente tras el gutter de numeración
+                        focoY = rect.top + visiblePos.top + (altoLinea / 2);
+                    } else {
+                        // La línea está scrolleada fuera del viewport visible
+                        esVisibleEnViewport = false;
+                    }
+                }
+            }
+
+            // Fallback proporcional sólo si no hay editor montado en el DOM
+            if (focoX === null) {
+                focoX = w * (this.inspeccion.currentX_foco || this.inspeccion.x_foco || 0.35);
+                focoY = h * (this.inspeccion.currentY_foco || this.inspeccion.y_foco || 0.40);
+            }
+
+            // Si la línea no es visible en pantalla, no dibujar un haz apuntando a la nada
+            if (!esVisibleEnViewport) {
+                return;
+            }
 
             ctx.save();
             const pulso = 0.5 + Math.sin(performance.now() * 0.005) * 0.4;
@@ -1012,12 +1059,13 @@
                 });
             }
 
-            // 3. Selección y Corchetes de Rango Detrás del Código (Background Code Backdrop & Brackets)
-            const altoRango = Math.min(160, Math.max(26, (lineaFin - linea + 1) * 20));
-            const yInicio = focoY - 10;
+            // 3. Selección y Corchetes de Rango Detrás del Código en Editor Prig
+            const numLineasRango = Math.max(1, lineaFin - linea + 1);
+            const altoRango = Math.min(260, Math.max(altoLinea, numLineasRango * altoLinea));
+            const yInicio = focoY - (altoLinea / 2);
             const yFin = yInicio + altoRango;
-            const anchoSeleccion = Math.min(w * 0.50, 520);
-            const xInicioBloque = Math.max(25, focoX - 18);
+            const anchoSeleccion = Math.min(w * 0.48, 540);
+            const xInicioBloque = Math.max(25, focoX - 10);
 
             // Franja translúcida de selección en el fondo (sin tapar el texto)
             ctx.fillStyle = (this.inspeccion.tipo_relacion === 'seguridad') ? 'rgba(243, 139, 168, 0.05)' : 'rgba(166, 227, 161, 0.04)';
@@ -1049,22 +1097,22 @@
             ctx.lineTo(focoX - 9, focoY - 4);
             ctx.fill();
 
-            // 4. Anotación técnica discreta en el fondo detrás del código (Background Note)
+            // 4. Anotación técnica discreta en el fondo detrás del código
             const tipo = this.inspeccion.tipo_relacion || 'buenas_practicas';
-            let etiqueta = `▶ Línea ${linea}-${lineaFin}`;
+            let etiqueta = `▶ Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
             let colorBadge = '#89b4fa';
 
             if (tipo === 'optimizacion') {
-                etiqueta = `⚡ Optimización en Línea ${linea}-${lineaFin}`;
+                etiqueta = `⚡ Optimización en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
                 colorBadge = '#f9e2af';
             } else if (tipo === 'seguridad') {
-                etiqueta = `🛡️ Validación en Línea ${linea}-${lineaFin}`;
+                etiqueta = `🛡️ Validación en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
                 colorBadge = '#f38ba8';
             } else if (tipo === 'buenas_practicas') {
-                etiqueta = `✨ Buenas Prácticas en Línea ${linea}-${lineaFin}`;
+                etiqueta = `✨ Prácticas en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
                 colorBadge = '#a6e3a1';
             } else if (tipo === 'flujo') {
-                etiqueta = `🔀 Flujo de Ejecución en Línea ${linea}-${lineaFin}`;
+                etiqueta = `🔀 Flujo en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
                 colorBadge = '#cba6f7';
             }
 
@@ -1073,18 +1121,25 @@
             ctx.textAlign = 'left';
             ctx.fillText(etiqueta, focoX + 6, focoY + 3);
 
-            // Anotación contextual en el fondo (sugerencia de código discreta detrás de la línea)
+            // Anotación contextual en el fondo
             if (this.consejo && this.consejo.titulo) {
                 ctx.font = 'italic 7.5px "Fira Code", monospace';
                 ctx.fillStyle = this.color;
                 ctx.globalAlpha = this.opacidadActual * 0.40;
-                ctx.fillText(`// [Nota]: ${this.consejo.titulo.slice(0, 46)}`, xInicioBloque + 12, yFin + 11);
+                ctx.fillText(`// [Nota Prig]: ${this.consejo.titulo.slice(0, 46)}`, xInicioBloque + 12, yFin + 11);
             }
 
             ctx.restore();
         }
 
         _dibujarPanelEvaluacionFijo(ctx, w, h) {
+            // Si el panel frontal de Razonamiento del Editor está activo (25% ancho),
+            // no dibujamos el cuadro sobre el canvas de fondo: el diálogo se muestra
+            // en el panel DOM frontal para máxima nitidez, profesionalismo y accesibilidad.
+            if (window.EditorRazonamiento && window.EditorRazonamiento.panelVisible) {
+                return;
+            }
+
             ctx.save();
 
             // Sincronización con el modo fondo / centro del diálogo (Ctrl + Alt)
@@ -1335,7 +1390,7 @@
                         ctx.font = 'bold 8.5px "Fira Code", monospace';
                         ctx.fillStyle = '#a6e3a1';
                         ctx.textAlign = 'center';
-                        ctx.fillText('✨ APLICAR EN MONACO (1-CLICK)', posXPanel + anchoPanel / 2, yBtnRefactor + 16);
+                        ctx.fillText('✨ APLICAR EN PRIG (1-CLICK)', posXPanel + anchoPanel / 2, yBtnRefactor + 16);
                         ctx.textAlign = 'left';
                     }
                 }
@@ -1843,6 +1898,9 @@
                                             this.evaluador.dialogo.charIndex = textoStream.length;
                                             this.evaluador.dialogo.estado = 'streaming';
                                         }
+                                        if (typeof window !== 'undefined' && window.EditorRazonamiento) {
+                                            window.EditorRazonamiento.actualizarStreamDialogo(textoStream);
+                                        }
                                     } else if (evento.tipo === 'decision_completa' && evento.data) {
                                         this.aplicarDecision(evento.data.decision || evento.data);
                                     }
@@ -1919,6 +1977,9 @@
 
             if (typeof window !== 'undefined' && window.CerebroMemoria) {
                 window.CerebroMemoria.actualizarMemoria();
+            }
+            if (typeof window !== 'undefined' && window.EditorRazonamiento) {
+                window.EditorRazonamiento.actualizarDesdeDecision(decision);
             }
         }
     }

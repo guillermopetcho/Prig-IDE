@@ -1,0 +1,118 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "general",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5161,
+   "temp_c": 60
+  },
+  "segundos": 115,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B3·g2",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "general",
+   "respuesta": "La función `is_path_allowed` en `backend/file_manager.py:31-45` tiene un error de seguridad crítico conocido como **truncamiento de prefijo** (prefix matching error).\n\n### El Error (Línea 39)\n\n```python\nif abs_path.startswith(root):\n    return True\n```\n\n`str.startswith()` no verifica si la ruta está *dentro* del directorio, sino si la cadena comienza con el texto del directorio. Esto falla si:\n1.  El directorio malicioso es un prefijo del directorio permitido (ej. `/home/user/proyecto_backup` vs `/home/user/proyecto`).\n2.  Faltan barras finales en `root`, permitiendo que `proyecto_evil` se considere parte de `proyecto`.\n\n### Caso Concreto de Fallo\n\nSupongamos:\n*   `self.base_dir` = `/home/user/mi_proyecto`\n*   `root` (calculado en `allowed_roots`) = `/home/user/mi_proyecto`\n\nSi un atacante intenta acceder a:\n*   `abs_path` = `/home/user/mi_proyecto_externo/archivo_secreto.py`\n\nLa comprobación `\"/home/user/mi_proyecto_externo/archivo_secreto.py\".startswith(\"/home/user/mi_proyecto\")` devuelve **`True`**.\n\nEl sistema permitiría leer, modificar o borrar archivos fuera del workspace designado, violando el aislamiento de seguridad.\n\n### Corrección\n\nSe debe asegurar que el separador de directorio esté presente al final del `root` o verificar que el carácter siguiente al prefijo (si existe) sea un separador de ruta (`os.sep`).\n\n```python\n# Corrección segura\nroot_norm = root + os.sep\nif abs_path == root or abs_path.startswith(root_norm):\n    return True\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 509,
+   "tokens": 402,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 46.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3·u2",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "unidad",
+   "respuesta": "Reviso `FileManager.is_path_allowed` en `backend/file_manager.py`. El código es:\n\n```python\ndef is_path_allowed(self, abs_path: str) -> bool:\n    abs_path = os.path.abspath(abs_path)\n    for root in self.allowed_roots():\n        try:\n            if abs_path.startswith(root):\n                return True\n        except ValueError:\n            continue\n    return False\n```\n\n**Sí, tiene un error de programación.**\n\n**Línea:** línea 37 (`if abs_path.startswith(root):`)\n\n**Qué hace mal:** La verificación `abs_path.startswith(root)` es vulnerable a ataques de prefijo. Si `root` es `/workspace` y `abs_path` es `/workspace_malicioso/archivo.py`, el `startswith` devuelve `True` cuando debería ser `False`. El `root` debe terminar en separador de directorio (o ser igual a `abs_path`) para que la comprobación sea correcta.\n\n**Caso concreto que falla:**\n- `allowed_roots()` devuelve `[\"/workspace\", \"/home/user/.prig_books\"]`\n- Si `abs_path = \"/workspace_malicioso/archivo.py\"`\n- `abs_path.startswith(\"/workspace\")` → `True` (falso positivo)\n- Se permite el acceso a `/workspace_malicioso/archivo.py` cuando debería estar denegado porque no está dentro de `/workspace/`\n\nLa corrección sería usar `os.path.commonpath` o añadir un separador al final del root (excepto cuando root es la raíz del sistema `/`):\n\n```python\nif abs_path == root or abs_path.startswith(root + os.sep):\n    return True\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 362,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 21.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3·g3",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de seguridad importante en `backend/file_manager.py:31-45`.\n\n### El error: Falsa seguridad por `startswith` sin separador\n\nEn la línea 39:\n```python\nif abs_path.startswith(root):\n    return True\n```\n\nLa comprobación usa `startswith` puro, sin asegurar que la ruta coincida con el `root` exacto o que continúe dentro de un subdirectorio (es decir, que tenga un separador de directorio después del root).\n\n### Caso concreto que falla\n\nSupongamos:\n- `root = \"/home/usuario/workspace\"`\n- `abs_path = \"/home/usuario/workspace_malicioso/archivo.py\"`\n\n`\"/home/usuario/workspace_malicioso/archivo.py\".startswith(\"/home/usuario/workspace\")` devuelve `True`, aunque `workspace_malicioso` esté fuera del workspace permitido.\n\nEsto permitiría leer, modificar o borrar archivos en directorios que no deberían ser accesibles, siempre que su ruta comience por la misma cadena que el root permitido.\n\n### Solución\n\nDebería comprobarse que la ruta sea exactamente el root o que comience por `root + os.sep` (o que `root` termine en separador). Por ejemplo:\n\n```python\nif abs_path == root or abs_path.startswith(root + os.sep):\n    return True\n```\n\nEsto asegura que solo se permitan rutas que estén **dentro** del directorio permitido, no directorios que simplemente compartan el prefijo.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 509,
+   "tokens": 326,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 28.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3·u3",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "unidad",
+   "respuesta": "Reviso `FileManager.is_path_allowed` en `backend/file_manager.py`:\n\n```python\ndef is_path_allowed(self, abs_path: str) -> bool:\n    \"\"\" True solo si la ruta cae dentro del workspace o de una raíz permitida.\n\n    Sin esta comprobación cualquier página web abierta por el usuario podía leer,\n    sobrescribir o borrar archivos arbitrarios a través de la API local.\n    \"\"\"\n    abs_path = os.path.abspath(abs_path)\n    for root in self.allowed_roots():\n        try:\n            if abs_path.startswith(root):\n                return True\n        except ValueError:\n            # Rutas en volúmenes distintos: commonpath lanza ValueError\n            continue\n    return False\n```\n\n**Sí, tiene un error de programación.**\n\n**Línea:** 39 (`if abs_path.startswith(root):`)\n\n**Qué hace mal:** El método usa `startswith` para verificar si una ruta está dentro de una raíz permitida, pero **no garantiza que el separador de directorio esté presente**. Esto significa que rutas que comparten un prefijo pero no están dentro del directorio pueden pasar la verificación incorrectamente.\n\n**Caso concreto que falla:**\n\nSupongamos que `self.base_dir` es `/home/user/workspace` y `allowed_roots()` devuelve `[\"/home/user/workspace\"]`.\n\n- `/home/user/workspace` → `startswith(\"/home/user/workspace\")` → `True` ✅ Correcto\n- `/home/user/workspace/archivo.py` → `startswith(\"/home/user/workspace\")` → `True` ✅ Correcto\n- `/home/user/workspace_extra/archivo.py` → `startswith(\"/home/user/workspace\")` → **`True`** ❌ **Incorrecto**\n\nLa ruta `/home/user/workspace_extra/archivo.py` NO está dentro de `/home/user/workspace`, pero `startswith` devuelve `True` porque la cadena `/home/user/workspace_extra/...` comienza literalmente con `/home/user/workspace`.\n\n**La corrección** sería verificar que después del `root` haya un separador de directorio o que sea exactamente igual:\n\n```python\nif abs_path == root or abs_path.startswith(root + os.sep):\n    return True\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 467,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 18.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

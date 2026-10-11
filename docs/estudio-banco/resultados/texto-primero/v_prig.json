@@ -1,0 +1,209 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 45
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 58
+  },
+  "segundos": 281,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "ind_15·v",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "unidad",
+   "respuesta": "Fuera de los tests, la única función que llama a `BookService.delete_item` es **`delete_book`** en `backend/app.py` (línea 450), que la invoca sobre una instancia de `BookService` con `book_service.delete_item(req.id)`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: book_service",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 62,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"BookService.delete_item\\\"))\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 30.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_16·v",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+   "prueba": "hueco del grafo: llamada por fábrica",
+   "base": "ind_16",
+   "modo": "unidad",
+   "respuesta": "Las funciones o métodos que llaman a `radiografia` definida en `backend/recursos/gestor.py` son:\n\n1. **`Gestor.maquina`** (en `backend/recursos/gestor.py`, línea 55): dentro de la propia clase Gestor, `maquina` llama a `radiografia` para obtener la radiografía actual.\n2. **`Gestor.estado_vivo`** (en `backend/recursos/gestor.py`, línea 150): también en la misma clase, `estado_vivo` llama a `radiografia` para obtener datos en vivo de la máquina.\n3. **`recursos_servidor_aplicar`** (en `backend/app.py`, línea 5387): llama a `recursos_gestor().radiografia(fresca=True)` para obtener una radiografía fresca al aplicar cambios del servidor.\n4. **`_num_gpus`** (en `backend/app.py`, línea 5631): llama a `recursos_gestor().radiografia().get(\"gpus\")` para contar las GPUs.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/recursos: almacen, detector, gestor, servidor",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 239,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"Gestor.radiografia\\\"))\\n\"}",
+     "resultado_caracteres": 834
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 41.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "f46b5c0819d3·v",
+   "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto con función pasada como argumento y lambda",
+   "base": "f46b5c0819d3",
+   "modo": "unidad",
+   "respuesta": "Basado en el análisis de los llamadores de `progreso.historial` en `backend/app.py` y la estructura del proyecto:\n\nSi cambio el comportamiento de `historial` en `backend/progreso.py`, los siguientes endpoints HTTP del backend se ven afectados directa o indirectamente:\n\n1. **`GET /api/progreso/analisis`** — Llama directamente a `progreso_analisis` (app.py:6401), que a su vez invoca `progreso.historial(almacen, limite=...)` en la línea 6405. Este endpoint devuelve el análisis del progreso del alumno, incluyendo el historial de desafíos.\n\n2. **`GET /api/progreso/resumen`** — Llama a `progreso_resumen` (app.py), que invoca `resumen` (progreso.py:235), y `resumen` llama a `historial` (progreso.py:59) para obtener todas las filas de desafíos. Este endpoint devuelve un resumen completo del avance del alumno.\n\n3. **`GET /api/progreso/historial`** — Llama a `progreso_historial` (app.py:6393), que pasa `progreso.historial` como argumento a `_desafio`. Este endpoint devuelve el historial de desafíos con filtros (por estado, concepto, fuente).\n\n4. **`GET /api/inicio`** — Llama a `inicio_resumen` (app.py:6361), que incluye `\"historial\": lambda: progreso.historial(desafios_almacen, limite=30)`. Este endpoint devuelve la información de la pantalla de inicio, que incluye los últimos 30 desafíos.\n\nAdemás, hay un posible impacto indirecto en:\n- **`GET /api/flujos/<flujo_id>`** (o similar) — La función `flujos_historial` (app.py:2018) llama a `flow_store.historial()`, pero esta es una función homónima en `FlowStore`, no en `progreso`, por lo que **no** se ve afectada por cambios en `progreso.historial`.\n\nEn resumen, los **4 endpoints afectados** son:\n- `GET /api/progreso/analisis`\n- `GET /api/progreso/resumen`\n- `GET /api/progreso/historial`\n- `GET /api/inicio`",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: almacen, ejecucion, progreso",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 526,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.api_getter(\\\"historial\\\"))\"}",
+     "resultado_caracteres": 65
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"progreso.historial\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar los llamadores directos en app.py y sus endpoints\\nimport re\\nwith open(\\\"backend/app.py\\\") as f:\\n    lines = f.readlines()\\n\\n# Buscar los endpoints que llaman a progreso.historial\\nfor i, line in enumerate(lines):\\n    if \\\"progreso.historial\\\" in line or \\\"progreso_analisis\\\" in line or \\\"progreso_historial\\\" in line or \\\"inicio_resumen\\\" in line:\\n        # Buscar el e",
+     "resultado_caracteres": 30
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"progreso_analisis\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar qué endpoints llaman a progreso_analisis, inicio_resumen y progreso_historial\\nprint(P.llamadores(\\\"progreso_analisis\\\"))\\nprint(\\\"---\\\")\\nprint(P.llamadores(\\\"inicio_resumen\\\"))\\nprint(\\\"---\\\")\\nprint(P.llamadores(\\\"progreso_historial\\\"))\"}",
+     "resultado_caracteres": 16
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar los endpoints HTTP que exponen estas funciones\\nprint(P.hechos(s=\\\"GET\\\", o=\\\"historial\\\", limite=20))\\nprint(\\\"---\\\")\\nprint(P.hechos(s=\\\"POST\\\", o=\\\"historial\\\", limite=20))\\nprint(\\\"---\\\")\\n# Buscar dónde se definen los endpoints que usan progreso.historial\\nprint(P.hechos(s=\\\"progreso.historial\\\", limite=20))\"}",
+     "resultado_caracteres": 16
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar los endpoints en app.py que llaman a estas funciones\\nprint(P.hechos(s=\\\"GET\\\", limite=50))\"}",
+     "resultado_caracteres": 2
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar las exposiciones de endpoints HTTP\\nprint(P.hechos(s=None, o=\\\"/api/progreso\\\", limite=50))\"}",
+     "resultado_caracteres": 2
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 158.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "02bd1db0d170·v",
+   "pregunta": "¿Qué funciones o métodos llaman a `escribir_manifiesto` (definida en `backend/hub/formato.py`)?",
+   "prueba": "llamadores: salida degenerada («...»)",
+   "base": "02bd1db0d170",
+   "modo": "unidad",
+   "respuesta": "`escribir_manifiesto` es llamada por dos métodos en `backend/hub/servicio.py`:\n\n1. **`Hub._crear`** (línea 151 de `servicio.py`): Se usa cuando se crea un nuevo repositorio de Prig Hub (perfil o pack).\n2. **`Hub.editar_manifiesto`** (línea 222 de `servicio.py`): Se usa cuando se editan los metadatos del manifiesto de un repositorio existente.\n\nEn resumen, `escribir_manifiesto` se invoca cada vez que se crea o se edita la ficha principal (`prig.yaml`) de un repositorio en Prig Hub.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/hub: enlaces, formato",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 152,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 10.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "12bb842411c5·v",
+   "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto: ruta HTTP inventada",
+   "base": "12bb842411c5",
+   "modo": "unidad",
+   "respuesta": "Cambiar el comportamiento de `cleanup_all_processes` afecta directamente al endpoint:\n\n- **`POST /api/app/shutdown`** (gestionado por `api_shutdown` en `backend/app.py`)\n\nAdemás, aunque no es un endpoint HTTP, `cleanup_all_processes` se ejecuta automáticamente en el ciclo de vida de la aplicación (lifespan) cuando FastAPI se apaga, por lo que cualquier reinicio del servidor (gracias o no gracias) también lo invocará. Pero en términos de endpoints HTTP expuestos, el único es `POST /api/app/shutdown`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: app",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 122,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.impacto(\\\"cleanup_all_processes\\\"))\\n\"}",
+     "resultado_caracteres": 316
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 21.6,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·v",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Las funciones que leen la clave `truncar` son:\n\n1. **`IndiceSemantico.embeber`** (backend/indice_semantico.py, línea 101)\n2. **`IndiceSemantico.estado`** (backend/indice_semantico.py, línea 265)\n\nAmbas se encuentran en la clase `IndiceSemantico` del archivo `backend/indice_semantico.py`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 99,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nprint(P.hechos(r=\\\"lee_config\\\", o=\\\"truncar\\\", limite=50))\\n\"}",
+     "resultado_caracteres": 243
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 18.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

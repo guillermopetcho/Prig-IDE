@@ -175,7 +175,11 @@ def generar(banco, por_tipo: int = 17, semilla: int = 7, guardar: bool = True) -
     for l in llamadas:
         if l["ruta"] in produccion and l["a_ruta"] in produccion:
             llamadores[(l["a_ruta"], l["a_nombre"])].add((l["ruta"], l["desde"]))
-    endpoint_de = {(h["ruta"], h["s"]): h["o"] for h in expone}
+    # Una función puede exponer varias rutas (dos decoradores): antes un dict por función se quedaba con la última
+    # y la clave del impacto omitía la otra (7 funciones en Prig; docs/estudio-banco.md)
+    endpoint_de: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+    for h in expone:
+        endpoint_de[(h["ruta"], h["s"])].add(h["o"])
     impactos = []
     for nodo in list(llamadores):
         if nodo in endpoint_de or _corto(nodo[1]).startswith("_"):
@@ -184,7 +188,7 @@ def generar(banco, por_tipo: int = 17, semilla: int = 7, guardar: bool = True) -
         for _ in range(3):
             frontera = [p for n in frontera for p in llamadores.get(n, ()) if p not in vistos]
             vistos |= set(frontera)
-        eps = sorted({endpoint_de[v] for v in vistos if v in endpoint_de})
+        eps = sorted({e for v in vistos if v in endpoint_de for e in endpoint_de[v]})
         if 1 <= len(eps) <= 4:
             impactos.append((nodo, eps))
     for (ruta, nombre), eps in elegir(impactos, por_tipo):

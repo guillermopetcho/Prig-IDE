@@ -1,0 +1,132 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 37
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "unidad",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5161,
+   "temp_c": 54
+  },
+  "segundos": 70,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "1f14bd2a14dd·i1",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `KAGGLE_API_TOKEN`?",
+   "prueba": "entorno: bucle de texto, agotada vacía",
+   "base": "1f14bd2a14dd",
+   "modo": "unidad",
+   "respuesta": "Según los hechos del banco del proyecto y la lectura de `backend/kaggle_lector.py`, la variable de entorno `KAGGLE_API_TOKEN` es leída por la función `credenciales()`.\n\nEn el código de `kaggle_lector.py` (línea 89), dentro de la función `credenciales()`, se encuentra la siguiente lógica:\n\n```python\nif os.environ.get(\"KAGGLE_API_TOKEN\"):\n    return {\"tipo\": \"token\", \"token\": os.environ[\"KAGGLE_API_TOKEN\"], \"usuario\": None, \"origen\": \"variable KAGGLE_API_TOKEN\"}\n```\n\nEsta es la única función que lee directamente esta variable de entorno en el código proporcionado.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: kaggle_colecciones, kaggle_lector",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 153,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 26.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_15·i1",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "unidad",
+   "respuesta": "La única función o método **fuera de los tests** que llama a `BookService.delete_item` es:\n\n- **`delete_book`** en `backend/app.py` (línea 450), que invoca `book_service.delete_item(req.id)` sobre una instancia de `BookService`.\n\nEl resto de los llamadores son tests unitarios (`test_datos_usuario.py` y `test_file_manager.py`), los cuales no se consideran según tu pregunta.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: book_service",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 99,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"BookService.delete_item\\\"))\"}",
+     "resultado_caracteres": 1795
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 15.6,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "1f14bd2a14dd·i2",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `KAGGLE_API_TOKEN`?",
+   "prueba": "entorno: bucle de texto, agotada vacía",
+   "base": "1f14bd2a14dd",
+   "modo": "unidad",
+   "respuesta": "Ninguna otra función del proyecto lee `KAGGLE_API_TOKEN` además de `credenciales()` en `backend/kaggle_lector.py`. Esa es la única función que accede directamente a dicha variable de entorno.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: kaggle_colecciones, kaggle_lector",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 47,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 8.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "02bd1db0d170·i1",
+   "pregunta": "¿Qué funciones o métodos llaman a `escribir_manifiesto` (definida en `backend/hub/formato.py`)?",
+   "prueba": "llamadores: salida degenerada («...»)",
+   "base": "02bd1db0d170",
+   "modo": "unidad",
+   "respuesta": "Basado en los hechos del banco del proyecto y en la lectura de la unidad, las funciones que llaman a `escribir_manifiesto` son:\n\n1. **`Hub._crear`** (en `backend/hub/servicio.py`, línea 151)\n2. **`Hub.editar_manifiesto`** (en `backend/hub/servicio.py`, línea 222)\n\nAmbos son métodos de la clase `Hub` que se encuentran en el archivo `backend/hub/servicio.py`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/hub: enlaces, formato",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 116,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 8.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "1f14bd2a14dd·i3",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `KAGGLE_API_TOKEN`?",
+   "prueba": "entorno: bucle de texto, agotada vacía",
+   "base": "1f14bd2a14dd",
+   "modo": "unidad",
+   "respuesta": "Según los hechos del banco del proyecto y la lectura de `backend/kaggle_lector.py`, la variable de entorno `KAGGLE_API_TOKEN` es leída por la función `credenciales()`.\n\nEn el código, dentro de `credenciales()` (línea 89 del archivo `backend/kaggle_lector.py`), se comprueba `if os.environ.get(\"KAGGLE_API_TOKEN\"):` para devolver las credenciales en modo \"token\" si está definida.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: kaggle_colecciones, kaggle_lector",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 103,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 10.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

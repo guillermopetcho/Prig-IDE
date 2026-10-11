@@ -1044,6 +1044,386 @@ propósito). Los estados del motor ocupan ≈28 GB de 32,8 GB permitidos: la pas
 Todo lo medido está en `~/.cache/prig-estudio/` y copiado en `docs/estudio-banco/resultados/` (serie-limpia, externo, e8,
 e9). Nada está en git todavía.
 
+### Reanudación (09/10/2026): el sistema cambió → sistema congelado
+
+Al retomar, el backend ya no era el medido: entre el 03/10 y el 09/10 entraron `perfiles_config.py`, `audio_monitor.py`,
+`llm_director.py` y endpoints nuevos en `app.py` (huella `375d999b…` → `09d615ce…`). El chequeo previo habría rechazado
+los lotes (a propósito). **El estado del 03/10 no se puede reconstruir**: no quedó en git (el commit del 06/10 ya trae
+cambios posteriores: ni completo ni sin `perfiles_config.py` da la huella del plan).
+
+Decisión: **congelar el sistema actual** (`docs/estudio-banco/congelar_sistema.py` → `~/.cache/prig-estudio/sistema/
+09d615ce45e84e2c`: copia de `backend/` y `main.py`, el resto del repositorio enlazado; `lote.py` y `sonda.py` lo usan con
+`PRIG_SISTEMA`) y medir con él todo lo que falta: el externo **completo** (lotes 1–7 de nuevo: el lote 1 del 03/10 queda
+archivado en `e7/sistema_0310/`), E8 y E9. Así la edición diaria del backend ya no interfiere.
+
+¿Afecta a la comparación con la serie de Prig? Se revisó el diff desde el 06/10: endpoints nuevos de configuración, un
+registro en `write_file` y la importación de `audio_monitor` (sin efectos al importar: solo captura con suscriptores por
+WebSocket); `llm_director` se importa solo al guardar un archivo. **Nada toca el camino del chat con banco** (`ai_chat`,
+`componer`, la consola, el motor). Entre la serie de Prig y lo que sigue, la diferencia que sí importa es el arreglo de
+`reasignar` (no afecta las respuestas). El plan nuevo del externo tiene los mismos lotes, el mismo examen y el mismo
+código medido.
+
+### Implementación de lo medido (09/10/2026)
+
+A pedido, la medición se detuvo (el externo se cortó en el lote 1, pregunta 4; E8 y E9a quedan preparados sin correr) y
+lo encontrado se pasó al sistema. Cada cambio sale de un hallazgo medido; **se valida con el uso** (y, si se quiere, con
+los lotes y sondas que siguen listos: `sonda.py`, `e8.py`, `e9.py`).
+
+| Hallazgo (dónde se midió) | Cambio | Dónde |
+|---|---|---|
+| Respuestas sin tope: bucles de texto de 32K tokens, y al no caber el motor agrandaba el contexto y **repetía la petición desde cero** (E7, lotes 4 y 6) | Tope de **4096 tokens** en el chat con banco (lo mismo que el motor ya reservaba al elegir el contexto: no cambia su elección); cortada, se puede «Continuar» | `app.py` `TOPE_RESPUESTA_BANCO`, `chat_eventos(max_tokens=)` |
+| Bucles de consultas: el mismo código fallido 4 veces; 16 rondas sin responder; con 9+ consultas, 1 de 5 correctas (E7) | Una consulta **idéntica** no se reejecuta (se le recuerda que el resultado está arriba); a la 2.ª repetida, o en la **última ronda**, se quitan las herramientas y se le pide responder. Con el banco: 9 rondas (8 de consultas + 1 para responder) | `ai_engine_class.chat_eventos`, `app.py` `RONDAS_BANCO` |
+| «Etiquetas de cierre» inventadas en el código de la consola (`</print(...)`): la mitad de las consultas de una respuesta fallaban (E7, lote 15) | Se quitan antes de ejecutar (y las cercas de Markdown) | `memoria_consulta.limpiar_codigo` |
+| **Modo unidad 86 % frente a 97 % del general** en las mismas clases de pregunta: no sabía qué consultar, una sola consulta, rutas inventadas o ausentes, respuestas en inglés (E7) | Con la pregunta (parte variable: **no invalida ninguna lectura guardada**) van los **hechos del banco** sobre lo que nombra: definición, `lee_config`/`lee_entorno`/`expone`…, llamadores (del grafo y por texto), rutas que expone, endpoints alcanzados y apariciones literales con la función que las contiene; si nombra un archivo, desambigua homónimos. La guía pide verificar antes de decir «nadie lo llama», dar método y ruta exactos y responder en el idioma de la pregunta | `memoria_consulta.hechos_de_la_pregunta`, `lectura_unidades.pregunta_con_contexto(hechos=True)`, `guia_consola` |
+| Huecos del grafo (instancia global, fábrica, función pasada como argumento, lambda): llamadores falsos «nadie la llama» (E2, E7: 4+ casos) | `P.llamadores` agrega, marcados «texto: …, sin resolver» y con la línea, los llamadores que encuentra en el código; sin cruzar lenguajes y sin variables locales homónimas. Probado con los casos reales: `delete_item` (falló 3 de 3 en E7), `radiografia`, `load_state`, `progreso.historial`, `comprobar` → aparecen los que faltaban | `memoria_consulta.API.llamadores` |
+| `memoria=False` no impedía que el modelo anotara notas, que entraban en las preguntas siguientes (E7, lote 10) | Sin memoria: `anotar` (herramienta) y `P.anotar/afirmar/guardar` (consola) no escriben, y el prompt general ya no pide anotar. La lista de herramientas del modo unidad no cambia (está en el prefijo guardado) | `herramientas_chat.Herramientas(escribir=)`, `memoria_consulta.Consola(escribir=)`, `app.py` `INSTRUCCION_BANCO_SIN_MEMORIA` |
+| Con el motor caído, respuestas **vacías** sin aviso (E7, lote 6) | Si no llega ni texto ni aviso, el chat lo dice | `app.py` `ai_chat` |
+| Notas: la marca «puede estar desactualizado» era por archivo y se le escapaba la nota que depende de una función cambiada desde otro archivo (E9b) | También se marcan las notas que **nombran** un símbolo que cambió (con forma de código, para no saltar con palabras comunes como «estado») | `banco_proyecto._marcar_revisar` |
+| Clave del examen: la segunda ruta de una función con dos decoradores se perdía (E7, 7 funciones) | El generador guarda todas las rutas | `examen_proyecto.py` |
+
+Tests nuevos (todos fallan sin su cambio): tope y consultas repetidas/última ronda (`test_ollama_modelos`), llamadores
+por texto, hechos de la pregunta, términos, limpieza del código y consola sin memoria (`test_memoria_consulta`), nota
+que nombra un símbolo cambiado (`test_banco_proyecto`); y los del chat actualizados (rondas, tope, hechos en modo
+unidad). Nada de esto toca el prefijo guardado de las unidades: las 96 lecturas siguen vigentes.
+
+**Qué observar al usarlo** (lo que el estudio no alcanzó a medir con el modelo después del cambio): si el modo unidad
+deja de fallar en llamadores/impacto/config (los hechos le llegan hechos); si los llamadores «por texto» confunden en
+nombres muy comunes (van marcados como posibles homónimos); si el tope de 4096 corta alguna respuesta legítima (se ve
+como «cortada» y se puede continuar).
+
+### Texto primero: medición corta (T7, 09/10/2026)
+
+**Qué se midió** (`docs/plan-texto-primero/T7-medicion.md`). En vez de repetir el examen, una pregunta por cada modo de
+falla que dejó E7 (11 de Prig + 1 control) y los 4 errores de E8 que ningún test detecta (+ 1 control), en modo general y
+en modo unidad, con el sistema congelado `c56a3849…` (T1–T5 y los 9 cambios de «Implementación de lo medido»). Mismas
+condiciones que E7: sin vectores ni memoria, GPU libre, `think=False`, tope de 600 s por respuesta; tope del caché en 60 GB
+solo en memoria; CPU sin turbo (`auto-cpufreq`: turbo «never» y «powersave», como quedó el 05/10; solo afecta los
+tiempos). Primera serie: 4 corridas, 34 respuestas, 32 min de modelo. Como el resultado quedó dudoso (la regla lo
+prevé), una **segunda tanda** de 18 respuestas (11 min) solo con las preguntas en que los modos difirieron: otra muestra
+de cada modo y una variante del general con los hechos al final (abajo). **Ninguna de las 52 respuestas salió vacía ni
+agotada.** Cada una se auditó a mano contra el código, no contra una clave: `resultados/texto-primero/notas.md` (el
+detalle, pregunta por pregunta) y `analisis.json`.
+
+**Prig: las 11 preguntas de falla** (C correcta, P parcial, I incorrecta; una letra por muestra; C* = correcta con un
+falso positivo de la herramienta)
+
+| Pregunta (modo de falla en E7) | E7 | General | Unidad | General, hechos al final |
+|---|---|---|---|---|
+| ind_15 llamadores por una instancia global (`book_service.delete_item`) | I (3 de 3) | P, C | C, C | C |
+| ind_16 llamadores por una fábrica (`recursos_gestor().radiografia`) | P | P, C | C*, C* | C |
+| f46b impacto con lambda y función pasada como argumento | C | C (3 de 4) | C, 4 de 4 (fue a general) | — |
+| a84a configuración con la lectora fuera del grafo | P | P | P | P (las 3 + 2 que no leen) |
+| 29b4 impacto: nombró la función y no la ruta | P | C | C | C |
+| 12bb impacto: ruta inventada | I | P, C | C, C | C |
+| 0b5f recorrido: negó un camino | I | I | I (fue a general) | — |
+| d408 recorrido: negó un camino | I | I | I (fue a general) | — |
+| ind_27 diseño: bucle de 28 consultas | agotada | C, P | P, C | (sin hechos: igual al general) |
+| 1f14 entorno: bucle de texto | agotada | C | C | — |
+| 02bd llamadores: salida «...» | I | C | C | C |
+| **Correctas esperadas** (fracción de C por pregunta, sumada) | **1** | **6,0** | **7,5** | **7,5** (el general donde no se midió) |
+| control: una constante | C | C (la línea mal) | C, la línea mal (fue a general) | — |
+
+**Lo que muestra cada mecanismo**
+
+1. **Lo mecánico quedó arreglado en los dos modos.** Bucles: ninguna de las 52 respuestas se agotó; ind_27 respondió con
+   0 a 5 consultas (en E7: 28 y agotada); 1f14 y 02bd, que en E7 terminaron vacía y en «...», salen correctas. Rutas
+   HTTP: 29b4 y 12bb salen exactas de los hechos («endpoints reached through the graph»). Llamadores que el grafo no ve:
+   el «posible llamador por texto» llega (ind_15, ind_16). De 7 incorrectas en E7 quedan 2.
+2. **Recorridos: 4 de 4 respuestas niegan un camino que existe** (0b5f y d408, en los dos modos). Nunca caen en una
+   unidad (reparten su peso entre las dos puntas) y los hechos miran cada nombre por separado. d408 llega a mostrar
+   `termico.py:365`, donde `Gobernador.__init__` crea `ControladorFrio`, y aun así lo niega razonando «en régimen estable».
+   **`P.camino` los encuentra exactos, sin modelo**: `modelos_borrar_parciales → _carpeta_modelos_servidor → estado →
+   librerias_disponibles` y `recursos_ritmo → gobernador → Gobernador.__init__ → ControladorFrio`. Es el único modo de
+   falla de E7 que sigue igual, y el arreglo está a mano (propuesta 1).
+3. **Una muestra por pregunta no separa los modos.** Tres de las cuatro diferencias de la primera serie no se repitieron:
+   ind_15, ind_16 y 12bb en general fueron P en la primera muestra y C en la segunda; ind_27 quedó 1 a 1 en los dos modos.
+   f46b dio 3 de 4 y 4 de 4 en dos muestras del mismo modo. Diferencias de una o dos preguntas entre modos están dentro
+   del ruido.
+4. **Lo que sí se sostiene con dos muestras: los hechos rinden mejor pegados a la pregunta.** El modo unidad acertó 6 de 6
+   en ind_15, ind_16 y 12bb (dos con el mismo falso positivo); el general, 3 de 6. Hoy el general pone los hechos en la
+   posición 0 y el paquete del banco los separa de la pregunta (21.083 caracteres en ind_15); el de unidad los pone
+   pegados a la pregunta (`unidad → hechos → guía → QUESTION`). Con los hechos al final (una variante del arnés:
+   `sonda.py`, `hechos_al_final`; el sistema no cambia), el general acertó 3 de 3 y dio **las respuestas más precisas de
+   esas tres preguntas**: verificó con la consola lo «sin resolver» y descartó el homónimo `file_mgr.delete_item` (ind_15)
+   y el atributo `maq.radiografia` (ind_16), que el de unidad repitió como llamador las dos veces. No empeoró los controles
+   (29b4 y 02bd igual; a84a ganó cobertura). Es una muestra por pregunta: indica el mecanismo, no lo prueba.
+5. **a84a: los modos fallan en direcciones opuestas.** El general toma la lectura literal (`_ajustes`) y un falso positivo
+   (`ConfigModelos._leer`, que define el valor por defecto); el de unidad toma lo del grafo (`embeber`, `estado`) y omite la
+   literal; con los hechos al final aparecen las tres, más `_leer` y `fijar_embeddings`, que escribe. Los hechos de
+   configuración tienen que separar «lee la clave» (`x.get("clave")`) de «la usa», «la escribe» y «la define».
+6. **Lo que el modelo agrega por su cuenta, a veces es inventado**: rutas «indirectas» `/api/chat…` (12bb, general, 1 de
+   2); en ind_27 (los dos modos, 1 de 2 cada uno), un orden de reintentos dado como «exacto» que no es el del código, «el
+   mismo número de calientes sin MTP» (se recalcula), la ruta del registro (`/var/log/prig.log`; es `~/.prig_moe.log`) y un
+   código «simplificado» presentado como literal. Los hechos arreglan lo que cubren, no el resto.
+7. **El enrutador manda a general 4 de 12 aunque se pida unidad.** Tres reparten su peso de verdad (la mejor unidad 24–29
+   %). El control no: `MESETA_S` no está en la tabla de símbolos (las constantes de módulo no se indexan) y las palabras de
+   la ruta nombrada (`recursos`, `termico`, `backend`) cuentan como identificadores y reparten puntos: la mejor 5,36 contra
+   4,0, menos de 1,5×. No es grave (el general responde igual), pero por eso la corrida «unidad» es mixta.
+8. **Detalles**: los números de línea salen corridos (la constante: 22 y 39, es 60; B3: 37 y 39, es 40); el eco del código
+   de la consola pegado al principio del texto (como en E7); un falso positivo sistemático de los llamadores por texto
+   (`calibrar`, por el atributo `maq.radiografia`, patrón «pasada como valor»).
+
+**E8: encontrar errores** (la misma pregunta, «¿tiene algún error?», sobre la copia con errores inyectados)
+
+| | B2 `n + 1` al cortar | B3 `startswith` | B6 clave mal escrita | B7 conexión sin cerrar | C2 control |
+|---|---|---|---|---|---|
+| Tests de Prig | no | no | no | no | — |
+| General | no (falso positivo) | **sí, 3 de 3** | no (salida degenerada) | no | limpio |
+| Unidad | no (falso positivo) | 2 de 3 (una: «está protegido», falso) | no (falso positivo) | no | limpio |
+
+- **Con `think=False`, ninguno de los dos modos sirve hoy para revisar código.** B3 (el agujero de seguridad) se encuentra
+  casi siempre, con el caso y el arreglo; los otros tres no los ve ninguno, y están en el texto de la función que tenía
+  delante (`n + 1`, «chunks», la falta de `close`): son fallas de lectura atenta, no de contexto. B6 cae en los dos modos
+  en el patrón «Espera… el error está en la línea 159… esto es correcto», repetido. Falsos positivos: 1 en general, 2 en
+  unidad.
+- **El riesgo real**: B3 en unidad, una de tres veces, afirma que el caso `/workspace` frente a `/workspace2` «está
+  protegido porque `startswith` se aplica sobre la ruta normalizada» (falso) y justifica el rastro del cambio (el `except
+  ValueError` de `commonpath`). Los controles (C2) dicen, con la misma seguridad, que `resolve` no tiene huecos: en esta
+  copia los tiene, por B3.
+- La consola no puede importar el proyecto (lista blanca de módulos, E5): el modelo no puede ejecutar la función con un
+  caso, solo reescribirla en comentarios. B2 lo revela cualquier ejecución con un tramo sin hijos mayor que el tope;
+  ninguno de los dos modos eligió ese caso.
+- El banco ya tiene lo necesario para señalar B6: `JobExporter.preparar lee_config max_chunks_tokens` (l.93) y, aparte,
+  `SondeoLibro.recomendar lee_config max_chunk_tokens`. Una clave leída en un solo lugar que difiere en una letra de otra
+  más usada es una «¿clave mal escrita?».
+
+**T5 y el caché, en uso real.** Las 4 unidades vencidas de la copia E8 se leyeron al vuelo («forzado: … no tiene lectura
+guardada; se lee ahora»), se guardaron y se reaprovecharon (C2 y las repeticiones de B3 restauraron la de B3 en 0,1–0,3 s).
+Las preguntas en modo general no escribieron ningún estado. Un hallazgo del registro del motor: cuando el modelo agota las
+8 consultas, **la última ronda sin herramientas cambia el prefijo guardado** (le faltan las definiciones de las
+herramientas, 641 tokens): el motor releyó la unidad desde cero (26 s) y guardó otro estado de 246 MB que casi nunca se
+reaprovecha. Pasó 1 vez en 19 respuestas en modo unidad (E8a_B2), que además pasó de 32K a 64K de contexto en medio de la
+pregunta. La medición dejó 5 estados nuevos (1,3 GB), todos de la copia E8: son del estudio, para la limpieza de T8.
+
+**Decisión** (reglas fijadas antes de medir, en T7-medicion.md)
+
+- **Modo por defecto: queda `auto`** (ya es el valor por defecto: no se cambia nada). El general queda por debajo del de
+  unidad en las 11 de falla: 6,0 contra 7,5 correctas esperadas con las dos muestras (5 contra 7 en la primera serie
+  sola). Las otras dos condiciones sí se cumplen: el control sigue correcto y en E8 el general encuentra al menos tantos
+  como el de unidad menos uno (B3 3 de 3 contra 2 de 3).
+- **Tope del caché: queda en 32 GB**: con `auto`, lo que entre el proyecto principal (Prig ocupa ~30 GB).
+- **Fichas por símbolo: no**: el de unidad no encontró ningún error que el general no encontrara.
+- La variante con los hechos al final empata al de unidad (7,5), pero es una prueba del arnés, no el sistema medido: no
+  decide; justifica el cambio 2 de abajo y volver a medir.
+
+**Límites**: una o dos muestras por pregunta (y una de la variante): no mide porcentajes. Las preguntas se eligieron por
+haber fallado en E7, así que parte de la mejora frente a E7 es regresión a la media (los bucles de E7 fueron azarosos);
+pero E7 repetido dio 23 de 24 veredictos iguales, así que casi todas esas fallas eran sistemáticas. E7 → T7 compara
+versiones del sistema (los 9 cambios y T1–T5), no solo modos. Todo con `think=False`.
+
+**Propuestas, en orden** (1–5 implementadas y re-medidas el 10/10: ver la sección siguiente)
+
+1. **`P.camino` en los hechos** cuando la pregunta nombra dos símbolos: los recorridos fallaron 4 de 4 y el camino exacto
+   ya está en el banco.
+2. **En modo general, los hechos después del paquete**, pegados a la pregunta: una línea en `ai_chat`; no toca ninguna
+   lectura guardada (el general no guarda estados). Con el arnés: 3 de 3 y las respuestas más precisas.
+3. **Hechos de configuración** que separen leer, escribir y definir una clave (a84a), y que marquen «¿clave mal
+   escrita?» (B6).
+4. **Llamadores por texto**: no tomar el atributo de otro objeto como «pasada como valor» (`maq.radiografia`, falso
+   positivo sistemático en unidad); separar los de tests y los homónimos de otra clase (`file_mgr.delete_item`).
+5. **La última ronda sin herramientas, sin cambiar el prefijo**: mantener las definiciones y forzar la respuesta de otro
+   modo (`tool_choice: "none"` si el servidor lo respeta, o ignorar una llamada que llegue igual).
+6. Impacto por texto de dos niveles (f46b: `/api/progreso/resumen` por dos saltos); en el enrutador, indexar las
+   constantes de módulo como símbolos y no contar las palabras de una ruta nombrada como identificadores.
+7. Revisión de código: medir E8 con `think=True` antes de recomendar Prig para eso; ejecutar una función del proyecto en un
+   proceso aislado (`P.probar`) es una decisión de seguridad (E5).
+
+Después de 1–5, volver a medir solo ind_15, ind_16, 12bb, a84a, 0b5f y d408, dos veces en cada modo (~10 min): si el
+general queda a la par del de unidad, T8 pasa el modo por defecto a `general` y el tope del caché a 5 GB.
+
+### Las propuestas de T7, implementadas y re-medidas (10/10/2026)
+
+| Propuesta | Cambio | Dónde |
+|---|---|---|
+| 1. El camino en los hechos | Si la pregunta nombra dos símbolos, la cadena del grafo entre ellos (en cualquier sentido), **cada salto con la línea de su llamada** | `memoria_consulta.hechos_de_la_pregunta`, `API.camino_con_llamadas` |
+| 2. Hechos pegados a la pregunta | En modo general van después del paquete, no arriba de todo | `app.py` `ai_chat` |
+| 3. Hechos de configuración | Las apariciones de una clave, separadas en «la lee» (`x.get("k")`, `x["k"]`), «la escribe» (`x["k"] =`, `setdefault`) y «solo en un diccionario literal» (un valor por defecto); para un símbolo nombrado, las claves y variables de entorno que lee; y el aviso **«possible misspelled key»**: una clave que aparece en un solo lugar y difiere en una letra de otra leída que aparece en varios. En la copia limpia de Prig, 0 avisos en 45 claves; en la de E8, exactamente B6 | `memoria_consulta._hechos_de`, `_claves_sospechosas` |
+| 4. Ruido de los llamadores por texto | No cuentan: el atributo de un objeto local pasado como valor (`Maquina(maq.radiografia)`: solo si lo de antes del punto es un módulo importado, una clase o `self` en el archivo propio), la instancia de otra clase con un método homónimo (`file_mgr = FileManager()` → `file_mgr.delete_item`) ni la función homónima de otro módulo (`detector.radiografia`); la instancia de la clase buscada se marca («instancia de BookService»); los llamadores en tests van aparte, contados | `memoria_consulta.API._llamadores_por_texto`, `_nombres_importados`, `_instancias_de` |
+| 5. La última ronda sin cambiar el prefijo | Cuando se le pide responder (última ronda o dos consultas repetidas), las herramientas siguen en la petición; una consulta que pida igual no se ejecuta y recién entonces hay una ronda más sin herramientas | `ai_engine_class.chat_eventos` |
+
+Con los casos reales: `P.llamadores("Gestor.radiografia")` da exactamente sus 4 llamadores (antes, más `calibrar` y `detector.radiografia`); `delete_item` de `book_service.py`, solo `delete_book` («instancia de BookService»; antes, también `file_mgr.delete_item`); `progreso.historial`, `comprobar` y `load_state` conservan los llamadores reales que E7 echaba de menos. Tests: 7 nuevos (`TestHechosT7`, la consulta en la última ronda) y 3 actualizados; cada uno falla sin su cambio; la batería, 1030 tests sin fallos. Nada toca el prefijo guardado de las unidades.
+
+**Re-medición** (sistema congelado `68a29512…`; los recorridos con líneas, `ceaa9911…`; mismas condiciones que T7): 36 respuestas, ninguna vacía ni agotada.
+
+| Pregunta | T7 general | T7 unidad | Ahora general | Ahora unidad |
+|---|---|---|---|---|
+| ind_15 llamadores por instancia global | P, C | C, C | C, C | C, C |
+| ind_16 llamadores por fábrica | P, C | C*, C* | P (omite uno de los hechos), C | **C, C** (sin el falso positivo) |
+| 12bb impacto | P, C | C, C | C, C | C, C |
+| a84a lectoras de una clave | P | P | **C, C** | **C, C** |
+| d408 recorrido | I | I | **C, C, C** | **C, C, C** (van a general) |
+| 0b5f recorrido | I | I | C, I, I, I | I, I, I, P (van a general) |
+| control (constante) | C | C | C (línea mal) | C (línea mal) |
+| E8 B6 clave mal escrita | no | no | **sí, sí** | **sí, sí** |
+
+- **Arreglado**: a84a (antes parcial en todas las muestras), d408 (6 de 6 con el camino en los hechos), el falso positivo
+  sistemático de unidad en ind_16, las invenciones de 12bb y **B6, el error que ningún test detecta**: 4 de 4, con la
+  línea, el caso y el arreglo; una respuesta cita el aviso del banco.
+- **Sigue fallando 0b5f** (1 de 8 y un parcial), con y sin la línea de cada llamada: el modelo considera «borrar
+  parciales» y «librerías disponibles» flujos sin relación, llama «falsa» o «imposible» a la cadena del banco y confunde
+  «llama directamente» con «la ejecución pasa por». No es falta de información; el sesgo gana a la evidencia (con
+  `think=False`).
+- **Los dos modos quedan parejos.** En las cuatro preguntas que de verdad se responden en modo unidad, unidad 8 de 8 y
+  general 7 de 8 (una omisión); los recorridos van a general en los dos. Correctas esperadas en las 11 de falla (las 6
+  re-medidas y las otras 5 de T7), contando por el modo pedido como en T7: **9,5 y 9,5** (con la tanda de recorridos con
+  líneas, 9,25 y 9,5). Es ruido de una respuesta.
+- **Lo que sí los separa es el costo.** Unidad responde en 29 s de media en esas cuatro preguntas (11 consultas en 8
+  respuestas) y el general en 45 s (16 consultas): el general lee el paquete en cada pregunta. A cambio, el modo unidad
+  necesita las lecturas guardadas: hoy 109 estados, 28 GB.
+
+**Decisión** (regla de T7: el general por defecto si queda a la par del de unidad, el control sigue correcto y en E8
+encuentra al menos tantos menos uno): las tres condiciones se cumplen en la cuenta por modo pedido (empate; control
+correcto; E8: B3 3 de 3 frente a 2 de 3 y B6 2 de 2 en los dos). Pasar a `general` con tope de 5 GB **borra unos 23 GB
+de lecturas guardadas** y cuesta ~16 s por pregunta; mantener `auto` con 32 GB conserva esa velocidad. Lo decidió el
+análisis de abajo.
+
+### Decisión final: `auto` con 32 GB, y lo que se mejoró sin perder nada (10/10/2026)
+
+El usuario pidió elegir lo mejor sin perder calidad. Las opciones, con lo medido:
+
+| Opción | Exactitud | Velocidad | Disco | Qué se pierde |
+|---|---|---|---|---|
+| `general`, tope 5 GB | igual (9,5 de 11) | ~16 s más por pregunta | libera ~23 GB | velocidad, y borra 23 GB de lecturas |
+| **`auto`, tope 32 GB** (el valor por defecto) | igual | la más rápida si la unidad está guardada | 28 GB, con tope y reserva de 20 GB | nada |
+| `auto`, 10 GB por último uso | igual | rápida solo en lo usado hace poco | libera ~18 GB | velocidad en las unidades desalojadas |
+
+**Queda `auto` con 32 GB y 20 GB de reserva** (ya son los valores por defecto: no se cambió la configuración ni se borró
+nada). Ninguna respuesta depende de un estado: sin lectura guardada, la pregunta va al general, que ahora acierta lo
+mismo; con lectura, el modo unidad responde antes. El caché no crece más allá del tope y quedan 103 GB libres.
+
+Dos fallas que seguían, arregladas en la parte variable (no vencen ninguna lectura guardada):
+
+- **El número de línea de las constantes** (mal en todas las muestras de T7: decía 22, 39, 35 o 20 por 60): las
+  constantes de módulo no son símbolos del banco. Los hechos ahora traen «assigned at module level: ruta:línea: código»
+  (`memoria_consulta._asignaciones_de`; no en la tabla de símbolos, que movería la partición). Con dos constantes nuevas
+  además del control: **3 de 3 con la línea exacta**.
+- **El idioma**: en modo unidad, con una unidad de código en inglés, una pregunta en castellano se respondía en inglés
+  (1f14, 2 de 2). La guía lo pedía lejos de la pregunta; ahora va pegado a ella («(Responde en castellano.)»,
+  `lectura_unidades.pregunta_con_contexto`): **3 de 3 en castellano**.
+
+La redacción del camino también se hizo explícita («when the first one runs, execution reaches the last one… to deny it,
+quote the line»); 0b5f siguió igual (1 de 4): no cambia nada más y se deja.
+
+**El modo por defecto, medido entero** (`auto`, sistema `2f2520f6…`; una muestra por pregunta):
+
+| | Resultado |
+|---|---|
+| Las 11 preguntas de falla de E7 | **10 de 11** (falla 0b5f; f46b con 3 de 4 endpoints, el criterio de E7). E7: 1 de 11; T7, primera serie: 5 (general) y 7 (unidad) |
+| Constantes (control + 2 nuevas) | 3 de 3, valor y línea |
+| E8, los 4 errores que ningún test detecta | **3 de 4** (B3, B6 y, por primera vez, B7), sin falsos positivos; B2 no. T7: 1 (general) y 0 (unidad) |
+| Vacías, agotadas, estados nuevos | ninguna; ningún estado nuevo (todo restauró lecturas existentes) |
+
+Tests: la batería, 1031 sin fallos (los de esta tanda fallan sin su cambio). Respuestas del modelo en el día: 62.
+
+Pendiente: 0b5f (el modelo niega un camino real con la evidencia delante: un límite con `think=False`), el enrutador (las
+palabras de una ruta nombrada cuentan como identificadores; sin efecto en la exactitud), B2 (nadie lo ve: haría falta
+ejecutar la función, o `think=True`), y la limpieza de T8 (los estados que solo usa el estudio, con confirmación).
+
+### Corrección de las fallas que quedaban (10/10/2026)
+
+Cada falla, su causa (buscada antes de tocar nada) y lo medido después (40 respuestas; auditadas a mano):
+
+| Falla | Causa | Arreglo | Antes → después |
+|---|---|---|---|
+| **0b5f** negaba un camino real | El paquete del modo general traía las dos puntas pero **no la función del medio** (`_carpeta_modelos_servidor`, la que llama a `estado`): el modelo le creía a lo que veía | El camino de los hechos trae el **código de las funciones intermedias** (entero si es corto; si no, la firma y la línea de la llamada, con su número) y dice que el camino indirecto es lo que se pregunta | 2 de 13 → **3 de 3** (y 3 C + 2 P de 5 con el código y la redacción anterior, que abría con «no pasa… de forma directa») |
+| **f46b** sin `/api/progreso/resumen` | Los endpoints alcanzados salían solo del grafo; los llamadores por texto eran de un nivel | `API.alcance_por_texto`: sube hasta 3 llamadas por el grafo **y** por texto; un llamador por texto con homónimos solo se sigue si lo de antes del punto es el módulo que lo define (o su alias); también en `P.impacto` (`endpoints_por_texto`) | 3 de 4 → **4 de 4** (3 muestras; una agregó un endpoint de más) |
+| Fábricas sin resolver | `gobernador().f()` no tenía clase | La clase sale del tipo de retorno anotado de la fábrica, si lo tiene; la de otra clase se descarta | test |
+| **Enrutador** | Las palabras de una ruta nombrada (`backend`, `recursos`, `termico`) contaban como identificadores; una constante no es un símbolo | Se quitan las palabras de las rutas; una CONSTANTE suma donde se asigna | constantes: a general → **a su unidad** (3 de 3, con valor y línea) |
+| **«Pensar» con banco: respuestas vacías** | `num_predict = 4096` de la configuración (que manda sobre el tope del chat): el razonamiento se comía todo | Con razonamiento, el tope del chat (16.384) manda si es mayor; el motor reserva ese espacio al elegir el contexto | vacía 4 de 4 → responde (pero ver abajo) |
+| **Bucles de texto** («Espera, el error está en…» hasta el tope) | — | Si el final del texto ya apareció literal dos veces, se corta y se le pide la conclusión (una vez; las herramientas siguen en la petición). En 132 respuestas guardadas solo dispara el bucle real | test; no hubo bucles en la regresión |
+
+**B2 sigue sin resolverse.** Sin razonar, en modo unidad lo encuentra cuando simula el corte por líneas en la consola: 2
+de 6; las otras dan falsos positivos sobre el etiquetado de tramos. **Con razonamiento es peor**: una respuesta inventó un
+error que no está en el código («línea 104: `actual = []`»; es `None`) y otra razonó 16.384 tokens y salió vacía. Por eso
+el razonamiento **no** se activa solo (para 0b5f sí acertó, 1 de 1). Lo que lo resolvería es ejecutar la función con un
+caso (una herramienta `P.probar` en un proceso aislado): es una decisión de seguridad (E5), no se hizo.
+
+**Regresión final del modo por defecto** (`auto`, sistema `0d8e6643…`): Prig **10 de 11** (a84a parcial: en unidad omitió
+la lectora directa, 3 de 4 en el día; ruido) y el control correcto en su unidad; E8 **3 de 4** (B3, B6 y B7 —este con el
+caso de la excepción y `rollback`/`close` en `finally`—; B2 no). Ninguna vacía ni agotada. Tests: 5 nuevos y 2 ampliados,
+cada uno falla sin su cambio; la batería, **1036 sin fallos**.
+
+### «Sigue corrigiendo» y pausa (10/10/2026, 14:00) — estado y cómo retomar
+
+**Hecho en esta ronda** (código y tests; la batería: **1044 sin fallos**; cada test nuevo falla sin su cambio):
+
+| Falla | Arreglo | Dónde | Con el modelo |
+|---|---|---|---|
+| B2: revisando, el modelo solo podía reescribir la función a mano | **`P.cargar(ruta, sustituir={})`**: carga las funciones de un archivo .py en la consola para ejecutarlas con un caso. Cada definición pasa la **misma revisión que el código del modelo** (`revisar`: sin «_» en atributos, sin open/exec/getattr…, solo módulos permitidos), sin anotaciones de tipo, con los mismos builtins y en el mismo proceso aislado: **no amplía lo que la consola puede hacer**. Lo que no pasa queda en `.omitidos`; los ayudantes de otros módulos se reemplazan con `sustituir`. Solo funciona dentro de la caja | `memoria_consulta.API.cargar`, `_builtins_seguros`, `_SinAnotaciones`, `Cargado` | con la pista de abajo, B2 lo encontró **ejecutando** («tope 30 → (1, 30) y (32, 60): se salta la 31») |
+| …pero el modelo no la usaba (0 de 3) | En una pregunta de revisión, los hechos sugieren ejecutarla («RUN it with a case…», con lo que hay que sustituir). Solo para funciones de primer nivel que pasan la revisión de la consola y cuyos ayudantes se sustituyen fácil (en E8a: B1 y B2) | `memoria_consulta._como_probarla`, `_REVISION` | B1 y B2: la usaron (2 y 7 veces) |
+| B8: «communicate() vacía los buffers» (lo daba por correcto) | **Trampas conocidas** en preguntas de revisión: `communicate()` en un `except TimeoutExpired` sin `kill()` antes (documentación de Python). 0 avisos en la copia limpia; en la E8, solo B8 | `memoria_consulta._trampas` | B8: 2 de 2 (antes 0 de 3) |
+| B5 sin aviso de clave mal escrita | Se cuentan **cadenas entre comillas del mismo lenguaje** («activa» es palabra y clase CSS) y la parecida se busca entre todas las cadenas | `_claves_sospechosas`, `_cadenas_del_codigo` | 0 avisos en la limpia; B5 y B6 en la E8 |
+| Una frase en un f-string contaba como llamador | Se quita el texto de las cadenas antes de buscar | `_llamadores_por_texto` | los llamadores reales, idénticos |
+| a84a en unidad: `P.hechos(r="lee_config")` daba 2 de 3 lectoras y el modelo respondía con eso | `P.hechos` de `lee_config`/`lee_entorno` con una clave suma las **lecturas literales**, marcadas «texto» (sin tocar el banco: cambiar el extractor obligaría a reindexar) | `API.hechos` | **sin medir todavía** |
+
+**Validación** (sistema `f005dd92…`, modo `auto`; 21 respuestas, ninguna vacía ni agotada; las últimas 8 auditadas
+solo provisionalmente, ver `resultados/texto-primero/notas.md`):
+
+- Prig: ind_15, ind_16, f46b, 02bd y 12bb correctas; a84a parcial (antes del arreglo de `P.hechos`).
+- E8a, 8 errores + 4 controles + 3 repeticiones: B1, B2 (2 de 3), B5, B6, B8 (2 de 2) detectados; **B3 y B4 no** esta vez
+  (en la corrida anterior, sí): ruido entre corridas que hay que medir con más de una muestra; B7 dudosa. Controles: C1
+  limpio; C2 y C3 señalan cosas reales (B3, que `resolve` usa; un JSON válido que no es objeto rompe `perfil`); C4 se
+  contradice.
+
+**Para retomar**
+
+1. Auditar a mano las 8 últimas de la validación (`v_e8.json`: C4, B3, B7, B6, B4, B2 v2, B8 v2, B2 v3).
+2. Congelar el sistema actual (`docs/estudio-banco/congelar_sistema.py`; incluye el arreglo de `P.hechos`) y medir a84a
+   en unidad (×3) y B3/B4 en `auto` (×3 cada una), para separar ruido de regresión.
+3. Documentar el resultado final de la ronda y actualizar el registro de pasos.
+4. T8: la limpieza de los estados que solo usa el estudio, **con confirmación del usuario**.
+
+Archivos: preguntas y respuestas en `~/.cache/prig-estudio/t7/` (`k_*`, `v_*`), copiadas en
+`docs/estudio-banco/resultados/texto-primero/`. Nada quedó corriendo: el motor está detenido. No se hizo commit.
+
+### Retomado y cerrado (10/10/2026, 17:15–17:45)
+
+**Auditoría de las 8 pendientes** (a mano, contra el código): C4 limpio en la conclusión (con un arranque falso que se
+corrige solo), B7 parcial, B6 / B2 v2 / B8 v2 detectados, B3 no («`startswith` es seguro»), B2 v3 no (falso positivo).
+**B4 no, y por una razón nueva**: el modelo citó textualmente `return max(picos) if picos else None` —la versión
+correcta, que **no está** en la copia: el banco tiene `return max(picos)` y ningún fragmento contiene la otra— y razonó
+sobre su cita. Citó de memoria el código idiomático.
+
+| Falla | Arreglo (en preguntas de revisión, salvo la primera) | Antes → después |
+|---|---|---|
+| a84a en unidad (2 de 3 lectoras) | `P.hechos` de una clave suma las lecturas literales (ver arriba) | 3 de 5 → **3 de 3** |
+| B4: citaba de memoria la versión correcta | El **código literal** de la función (≤ 60 líneas, con números) va en los hechos, pegado a la pregunta: «quote THIS code, not from memory» | — |
+| B4: aun con la cita correcta, no veía la lista vacía | Trampa: `max()`/`min()` de una lista **filtrada** sin `default=` ni comprobación (también sobre lo que se filtra: `elif entradas_orig:` la protege) | 0 de 3 → **3 de 3** |
+| B7 y B3: «no tiene ningún error» en modo unidad, 1 de cada 3–4 | Trampas: `@contextmanager` con el `yield` fuera de `try/finally` (y sin `close`); `ruta.startswith(raiz)` como prueba de pertenencia (por partes del nombre: `database_url` no es una ruta) | B7 3 de 3, B3 3 de 3 |
+
+Las trampas se ajustaron sobre este proyecto, así que sus falsas alarmas se midieron en todas las funciones de la copia
+limpia (2147) y en el repositorio externo (71, que no se usó para ajustarlas): **0 falsas alarmas**, y en la copia
+limpia **un aviso real**: `backend/desafios/catalogo_github.py:1159`, `path.startswith(ruta_sub)` deja pasar
+`ejercicios_avanzados/…` si `ruta_sub` es `ejercicios` (un error latente del proyecto, no inyectado; no se tocó). Las
+reglas solo se activan en preguntas de revisión: ninguna de las 11 de Prig las dispara.
+
+**E8 con todo** (las muestras de esta ronda, sistema por sistema): B1 ✓ (arreglo correcto), B2 2 de 3 (con `P.cargar`,
+ejecutando; la que falla no usó la pista), **B3 3 de 3, B4 3 de 3**, B5 ✓, B6 ✓, **B7 3 de 3**, **B8 2 de 2**. Controles:
+C1, C3 y C4 limpios; C2 señala B3, real y en la función que `resolve` usa. En T7, el mejor modo encontraba **1 de 4**
+de los errores que ningún test ve. Tests: la batería, **1047 sin fallos** (12 nuevos en la ronda, cada uno falla sin su
+cambio).
+
+Pendiente: B2 a veces (el modelo no siempre usa la pista de ejecutarla); la limpieza de T8, con confirmación; decidir
+si se corrige el error latente de `catalogo_github.py:1159`.
+
+### «Corrige todo» (10/10/2026, 17:45–18:30)
+
+| Qué | Cambio | Resultado |
+|---|---|---|
+| El error latente de `catalogo_github.py` | `_dentro_de(ruta, carpeta)` en las dos comparaciones con `startswith` (l.1159 y l.1207) | test nuevo; «ejercicios» ya no deja pasar «ejercicios_avanzados/…» |
+| B2: con la pista, el modelo no siempre ejecutaba la función | Si una pregunta de revisión sobre una función ejecutable (`memoria_consulta.sugiere_ejecutar`) se responde sin `P.cargar`, se le pide **una vez** que la ejecute con casos borde y confirme o corrija (`app.EJECUTALA`) | las 4 respuestas la ejecutaron; **2 de 4** detectan B2 (las otras eligieron casos que no pasan por el corte por líneas) |
+| «Pensar»: si el razonamiento llena el tope, respuesta vacía | Se responde de nuevo **sin razonar**, con un aviso (`app.SIN_RAZONAR`) | test; en vivo, B2 con «Pensar» respondió dentro del tope (14.243 tokens) y lo **detectó** |
+| Idioma en modo unidad | El recordatorio pide castellano «desde la primera línea» | 4 de 5 empiezan en castellano (una abrió en inglés) |
+| T8: limpieza (confirmada por el usuario) | Se borraron los **21 estados que solo usaba el estudio** (20 de sus bancos y el de la ronda final de B2 en T7, sin banco): **5,24 GB**; antes de borrar se comprobó que ninguno figuraba en las lecturas de un banco real | quedan 88 estados (23 GB), todos de lecturas del banco real de Prig; 108 GB libres. `~/.cache/prig-estudio` (377 MB: copias, bancos del estudio, un respaldo del banco del 30/09) **no se tocó** |
+
+Un dato de la limpieza: el registro de lecturas del banco real tiene 97 entradas y **9 ya no tenían su archivo antes
+de borrar** (ninguna está entre las borradas hoy; vienen de antes: el tope del caché o el error de `reasignar` del 03/10,
+ya corregido). Esas unidades van al modo general o se releen al usarse.
+
+**Estado final de la revisión de código (E8, los 8 errores que ningún test detecta, modo `auto`)**: B1, B3, B4, B5, B6,
+B7 y B8 de forma estable (las últimas muestras, todas detectadas); **B2 ~ la mitad** (lo encuentra cuando el caso que
+ejecuta pasa por el corte por líneas; con «Pensar», 1 de 1). Controles limpios. Tests: **1051 sin fallos**.
+
 ## Registro de pasos
 
 | Paso | Estado | Fecha | Hallazgo principal |
@@ -1060,4 +1440,18 @@ e9). Nada está en git todavía.
 | E7 piloto y serie del 02/10 | descartados | 30/09–03/10 | el piloto pudo correr con vectores; la serie del 02/10 tuvo la clave del examen al alcance del modelo (citó la rúbrica); se descubrieron tres vías de filtración |
 | E7 serie limpia, lotes 1–2 de 15 (Prig) | hecho, verificado y auditado | 03/10/2026 | 21 de 24 correctas a mano; huecos del grafo → respuestas falsas y seguras; confusión de nombres parecidos; la clave del examen también falla (lambda) |
 | E7 serie limpia, lotes 3–5 (Prig) | hecho, verificado y auditado | 03/10/2026 | 51/5/4 de 60 a mano (lotes 1–5); respuestas sin tope de tokens (bucle de 32K) y bucle de consultas → tope de 600 s en el arnés; 4 defectos de clave; hueco del grafo con instancias globales (4 casos); bug de `reasignar` con estados compartidos |
-| E7 lotes 6–15, repeticiones, externo; E8 … E10 | en curso (03/10, desde 11:32) | | ver «Serie limpia retomada» |
+| E7 serie limpia completa (Prig) + 2 repeticiones | hecho, verificado y auditado | 03/10/2026 | **157/13/10 de 180** a mano; modo unidad 86 % frente a general 97 %; ruido bajo (23 de 24 veredictos iguales); 11 claves defectuosas; el corrector dio 1,0 a 4 respuestas no correctas |
+| Arreglo de `reasignar` (estados compartidos entre bancos) | hecho, con test | 03/10/2026 | el test falla sin el arreglo |
+| E7 externo | parcial | 03/10 y 09/10 | lote 1: 9/1/2 a mano; el examen de frontend no es válido en React/TS (tipos como funciones); el grafo de TS no ve funciones importadas. Cortado a pedido |
+| E8 | preparado; sin correr con el modelo | 03/10/2026 | los tests de Prig detectan **3 de 8** errores realistas inyectados |
+| E9 | E9b hecho; E9a y E9c preparados | 03/10/2026 | aviso de notas por archivo: una falsa alarma y una omisión; las fichas no se usan |
+| Sistema congelado para medir | hecho | 09/10/2026 | el backend cambió entre sesiones; el estado del 03/10 no era reconstruible |
+| **Implementación de lo medido** | hecho, con tests | 09/10/2026 | 9 cambios (tope, consultas repetidas, hechos para el modo unidad, llamadores por texto, memoria, vacías, notas, examen); ver «Implementación de lo medido» |
+| E10 (costos y veredicto) | no se hizo: se pasó a implementar | | lo esencial está en E3–E4 (disco y tiempos) y en el resumen de E7 |
+| Plan «texto primero», fases A y B | hecho, con tests | 09/10/2026 | tope configurable del caché de estados (0 = no guardar), modo del banco auto/general/unidad con su motivo, hechos del banco también en modo general, lectura al vuelo; ver `docs/plan-texto-primero/` |
+| **T7: medición corta** | hecho, auditado a mano | 09/10/2026 | 52 respuestas, ninguna vacía ni agotada; de 7 incorrectas en E7 a 2 (los recorridos: `P.camino` los resuelve); en las 11 de falla, general 6,0 frente a unidad 7,5 → **queda `auto` y 32 GB**; los hechos pegados a la pregunta: 3 de 3 en general; E8 con `think=False`: solo B3; la última ronda sin herramientas relee la unidad; ver «Texto primero: medición corta» |
+| **Propuestas de T7 implementadas y re-medidas** | hecho, con tests, auditado a mano | 10/10/2026 | camino con la línea de cada llamada, hechos al final en general, claves leídas/escritas/definidas y «¿clave mal escrita?», llamadores por texto sin ruido, última ronda sin cambiar el prefijo; 36 respuestas: a84a, d408 y **B6** (4 de 4) arreglados, 0b5f sigue; los modos quedan parejos (9,5 y 9,5): unidad es ~16 s más rápido, general no necesita 28 GB de estados |
+| **«Corrige todo» y limpieza de T8** | hecho, con tests, auditado a mano | 10/10/2026 | error latente de catalogo_github corregido; empujón a ejecutar (B2 2 de 4, siempre ejecuta); «Pensar» ya no queda vacía; 21 estados del estudio borrados (5,24 GB), 88 del banco real intactos; 1051 tests |
+| **«Sigue corrigiendo»** | hecho, con tests, auditado a mano | 10/10/2026 | `P.cargar` (ejecutar la función real en la caja, mismas reglas), pista de ejecutarla, trampa de TimeoutExpired, claves mal escritas por cadenas, llamadores sin cadenas, `P.hechos` con lecturas literales; más el código literal en revisión y trampas de max/contextmanager/rutas; a84a 3 de 3; E8: B3, B4, B7 3 de 3, B8 2 de 2, B2 2 de 3; 0 falsas alarmas en 2147 + 71 funciones (y un error latente real en catalogo_github.py:1159) |
+| **Corrección de las fallas que quedaban** | hecho, con tests, auditado a mano | 10/10/2026 | 0b5f 3 de 3 (el código de la función del medio en el camino), f46b 4 de 4 (endpoints a 3 llamadas por texto), constantes a su unidad, «Pensar» sin respuestas vacías, corte de bucles; B2 sigue (2 de 6; razonar es peor: haría falta ejecutar); modo por defecto: Prig 10 de 11, E8 3 de 4 |
+| **Decisión final y modo auto medido** | hecho, auditado a mano | 10/10/2026 | queda `auto` con 32 GB (nada se pierde ni se borra); constantes con su línea (3 de 3) y el idioma pegado a la pregunta (3 de 3); el modo por defecto: 10 de 11 preguntas de falla, E8 3 de 4 sin falsos positivos |

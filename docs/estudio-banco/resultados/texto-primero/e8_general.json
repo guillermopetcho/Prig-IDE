@@ -1,0 +1,152 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   64,
+   67,
+   73,
+   74,
+   75,
+   78,
+   79,
+   80
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "general",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5195,
+   "temp_c": 55
+  },
+  "segundos": 300,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "Voy a analizar `piezas_de_archivo` buscando errores lógicos, de límites o de comportamiento en casos extremos.\n\nEl análisis mostró un bug crítico. Voy a verificarlo con un ejemplo concreto usando el código real:\n\n## Sí, tiene un error de programación\n\n### Dónde está\n\n**`backend/particion_proyecto.py:87-91`** (el bucle que procesa hijos):\n\n```python\ncur = ini\nfor h in hijos:\n    if h[\"fin\"] < cur:\n        continue\n    finos.append((cur, h[\"fin\"], [h[\"nombre\"]]))  # ← LÍNEA 89\n    cur = h[\"fin\"] + 1\nif cur <= fin:\n    finos.append((cur, fin, nombres if not hijos else []))\n```\n\n### Qué hace mal\n\nCuando un hijo no cabe en `cur` (se salta con `continue`), `cur` **no se actualiza**. El siguiente hijo procesable empieza en `cur`, pero el tramo que se añade es `(cur, h[\"fin\"], ...)`, lo que incluye **todo el código entre `cur` y `h[\"ini\"]`**, aunque ese código no pertenece al hijo.\n\nEn el caso más común: el primer hijo empieza en `s[\"ini\"]` (coincide con `cur`), pero el segundo hijo empieza mucho después. El tramo `(cur, h2[\"fin\"], ...)` incluye el código intermedio que no pertenece a ningún símbolo.\n\n### Caso concreto que falla\n\nArchivo con 100 líneas:\n- `ClaseGigante`: líneas 10-100\n- `metodo_pequeno`: líneas 10-20\n- `metodo_grande`: líneas 90-100\n\n**Resultado incorrecto:**\n- Pieza 1: líneas 1-20 → símbolos `['metodo_pequeno']` ✓\n- Pieza 2: líneas **21-100** → símbolos `['metodo_grande']` ✗\n\nLa pieza 2 incluye las líneas 21-89 (código suelto entre métodos) y las etiqueta como `metodo_grande`, cuando `metodo_grande` solo ocupa las líneas 90-100. El modelo que lea esta unidad creerá que las líneas 21-89 pertenecen a `metodo_grande`, lo que genera contexto incorrecto.\n\n### La causa raíz\n\nLa línea `finos.append((cur, h[\"fin\"], [h[\"nombre\"]]))` asume que `cur == h[\"ini\"]`, pero solo es cierto para el primer hijo. Para hijos posteriores, `cur` puede ser menor que `h[\"ini\"]`, y el código intermedio se \"cuela\" en el tramo del hijo.\n\n### La corrección\n\nDebería ser `finos.append((h[\"ini\"], h[\"fin\"], [h[\"nombre\"]]))` en lugar de `(cur, h[\"fin\"], ...)`, y el código entre `cur` y `h[\"ini\"]` debería gestionarse como código suelto (con `nombres=[]`).",
+   "agotada": false,
+   "corte": null,
+   "modo": "general",
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 326,
+   "tokens": 637,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Analizo piezas_de_archivo con casos de prueba\\ncodigo = \\\"\\\"\\\"\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\\": max(1, total), \\\"tokens\\\": tokens,\\n                 \\\"simbolos\\\": [s[\\\"nombre\\\"] for s in simbolos if not s[\\\"padre\\\"]]}]\\n    primer = sort",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ejecuto la función real con un caso de prueba\\nimport backend.particion_proyecto as pp\\n\\n# CASO DE PRUEBA: Tramo grande con hijos que dejan huecos\\n# Simulo: archivo de 100 líneas, tope=50 líneas (250 tokens aprox)\\n# Símbolo padre: líneas 10-100\\n# Hijo1: líneas 10-20\\n# Hijo2: líneas 90-100\\n# Hueco entre 21-89 NO se asigna a ningún hijo\\n\\nlineas = [f\\\"linea {i}\\\" for i in rang",
+     "resultado_caracteres": 227
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Uso P.leer para obtener la función y la ejecuto\\nlineas_archivo = P.leer(\\\"backend/particion_proyecto.py\\\")\\n# Extraigo piezas_de_archivo\\nimport re\\n\\n# Busco la función\\nmatch = re.search(r'def piezas_de_archivo\\\\(.*?\\\\).*?\\\\n(.*?)(?=\\\\ndef [a-z_]|\\\\Z)', lineas_archivo, re.DOTALL)\\nif match:\\n    func_text = match.group(0)\\n    print(\\\"Función encontrada:\\\")\\n    print(func_text[",
+     "resultado_caracteres": 577
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Simulo la lógica de piezas_de_archivo con el caso de prueba\\ndef piezas_de_archivo_simulada(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n    if tokens <= tope or total == 0:\\n        return [{\\\"ruta\\\": ruta, \\\"ini\\\": 1, \\\"fin\\\": max(1, total), \\\"tokens\\\": tokens,\\n                 \\\"simbolos\\\": [s[\\\"nombre\\\"] for s in simbolos if not s[\\\"padre\\\"]]}]\\n    primer ",
+     "resultado_caracteres": 532
+    }
+   ],
+   "segundos": 178.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "Sí, tiene un error de seguridad importante en la validación de rutas.\n\n## El error: `startswith` sin barra final\n\n**Archivo:** `backend/file_manager.py`, líneas 31-45, específicamente la línea 40:\n\n```python\nif abs_path.startswith(root):\n    return True\n```\n\n**Qué hace mal:**\n`str.startswith()` verifica si la cadena comienza con el prefijo dado, pero **no exige que sea un directorio completo**. Esto permite rutas \"hermanas\" o \"fantasma\" que comparten el prefijo de texto pero están fuera del directorio permitido.\n\n**Falta crítica:** No se añade una barra `/` al final de `root` ni se verifica que el carácter siguiente (si existe) sea `/`.\n\n## Caso concreto que falla\n\nSupongamos:\n- `root = \"/home/usuario/workspace\"`\n- `abs_path = \"/home/usuario/workspace_malicioso/archivo.py\"`\n\nLa condición `abs_path.startswith(root)` devuelve `True` porque `/home/usuario/workspace_malicioso...` **sí comienza con** `/home/usuario/workspace`.\n\nEsto permitiría leer, escribir o borrar archivos fuera del workspace permitido, rompiendo el aislamiento de seguridad.\n\n## Otros directorios vulnerables\n\nEl mismo error afecta a todas las raíces permitidas:\n- `~/.prig_books` → permitiría `~/.prig_books_extra/`\n- Los repositorios propios de Prig Hub → permitiría `~/.prig_hub/propios_extra/`\n\n## Solución\n\nLa línea 40 debería ser:\n\n```python\nif abs_path == root or abs_path.startswith(root + os.sep):\n    return True\n```\n\nEsto asegura que:\n1. La ruta sea exactamente la raíz permitida\n2. O que esté dentro de un subdirectorio (el `os.sep` es `/` en Linux/Mac y `\\` en Windows)",
+   "agotada": false,
+   "corte": null,
+   "modo": "general",
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 509,
+   "tokens": 413,
+   "consultas": [],
+   "segundos": 22.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "Revisé el código de `JobExporter.preparar` en `backend/job_exporter.py` (líneas 41-206).\n\nEl método tiene un error de programación en la **línea 159** (dentro del bucle que escribe los chunks):\n\n```python\n                escritos = 0\n                for c in chunks:\n                    texto = (c.get(\"content\") or \"\").strip()\n                    if len(texto) < min_chars:\n                        descartados += 1\n                        continue\n                    salida.write(json.dumps({\n                        \"chunk_id\": c[\"chunk_id\"],\n                        \"source_id\": source_id,\n                        \"book_title\": parsed[\"filename\"],\n                        \"domain\": dominio,\n                        \"page\": c.get(\"page_start\", 1),\n                        \"page_end\": c.get(\"page_end\", c.get(\"page_start\", 1)),\n                        \"content_type\": c.get(\"content_type\", \"TEXT\"),\n                        \"section_id\": c.get(\"section_id\"),\n                        \"chapter_id\": c.get(\"chapter_id\"),\n                        \"text\": texto,\n                    }, ensure_ascii=False) + \"\\n\")\n                    escritos += 1\n```\n\n**El error:** La variable `escritos` se reinicia a 0 en cada libro (`escritos = 0`), pero **nunca se usa para nada después del bucle interno**. Sin embargo, el problema real es que **`escritos` se usa para contar los chunks escritos por ese libro específico**, y luego se usa en la línea 172 para añadir al libro al manifiesto:\n\n```python\n                libros.append({\n                    ...\n                    \"chunks\": escritos,  # <-- Aquí usa el contador del libro actual\n                    ...\n                })\n```\n\nEsto parece correcto inicialmente, pero hay un **problema de alcance y lógica**: la variable `total_chunks` (línea 50) se acumula correctamente, pero `escritos` se reinicia en cada iteración del bucle `for numero, item in enumerate(rutas, 1):`.\n\n**El verdadero error** está en la **línea 159**: `escritos = 0` está **dentro** del bucle principal, pero **después** del bloque `try/except` y antes del procesamiento del libro. Esto significa que `escritos` se reinicia correctamente para cada libro.\n\nEspera, revisando más detenidamente... el código parece correcto en cuanto al alcance de `escritos`.\n\nSin embargo, hay un **error de lógica en la línea 130-132**:\n\n```python\n                if not dominio or dominio not in DOMAINS:\n                    muestra = \" \".join(p[\"text\"] for p in parsed[\"pages\"][:4])\n                    dominio = sugerir_dominio(muestra, parsed[\"filename\"])\n```\n\n**El error:** Si el libro tiene menos de 4 páginas, `parsed[\"pages\"][:4]` devolverá todas las páginas disponibles, lo cual es correcto. Pero si `parsed[\"pages\"]` está vacío o no tiene texto, `muestra` será una cadena vacía, y `sugerir_dominio` podría devolver un dominio por defecto incorrecto.\n\nPero el error más grave está en la **línea 159**: la variable `escritos` se inicializa **después** de que se haya verificado si el libro es escaneado (línea 118-124) y **antes** de procesar los chunks. Esto es correcto.\n\n**El error real** está en la **línea 159** y la **línea 172**: `escritos` se reinicia en cada libro, pero **no se acumula en `total_chunks` hasta después del bucle de chunks**. Esto es correcto.\n\nEspera, hay un **error de variable no definida** en la **línea 159**: `escritos = 0` está bien, pero...\n\n**El error real** está en la **línea 159**: `escritos = 0` se ejecuta **después** de que se haya verificado si el libro es escaneado. Esto es correcto.\n\n**El error** está en la **línea 159**: la variable `escritos` se reinicia, pero **no hay un error de programación**.\n\nSin embargo, hay un **error de lógica en la línea 130-132**: si `dominio` ya está en `DOMAINS`, no se vuelve a sugerir, lo cual es correcto.\n\n**El error real** está en la **línea 159**: `escritos = 0` está bien, pero...\n\nEspera, revisando el código completo, **no hay un error de programación obvio** en `JobExporter.preparar`. El código parece correcto en cuanto a:\n\n1. Manejo de rutas con `~` (línea 86)\n2. Verificación de archivos existentes (línea 88-92)\n3. Manejo de errores de lectura (línea 94-99)\n4. Detección de PDFs escaneados (línea 118-124)\n5. Sugerencia de dominio (línea 130-132)\n6. Detección de duplicados (línea 134-139)\n7. Troceado y filtrado de chunks (línea 159-185)\n8. Acumulación de resultados (línea 187-206)\n\n**Conclusión:** No hay un error de programación obvio en `JobExporter.preparar`. El código es robusto y maneja correctamente los casos edge.",
+   "agotada": false,
+   "corte": null,
+   "modo": "general",
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1079,
+   "tokens": 1248,
+   "consultas": [],
+   "segundos": 46.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B7",
+   "prueba": "conexión SQLite que nunca se cierra",
+   "objetivo": "B7",
+   "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "No tiene ningún error de programación.\n\nLa implementación en `backend/banco_proyecto.py:708-713` es correcta y robusta para un contexto de servidor web con concurrencia (como el de `app.py`):\n\n1.  **`check_same_thread=False`**: Es **necesario** y correcto. `Flask` (y la mayoría de frameworks web) atienden múltiples peticiones en hilos distintos. SQLite por defecto lanza `ProgrammingError` si una conexión se usa desde un hilo diferente al que la creó. Al desactivar esta comprobación, permites que el contexto `with` se use de forma segura en hilos concurrentes.\n2.  **`timeout=30`**: Es adecuado. SQLite usa bloqueo a nivel de base de datos para escrituras. Si otro hilo está escribiendo, este hilo esperará hasta 30 segundos antes de fallar, lo cual previene errores de \"database is locked\" frecuentes en servidores web bajo carga.\n3.  **`row_factory = sqlite3.Row`**: Permite acceder a las columnas por nombre (`fila['nombre']`), lo cual es la práctica estándar para mejorar la legibilidad del código sin perder rendimiento.\n4.  **`c.commit()` en el bloque `finally` implícito del `contextmanager`**: Asegura que los cambios realizados dentro del bloque `with` se persistan siempre que el bloque se cierre normalmente. Si hay una excepción, el contexto no llama a `commit()`, manteniendo la integridad de la base de datos (transaccionalidad).\n\nEl patrón es idéntico al usado en `KnowledgeBase.conectar` (`backend/knowledge_base.py:146`), aunque allí no usa `contextmanager` ni `check_same_thread=False` porque `KnowledgeBase` parece estar diseñado para un uso más secuencial o con gestión explícita de conexiones. En `BancoProyecto`, al ser el núcleo del \"banco\" que usa el motor de IA y el chat, la concurrencia es crítica y esta implementación la maneja correctamente.",
+   "agotada": false,
+   "corte": null,
+   "modo": "general",
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1813,
+   "tokens": 449,
+   "consultas": [],
+   "segundos": 28.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C2",
+   "prueba": "control: función sin error",
+   "objetivo": "C2",
+   "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "No, `FileManager.resolve` no tiene errores de programación. Su lógica es correcta y segura para el propósito de un sandbox de archivos.\n\nAquí está el análisis de por qué funciona bien:\n\n1.  **Normalización de ruta (Línea 50):**\n    ```python\n    abs_path = os.path.abspath(path if os.path.isabs(path) else os.path.join(self.base_dir, path))\n    ```\n    Si la ruta ya es absoluta, la usa tal cual. Si es relativa, la concatena con `self.base_dir`. `os.path.abspath` se encarga de limpiar los `..` y `.`.\n\n2.  **Verificación de seguridad (Líneas 51-54):**\n    ```python\n    if not self.is_path_allowed(abs_path):\n        raise PermissionError(\n            f\"Acceso denegado: '{abs_path}' está fuera de la carpeta de trabajo.\"\n        )\n    ```\n    Llama a `is_path_allowed`, que verifica si `abs_path` comienza con alguna de las raíces permitidas (`self.base_dir`, `~/.prig_books`, o los repositorios propios de Prig Hub).\n\n3.  **Casos de borde manejados:**\n    *   **Ruta vacía:** La línea 48-49 lanza `PermissionError` explícitamente.\n    *   **Rutas con `..` que intentan salir del workspace:** `is_path_allowed` las bloquea porque la ruta normalizada ya no empezará por la raíz permitida.\n    *   **Symlinks:** Aunque `os.path.abspath` no resuelve symlinks (usa `os.path.realpath` para eso), en un entorno de desarrollo local donde el usuario controla los enlaces, esto es aceptable. Si se quisiera una seguridad extrema contra symlinks maliciosos que apunten fuera, se debería usar `os.path.realpath`, pero en el contexto de Prig (un IDE local para aprendizaje), la implementación actual es suficiente y más rápida.\n\n**Conclusión:** El código es sólido. No hay errores lógicos ni de seguridad evidentes en esta función.",
+   "agotada": false,
+   "corte": null,
+   "modo": "general",
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1149,
+   "tokens": 459,
+   "consultas": [],
+   "segundos": 24.5,
+   "memoria_del_modelo": null
+  }
+ ]
+}

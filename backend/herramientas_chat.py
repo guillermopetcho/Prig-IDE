@@ -96,7 +96,7 @@ def _recortar(texto: str) -> str:
 class Herramientas:
     def __init__(self, knowledge_base=None, file_mgr=None, ide=None, runner=None,
                  permitir_codigo: bool = False, timeout: int = 25, banco=None, consola=None,
-                 solo: Optional[List[str]] = None):
+                 solo: Optional[List[str]] = None, escribir: bool = True):
         self.kb = knowledge_base
         self.fm = file_mgr
         self.ide = ide
@@ -108,6 +108,11 @@ class Herramientas:
         # Solo estas herramientas y en este orden (la lista va en el prefijo del modelo: si cambia,
         # no se puede reusar una lectura guardada; lectura_unidades.py la fija)
         self.solo = list(solo) if solo else None
+        # Con la memoria del chat desactivada no se guarda nada: «anotar» sigue en la lista (cambiarla
+        # invalidaría las lecturas guardadas del modo unidad) pero no escribe. Antes memoria=False solo
+        # evitaba guardar la respuesta y el modelo seguía anotando notas que entraban en las preguntas
+        # siguientes (visto en el estudio del banco, docs/estudio-banco.md)
+        self.escribir = escribir
         self.rutas_consultadas: List[str] = []      # lo que el modelo miró: va a la resolución
 
     def definiciones(self) -> List[Dict[str, Any]]:
@@ -217,6 +222,8 @@ class Herramientas:
         return memoria_consulta.formatear(self.consola.ejecutar(codigo))
 
     def _h_anotar(self, tipo: str = "nota", titulo: str = "", texto: str = "", rutas=None) -> str:
+        if not self.escribir:
+            return "No se guardó: este chat tiene la memoria desactivada. Responde sin anotar."
         if isinstance(rutas, str):
             rutas = [rutas]
         r = self.banco.anotar(tipo, titulo, texto, rutas or [], origen="modelo")

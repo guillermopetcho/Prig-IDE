@@ -214,10 +214,27 @@ class EditorManager {
             };
         };
 
-        ed.onDidChangeCursorPosition(() => {
-            if (!window.motorMovimiento) return;
-            const pt = obtenerCoordsCursor();
-            if (pt) window.motorMovimiento.notificarPosicionCursor(pt.x, pt.y);
+        ed.onDidChangeCursorPosition((e) => {
+            if (window.motorMovimiento) {
+                const pt = obtenerCoordsCursor();
+                if (pt) window.motorMovimiento.notificarPosicionCursor(pt.x, pt.y);
+            }
+            if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.notificarCursor === 'function') {
+                const pos = ed.getPosition();
+                if (pos) {
+                    window.DIRECTOR_ASCII.evaluador.notificarCursor(pos.lineNumber, pos.column);
+                }
+            }
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.notificarCursor(ed);
+            }
+        });
+
+        // Sincronización continua de corchetes y flechas con el scroll de Monaco
+        ed.onDidScrollChange(() => {
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.actualizarOverlay();
+            }
         });
 
         ed.onKeyDown((e) => {
@@ -238,6 +255,9 @@ class EditorManager {
         ed.onDidChangeModelContent(() => {
             if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.aplicarImpulso === 'function') {
                 window.DIRECTOR_ASCII.evaluador.aplicarImpulso((Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 0.8);
+            }
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.alCambiarCodigo(ed);
             }
             if (_timerEvaluacionCodigo) clearTimeout(_timerEvaluacionCodigo);
             _timerEvaluacionCodigo = setTimeout(() => {

@@ -1386,7 +1386,8 @@ class AIChatManager {
                         } else if (b.modo === 'unidad') {
                             // Modo unidad: se restauró la lectura guardada de la parte del proyecto que toca
                             el.querySelector('span').textContent = `Banco «${b.proyecto}»: lectura de «${b.unidad}» restaurada; el resto del proyecto, con la consola`;
-                            el.title = `El modelo tiene esa unidad leída completa (estado guardado del motor) y consulta lo demás con herramientas.`;
+                            el.title = `El modelo tiene esa unidad leída completa (estado guardado del motor) y consulta lo demás con herramientas.` +
+                                (b.motivo ? `\nModo: ${b.motivo}` : '');
                         } else {
                             const partes = [`${b.fragmentos} fragmentos de ${(b.archivos || []).length} archivos`,
                                             `${(b.tokens || 0).toLocaleString('es')} tokens`];
@@ -1394,9 +1395,11 @@ class AIChatManager {
                             if (b.conocimiento) partes.push(`${b.conocimiento} nota(s) de memoria`);
                             if (b.resoluciones) partes.push(`${b.resoluciones} resolución(es) parecida(s)`);
                             if (b.inicial) partes.push('proyecto indexado ahora');
+                            if (b.hechos_caracteres) partes.push('hechos del banco');
                             el.querySelector('span').textContent = `Banco «${b.proyecto}»: ${partes.join(' · ')}`;
                             el.title = `Archivos: ${(b.archivos || []).join(', ')}\nMapa: ${b.mapa_tokens} tokens · búsqueda ${b.segundos} s` +
-                                (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)');
+                                (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)') +
+                                (b.motivo ? `\nModo general: ${b.motivo}` : '');
                         }
                     }
                     else if (ev.t === 'referencias') {

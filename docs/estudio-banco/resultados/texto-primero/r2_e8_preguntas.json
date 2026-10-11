@@ -1,0 +1,50 @@
+[
+ {
+  "id": "E8a_B3·r1",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B4·r1",
+  "prueba": "E8a",
+  "objetivo": "B4",
+  "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B4",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·r2",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B4·r2",
+  "prueba": "E8a",
+  "objetivo": "B4",
+  "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B4",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·r3",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B4·r3",
+  "prueba": "E8a",
+  "objetivo": "B4",
+  "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B4",
+  "modo": "auto"
+ }
+]

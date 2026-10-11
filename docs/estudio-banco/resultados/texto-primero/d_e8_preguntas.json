@@ -1,0 +1,34 @@
+[
+ {
+  "id": "E8a_B2·a",
+  "prueba": "off-by-one: se pierde una línea al partir",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·a",
+  "prueba": "seguridad: startswith en vez de commonpath",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B6·a",
+  "prueba": "clave de configuración mal escrita",
+  "objetivo": "B6",
+  "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B6",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B7·a",
+  "prueba": "conexión SQLite que nunca se cierra",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B7",
+  "modo": "auto"
+ }
+]

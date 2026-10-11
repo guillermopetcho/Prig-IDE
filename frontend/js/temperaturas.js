@@ -285,7 +285,7 @@
     const m = ultimoMoe;
     if (!z || !m) return;
     const escrito = {};
-    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo', 'moe-cache'].forEach((id) => { const el = $(id); if (el && el.dataset.tocado) escrito[id] = el.value; });
     const a = m.ajustes || {};
     let estado;
     if (!m.disponible) {
@@ -333,8 +333,10 @@
         <div style="font-size:10.5px; margin-top:6px; display:flex; gap:7px; align-items:center; flex-wrap:wrap;">
           <span title="Archivos enganchados que el motor ya leyó: preguntar de nuevo sobre ellos los restaura del disco en ~0,1 s en lugar de releerlos">
             <i class="fa-solid fa-box-archive"></i> Proyectos guardados: ${(m.proyectos || {}).archivos || 0}
-            (${(((m.proyectos || {}).mb || 0) / 1000).toFixed(1)} GB)${(m.proyectos || {}).ultimo && m.proyectos.ultimo.origen
+            (${(((m.proyectos || {}).mb || 0) / 1000).toFixed(1)} GB${(m.proyectos || {}).tope_mb != null ? ` de ${((m.proyectos.tope_mb || 0) / 1000).toFixed(0)} GB` : ''}${(m.proyectos || {}).libre_mb != null ? ` · ${(m.proyectos.libre_mb / 1000).toFixed(0)} GB libres en disco` : ''})${(m.proyectos || {}).ultimo && m.proyectos.ultimo.origen
               ? ` · último: ${m.proyectos.ultimo.origen === 'disco' ? 'restaurado' : 'leído'}, ${(m.proyectos.ultimo.tokens || 0).toLocaleString('es')} tokens en ${m.proyectos.ultimo.segundos} s` : ''}</span>
+          <label for="moe-cache" title="Lecturas del motor guardadas en disco: responden en 0,1–0,4 s sin releer. 0 = no guardar (cada pregunta arma su contexto desde el banco). Se aplica al guardar (docs/plan-texto-primero.md)">Caché de lecturas (GB)</label>
+          <input id="moe-cache" type="number" min="0" max="2000" step="1" value="${esc(String(valor('moe-cache', a.cache_gb ?? 32)))}" style="width:48px; ${estiloCampo}">
           ${((m.proyectos || {}).archivos || 0) ? `<button id="moe-olvidar" style="${estiloBoton}"><i class="fa-solid fa-trash-can"></i> Borrar</button>` : ''}
         </div>` : ''}
         <div id="moe-msg" style="font-size:10.5px; margin-top:4px;"></div>
@@ -343,19 +345,24 @@
     const enviar = async (cuerpo) => {
       try {
         ultimoMoe = await prigFetchJson('/api/recursos/moe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
-        ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo'].forEach((id) => { const el = $(id); if (el) delete el.dataset.tocado; });
+        ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-cache'].forEach((id) => { const el = $(id); if (el) delete el.dataset.tocado; });
         pintarMoe();
       } catch (err) { msg(err.message, true); }
     };
-    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo'].forEach((id) => {
+    ['moe-ctx', 'moe-calientes', 'moe-hilos', 'moe-modo', 'moe-nucleo', 'moe-cache'].forEach((id) => {
       const el = $(id);
       if (el) el.oninput = el.onchange = () => { el.dataset.tocado = '1'; };
     });
     Object.keys(escrito).forEach((id) => { if ($(id)) $(id).dataset.tocado = '1'; });
-    if ($('moe-guardar')) $('moe-guardar').onclick = () => enviar({
-      contexto: $('moe-ctx').value, calientes: $('moe-calientes').value.trim() || 'auto',
-      hilos: parseInt($('moe-hilos').value, 10) || 0, modo: $('moe-modo').value, mtp: $('moe-mtp').checked,
-      nucleo: $('moe-nucleo').value });
+    if ($('moe-guardar')) $('moe-guardar').onclick = () => {
+      const cuerpo = {
+        contexto: $('moe-ctx').value, calientes: $('moe-calientes').value.trim() || 'auto',
+        hilos: parseInt($('moe-hilos').value, 10) || 0, modo: $('moe-modo').value, mtp: $('moe-mtp').checked,
+        nucleo: $('moe-nucleo').value };
+      const cache = $('moe-cache') ? parseFloat($('moe-cache').value) : NaN;
+      if (!Number.isNaN(cache)) cuerpo.cache_gb = cache;          // el tope del caché se aplica en el acto
+      enviar(cuerpo);
+    };
     if ($('moe-parar')) $('moe-parar').onclick = () => enviar({ detener: true });
     if ($('moe-olvidar')) $('moe-olvidar').onclick = () => {
       if (confirm('¿Borrar los proyectos guardados? La próxima pregunta sobre cada uno lo volverá a leer.')) enviar({ olvidar_proyectos: true });

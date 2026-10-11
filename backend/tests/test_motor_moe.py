@@ -259,6 +259,34 @@ class Ajustes(unittest.TestCase):
             self.assertEqual(motor_moe.podar_proyectos(d, limite_mb=2), 1)
             self.assertEqual(sorted(os.listdir(d)), ["medio.bin", "nuevo.bin"])
 
+    def _tres_estados(self, d):
+        for i, nombre in enumerate(("viejo", "medio", "nuevo")):
+            ruta = os.path.join(d, nombre + ".bin")
+            open(ruta, "wb").write(b"x" * 1_000_000)
+            os.utime(ruta, (1000 + i, 1000 + i))
+
+    def test_podar_respeta_la_reserva_de_disco(self):
+        """ Aunque entren en el tope, el caché nunca deja el disco por debajo de la reserva """
+        with tempfile.TemporaryDirectory() as d:
+            self._tres_estados(d)
+            with mock.patch.object(motor_moe.shutil, "disk_usage", return_value=mock.Mock(free=3_500_000)):
+                self.assertEqual(motor_moe.podar_proyectos(d, limite_mb=10, reserva_mb=5), 2)   # faltaban 1,5 MB libres
+            self.assertEqual(os.listdir(d), ["nuevo.bin"])
+
+    def test_tope_del_cache_desde_los_ajustes(self):
+        """ El tope sale de la configuración (moe_cache_gb), no de una constante (docs/plan-texto-primero.md) """
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
+            self._tres_estados(d)
+            motor = motor_moe.Motor(ajustes=lambda: {"cache_gb": 0.002})          # 2 MB
+            self.assertEqual(motor.tope_cache_mb(), 2.0)
+            self.assertEqual(motor.podar(), 1)
+            self.assertEqual(sorted(os.listdir(d)), ["medio.bin", "nuevo.bin"])
+            self.assertEqual(motor_moe.Motor().tope_cache_mb(), motor_moe.PROYECTOS_MAX_MB)   # sin ajuste, el de siempre
+            self.assertEqual(motor_moe.Motor(ajustes=lambda: {"cache_gb": "nada"}).tope_cache_mb(), motor_moe.PROYECTOS_MAX_MB)
+            proyectos = motor_moe.Motor(ajustes=lambda: {"cache_gb": 5, "cache_reserva_gb": 20}).estado()["proyectos"]
+            self.assertEqual((proyectos["tope_mb"], proyectos["reserva_mb"]), (5000.0, 20000.0))
+            self.assertIn("libre_mb", proyectos)
+
     def test_mtp_reserva_vram(self):
         c = motor_moe.calientes_para
         self.assertLess(c(6100, 16384, mtp=True), c(6100, 16384))
@@ -503,6 +531,35 @@ class DePuntaAPunta(unittest.TestCase):
             self.assertEqual(self.motor.olvidar_proyectos(), 1)
             self.assertEqual(os.listdir(d), [])
 
+    def _pregunta_con_proyecto(self):
+        proyecto = {"role": "user", "content": "### Archivo: a.py\n" + "x = 1\n" * 4000}
+        conversacion = [{"role": "system", "content": "tutor"}, proyecto, {"role": "user", "content": "¿qué hace?"}]
+        return list(self.ia.chat_eventos(conversacion, motor_moe.NOMBRE, think=False))
+
+    def test_cache_apagado_no_guarda_ni_restaura(self):
+        """ Con el tope en 0 el prefijo se lee con la petición: nada se restaura ni se escribe en disco """
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
+            ServidorFalso.carpeta = d
+            open(os.path.join(d, "otro.bin"), "wb").write(b"x")            # un estado viejo cualquiera
+            self.motor.ajustes = lambda: {"cache_gb": 0}
+            eventos = self._pregunta_con_proyecto()
+            self.assertEqual("".join(e["v"] for e in eventos if e["t"] == "texto"), "Hola Prig")
+            self.assertEqual([p["_ruta"] for p in ServidorFalso.pedidos], ["/v1/chat/completions"])
+            self.assertEqual(os.listdir(d), ["otro.bin"])                    # no se escribió nada nuevo
+
+    def test_estado_que_no_cabe_no_se_guarda(self):
+        """ Un estado más grande que el tope entero no se escribe (se borraría enseguida al podar) """
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
+            ServidorFalso.carpeta = d
+            self.motor.ajustes = lambda: {"cache_gb": 0.05}                  # 50 MB: menos que la parte fija
+            self._pregunta_con_proyecto()
+            rutas = [p["_ruta"] for p in ServidorFalso.pedidos]
+            self.assertIn("/completion", rutas)
+            self.assertNotIn("/slots/0?action=save", rutas)
+            self.assertEqual(os.listdir(d), [])
+            self.assertFalse(self.motor.ultimo_proyecto["guardado"])
+            self.assertEqual(self.motor.ultimo_proyecto["motivo"], "no cabe en el caché")
+
     def test_el_proyecto_trae_su_lista_caliente(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(motor_moe, "CARPETA_PROYECTOS", d):
             ServidorFalso.carpeta = d
@@ -554,18 +611,35 @@ class Endpoints(unittest.TestCase):
         import app
         self.app = app
         cfg = mock.patch.dict(app.ai_engine.config, {"moe_contexto": 16384, "moe_hilos": 0, "moe_calientes": "auto",
-                                                     "moe_modo": "equilibrado", "moe_mtp": True, "moe_nucleo": "q8"})
+                                                     "moe_modo": "equilibrado", "moe_mtp": True, "moe_nucleo": "q8",
+                                                     "moe_cache_gb": 32, "moe_cache_reserva_gb": 20})
         cfg.start()
         self.addCleanup(cfg.stop)
         guardar = mock.patch.object(app.ai_engine, "_save_config", lambda: None)
         guardar.start()
         self.addCleanup(guardar.stop)
 
+    def test_ajustar_el_tope_del_cache(self):
+        """ El tope del caché se cambia desde el panel del motor y se aplica en el acto (docs/plan-texto-primero.md) """
+        podar = mock.Mock(return_value=0)
+        with mock.patch.object(motor_moe.Motor, "podar", podar):
+            e = self.app.recursos_moe_ajustar(self.app.MoeRequest(cache_gb=5))
+            self.assertEqual(e["ajustes"]["cache_gb"], 5)
+            self.assertEqual(podar.call_count, 1)
+            e = self.app.recursos_moe_ajustar(self.app.MoeRequest(cache_reserva_gb=30))
+            self.assertEqual(e["ajustes"]["cache_reserva_gb"], 30)
+            for malo in ({"cache_gb": -1}, {"cache_gb": 5000}, {"cache_reserva_gb": 2000}):
+                with self.assertRaises(self.app.HTTPException):
+                    self.app.recursos_moe_ajustar(self.app.MoeRequest(**malo))
+            self.app.recursos_moe_ajustar(self.app.MoeRequest(modo="exacto"))
+            self.assertEqual(podar.call_count, 2)                             # sin tocar el tope, no poda
+        self.assertIn("tope_mb", self.app.recursos_moe()["proyectos"])
+
     def test_estado_y_ajustes(self):
         e = self.app.recursos_moe()
         self.assertEqual(e["nombre"], motor_moe.NOMBRE)
         self.assertEqual(e["ajustes"], {"contexto": 16384, "hilos": 0, "calientes": "auto", "modo": "equilibrado", "mtp": True,
-                                        "nucleo": "q8"})
+                                        "nucleo": "q8", "cache_gb": 32, "cache_reserva_gb": 20})
         e = self.app.recursos_moe_ajustar(self.app.MoeRequest(contexto="999999", hilos=3, calientes="40"))
         self.assertEqual({k: e["ajustes"][k] for k in ("contexto", "hilos", "calientes")}, {"contexto": 262144, "hilos": 3, "calientes": 40})
         e = self.app.recursos_moe_ajustar(self.app.MoeRequest(contexto="auto"))

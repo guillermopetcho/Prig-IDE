@@ -393,12 +393,24 @@ class LLMDirectorAgentes:
             "}"
         )
 
+        # Extraer ventana contextual focalizada en la línea activa del cursor
+        lineas_todas = codigo_completo.splitlines() if codigo_completo else []
+        idx_c = max(0, min(len(lineas_todas) - 1, linea_cursor - 1)) if lineas_todas else -1
+        linea_texto_cursor = lineas_todas[idx_c].strip() if idx_c >= 0 else ""
+        ventana_inicio = max(0, idx_c - 4) if idx_c >= 0 else 0
+        ventana_fin = min(len(lineas_todas), idx_c + 5) if idx_c >= 0 else 0
+        snippet_focal = "\n".join(f"{i+1:4d}: {lineas_todas[i]}" for i in range(ventana_inicio, ventana_fin)) if lineas_todas else "(archivo vacío)"
+
         prompt_usuario = (
-            f"Archivo: {nombre_archivo} | Lenguaje: {lenguaje} | Línea activa: {linea_cursor}\n"
+            f"Archivo: {nombre_archivo} | Lenguaje: {lenguaje} | Línea activa del cursor: L{linea_cursor}\n"
+            f"Línea de edición activa L{linea_cursor}: '{linea_texto_cursor}'\n"
+            f"=== BLOQUE EN EDICIÓN ACTIVA (L{ventana_inicio+1} a L{ventana_fin}) ===\n"
+            f"{snippet_focal}\n\n"
             f"=== CÓDIGO COMPLETO DEL USUARIO ===\n"
             f"{codigo_para_prompt if codigo_para_prompt else '# Archivo recién abierto o sin contenido aún.'}\n"
             "===============================\n"
-            f"Aplica la lente [{lente_actual['nombre']}], razona paso a paso en 'pensamiento' sobre el código completo y emite tu JSON de evaluación:"
+            f"INSTRUCCIÓN OBLIGATORIA: Tu análisis, diálogo y consejo DEBEN estar directamente relacionados con la línea activa L{linea_cursor} ('{linea_texto_cursor}') o su bloque contenedor inmediato. No emitas mensajes genéricos desvinculados de esta línea. "
+            f"Aplica la lente [{lente_actual['nombre']}], razona paso a paso en 'pensamiento' y emite tu JSON de evaluación:"
         )
 
         modelo_efectivo = self._resolver_modelo_disponible(endpoint, modelo)
@@ -575,12 +587,24 @@ class LLMDirectorAgentes:
             "Responde ÚNICAMENTE un objeto JSON válido con claves: personaje, pensamiento, dialogo, posicion, consejo, flujo_ascii, flujo_grafico, inspeccion, metricas."
         )
 
+        # Extraer ventana contextual focalizada en la línea activa del cursor
+        lineas_todas = codigo_completo.splitlines() if codigo_completo else []
+        idx_c = max(0, min(len(lineas_todas) - 1, linea_cursor - 1)) if lineas_todas else -1
+        linea_texto_cursor = lineas_todas[idx_c].strip() if idx_c >= 0 else ""
+        ventana_inicio = max(0, idx_c - 4) if idx_c >= 0 else 0
+        ventana_fin = min(len(lineas_todas), idx_c + 5) if idx_c >= 0 else 0
+        snippet_focal = "\n".join(f"{i+1:4d}: {lineas_todas[i]}" for i in range(ventana_inicio, ventana_fin)) if lineas_todas else "(archivo vacío)"
+
         prompt_usuario = (
-            f"Archivo: {nombre_archivo} | Lenguaje: {lenguaje} | Línea activa: {linea_cursor}\n"
+            f"Archivo: {nombre_archivo} | Lenguaje: {lenguaje} | Línea activa del cursor: L{linea_cursor}\n"
+            f"Línea de edición activa L{linea_cursor}: '{linea_texto_cursor}'\n"
+            f"=== BLOQUE EN EDICIÓN ACTIVA (L{ventana_inicio+1} a L{ventana_fin}) ===\n"
+            f"{snippet_focal}\n\n"
             f"=== CÓDIGO COMPLETO DEL USUARIO ===\n"
             f"{codigo_para_prompt if codigo_para_prompt else '# Archivo recién abierto.'}\n"
             "===============================\n"
-            f"Aplica la lente [{lente_actual['nombre']}], razona paso a paso sobre el código completo y emite tu JSON:"
+            f"INSTRUCCIÓN OBLIGATORIA: Tu análisis, diálogo y consejo DEBEN enfocarse en la línea activa L{linea_cursor} ('{linea_texto_cursor}') o su bloque contenedor inmediato. Prohibido dar consejos que no tengan relación con esta línea. "
+            f"Aplica la lente [{lente_actual['nombre']}], razona paso a paso sobre este bloque y emite tu JSON:"
         )
 
         modelo_efectivo = self._resolver_modelo_disponible(endpoint, modelo)
@@ -663,196 +687,177 @@ class LLMDirectorAgentes:
         lente_actual: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
-        Generador procedural ultra-diverso con descomposición sintáctica AST en vivo
-        y catálogo combinatorio de 60+ variantes técnicas con control de duplicados LRU.
+        Generador procedural sintácticamente fundamentado en el AST y en la línea real del cursor.
+        Inspecciona el constructo concreto (imports, funciones, clases, bucles, condiciones, excepciones, retornos)
+        para emitir diálogos, consejos, CFG y coordenadas telemétricas 100% coherentes.
         """
         if not lente_actual:
             lente_actual = self._obtener_siguiente_lente()
 
-        # 1. Extracción de entidades sintácticas reales mediante Analizador AST profundo
         archivo_nombre = contexto_editor.get("archivo_actual", "main.py")
+        lenguaje = contexto_editor.get("lenguaje", "python")
+        linea_cursor = int(contexto_editor.get("linea_cursor", 1) or 1)
+        total_lineas_ctx = int(contexto_editor.get("total_lineas", 1) or 1)
+
+        codigo_lineas = codigo.splitlines() if codigo else []
+        total_l = max(1, len(codigo_lineas), total_lineas_ctx)
+        idx_cursor = max(0, min(len(codigo_lineas) - 1, linea_cursor - 1)) if codigo_lineas else -1
+        linea_codigo = codigo_lineas[idx_cursor].strip() if idx_cursor >= 0 else ""
+
+        # 1. Extracción de entidades sintácticas reales mediante Analizador AST profundo
         analisis_ast = AnalizadorSintacticoAST.analizar_codigo(archivo_nombre, codigo, lenguaje)
         simbolos_ast = analisis_ast.get("simbolos", [])
         pasos_cfg_reales = analisis_ast.get("pasos_cfg", [])
         complejidad_ast = analisis_ast.get("complejidad_max", 1)
         calidad_score = analisis_ast.get("calidad_score", 95)
 
-        funciones = [s["nombre"] for s in simbolos_ast if s["tipo"] == "funcion"]
-        clases = [s["nombre"] for s in simbolos_ast if s["tipo"] == "clase"]
+        funciones = [s for s in simbolos_ast if s.get("tipo") in ("funcion", "metodo")]
+        clases = [s for s in simbolos_ast if s.get("tipo") == "clase"]
 
-        target_nombre = funciones[0] if funciones else (clases[0] if clases else "modulo_principal")
-        linea_target = simbolos_ast[0]["linea_inicio"] if simbolos_ast else linea_activa
-        lente_id = lente_actual["id"]
-
-        variantes_por_lente = {
-            "ARQUITECTURA_Y_PATRONES": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Componente '{target_nombre}' identificado en L{linea_target}. "
-                    f"Para preservar el principio de Responsabilidad Única (SRP), separa la orquestación del procesamiento de datos en capas independientes.",
-                    f"Desacoplamiento Modular en '{target_nombre}'",
-                    "Aislar la lógica de cómputo en un adaptador o servicio dedicado facilita el testing unitario y reduce el acoplamiento global.",
-                    f"class {target_nombre.title()}Service:\n    def execute(self, payload): ...",
-                    [
-                        f"[ORQUESTADOR: {target_nombre}]",
-                        "   ├──► [CAPA ADAPTADOR]",
-                        "   └──► [NÚCLEO DE NEGOCIO]",
-                        "   │",
-                        "   ▼",
-                        "[RESPUESTA DETERMINISTA]"
-                    ]
-                ),
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Estructura modular de {target_nombre} examinada. "
-                    f"Favorece la inyección de dependencias para evitar instanciaciones duras en el cuerpo del método.",
-                    f"Inyección de Dependencias en '{target_nombre}'",
-                    "Inyectar interfaces o clientes en lugar de crearlos internamente permite mockear dependencias con facilidad.",
-                    f"def {target_nombre}(client_dep, config): ...",
-                    [
-                        "[FACTORY / INJECTOR]",
-                        "   │",
-                        f"   ├──► [DEP MOCK / LIVE]",
-                        "   ▼",
-                        f"[MÉTODO: {target_nombre}]",
-                        "   ▼",
-                        "[EXECUTION COMPLETED]"
-                    ]
-                )
-            ],
-            "ALGORITMOS_Y_COMPLEJIDAD": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Búsqueda de eficiencia en la ruta de '{target_nombre}'. "
-                    f"Complejidad asintótica estimada. Si iteras colecciones repetidamente, transforma búsquedas lineales O(N) en indexaciones Set/Dict O(1).",
-                    "Indexación Asintótica O(N) ➔ O(1)",
-                    "Pre-indexar elementos en una tabla hash evita el producto cartesiano O(N²) en comparaciones iterativas.",
-                    "lookup_table = {item.id: item for item in items}",
-                    [
-                        "[COLECCIÓN CRUDA]",
-                        "   │",
-                        "   ▼",
-                        "[HASH INDEX (O(1))]",
-                        "   ├──► [QUERY INSTANTÁNEA]",
-                        "   └──► [EMISIÓN SIN LATENCIA]"
-                    ]
-                ),
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Flujo de procesamiento evaluado. "
-                    f"Reemplaza la acumulación masiva de listas en memoria por iteradores generadores (yield) para procesar datos en streaming O(1) de memoria.",
-                    "Procesamiento por Generadores (Yield)",
-                    "El streaming de datos bajo demanda elimina picos de consumo de RAM al procesar datasets o archivos extensos.",
-                    "def stream_records(source):\n    for row in source:\n        yield parse(row)",
-                    [
-                        "[DATA STREAM SOURCE]",
-                        "   │",
-                        "   ▼ (yield)",
-                        "[STREAM GENERATOR O(1) RAM]",
-                        "   │",
-                        "   ▼",
-                        "[CONSUMER PIPELINE]"
-                    ]
-                )
-            ],
-            "SEGURIDAD_Y_RESILIENCIA": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Frontera de validación para '{target_nombre}' en L{linea_target}. "
-                    f"Aplica cláusulas de guarda (Early Return) para rechazar parámetros inválidos antes de ejecutar transformaciones costosas.",
-                    f"Cláusula de Guarda Temprana en '{target_nombre}'",
-                    "Validar inmediatamente al entrar a la función reduce la anidación excesiva de bloques if/else y previene excepciones de tipo NoneType.",
-                    f"if not {asignaciones[0] if asignaciones else 'payload'}:\n    return None",
-                    [
-                        f"[ENTRY: {target_nombre}]",
-                        "   │",
-                        "   ├── [INVALID?] ──► [RETURN EARLY]",
-                        "   ▼",
-                        "[LÓGICA PRINCIPAL LIMPIA]"
-                    ]
-                ),
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Estrategia de manejo de excepciones en {lenguaje}. "
-                    f"Evita capturar bloques 'except Exception' genéricos; captura excepciones canónicas específicas y registra el contexto del fallo.",
-                    "Manejo Granular de Excepciones",
-                    "Los bloques catch genéricos ocultan bugs lógicos críticos. Captura solo excepciones conocidas como KeyError, ValueError o TimeoutError.",
-                    "try:\n    perform_op()\nexcept (KeyError, ValueError) as err:\n    logger.warning(f'Error de datos: {err}')",
-                    [
-                        "[OPERACIÓN CRÍTICA]",
-                        "   │",
-                        "   ├──► [ERROR CONOCIDO] ──► [LOG + FALLBACK]",
-                        "   ▼",
-                        "[ESTADO RESILIENTE]"
-                    ]
-                )
-            ],
-            "CONCURRENCIA_Y_FLUJO": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Concurrencia y pipeline de ejecución no bloqueante. "
-                    f"Asegura que las operaciones de I/O o llamadas a red no congelen el event loop principal de la aplicación.",
-                    "Orquestación Asíncrona sin Bloqueo",
-                    "Envuelve llamadas pesadas en ejecutores asíncronos o hilos worker para mantener la UI y el socket 100% responsivos.",
-                    "results = await asyncio.gather(*[fetch(u) for u in urls])",
-                    [
-                        "[EVENT LOOP DISPATCH]",
-                        "   ├──► [TASK A (ASYNC)]",
-                        "   ├──► [TASK B (ASYNC)]",
-                        "   ▼",
-                        "[GATHER ALL RESULTS]"
-                    ]
-                )
-            ],
-            "INVARIANTES_Y_TIPADO": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Pureza funcional e inmutabilidad en '{target_nombre}'. "
-                    f"Evita mutar argumentos de entrada por referencia; devuelve nuevas instancias transformadas para asegurar reproducibilidad determinista.",
-                    f"Inmutabilidad de Datos en '{target_nombre}'",
-                    "Las funciones sin efectos secundarios son triviales de paralelizar y previenen bugs elusivos causados por referencias compartidas.",
-                    f"return {{**state, 'updated_key': new_value}}",
-                    [
-                        "[ESTADO INICIAL]",
-                        "   │",
-                        "   ▼ (pure transform)",
-                        "[NUEVO ESTADO INMUTABLE]",
-                        "   │",
-                        "   ▼",
-                        "[PREVIENE RACE CONDITIONS]"
-                    ]
-                )
-            ],
-            "CLEAN_CODE_Y_EXPRESIVIDAD": [
-                (
-                    f"[{lente_actual['nombre'].upper()}]: Expresividad semántica y densidad cognitiva en {lenguaje}. "
-                    f"Nombres descriptivos y extracción de constantes mágicas eliminan la ambigüedad y convierten el código en su propia documentación.",
-                    f"Refactorización Expresiva de '{target_nombre}'",
-                    "Reemplaza números y cadenas literales repetidas por constantes semánticas con nombres que declaren su propósito de negocio.",
-                    "MAX_RETRY_ATTEMPTS = 3\nTIMEOUT_SECONDS = 5.0",
-                    [
-                        "[LITERALES MÁGICOS]",
-                        "   │",
-                        "   ▼ (refactor)",
-                        "[CONSTANTES SEMÁNTICAS]",
-                        "   │",
-                        "   ▼",
-                        "[AUTO-DOCUMENTADO]"
-                    ]
-                )
-            ]
-        }
-
-        # Seleccionar variante con filtro de hash para garantizar 0 repetición
-        opciones = variantes_por_lente.get(lente_id, variantes_por_lente["ARQUITECTURA_Y_PATRONES"])
-        
-        # Buscar una opción que no esté en el buffer reciente
-        seleccion = None
-        for cand in opciones:
-            cand_hash = hash(cand[1])
-            if cand_hash not in self._buffer_hashes_recientes:
-                seleccion = cand
-                self._buffer_hashes_recientes.add(cand_hash)
-                if len(self._buffer_hashes_recientes) > 30:
-                    self._buffer_hashes_recientes.pop()
+        # 2. Localizar símbolo contenedor o más próximo a la línea de edición activa
+        simbolo_activo = None
+        for s in simbolos_ast:
+            if s.get("linea_inicio", 1) <= linea_cursor <= s.get("linea_fin", 1):
+                simbolo_activo = s
                 break
 
-        if not seleccion:
-            seleccion = random.choice(opciones)
+        if not simbolo_activo and simbolos_ast:
+            simbolo_activo = min(simbolos_ast, key=lambda s: abs(s.get("linea_inicio", 1) - linea_cursor))
 
-        dialogo_txt, titulo_consejo, detalle_consejo, sugerencia_cod, flujo_asc = seleccion
+        if simbolo_activo:
+            target_nombre = simbolo_activo["nombre"]
+            linea_target = linea_cursor
+            linea_fin_target = min(total_l, max(linea_cursor + 2, simbolo_activo.get("linea_fin", linea_cursor + 2)))
+        else:
+            target_nombre = os.path.basename(archivo_nombre).split(".")[0] or "modulo"
+            linea_target = max(1, min(total_l, linea_cursor))
+            linea_fin_target = min(total_l, linea_target + 3)
+
+        # 3. Clasificación semántica del constructo en la línea activa y entorno
+        linea_raw = linea_codigo.lower()
+        es_import = linea_raw.startswith("import ") or linea_raw.startswith("from ") or "require(" in linea_raw or "#include" in linea_raw
+        es_funcion = linea_raw.startswith("def ") or linea_raw.startswith("async def ") or "function " in linea_raw or "fn " in linea_raw or "=>" in linea_raw
+        es_clase = linea_raw.startswith("class ") or linea_raw.startswith("struct ") or linea_raw.startswith("interface ")
+        es_bucle = linea_raw.startswith("for ") or linea_raw.startswith("while ") or ".foreach" in linea_raw or ".map(" in linea_raw
+        es_condicional = linea_raw.startswith("if ") or linea_raw.startswith("elif ") or linea_raw.startswith("else:") or linea_raw.startswith("switch")
+        es_excepcion = linea_raw.startswith("try:") or linea_raw.startswith("except") or linea_raw.startswith("catch") or linea_raw.startswith("finally") or linea_raw.startswith("raise ") or linea_raw.startswith("throw ")
+        es_retorno = linea_raw.startswith("return") or linea_raw.startswith("yield")
+
+        lente_nom = lente_actual.get("nombre", "ANÁLISIS").upper()
+
+        if es_import:
+            dialogo_txt = f"[{lente_nom}]: Declaración de dependencias en L{linea_target}. Desacopla módulos para evitar importaciones circulares y favorecer testing modular."
+            titulo_consejo = "Gestión Modular de Dependencias"
+            detalle_consejo = "Agrupa módulos estándar, de terceros y locales de forma separada. Evita importar con comodín (*) para mantener la visibilidad explícita."
+            sugerencia_cod = "from typing import Optional, List, Dict"
+            flujo_asc = [
+                "[MÓDULOS EXTERNOS]",
+                "   │",
+                "   ▼",
+                "[IMPORTS EXPLÍCITOS]",
+                "   │",
+                "   ▼",
+                "[NÚCLEO DESACOPLADO]"
+            ]
+        elif es_bucle:
+            dialogo_txt = f"[{lente_nom}]: Bucle de procesamiento en L{linea_target}. Optimiza la complejidad temporal asintótica O(N) pre-indexando búsquedas en estructuras Hash."
+            titulo_consejo = "Optimización Asintótica O(N) ➔ O(1)"
+            detalle_consejo = "Evita búsquedas lineales o conversiones costosas dentro de cada ciclo del bucle. Pre-computa índices en diccionarios o sets."
+            sugerencia_cod = "lookup_table = {item.id: item for item in items}"
+            flujo_asc = [
+                "[COLECCIÓN ORIGEN]",
+                "   │",
+                "   ▼",
+                "[PRE-INDEX HASH (O(1))]",
+                "   │",
+                "   ▼",
+                "[ITERACIÓN SIN LATENCIA]"
+            ]
+        elif es_condicional:
+            dialogo_txt = f"[{lente_nom}]: Ramificación condicional en L{linea_target}. Aplica cláusulas de guarda tempranas (Early Return) para reducir la indentación anidada."
+            titulo_consejo = "Cláusula de Guarda Temprana"
+            detalle_consejo = "Validar y rechazar estados no válidos al inicio del bloque simplifica la ruta principal del código y previene errores NoneType."
+            sugerencia_cod = "if not parametros_validos:\n    return None"
+            flujo_asc = [
+                f"[ENTRADA: L{linea_target}]",
+                "   │",
+                "   ├── [INVÁLIDO?] ──► [RETURN]",
+                "   ▼",
+                "[FLUJO PRINCIPAL LIMPIO]"
+            ]
+        elif es_excepcion:
+            dialogo_txt = f"[{lente_nom}]: Control de fallos en L{linea_target}. Captura excepciones canónicas específicas en lugar de bloques genéricos que oculten bugs lógicos."
+            titulo_consejo = "Manejo Granular y Resiliente de Errores"
+            detalle_consejo = "Los bloques 'except Exception' genéricos pueden ocultar errores tipográficos o interrupciones de sistema. Captura únicamente excepciones esperadas."
+            sugerencia_cod = "except (ValueError, KeyError) as err:\n    logger.warning(f'Error controlado: {err}')"
+            flujo_asc = [
+                "[OPERACIÓN CRÍTICA]",
+                "   │",
+                "   ├──► [EXCEPCIÓN ESPERADA] ──► [FALLBACK]",
+                "   ▼",
+                "[ESTADO RESILIENTE]"
+            ]
+        elif es_funcion:
+            dialogo_txt = f"[{lente_nom}]: Firma de '{target_nombre}' en L{linea_target}. Define contratos de entrada explícitos y anotaciones de tipo para verificación estática."
+            titulo_consejo = f"Contratos de Tipo en '{target_nombre}'"
+            detalle_consejo = f"Documentar parámetros y tipos de retorno en '{target_nombre}' previene desajustes de interfaces y asiste al autocompletado del editor."
+            sugerencia_cod = f"def {target_nombre}(payload: dict) -> bool:"
+            flujo_asc = [
+                f"[CONTRATO: {target_nombre}]",
+                "   │",
+                "   ▼",
+                "[VALIDACIÓN TIPADA]",
+                "   │",
+                "   ▼",
+                "[EJECUCIÓN DETERMINISTA]"
+            ]
+        elif es_clase:
+            dialogo_txt = f"[{lente_nom}]: Definición de clase '{target_nombre}' en L{linea_target}. Asegura alta cohesión interna y encapsulación de estado."
+            titulo_consejo = f"Cohesión y Responsabilidad Única en '{target_nombre}'"
+            detalle_consejo = f"Mantén los métodos de '{target_nombre}' centrados en su dominio específico, delegando responsabilidades colaterales en colaboradores dedicados."
+            sugerencia_cod = f"class {target_nombre.title()}:\n    def __init__(self, config): ..."
+            flujo_asc = [
+                f"[CLASE: {target_nombre}]",
+                "   ├──► [ESTADO ENCAPSULADO]",
+                "   └──► [MÉTODOS COHESIVOS]",
+                "   ▼",
+                "[INSTANCIA ROBUSTA]"
+            ]
+        elif es_retorno:
+            dialogo_txt = f"[{lente_nom}]: Emisión de salida en L{linea_target}. Preserva la inmutabilidad retornando copias o nuevos estados deterministas."
+            titulo_consejo = "Inmutabilidad de Salida y Determinismo"
+            detalle_consejo = "Evita mutar directamente referencias compartidas recibidas como parámetro. Retornar nuevas instancias evita efectos secundarios impredecibles."
+            sugerencia_cod = "return {**estado_previo, 'actualizado': True}"
+            flujo_asc = [
+                "[ESTADO INICIAL]",
+                "   │",
+                "   ▼",
+                "[TRANSFORMACIÓN PURA]",
+                "   │",
+                "   ▼",
+                "[ESTADO INMUTABLE]"
+            ]
+        else:
+            # Línea general / asignación / cómputo: adaptada a la lente activa
+            lente_id = lente_actual.get("id", "ARQUITECTURA_Y_PATRONES")
+            if lente_id == "ALGORITMOS_Y_COMPLEJIDAD":
+                dialogo_txt = f"[{lente_nom}]: Línea de cómputo L{linea_target} en '{target_nombre}'. Evalúa el consumo de memoria evitando clonaciones innecesarias de buffers."
+                titulo_consejo = f"Eficiencia de Memoria en L{linea_target}"
+                detalle_consejo = "Reutiliza referencias o usa iteradores generadores cuando transformes secuencias extensas para mantener el espacio auxiliar en O(1)."
+                sugerencia_cod = f"# Optimizar cómputo en {target_nombre}"
+                flujo_asc = ["[FLUJO DE DATOS]", "   │", "   ▼", "[BUFFER EFICIENTE O(1)]", "   │", "   ▼", "[RESULTADO]"]
+            elif lente_id == "SEGURIDAD_Y_RESILIENCIA":
+                dialogo_txt = f"[{lente_nom}]: Inspección defensiva en L{linea_target}. Comprueba invariantes de datos y neutraliza entradas no saneadas."
+                titulo_consejo = f"Defensa en Profundidad en L{linea_target}"
+                detalle_consejo = "Asegura que los valores numéricos y cadenas cumplan con los límites esperados antes de utilizarlos en operaciones críticas."
+                sugerencia_cod = "assert valor is not None, 'Valor requerido'"
+                flujo_asc = ["[ENTRADA]", "   │", "   ▼", "[VALIDADOR INVARIANTES]", "   │", "   ▼", "[OPERACIÓN SEGURA]"]
+            else:
+                dialogo_txt = f"[{lente_nom}]: Línea activa L{linea_target} en '{target_nombre}'. Nombres descriptivos y separación de constantes clarifican la intención del código."
+                titulo_consejo = f"Claridad Semántica en '{target_nombre}'"
+                detalle_consejo = "Extraer literales repetidos a constantes semánticas con nombre explicativo convierte el código en su propia documentación."
+                sugerencia_cod = "MAX_REINTENTOS = 3"
+                flujo_asc = ["[LITERALES]", "   │", "   ▼", "[CONSTANTES SEMÁNTICAS]", "   │", "   ▼", "[CÓDIGO AUTO-EXPLICADO]"]
 
         # Registrar título en historial anti-repetición
         self._ultimos_titulos.append(titulo_consejo)
@@ -860,27 +865,24 @@ class LLMDirectorAgentes:
             self._ultimos_titulos.pop(0)
 
         consejo = {
-            "tipo": lente_actual["tipo_relacion"],
-            "categoria": lente_actual["categoria"],
+            "tipo": lente_actual.get("tipo_relacion", "buenas_practicas"),
+            "categoria": lente_actual.get("categoria", "Clean Code"),
             "titulo": titulo_consejo,
             "detalle": detalle_consejo,
-            "linea_inicio": max(1, linea_target - 1),
-            "linea_fin": min(max(num_lineas, 1), linea_target + 4),
+            "linea_inicio": linea_target,
+            "linea_fin": linea_fin_target,
             "sugerencia_codigo": sugerencia_cod
         }
 
-        total_l = max(1, contexto_editor.get("total_lineas", 20))
         y_foco = min(0.85, max(0.15, (linea_target / total_l) * 0.7 + 0.15))
 
-        # Construcción de la secuencia animada de movimiento de gráficos (AST o Procedural)
+        # Pasos gráficos de movimiento alineados con el código
         if pasos_cfg_reales and len(pasos_cfg_reales) >= 2:
             pasos_graficos = pasos_cfg_reales
         else:
-            l_ini = max(1, linea_target)
-            l_mid1 = min(total_l, l_ini + 1)
-            l_mid2 = min(total_l, l_ini + 3)
-            l_fin = min(total_l, l_ini + 5)
-
+            l_ini = linea_target
+            l_mid = min(total_l, l_ini + 1)
+            l_fin = min(total_l, l_ini + 3)
             pasos_graficos = [
                 {
                     "paso": 1,
@@ -888,51 +890,25 @@ class LLMDirectorAgentes:
                     "tipo": "entrada",
                     "icono": "📥",
                     "linea_inicio": l_ini,
-                    "linea_fin": l_mid1,
+                    "linea_fin": l_mid,
                     "x_foco": 0.35,
-                    "y_foco": round(min(0.85, max(0.15, (l_ini / total_l) * 0.7 + 0.15)), 2),
+                    "y_foco": round(y_foco, 2),
                     "posicion_agente": {"x_ratio": 0.88, "y_ratio": 0.88},
-                    "explicacion": f"Invocación de '{target_nombre}' con validación de contrato de entrada.",
-                    "sugerencia": f"def {target_nombre}(...)"
+                    "explicacion": f"Inspección de '{target_nombre}' en línea L{linea_target}.",
+                    "sugerencia": sugerencia_cod.splitlines()[0] if sugerencia_cod else ""
                 },
                 {
                     "paso": 2,
-                    "etiqueta": "Cláusula de Guarda",
-                    "tipo": "guarda",
-                    "icono": "🛡️",
-                    "linea_inicio": l_mid1,
-                    "linea_fin": l_mid2,
-                    "x_foco": 0.35,
-                    "y_foco": round(min(0.85, max(0.15, (l_mid1 / total_l) * 0.7 + 0.15)), 2),
-                    "posicion_agente": {"x_ratio": 0.85, "y_ratio": 0.81},
-                    "explicacion": "Verificación temprana de precondiciones y manejo de excepciones.",
-                    "sugerencia": "if not data: return"
-                },
-                {
-                    "paso": 3,
-                    "etiqueta": "Cómputo & Pipeline",
+                    "etiqueta": "Verificación & Contrato",
                     "tipo": "proceso",
                     "icono": "⚡",
-                    "linea_inicio": l_mid2,
+                    "linea_inicio": l_mid,
                     "linea_fin": l_fin,
                     "x_foco": 0.35,
-                    "y_foco": round(min(0.85, max(0.15, (l_mid2 / total_l) * 0.7 + 0.15)), 2),
-                    "posicion_agente": {"x_ratio": 0.82, "y_ratio": 0.74},
-                    "explicacion": "Transformación central de estructuras y aplicación de lógica de negocio.",
-                    "sugerencia": "lookup_set = set(items)"
-                },
-                {
-                    "paso": 4,
-                    "etiqueta": "Emisión & Retorno",
-                    "tipo": "salida",
-                    "icono": "📤",
-                    "linea_inicio": l_fin,
-                    "linea_fin": min(total_l, l_fin + 1),
-                    "x_foco": 0.35,
-                    "y_foco": round(min(0.85, max(0.15, (l_fin / total_l) * 0.7 + 0.15)), 2),
-                    "posicion_agente": {"x_ratio": 0.88, "y_ratio": 0.88},
-                    "explicacion": "Retorno determinista del estado inmutable procesado.",
-                    "sugerencia": "return result"
+                    "y_foco": round(min(0.85, max(0.15, (l_mid / total_l) * 0.7 + 0.15)), 2),
+                    "posicion_agente": {"x_ratio": 0.85, "y_ratio": 0.82},
+                    "explicacion": detalle_consejo,
+                    "sugerencia": sugerencia_cod
                 }
             ]
 
@@ -951,7 +927,7 @@ class LLMDirectorAgentes:
             "timestamp": time.time(),
             "decision": {
                 "personaje": tema_info["nombre_personaje"],
-                "pensamiento": f"Lente [{lente_actual['nombre']}]: Analizando símbolos '{target_nombre}' en L{linea_target} ({lenguaje}) sin repetir evaluaciones previas.",
+                "pensamiento": f"Lente [{lente_actual['nombre']}]: Analizando constructo '{target_nombre}' en L{linea_target} ({lenguaje}) enfocado en la edición activa.",
                 "dialogo": dialogo_txt,
                 "consejo": consejo,
                 "flujo_ascii": flujo_asc,
@@ -960,19 +936,19 @@ class LLMDirectorAgentes:
                 "inspeccion": {
                     "activo": True,
                     "linea": linea_target,
-                    "linea_fin": consejo["linea_fin"],
+                    "linea_fin": linea_fin_target,
                     "modo": "explicar",
-                    "tipo_relacion": lente_actual["tipo_relacion"],
+                    "tipo_relacion": lente_actual.get("tipo_relacion", "buenas_practicas"),
                     "x_foco": 0.35,
                     "y_foco": round(y_foco, 2)
                 },
                 "metricas": {
-                    "complejidad": "O(N)" if bucles else "O(1)",
-                    "calidad": 96 if (funciones or clases) else 91,
-                    "modularidad": 95 if funciones else 89,
-                    "mantenibilidad": 94 if try_blocks else 92
+                    "complejidad": "O(N)" if complejidad_ast > 2 else "O(1)",
+                    "calidad": calidad_score,
+                    "modularidad": 95 if funciones else 88,
+                    "mantenibilidad": 94 if len(simbolos_ast) > 2 else 91
                 },
-                "modulo_activo": contexto_editor.get("archivo_actual", "main.py"),
+                "modulo_activo": archivo_nombre,
                 "tono": random.choice(tema_info["tonos"])
             }
         }

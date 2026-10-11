@@ -1,0 +1,23 @@
+[
+ {
+  "id": "0b5f93c17f28·w1",
+  "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+  "prueba": "recorrido: negó un camino que existe",
+  "base": "0b5f93c17f28",
+  "modo": "general"
+ },
+ {
+  "id": "0b5f93c17f28·w2",
+  "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+  "prueba": "recorrido: negó un camino que existe",
+  "base": "0b5f93c17f28",
+  "modo": "general"
+ },
+ {
+  "id": "0b5f93c17f28·w3",
+  "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+  "prueba": "recorrido: negó un camino que existe",
+  "base": "0b5f93c17f28",
+  "modo": "general"
+ }
+]

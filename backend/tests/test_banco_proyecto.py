@@ -172,10 +172,15 @@ class TestIndice(BaseBanco):
         self.assertEqual(self.banco.cambios_desde(0), [])     # lo inicial no son «cambios»
 
     def test_sin_cambios_no_relee(self):
-        with mock.patch.object(bp.BancoProyecto, "_indexar_archivo") as indexar:
-            r = self.banco.sincronizar()
-        indexar.assert_not_called()
-        self.assertEqual(r["modificados"] + r["borrados"], 0)
+        # Releer un archivo rehace sus símbolos y fragmentos (con ids nuevos): sin cambios quedan los mismos
+        def filas():
+            with self.banco.conectar() as c:
+                return ([tuple(f) for f in c.execute("SELECT rowid, ruta, sha FROM fragmentos ORDER BY rowid")],
+                        [tuple(f) for f in c.execute("SELECT rowid, ruta, nombre FROM simbolos ORDER BY rowid")])
+        antes = filas()
+        r = self.banco.sincronizar()
+        self.assertEqual(filas(), antes)
+        self.assertEqual(r["nuevos"] + r["modificados"] + r["borrados"], 0)
         self.assertEqual(r["version"], self.r0["version"])
 
     def test_simbolos_python(self):
@@ -258,6 +263,19 @@ class TestCambios(BaseBanco):
         # Reescribirla la da por revisada
         self.banco.anotar("definicion", "experto caliente", "Experto en la GPU (actualizado).", ["motor.py"])
         self.assertEqual({k["titulo"]: k["revisar"] for k in self.banco.listar_conocimiento()}["experto caliente"], 0)
+
+    def test_se_marca_la_nota_que_nombra_un_simbolo_cambiado_aunque_sea_de_otro_archivo(self):
+        # E9b (docs/estudio-banco.md): por archivo, una nota que dependía de la función cambiada desde otro
+        # archivo no se marcaba. Las palabras comunes en prosa no cuentan: solo con forma de código
+        self.banco.anotar("decision", "usa el cálculo", "El reparto en util.py usa calientes_para para decidir.", ["util.py"])
+        self.banco.anotar("nota", "prosa", "Aquí se habla del estado y del modo de las cosas.", ["util.py"])
+        self.banco.anotar("nota", "ajena", "Nada que ver con el motor.", ["web/ayuda.js"])
+        escribir(self.raiz, "motor.py", MOTOR.replace("// 68", "// 70"))   # cambia solo calientes_para
+        self.banco.sincronizar()
+        estado = {k["titulo"]: k["revisar"] for k in self.banco.listar_conocimiento()}
+        self.assertGreater(estado["usa el cálculo"], 0)
+        self.assertEqual(estado["prosa"], 0)
+        self.assertEqual(estado["ajena"], 0)
 
 
 class TestBusquedaYContexto(BaseBanco):
@@ -507,6 +525,7 @@ class TestChat(unittest.TestCase):
             vistos["mensajes"] = mensajes
             vistos["herramientas"] = kw.get("herramientas")
             vistos["max_rondas"] = kw.get("max_rondas")
+            vistos["max_tokens"] = kw.get("max_tokens")
             yield {"t": "texto", "v": "Lo decide calientes_para en motor.py."}
         req = self.app.AIChatRequest(prompt="¿Qué hace calientes_para?", model="qwen2.5-coder:7b",
                                      eventos=True, banco=True)
@@ -527,9 +546,17 @@ class TestChat(unittest.TestCase):
         self.assertIn("BANCO DEL PROYECTO", sistema)
         self.assertIn("MAPA DEL PROYECTO", pregunta)
         self.assertIn("def calientes_para", pregunta)
+        self.assertIn("FACTS FROM THE PROJECT BANK", pregunta)                   # los hechos, también en modo general
+        # …después del paquete y pegados a la pregunta, como en el modo unidad (T7: arriba de todo se ignoraban)
+        self.assertLess(pregunta.index("def calientes_para"), pregunta.index("FACTS FROM THE PROJECT BANK"))
+        self.assertTrue(pregunta.rstrip().endswith("¿Qué hace calientes_para?"))
+        self.assertGreater(info["hechos_caracteres"], 0)
+        self.assertEqual(info["modo"], "general")
+        self.assertEqual(info["motivo"], "modo unidad no disponible: no es el motor MoE")
         self.assertIsNotNone(vistos["herramientas"])
         self.assertIsNotNone(vistos["herramientas"].banco)
-        self.assertEqual(vistos["max_rondas"], 16)
+        self.assertEqual(vistos["max_rondas"], self.app.RONDAS_BANCO)          # la última, sin herramientas
+        self.assertEqual(vistos["max_tokens"], self.app.TOPE_RESPUESTA_BANCO)  # una respuesta en bucle se corta
         self.assertIn("MEMORIA DE CONSULTA", sistema)
         self.assertIsNotNone(vistos["herramientas"].consola)
         self.assertIn("consola", {d["function"]["name"] for d in vistos["herramientas"].definiciones()})
@@ -553,13 +580,15 @@ class TestChat(unittest.TestCase):
             def mensajes(self, u):
                 return [{"role": "system", "content": "LECTOR"}, {"role": "user", "content": "UNIDAD " + u["nombre"]}]
 
-            def pregunta_con_contexto(self, u, texto):
+            def pregunta_con_contexto(self, u, texto, hechos=False):
+                vistos["hechos"] = hechos
                 return "CONTEXTO\n\n" + texto
         unidad = {"orden": 3, "nombre": "nucleo", "cuota": 0.8, "lector": LectorFalso(), "datos": {"nombre": "nucleo"}}
         req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
         with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
                 mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools"]), \
-                mock.patch.object(self.app, "_unidad_para", lambda *a: unidad):
+                mock.patch.object(self.app, "_unidad_para", lambda *a: (unidad, "lectura guardada de la unidad")), \
+                mock.patch.object(self.app.memoria_consulta, "hechos_de_la_pregunta") as hechos_generales:
             res = self.app.ai_chat(req)
             import asyncio
 
@@ -567,12 +596,205 @@ class TestChat(unittest.TestCase):
                 return [c async for c in res.body_iterator]
             eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
                                                        for c in asyncio.run(leer())).splitlines() if x.strip()]
+        hechos_generales.assert_not_called()                 # en modo unidad los pide pregunta_con_contexto
         self.assertEqual([m["content"] for m in vistos["mensajes"]], ["LECTOR", "UNIDAD nucleo", "CONTEXTO\n\n¿Cuánto vale X?"])
         import lectura_unidades
         self.assertEqual(vistos["herramientas"].solo, list(lectura_unidades.HERRAMIENTAS_UNIDAD))
+        self.assertTrue(vistos["hechos"])                    # con la pregunta van los hechos del banco
         info = [e["v"] for e in eventos if e["t"] == "banco"][0]
         self.assertEqual(info["modo"], "unidad")
         self.assertEqual(info["unidad"], "nucleo")
+        self.assertEqual(info["motivo"], "lectura guardada de la unidad")
+
+    # ---------------------------------------------------------------- texto primero (docs/plan-texto-primero.md)
+    def test_con_razonamiento_el_tope_deja_lugar_a_responder(self):
+        # Con «Pensar» el razonamiento cuenta en el tope: con 4096, B2 de E8 dio 2 respuestas vacías de 2
+        vistos = {}
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            vistos["max_tokens"] = kw.get("max_tokens")
+            yield {"t": "texto", "v": "Respuesta."}
+        for think, tope in ((False, self.app.TOPE_RESPUESTA_BANCO), (True, self.app.TOPE_RESPUESTA_BANCO_PENSANDO)):
+            req = self.app.AIChatRequest(prompt="¿Qué hace calientes_para?", model="qwen2.5-coder:7b", eventos=True,
+                                         banco=True, think=think)
+            with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                    mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools", "thinking"]):
+                res = self.app.ai_chat(req)
+                import asyncio
+
+                async def leer():
+                    return [c async for c in res.body_iterator]
+                asyncio.run(leer())
+            self.assertEqual(vistos["max_tokens"], tope)
+        self.assertGreaterEqual(self.app.TOPE_RESPUESTA_BANCO_PENSANDO, 3 * self.app.TOPE_RESPUESTA_BANCO)
+
+    def _guion(self, rondas, prompt="¿Qué hace calientes_para?", think=False, ejecutar=False):
+        """ ai_chat con un chat_eventos que devuelve, llamada a llamada, los eventos de `rondas` → (eventos, llamadas) """
+        llamadas = []
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            llamadas.append({"mensajes": list(mensajes), **kw})
+            for e in rondas[len(llamadas) - 1]:
+                yield e
+        req = self.app.AIChatRequest(prompt=prompt, model="qwen2.5-coder:7b", eventos=True, banco=True, think=think)
+        with mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos), \
+                mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools", "thinking"]), \
+                mock.patch.object(self.app.memoria_consulta, "sugiere_ejecutar", lambda b, p: ejecutar):
+            res = self.app.ai_chat(req)
+            import asyncio
+
+            async def leer():
+                return [c async for c in res.body_iterator]
+            eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
+                                                       for c in asyncio.run(leer())).splitlines() if x.strip()]
+        return eventos, llamadas
+
+    def test_razonamiento_sin_respuesta_se_responde_sin_razonar(self):
+        # B2 de E8 con «Pensar»: 16.384 tokens de razonamiento y la respuesta vacía
+        eventos, llamadas = self._guion([[{"t": "pensando", "v": "Veamos… " * 50}],
+                                          [{"t": "texto", "v": "Lo decide calientes_para."}]], think=True)
+        self.assertEqual([l["think"] for l in llamadas], [True, False])
+        self.assertEqual(llamadas[1]["max_tokens"], self.app.TOPE_RESPUESTA_BANCO)
+        self.assertIn(self.app.SIN_RAZONAR, [e.get("v") for e in eventos if e["t"] == "aviso"])
+        self.assertIn("Lo decide calientes_para.", [e.get("v") for e in eventos if e["t"] == "texto"])
+
+    def test_revision_sin_ejecutar_se_le_pide_ejecutarla(self):
+        # B2 de E8: con la pista sola, 1 de 3 la ejecutó; se le pide una vez, si respondió sin P.cargar
+        prompt = "Revisa `calientes_para` en `motor.py`. ¿Tiene algún error?"
+        eventos, llamadas = self._guion([[{"t": "texto", "v": "No tiene errores."}],
+                                          [{"t": "herramienta", "nombre": "consola", "argumentos": {"codigo": 'm = P.cargar("motor.py")'}},
+                                           {"t": "texto", "v": "Ejecutada: sí, pierde una línea."}]], prompt=prompt, ejecutar=True)
+        self.assertEqual(len(llamadas), 2)
+        self.assertEqual(llamadas[1]["mensajes"][-1]["content"], self.app.EJECUTALA)
+        self.assertEqual(llamadas[1]["mensajes"][-2], {"role": "assistant", "content": "No tiene errores."})
+        # si ya la ejecutó, no se le pide
+        eventos, llamadas = self._guion([[{"t": "herramienta", "nombre": "consola", "argumentos": {"codigo": 'm = P.cargar("motor.py")'}},
+                                          {"t": "texto", "v": "Pierde una línea."}]], prompt=prompt, ejecutar=True)
+        self.assertEqual(len(llamadas), 1)
+        # y si no es una revisión de algo ejecutable, tampoco
+        eventos, llamadas = self._guion([[{"t": "texto", "v": "Respuesta."}]], ejecutar=False)
+        self.assertEqual(len(llamadas), 1)
+
+    def _charlar(self, req, unidad=None, motivo="lectura guardada de la unidad"):
+        """ ai_chat con un chat_eventos falso (y, si se da, la unidad que elegiría el enrutador) → (eventos, vistos) """
+        vistos = {}
+
+        def chat_eventos(mensajes, modelo, uso, **kw):
+            vistos["mensajes"] = mensajes
+            yield {"t": "texto", "v": "Respuesta."}
+        parches = [mock.patch.object(self.app.ai_engine, "chat_eventos", chat_eventos),
+                   mock.patch.object(self.app.ai_engine, "capacidades", lambda m: ["completion", "tools"])]
+        if unidad is not None:
+            parches.append(mock.patch.object(self.app, "_unidad_para", lambda *a: (unidad, motivo)))
+        for p in parches:
+            p.start()
+        try:
+            res = self.app.ai_chat(req)
+            import asyncio
+
+            async def leer():
+                return [c async for c in res.body_iterator]
+            eventos = [json.loads(x) for x in "".join((c.decode() if isinstance(c, bytes) else c)
+                                                       for c in asyncio.run(leer())).splitlines() if x.strip()]
+        finally:
+            for p in reversed(parches):
+                p.stop()
+        return eventos, vistos
+
+    def test_sin_nombres_de_codigo_no_hay_hechos(self):
+        req = self.app.AIChatRequest(prompt="¿Cómo está organizado el proyecto?", model="qwen2.5-coder:7b",
+                                     eventos=True, banco=True)
+        eventos, vistos = self._charlar(req)
+        self.assertNotIn("FACTS FROM THE PROJECT BANK", vistos["mensajes"][-1]["content"])
+        self.assertEqual([e["v"] for e in eventos if e["t"] == "banco"][0]["hechos_caracteres"], 0)
+
+    def _enrutar(self, req, eleccion):
+        """ _unidad_para con un lector falso que elige lo que se le diga """
+        class Lector:
+            def __init__(self, *a, **k):
+                self._unidades = {3: {"nombre": "nucleo"}}
+
+            def elegir_unidad(self, pregunta):
+                return dict(eleccion)
+        with mock.patch.object(self.app.lectura_unidades, "LectorUnidades", Lector):
+            return self.app._unidad_para(req, req.model, object())
+
+    def test_modo_del_banco_auto_general_y_unidad(self):
+        moe = "qwen3.6-35b-moe:prig"
+        leida = {"orden": 3, "nombre": "nucleo", "vigente": True, "cuota": 0.9}
+        sin_leer = {**leida, "vigente": False}
+        req = lambda **k: self.app.AIChatRequest(prompt="¿Cuánto vale X?", model=moe, eventos=True, banco=True, **k)
+        with mock.patch.dict(self.app.ai_engine.config, {"banco_modo": "auto"}):
+            u, motivo = self._enrutar(req(), leida)
+            self.assertEqual((u["orden"], motivo), (3, "lectura guardada de la unidad"))
+            self.assertEqual(self._enrutar(req(), sin_leer), (None, "«nucleo» no tiene lectura guardada: modo general"))
+            self.assertEqual(self._enrutar(req(banco_modo="general"), leida), (None, "forzado: modo general"))
+            u, motivo = self._enrutar(req(banco_modo="unidad"), sin_leer)
+            self.assertTrue(u["leer_antes"])
+            self.assertEqual(motivo, "forzado: «nucleo» no tiene lectura guardada; se lee ahora")
+            u, motivo = self._enrutar(req(), {"orden": None, "motivo": "repartida entre unidades (la mejor tiene 20 %)"})
+            self.assertIsNone(u)
+            self.assertIn("reparte su peso", motivo)
+            self.assertEqual(self._enrutar(req(think=True), leida), (None, "modo unidad no disponible: con razonamiento"))
+            self.assertEqual(self.app._unidad_para(req(), moe, None), (None, "sin banco"))
+        with mock.patch.dict(self.app.ai_engine.config, {"banco_modo": "general"}):      # el de la configuración
+            self.assertEqual(self._enrutar(req(), leida), (None, "forzado: modo general"))
+
+    def test_ajustes_del_modo(self):
+        with mock.patch.object(self.app.ai_engine, "_save_config", lambda: None), \
+                mock.patch.dict(self.app.ai_engine.config, {"banco_modo": "auto"}):
+            r = self.app.banco_ajustes(self.app.BancoAjustesRequest(modo="general"))
+            self.assertEqual(r["modo"], "general")
+            self.assertEqual(self.app.ai_engine.config["banco_modo"], "general")
+            self.assertEqual(self.app.banco_estado()["modo"], "general")
+            with self.assertRaises(self.app.HTTPException):
+                self.app.banco_ajustes(self.app.BancoAjustesRequest(modo="otro"))
+
+    def _unidad_sin_lectura(self, leer):
+        class LectorFalso:
+            def mensajes(self, u):
+                return [{"role": "system", "content": "LECTOR"}, {"role": "user", "content": "UNIDAD"}]
+
+            def pregunta_con_contexto(self, u, texto, hechos=False):
+                return texto
+
+            def leer(self, orden):
+                return leer(orden)
+        return {"orden": 3, "nombre": "nucleo", "cuota": 0.8, "lector": LectorFalso(), "datos": {"nombre": "nucleo"},
+                "leer_antes": True}
+
+    def test_unidad_sin_lectura_se_lee_antes(self):
+        leidas = []
+        unidad = self._unidad_sin_lectura(lambda orden: leidas.append(orden) or {"tokens": 1234, "segundos": 30.0})
+        req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
+        with mock.patch.dict(self.app.ai_engine.config, {"moe_cache_gb": 10}):
+            eventos, _ = self._charlar(req, unidad, "forzado: «nucleo» no tiene lectura guardada; se lee ahora")
+        self.assertEqual(leidas, [3])
+        tipos = [e["t"] for e in eventos]
+        avisos = [e["v"] for e in eventos if e["t"] == "aviso"]
+        self.assertTrue(avisos[0].startswith("Leyendo «nucleo»"))
+        self.assertIn("1.234 tokens", avisos[1])
+        self.assertLess(tipos.index("aviso"), tipos.index("texto"))           # antes de responder
+
+    def test_cache_apagado_no_lee_antes(self):
+        leidas = []
+        unidad = self._unidad_sin_lectura(lambda orden: leidas.append(orden) or {})
+        req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
+        with mock.patch.dict(self.app.ai_engine.config, {"moe_cache_gb": 0}):
+            eventos, _ = self._charlar(req, unidad)
+        self.assertEqual(leidas, [])                                          # leería el prefijo dos veces
+        self.assertTrue(any("el caché está apagado" in e["v"] for e in eventos if e["t"] == "aviso"))
+        self.assertIn("Respuesta.", [e.get("v") for e in eventos if e["t"] == "texto"])
+
+    def test_si_leer_falla_responde_igual(self):
+        def falla(orden):
+            raise RuntimeError("sin motor")
+        unidad = self._unidad_sin_lectura(falla)
+        req = self.app.AIChatRequest(prompt="¿Cuánto vale X?", model="qwen3.6-35b-moe:prig", eventos=True, banco=True)
+        with mock.patch.dict(self.app.ai_engine.config, {"moe_cache_gb": 10}):
+            eventos, vistos = self._charlar(req, unidad)
+        self.assertTrue(any("No se pudo leer antes (RuntimeError)" in e["v"] for e in eventos if e["t"] == "aviso"))
+        self.assertIn("mensajes", vistos)                                     # la respuesta siguió
 
     def test_codigo_escrito_se_ejecuta(self):
         """ Si el modelo escribe la consulta P.… como respuesta, el chat la ejecuta y le pide que
@@ -698,3 +920,54 @@ class TestEndpointPorSufijo(unittest.TestCase):
         self.assertEqual(bp.endpoint_de("/items", expuestas), "/items")                 # exacta
         self.assertIsNone(bp.endpoint_de("/api/v1/myitems", expuestas))                # límite de segmento
         self.assertIsNone(bp.endpoint_de("/otra", expuestas))                          # «/» no atrapa todo
+
+
+class TestBordesDelMotor(unittest.TestCase):
+    """ Lo que encontró la revisión del motor de Rust (docs/plan-banco-rust.md, sección 13) """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="prig_banco_bordes_")
+        self.raiz = os.path.join(self.tmp, "proyecto")
+        escribir(self.raiz, ".pre-commit-config.yaml", "repos: []\n")
+        escribir(self.raiz, "a.py", "def f():\n    return 1\n")
+        # Con git el listado incluye los archivos ocultos (sin git, el listado por disco los salta)
+        import subprocess
+        subprocess.run(["git", "init", "-q", self.raiz], check=True)
+        self.banco = bp.BancoProyecto(self.raiz, carpeta=os.path.join(self.tmp, "banco"))
+        self.banco.sincronizar()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_archivo_oculto(self):
+        # strip("./") le quitaba el punto: el resumen se llamaba a sí mismo sin fin (en Rust tiraba el proceso)
+        self.assertTrue(self.banco.resumen_archivo(".pre-commit-config.yaml").startswith(".pre-commit-config.yaml ("))
+        self.assertTrue(self.banco.resumen_archivo("pre-commit-config.yaml").startswith(".pre-commit-config.yaml ("))
+        nota = self.banco.anotar("nota", "Hooks", "Los hooks de pre-commit.", [".pre-commit-config.yaml"])
+        self.assertEqual(nota["rutas"], [".pre-commit-config.yaml"])
+        with self.banco.conectar() as c:
+            self.assertEqual(self.banco._rutas_mencionadas(c, "mira .pre-commit-config.yaml"), {".pre-commit-config.yaml"})
+
+    def test_topes_de_cpython(self):
+        # Más de 99 niveles de sangría o de 200 paréntesis abiertos: CPython da SyntaxError (el archivo queda sin símbolos)
+        def clases(n):
+            return "".join(" " * i + f"class C{i}:\n" for i in range(n)) + " " * n + "pass\n"
+        self.assertEqual(len(bp.simbolos_python(clases(99))[0]), 99)
+        self.assertEqual(bp.simbolos_python(clases(100))[0], [])
+        definicion = "def f():\n    return 1\n"
+        self.assertEqual(len(bp.simbolos_python(definicion + "x = " + "(" * 200 + "1" + ")" * 200 + "\n")[0]), 1)
+        self.assertEqual(bp.simbolos_python(definicion + "x = " + "(" * 201 + "1" + ")" * 201 + "\n")[0], [])
+
+    def test_anidamiento_extremo_no_tumba_el_proceso(self):
+        # Un archivo de 1 MB puede anidar cientos de miles de niveles: la pila de un hilo normal se desbordaba. En otro
+        # proceso (si se desbordara, mataría al que corre los tests) y en un hilo con poca pila
+        import subprocess
+        codigo = ("import sys, threading; sys.path.insert(0, sys.argv[1]); import banco_proyecto as bp\n"
+                  "def f():\n"
+                  "    for t in ('x = ' + '-' * 300000 + '1\\n', 'x = a' + '.b' * 200000 + '\\n',\n"
+                  "              'def g(a=' + '-' * 100000 + '1):\\n    return a\\n'):\n"
+                  "        s = bp.simbolos_python(t); bp.hechos_python('a.py', t, s[0]); bp.alias_python(t)\n"
+                  "    print('ok')\n"
+                  "threading.stack_size(2 * 1024 * 1024); h = threading.Thread(target=f); h.start(); h.join()\n")
+        r = subprocess.run([sys.executable, "-c", codigo, RAIZ], capture_output=True, text=True, timeout=120)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "ok"), r.stderr[-500:])

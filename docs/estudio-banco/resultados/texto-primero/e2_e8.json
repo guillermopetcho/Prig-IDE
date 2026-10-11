@@ -1,0 +1,416 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 900,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 36
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 56
+  },
+  "segundos": 2055,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2·e1",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar la función `piezas_de_archivo` para detectar errores de programación. Primero, veamos el código completo de la función y luego probaré algunos casos borde.\n\nVoy a probar la función con algunos casos borde para detectar errores:\n\nAhora voy a probar la función con casos borde usando la consola:\n\nVeo un problema en el Caso 3 y Caso 4: hay líneas que se saltan. En el Caso 3, las piezas son (1-5), (7-10), (12-15), (17-20). Las líneas 6, 11, 16 no están incluidas. Esto es un error.\n\nAnalicemos el código en las líneas 92-99:\n\n```python\na, acumulado, primero = ini, 0, True\nfor n in range(ini, fin + 1):\n    t = _tokens_de(lineas, n, n)\n    if acumulado + t > tope and n > a:\n        cortados.append((a, n - 1, nombres if primero else []))\n        a, acumulado, primero = n + 1, 0, False\n    acumulado += t\ncortados.append((a, fin, nombres if primero else []))\n```\n\nEl problema está en la línea 99: después del bucle, se añade `(a, fin, ...)`, pero `a` podría no ser igual a `fin + 1` si el bucle terminó antes de procesar todas las líneas. Más específicamente, cuando `acumulado + t > tope` se cumple, se hace un corte en `n-1`, y luego `a` se pone en `n+1`. Pero si al final del bucle `a <= fin`, se añade `(a, fin)`, lo cual está bien. \n\nSin embargo, el problema real es que cuando se hace un corte, se salta la línea `n` porque `a` se pone en `n+1`. La línea `n` nunca se incluye en ninguna pieza.\n\nVoy a verificar esto con un caso más simple:\n\n¡Confirmado! Hay un error grave en la línea 96-97. Cuando se hace un corte, la línea `n` se salta completamente porque:\n\n1. Se añade `(a, n-1)` a `cortados`\n2. Se pone `a = n + 1`\n3. La línea `n` nunca se incluye\n\nEl error está en la línea 97: `a, acumulado, primero = n + 1, 0, False`. Debería ser `a = n` en lugar de `a = n + 1`, porque la línea `n` debe incluirse en la siguiente pieza (o al menos no saltarse).\n\nEspera, déjame reconsiderar. El problema es que cuando `acumulado + t > tope`, significa que la línea `n` no cabe en la pieza actual. Pero luego se hace `a = n + 1`, lo que significa que la línea `n` se salta completamente.\n\nLa corrección debería ser: cuando se hace un corte, la línea `n` debería comenzar la siguiente pieza, no saltarse. Entonces `a` debería ser `n`, no `n + 1`.\n\nPero espera, hay otro problema: después del corte, se hace `acumulado += t`, lo que significa que `acumulado` incluye la línea `n`. Pero `a` se puso en `n + 1`, así que la línea `n` no está en ninguna pieza.\n\nEl bug está en la línea 97: `a, acumulado, primero = n + 1, 0, False`. Debería ser `a, acumulado, primero = n, t, False` para que la línea `n` se incluya en la siguiente pieza.\n\nSí, `piezas_de_archivo` tiene un error de programación.\n\n**Ubicación:** Líneas 92-99 de `backend/particion_proyecto.py`, específicamente en la línea 97.\n\n**Qué hace mal:** Cuando un tramo de código no cabe en el `tope` de tokens y se corta línea por línea, el algoritmo salta líneas enteras. En la línea 97, al hacer un corte (`a, acumulado, primero = n + 1, 0, False`), se asigna `a = n + 1`, lo que significa que la línea `n` (la que causó el desborde) se descarta y no se incluye en ninguna pieza. La línea siguiente `acumulado += t` suma los tokens de la línea `n` al acumulador, pero `a` ya apuntó más allá, creando un hueco.\n\n**Caso concreto de fallo:**\n- Archivo con 10 líneas de 100 caracteres cada una (1000 caracteres totales)\n- `tope = 250` tokens (en mi simulación, caracteres)\n- El bucle procesa las líneas y hace cortes cada vez que `acumulado + t > 250`\n\nResultado del código actual:\n- Piezas generadas: `(1, 2)`, `(4, 4)`, `(6, 6)`, `(8, 8)`, `(10, 10)`\n- Líneas cubiertas: 1, 2, 4, 6, 8, 10\n- **Líneas faltantes: 3, 5, 7, 9** (se pierden completamente)\n\nLa corrección en la línea 97 sería cambiar `n + 1` por `n` (y `0` por `t` para `acumulado`), de modo que la línea que desborda comience la siguiente pieza en lugar de saltarse:\n\n```python\n# Línea 97 incorrecta:\na, acumulado, primero = n + 1, 0, False\n# Línea 97 corregida:\na, acumulado, primero = n, t, False\n```\n\n**Confirmado: hay un error.**\n\nEn el caso \"Apenas por encima\" (3 líneas de 10 tokens cada una, tope 25), devuelve `(1, 3)` con 20 tokens, lo cual está bien porque las 3 líneas están incluidas.\n\nPero en el caso \"Sin símbolos, 5 líneas, tope 25\", devuelve:\n- Pieza 1: `(1, 2)` → líneas 1-2 ✓\n- Pieza 2: `(4, 5)` → líneas 4-5 ✓\n- **Línea 3 está completamente perdida** ✗\n\nEl bug está en la línea 97 de `backend/particion_proyecto.py`:\n\n```python\na, acumulado, primero = n + 1, 0, False\n```\n\nCuando la línea `n` desborda el tope, se hace un corte y se asigna `a = n + 1`, lo que salta la línea `n`. Luego `acumulado += t` suma los tokens de la línea `n`, pero como `a` ya apuntó más allá, esa línea nunca se incluye.\n\n**Corrección:** La línea 97 debería ser:\n```python\na, acumulado, primero = n, t, False\n```\n\nAsí la línea `n` que desborda comienza la siguiente pieza en lugar de saltarse.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 792,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"piezas_de_archivo\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso 1: archivo vacío\\ndef _tokens_de(lineas, ini, fin):\\n    return sum(len(lineas[i-1]) for i in range(ini-1, min(fin, len(lineas))))\\n\\nimport backend.particion_proyecto as pp\\n\\n# Caso: archivo vacío (lineas=[], tokens=0)\\nresultado = pp.piezas_de_archivo(\\\"test.py\\\", [], [], 0, 100)\\nprint(\\\"Caso vacío:\\\", resultado)\\n\\n# Caso: archivo con contenido que cabe en el tope\\nlineas",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso 1: archivo vacío\\ndef _tokens_de(lineas, ini, fin):\\n    return sum(len(lineas[i-1]) for i in range(ini-1, min(fin, len(lineas))))\\n\\n# Importar el módulo con _tokens_de sustituido\\nm = __import__('importlib').import_module('importlib')\\nimport importlib.util\\nspec = importlib.util.spec_from_file_location(\\\"particion\\\", \\\"backend/particion_proyecto.py\\\")\\nm = importlib.util.mo",
+     "resultado_caracteres": 195
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar el código manualmente y buscar errores lógicos\\n\\ncodigo = open(\\\"backend/particion_proyecto.py\\\").read()\\nlineas = codigo.split('\\\\n')\\n\\n# Imprimir la función piezas_de_archivo con números de línea\\nfor i, linea in enumerate(lineas[46:115], start=47):\\n    print(f\\\"{i:3d}: {linea}\\\")\\n\"}",
+     "resultado_caracteres": 30
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Usar P.leer para obtener el código\\nprint(P.leer(\\\"backend/particion_proyecto.py\\\", desde=47, hasta=115))\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Crear una versión de prueba de piezas_de_archivo\\ndef _tokens_de(lineas, ini, fin):\\n    \\\"\\\"\\\"Versión simple para pruebas: cuenta caracteres\\\"\\\"\\\"\\n    return sum(len(lineas[i-1]) for i in range(ini-1, min(fin, len(lineas))))\\n\\n# Versión simplificada de piezas_de_archivo para pruebas\\ndef piezas_de_archivo_prueba(ruta, lineas, simbolos, tokens, tope):\\n    total = len(lineas)\\n  ",
+     "resultado_caracteres": 1308
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso de prueba más simple para demostrar el bug\\ndef _tokens_de(lineas, ini, fin):\\n    \\\"\\\"\\\"Versión simple: cuenta caracteres\\\"\\\"\\\"\\n    return sum(len(lineas[i-1]) for i in range(ini-1, min(fin, len(lineas))))\\n\\n# Simular el bucle de corte por líneas\\nlineas = [\\\"x\\\" * 100 for _ in range(10)]  # 10 líneas de 100 caracteres\\ntope = 250  # 250 caracteres por pieza\\nini, fin = 1, ",
+     "resultado_caracteres": 1034
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Verificar la corrección propuesta\\ndef _tokens_de(lineas, ini, fin):\\n    return sum(len(lineas[i-1]) for i in range(ini-1, min(fin, len(lineas))))\\n\\nlineas = [\\\"x\\\" * 100 for _ in range(10)]\\ntope = 250\\nini, fin = 1, 10\\n\\nprint(\\\"=== Versión corregida ===\\\")\\ncortados = []\\na, acumulado, primero = ini, 0, True\\nfor n in range(ini, fin + 1):\\n    t = _tokens_de(lineas, n, n)\\n  ",
+     "resultado_caracteres": 371
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso borde 1: vacío\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\\"_tokens_de\\\": lambda lineas, ini, fin: (fin - ini + 1) * 10})\\nresultado = m.piezas_de_archivo(\\\"test.py\\\", [], [], 0, 100)\\nprint(\\\"Caso vacío:\\\", resultado)\\n\\n# Caso borde 2: un elemento que cabe\\nresultado = m.piezas_de_archivo(\\\"test.py\\\", [\\\"linea1\\\"], [], 10, 100)\\nprint(\\\"Un elemento (cabe):\\\"",
+     "resultado_caracteres": 670
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 323.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C3·e1",
+   "prueba": "E8a",
+   "objetivo": "C3",
+   "pregunta": "Revisa `perfil` en `backend/inicio.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C3",
+   "modo": "unidad",
+   "respuesta": "La función `perfil()` en `backend/inicio.py` (líneas 31-37) **no tiene ningún error de programación**. Su implementación es correcta y robusta:\n\n1. **Manejo correcto de excepciones**: Captura `FileNotFoundError` (cuando el archivo no existe) y `ValueError` (cuando el JSON está corrupto), devolviendo un diccionario vacío en ambos casos.\n2. **Fusión segura con el default**: Usa `{**PERFIL_POR_DEFECTO, **{...}}` para que los valores del archivo siempre sobrescriban los predeterminados, pero solo si las claves son válidas (están en `PERFIL_POR_DEFECTO`).\n3. **Filtrado de claves**: El diccionario de comprensión `{k: v for k, v in datos.items() if k in PERFIL_POR_DEFECTO}` asegura que no se introduzcan campos inesperados o maliciosos desde el archivo JSON.\n4. **Carga de archivo segura**: Usa `encoding=\"utf-8\"` explícito y cierra el archivo correctamente con `with`.\n\nNo hay casos borde en los que esta función falle o se comporte incorrectamente. Es una implementación limpia y segura de lectura de configuración.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: github_stats_widget, inicio, sondeo_libro",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 265,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 15.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·e2",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar `piezas_de_archivo` con casos de prueba, especialmente los casos borde que menciona el banco de hechos.\n\nVeo un problema en el CASO 4 y CASO 5: las piezas no son contiguas. Hay huecos entre las líneas. En CASO 4, la primera pieza va de 1 a 10, la segunda de 12 a 20... hay un hueco en la línea 11. Y en CASO 5, igual.\n\nEsto pasa porque el bucle de corte por líneas salta la línea donde se excede el tope. Veamos el código:\n\n```python\nfor n in range(ini, fin + 1):\n    t = _tokens_de_simple(lineas, n, n)\n    if acumulado + t > tope and n > a:\n        cortados.append((a, n - 1, nombres if primero else []))\n        a, acumulado, primero = n + 1, 0, False\n    acumulado += t\ncortados.append((a, fin, nombres if primero else []))\n```\n\nEl problema es que cuando se corta, `a` salta a `n + 1`, pero la línea `n` (la que causó el desborde) se descarta completamente. Luego al final se append `(a, fin)` que empieza después de `n`, dejando la línea `n` sin asignar a ninguna pieza.\n\nConfirmado: las líneas 11, 21, 31 y 41 quedan sin cubrir. Esto es un error de programación.\n\nEl bug está en las líneas **117-122** de `backend/particion_proyecto.py`. El bucle de corte por líneas tiene un error de lógica: cuando se excede el tope, descarta la línea `n` que causó el desborde (salta a `n+1`) y al final hace `append((a, fin))` que empieza después de `n`, dejando la línea `n` sin asignar a ninguna pieza.\n\n**Línea del error:** La lógica en las líneas 117-122 (el bucle `for n in range(ini, fin + 1)`).\n\n**Qué hace mal:** Cuando `acumulado + t > tope`, la línea `n` que causó el desborde se salta completamente. `a` se establece en `n + 1` y `acumulado` se reinicia a 0, pero la línea `n` nunca se asigna a ninguna pieza. Al final, el `append((a, fin))` empieza después de `n`, dejando `n` sin cubrir.\n\n**Caso concreto:** Un archivo de 50 líneas sin símbolos, con `tope=10` y `tokens=50`. Las piezas resultantes cubren las líneas 1-10, 12-20, 22-30, 32-40, 42-50. Las líneas 11, 21, 31 y 41 quedan sin asignar a ninguna pieza, lo que significa que el contenido de esas líneas se pierde y no se lee.\n\n**Confirmado: hay un bug en `piezas_de_archivo`.**\n\n**Línea:** 117-122 (bucle de corte por líneas).\n\n**Qué hace mal:** Cuando se excede el tope de tokens, la línea `n` que causa el desborde se descarta completamente. El código salta a `n + 1` y al final hace `append((a, fin))` donde `a = n + 1`, dejando la línea `n` sin asignar.\n\n**Caso concreto:** Archivo de 11 líneas sin símbolos, `tope=10`. Devuelve dos piezas:\n- Pieza 0: líneas 1-10 ✓\n- Pieza 1: líneas **12-11** (rango vacío, y la línea 11 se perdió)\n\nLa línea 11 queda sin cubrir y la segunda pieza tiene `ini > fin`, lo que es un rango inválido.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 594,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Revisar piezas_de_archivo con casos borde\\nimport sys\\nsys.path.insert(0, 'backend')\\n\\n# Versión simplificada de _tokens_de para pruebas\\ndef _tokens_de_simple(lineas, ini, fin):\\n    return len(\\\"\\\\n\\\".join(lineas[ini-1:fin]).split())\\n\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    \\\"\\\"\\\" Versión con el _tokens_de simple \\\"\\\"\\\"\\n    total = len(lineas)\\n    if ",
+     "resultado_caracteres": 184
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Revisar piezas_de_archivo con casos borde\\nfrom collections import defaultdict\\n\\n# Versión simplificada de _tokens_de para pruebas\\ndef _tokens_de_simple(lineas, ini, fin):\\n    return len(\\\"\\\\n\\\".join(lineas[ini-1:fin]).split())\\n\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    \\\"\\\"\\\" Versión con el _tokens_de simple \\\"\\\"\\\"\\n    total = len(lineas)\\n    if tokens",
+     "resultado_caracteres": 1330
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar el bug: línea 11 en CASO 4 no está en ninguna pieza\\nlineas = [str(i) for i in range(50)]\\n\\ndef _tokens_de_simple(lineas, ini, fin):\\n    return len(\\\"\\\\n\\\".join(lineas[ini-1:fin]).split())\\n\\ntope = 10\\nini, fin = 1, 50\\n\\ncortados = []\\na, acumulado, primero = ini, 0, True\\nfor n in range(ini, fin + 1):\\n    t = _tokens_de_simple(lineas, n, n)\\n    if acumulado + t > top",
+     "resultado_caracteres": 303
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso 1: archivo vacío\\npiezas = m.piezas_de_archivo(\\\"test.py\\\", [], [], 0, 100)\\nprint(\\\"CASO VACÍO:\\\", piezas)\\n\\n# Caso 2: un elemento que cabe\\npiezas = m.piezas_de_archivo(\\\"test.py\\\", [\\\"linea1\\\"], [], 1, 100)\\nprint(\\\"CASO UN ELEMENTO:\\\", piezas)\\n\\n# Caso 3: justo en el límite\\nlineas_10 = [f\\\"linea{i}\\\" for i in range(10)]\\npiezas = m.piezas_de_archivo(\\\"test.py\\\", lineas_",
+     "resultado_caracteres": 206
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargar el módulo con _tokens_de simulado\\ndef _tokens_de_simple(lineas, ini, fin):\\n    return max(1, fin - ini + 1)  # 1 token por línea\\n\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\\"_tokens_de\\\": _tokens_de_simple})\\n\\n# Caso 1: archivo vacío\\npiezas = m.piezas_de_archivo(\\\"test.py\\\", [], [], 0, 100)\\nprint(\\\"CASO VACÍO:\\\", piezas)\\n\\n# Caso 2: un elemento que c",
+     "resultado_caracteres": 831
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 233.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B1·e1",
+   "prueba": "E8a",
+   "objetivo": "B1",
+   "pregunta": "Revisa `racha` en `backend/progreso.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B1",
+   "modo": "general",
+   "respuesta": "Sí, tiene un error de lógica en el cálculo de la racha **mejor** (líneas 161-167).\n\n### El error\nLa línea 165 reinicia `seguidos` a `0` cuando encuentra un salto de días, pero debería reiniciarlo a `1` (porque el día actual cuenta como uno). Además, la línea 166 compara `mejor` con `seguidos` **antes** de contar el día actual en el bucle, lo que hace que la racha máxima siempre esté desfasada o sea incorrecta en secuencias continuas.\n\n### Caso concreto que falla\nSupongamos `dias_activos = {\"2024-01-01\": 1, \"2024-01-02\": 1, \"2024-01-03\": 1}` (3 días seguidos).\n\n1. `d = \"2024-01-01\"`: `anterior` es `None`, `seguidos` se mantiene en `0` (no entra en el `if`), `mejor = max(0, 0) = 0`.\n2. `d = \"2024-01-02\"`: `f - anterior` es 1 día, `seguidos = 0 + 1 = 1`, `mejor = max(0, 1) = 1`.\n3. `d = \"2024-01-03\"`: `f - anterior` es 1 día, `seguidos = 1 + 1 = 2`, `mejor = max(1, 2) = 2`.\n\nEl resultado es `mejor: 2`, cuando debería ser `3`.\n\n### Corrección\nLa línea 165 debe inicializar `seguidos` a `1` si es el primer día o si la secuencia continúa, y la actualización de `mejor` debe reflejar el valor actualizado:\n\n```python\n    mejor = 0\n    anterior = None\n    for d in sorted(fechas):\n        f = date.fromisoformat(d)\n        if anterior and (f - anterior).days == 1:\n            seguidos += 1\n        else:\n            seguidos = 1  # El día actual cuenta\n        mejor = max(mejor, seguidos)\n        anterior = f\n```\n\nNo pude ejecutar `P.cargar` debido a las restricciones de la consola (no permite `import` de `sys` ni crear clases con `object` para simular `os`/`threading`), por lo que no tengo la salida literal de los casos borde.\n\nSin embargo, analizando la lógica de `racha` (líneas 161-167) sin ejecución:\n\n1.  **Línea 165**: `seguidos = seguidos + 1 if anterior and (f - anterior).days == 1 else 0`\n    *   Si la secuencia continúa, suma 1.\n    *   Si es el primer elemento o hay salto, pone `0`.\n2.  **Línea 166**: `mejor = max(mejor, seguidos)`\n    *   Compara el valor *antes* de contar el día actual en la iteración presente (si fue continuación) o *0* (si fue inicio/salto).\n\n**Conclusión:** El error existe. La variable `seguidos` cuenta los **saltos** o **transiciones**, no los días. Para una racha de 1 día, `seguidos` queda en `0`. Para una de 3 días, queda en `2`.\n\n**Corrección:**\n```python\n        if anterior and (f - anterior).days == 1:\n            seguidos += 1\n        else:\n            seguidos = 1  # El día actual cuenta como 1\n        mejor = max(mejor, seguidos)\n```\n\nLa función devuelve `mejor` como `n-1` para rachas continuas de longitud `n`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend: almacen, ejecucion, progreso» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 3027,
+   "tokens": 908,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargar la función y probar los casos borde\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\n# Caso 1: vacío\\nr1 = m.racha({})\\nprint(\\\"Vacío:\\\", r1)\\n# Esperado: actual=0, mejor=0, dias_activos=0\\n\\n# Caso 2: un elemento\\nr2 = m.racha({\\\"2024-01-01\\\": 1})\\nprint(\\\"Un elemento:\\\", r2)\\n# Esperado: actual=1 (si es hoy/ayer), mejor=1, dias_activos=1\\n\\n# Caso 3: tres días seguidos (ejemplo c",
+     "resultado_caracteres": 126
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Reintentar con sustitución de time si es necesario, o verificar si ya está cargada\\n# P.cargar a veces falla con imports del sistema. Probemos directamente con el módulo importado\\nimport sys\\nif \\\"backend.progreso\\\" not in sys.modules:\\n    try:\\n        import backend.progreso as m\\n    except Exception as e:\\n        print(f\\\"Error al importar: {e}\\\")\\n        m = None\\n\\nif m:\\",
+     "resultado_caracteres": 199
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nfrom datetime import date, timedelta\\nimport backend.progreso as m\\n\\n# Caso 1: vacío\\nr1 = m.racha({})\\nprint(\\\"Vacío:\\\", r1)\\n\\n# Caso 2: un elemento (hoy)\\nhoy = date.today().isoformat()\\nr2 = m.racha({hoy: 1})\\nprint(\\\"Hoy:\\\", r2)\\n\\n# Caso 3: tres días seguidos (pasados)\\nr3 = m.racha({\\\"2020-01-01\\\": 1, \\\"2020-01-02\\\": 1, \\\"2020-01-03\\\": 1})\\nprint(\\\"3 días seguidos:\\\", r3)\\n\\n",
+     "resultado_caracteres": 212
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Usar P.cargar con sustitución de imports problemáticos\\nm = P.cargar(\\\"backend/progreso.py\\\", sustituir={\\n    \\\"os\\\": type('obj', (object,), {'makedirs': lambda *a, **k: None, 'replace': lambda *a, **k: None, 'path': type('obj', (object,), {'join': lambda *a: '/'.join(a)})()})(),\\n    \\\"threading\\\": type('obj', (object,), {'Lock': lambda: type('Lock', (), {'__enter__': lambda s: s",
+     "resultado_caracteres": 47
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Usar P.cargar sin sustituciones complejas, solo lo necesario\\nm = P.cargar(\\\"backend/progreso.py\\\")\\n\\nfrom datetime import date, timedelta\\n\\n# Caso 1: vacío\\nr1 = m.racha({})\\nprint(\\\"Vacío:\\\", r1)\\n\\n# Caso 2: un elemento (hoy)\\nhoy = date.today().isoformat()\\nr2 = m.racha({hoy: 1})\\nprint(\\\"Hoy:\\\", r2)\\n\\n# Caso 3: tres días seguidos (pasados)\\nr3 = m.racha({\\\"2020-01-01\\\": 1, ",
+     "resultado_caracteres": 126
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar qué imports tiene progreso.py para saber qué sustituir\\nprint(P.leer(\\\"backend/progreso.py\\\", hasta=20))\\n\"}",
+     "resultado_caracteres": 1188
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Buscar el import de time\\nimport re\\nlines = P.lineas(\\\"backend/progreso.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"import\\\" in line and not line.strip().startswith(\\\"#\\\"):\\n        print(f\\\"{i}: {line.strip()}\\\")\\n\"}",
+     "resultado_caracteres": 308
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# El error de 'time' es extraño porque no lo usa directamente. \\n# Probemos cargarlo con sustitución de los módulos problemáticos\\nm = P.cargar(\\\"backend/progreso.py\\\", sustituir={\\n    \\\"os\\\": type('obj', (object,), {'makedirs': lambda *a, **k: None, 'replace': lambda *a, **k: None, 'path': type('obj', (object,), {'join': lambda *a: '/'.join(a)})()})(),\\n    \\\"threading\\\": type('obj",
+     "resultado_caracteres": 67
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 155.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·e3",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar `piezas_de_archivo` con detenimiento, probando casos borde para ver si hay errores.\n\nRevisé el código de `piezas_de_archivo` en `backend/particion_proyecto.py` (líneas 47-115) y encontré un **error de programación**:\n\n## El error: Falta de cobertura de código cuando no hay símbolos de primer nivel y el archivo no cabe\n\n**Línea 67-68:**\n```python\nif not tramos:\n    tramos = [(1, total, [], None)]\n```\n\nEl problema es que este código solo se ejecuta si `primer` (la lista de símbolos de primer nivel) está vacía. Pero si `primer` tiene símbolos, el bucle de la línea 60-64 los procesa. Sin embargo, **si todos los símbolos de primer nivel tienen `fin < cursor` (se saltan por la condición de la línea 61), `tramos` queda vacía y se asigna `[(1, total, [], None)]`**. Esto parece correcto, pero el error real está en la **lógica de subdivisión de tramos**.\n\n**Línea 76-84:**\n```python\nhijos = sorted((h for h in simbolos if s is not None and h[\"padre\"] == s[\"nombre\"]), key=lambda h: h[\"ini\"])\ncur = ini\nfor h in hijos:\n    if h[\"fin\"] < cur:\n        continue\n    finos.append((cur, h[\"fin\"], [h[\"nombre\"]]))\n    cur = h[\"fin\"] + 1\nif cur <= fin:\n    finos.append((cur, fin, nombres if not hijos else []))\n```\n\nCuando un tramo no cabe y se subdivide por hijos, **si no hay hijos (`hijos` está vacío)**, el código salta directamente al `if cur <= fin` (línea 83), que añade `(cur, fin, nombres if not hijos else [])`. Como `hijos` está vacío, `nombres if not hijos else []` evalúa a `nombres`. Esto está bien.\n\nPero el error real está en la **fase de agrupamiento final (líneas 101-114)**:\n\n**Línea 103-112:**\n```python\nfor ini, fin, nombres in cortados:\n    t = _tokens_de(lineas, ini, fin)\n    if actual is not None and actual[\"tokens\"] + t <= tope:\n        actual[\"fin\"] = fin\n        actual[\"tokens\"] += t\n        actual[\"simbolos\"] += nombres\n    else:\n        if actual is not None:\n            piezas.append(actual)\n        actual = {\"ruta\": ruta, \"ini\": ini, \"fin\": fin, \"tokens\": t, \"simbolos\": list(nombres)}\n```\n\nEl error es que **`actual[\"simbolos\"] += nombres` modifica la lista en lugar de crear una nueva**. Si `nombres` es una lista mutable compartida, y luego se reutiliza en otra iteración, puede haber efectos secundarios. Pero el problema más grave es:\n\n**Caso concreto de fallo:**\n\nCuando hay **código suelto entre símbolos** (líneas sin símbolo asociado) y ese código suelto no cabe solo, el código de la línea 84 añade `(cur, fin, nombres if not hijos else [])`. Si `hijos` está vacío, `nombres` se mantiene. Pero `nombres` viene del tramo original, que es `[s[\"nombre\"]]` para un símbolo, o `[]` para código suelto.\n\nEl error crítico está en la **línea 96**:\n```python\ncortados.append((a, n - 1, nombres if primero else []))\n```\n\nCuando se corta un tramo gigante por líneas, **se pierde el nombre del símbolo** en los cortes siguientes (`primero` cambia a `False`). Esto significa que las piezas resultantes de un corte por líneas **no tienen los nombres de los símbolos**, aunque deberían tenerlos si están dentro de un símbolo.\n\n**Ejemplo concreto:**\n- Archivo con un símbolo `foo` que ocupa líneas 1-50\n- `tope=10` tokens\n- El símbolo no cabe, sus hijos tampoco caben o no hay hijos\n- Se corta por líneas en la línea 96\n- La primera pieza tendrá `nombres=[\"foo\"]` (porque `primero=True`)\n- Las piezas siguientes tendrán `nombres=[]` (porque `primero=False`)\n\nEsto no es un error funcional grave (las piezas se agrupan después), pero **pérdida de información sobre qué símbolos contiene cada pieza**, lo que afecta a la calidad del contexto que se pasa al modelo.\n\nAdemás, hay un **posible bug en la línea 54**:\n```python\n\"ini\": 1, \"fin\": max(1, total), \"tokens\": tokens,\n```\n\nSi `total=0` (archivo vacío), `max(1, 0)=1`, así que `ini=1, fin=1`. Esto es correcto para un archivo vacío. Pero si `total > 0`, `fin=total`, lo cual es correcto.\n\n**Conclusión:** El error principal es la **pérdida de nombres de símbolos en cortes por líneas** (línea 96), donde `primero=False` hace que las piezas intermedias y finales no registren qué símbolos contienen, solo la primera pieza de cada tramo gigante.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 1185,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargar la función y probar casos borde\\nimport backend.particion_proyecto as pp\\n\\n# Mock de estimar_tokens para pruebas\\ndef mock_tokens(lineas, ini, fin):\\n    \\\"\\\"\\\"Estimación simple: 1 token por palabra aproximada\\\"\\\"\\\"\\n    texto = \\\"\\\\n\\\".join(lineas[ini-1:fin]) if ini and fin else \\\"\\\"\\n    return len(texto.split())\\n\\n# Caso 1: tokens <= tope (archivo cabe entero)\\nlineas1 ",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Cargar solo el módulo sin importar dependencias\\nimport sys\\nimport types\\n\\n# Crear un mock de banco_proyecto\\nbp = types.ModuleType(\\\"banco_proyecto\\\")\\nbp._ES_TEST = type('', (), {'search': lambda self, x: False})()\\nbp.estimar_tokens = lambda texto: len(texto.split())\\nsys.modules[\\\"banco_proyecto\\\"] = bp\\n\\n# Cargar el módulo\\nimport importlib.util\\nspec = importlib.util.spec_",
+     "resultado_caracteres": 184
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Usar importlib que debería estar permitido indirectamente, o simplemente cargar el archivo como texto\\n# y extraer la función. Pero el problema es que no puedo importar sys.\\n# Voy a intentar con el enfoque de sustituir en P.cargar\\n\\n# Primero, leer el código de la función para entenderla bien\\ncodigo = P.leer(\\\"backend/particion_proyecto.py\\\", desde=47, hasta=120)\\nprint(codigo)\\",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora voy a ejecutar la función con casos de prueba usando P.cargar\\n# Necesito pasar estimar_tokens en sustituir\\n\\n# Primero, ver qué hace _tokens_de\\ntokens_code = P.leer(\\\"backend/particion_proyecto.py\\\", desde=37, hasta=39)\\nprint(tokens_code)\\n\"}",
+     "resultado_caracteres": 136
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# _tokens_de está en la línea 35\\ntokens_code = P.leer(\\\"backend/particion_proyecto.py\\\", desde=35, hasta=36)\\nprint(tokens_code)\\n\"}",
+     "resultado_caracteres": 118
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Buscar _tokens_de\\ntokens_code = P.grep(r\\\"_tokens_de\\\", maximo=10)\\nprint(tokens_code)\\n\"}",
+     "resultado_caracteres": 580
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ver la definición de _tokens_de\\ntokens_def = P.leer(\\\"backend/particion_proyecto.py\\\", desde=42, hasta=44)\\nprint(tokens_def)\\n\"}",
+     "resultado_caracteres": 220
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora voy a ejecutar piezas_de_archivo con casos de prueba\\n# Necesito simular banco_proyecto.estimar_tokens\\n\\ndef mock_estimar_tokens(texto):\\n    return len(texto.split())\\n\\n# Usar P.cargar con sustitución\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\\"banco_proyecto\\\": type('', (), {'estimar_tokens': mock_estimar_tokens, '_ES_TEST': type('', (), {'search': lambd",
+     "resultado_caracteres": 387
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 225.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C1·e1",
+   "prueba": "E8a",
+   "objetivo": "C1",
+   "pregunta": "Revisa `Gobernador.reanudar` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_C1",
+   "modo": "general",
+   "respuesta": "No tiene ningún error de programación.\n\nLa lógica de `Gobernador.reanudar` (líneas 458-464) es correcta y robusta:\n\n1.  **Cálculo base (l. 460):** Calcula el objetivo de temperatura para reanudar usando la mínima de dos estrategias:\n    *   `self.limite - 4.0`: Un margen fijo de seguridad.\n    *   `self.limite - self.salto - 2.0`: Compensa el \"salto\" térmico aprendido al iniciar un tramo (el chip sube rápido al empezar) y añade 2 °C extra de holgura.\n2.  **Ajuste por reposo (l. 461-463):** Si el sistema ha aprendido una temperatura de reposo (`reposo_c`), fuerza el objetivo a ser al menos `reposo_c + 1.0`. Esto evita que el gobernador intente enfriar la GPU por debajo de su temperatura natural de reposo (lo cual sería inalcanzable o requeriría un tiempo infinito), asegurando que el objetivo sea físicamente viable.\n\n**Ejemplo concreto de funcionamiento:**\nSi `limite = 60`, `salto = 8` y `reposo_c = 35`:\n*   Base: `min(56, 60 - 8 - 2) = min(56, 50) = 50`.\n*   Reposo: `max(50, 35 + 1) = 36`.\n*   Resultado: Reanuda cuando la GPU baja de **36 °C**.\n\nSi no hubiera la línea 463, el objetivo sería 50 °C, lo que obligaría a esperar innecesariamente a que la GPU se enfriara mucho más de lo necesario, reduciendo el rendimiento sin beneficio térmico real. La implementación es correcta.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "«backend/recursos: motor_suave, ritmo, termico» no tiene lectura guardada: modo general",
+   "hechos_caracteres": 940,
+   "tokens": 429,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 36.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·e4",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Let me analyze the `piezas_de_archivo` function in `backend/particion_proyecto.py`.\n\nHay un problema en el **Caso 5**. Veamos qué ocurre:\n\n- El archivo tiene 5 líneas: `class A:`, `def m1(self):`, `pass`, `def m2(self):`, `pass`\n- Los símbolos son: `A` (líneas 1-5), `m1` (líneas 2-3), `m2` (líneas 4-5)\n- El tope es 2 tokens, pero el archivo tiene 5 tokens (no cabe entero)\n\nEn la subdivisión de símbolos:\n1. El símbolo `A` (líneas 1-5) no cabe en 2 tokens, así que se subdivide por sus hijos (`m1`, `m2`)\n2. `m1` ocupa líneas 2-3 (2 tokens), cabe → `finos.append((2, 3, ['m1']))`\n3. `m2` ocupa líneas 4-5 (2 tokens), cabe → `finos.append((4, 5, ['m2']))`\n4. Pero `cur` después de `m1` es 4, y `m2` empieza en 4, así que no hay hueco entre medias\n5. Sin embargo, **la línea 1 (`class A:`) no está cubierta por ningún hijo** — queda sin asignar\n\nEl resultado es:\n- `{'ini': 1, 'fin': 1, 'tokens': 2, 'simbolos': ['m1']}` — ¡incorrecto! `ini=1, fin=1` pero `simbolos=['m1']` que está en líneas 2-3\n- `{'ini': 3, 'fin': 3, 'tokens': 1, 'simbolos': []}` — línea suelta\n- `{'ini': 4, 'fin': 5, 'tokens': 2, 'simbolos': ['m2']}`\n\nEl error está en las líneas **81-85** del código original (dentro del bucle de subdivisión por hijos). Cuando se subdividen los hijos de un símbolo grande, `cur` se pone en `h[\"fin\"] + 1` después de cada hijo, pero si dos hijos son contiguos (como `m1` que termina en 3 y `m2` que empieza en 4), `cur` queda en 4 y `m2[\"ini\"]` es 4, así que la condición `h[\"fin\"] < cur` no filtra `m2` correctamente... pero eso está bien.\n\nEl problema real es que **la línea 1 (`class A:`) queda fuera de todos los hijos** y después de procesar los hijos, `cur = 4` y `fin = 5`, así que `cur <= fin` es `4 <= 5` → True, y se añade `finos.append((4, 5, nombres if not hijos else []))`. Pero `nombres` es `['A']` y `hijos` no está vacío, así que se añade `(4, 5, [])`. Sin embargo, `m2` ya cubrió (4, 5) antes... \n\nEspera, revisemos el flujo más cuidadosamente. El problema es que el código de subdivisión por hijos **no cubre la línea 1** porque `m1` empieza en 2, no en 1. La línea 1 queda sin asignar.\n\nVeamos el **Caso 5** más de cerca:\n\nSí, `piezas_de_archivo` tiene un error de programación.\n\n**Ubicación:** Líneas 75-85 de `backend/particion_proyecto.py`, dentro del bucle que subdivide tramos grandes por sus hijos (métodos/clases anidadas).\n\n**Qué hace mal:** Cuando un símbolo padre grande se subdivide por sus hijos, el código calcula `cur` (el cursor de la última línea cubierta) como `h[\"fin\"] + 1` después de cada hijo. Pero si dos hijos son contiguos (el hijo 1 termina en la línea N y el hijo 2 empieza en la línea N+1), `cur` queda en N+1, que es exactamente donde empieza el siguiente hijo. Esto está bien para saltar el hijo siguiente, pero **el código no verifica que `h[\"ini\"] == cur`**, solo que `h[\"fin\"] >= cur`. Como resultado, si hay un hueco entre hijos (líneas de código suelto, o la línea de definición del padre que no pertenece a ningún hijo), ese hueco **no se registra** y queda sin cubrir.\n\nMás grave aún: en el caso de que los hijos sean contiguos, el código **añade el resto después del último hijo** (`if cur <= fin`), pero si los hijos cubren todo hasta `fin`, `cur` queda en `fin + 1` y no se añade nada. Sin embargo, **la línea de definición del padre (la que está antes del primer hijo) tampoco se cubre**, porque `cur` empieza en `ini` (la línea del padre) y el primer hijo empieza después. El tramo `(cur, h[\"fin\"])` del primer hijo incluye la línea del padre, pero la etiqueta de símbolos es `[h[\"nombre\"]]`, lo cual es engañoso pero no incorrecto per se.\n\nEl error real se ve en el caso de prueba que generé:\n\n**Caso concreto que falla:**\n```python\nlineas = [\"class A:\", \"    def m1(self):\", \"        pass\", \"    def m2(self):\", \"        pass\"]\nsimbolos = [\n    {\"nombre\": \"A\", \"padre\": None, \"ini\": 1, \"fin\": 5},\n    {\"nombre\": \"m1\", \"padre\": \"A\", \"ini\": 2, \"fin\": 3},\n    {\"nombre\": \"m2\", \"padre\": \"A\", \"ini\": 4, \"fin\": 5}\n]\n# tope = 2 tokens, archivo tiene 8 tokens\n```\n\nResultado obtenido:\n```\n[{'ini': 1, 'fin': 1, 'tokens': 2, 'simbolos': ['m1']},   # Línea 1 (\"class A:\") etiquetada como m1\n {'ini': 3, 'fin': 3, 'tokens': 1, 'simbolos': []},        # Línea 3 (\"pass\") sin símbolos\n {'ini': 4, 'fin': 5, 'tokens': 2, 'simbolos': ['m2']}]    # Líneas 4-5 correctas\n```\n\n**Problemas:**\n1. **Línea 1 (`class A:`) queda asociada a `m1`**, pero `m1` empieza en la línea 2. La línea 1 es la definición de la clase, no del método.\n2. **Línea 3 (`pass` dentro de `m1`) queda sin símbolos**, cuando debería estar asociada a `m1`.\n3. **Línea 2 (`def m1(self):`) no aparece en ningún resultado** — se perdió entre los tramos.\n\nEl tramo `(1, 3, ['m1'])` debería cubrir líneas 1-3, pero luego el corte por líneas (porque 3 tokens > tope 2) lo divide en `(1, 1)` y `(2, 3)`, y `(2, 3)` se pierde porque el siguiente tramo empieza en 4. El código de agrupación no conecta `(2, 3)` con nada porque el siguiente tramo es `(4, 5)`.\n\n**Causa raíz:** En la fase de corte por líneas (líneas 88-98), cuando un tramo se divide en varios, el último fragmento puede dejar un hueco si el siguiente tramo no es contiguo. Además, la fase de subdivisión por hijos produce tramos que no necesariamente cubren todo el rango original del padre, dejando líneas \"huérfanas\" que se pierden en el corte final.\n\nMi análisis anterior era incorrecto. Los casos borde pasan correctamente:\n\n- **Vacío:** devuelve `[1, 1]` con 0 tokens (aceptable, cubre al menos la línea 1)\n- **Cabe entero:** todo en una pieza\n- **Justo en límite:** todo en una pieza\n- **Apenas por encima, un símbolo:** el corte por líneas produce `[1,1], [2,2], [3,3]` que se agrupan de nuevo en `[1,3]` (3 tokens ≤ tope 3) — correcto\n- **Hijos contiguos:** líneas 1-5 todas cubiertas, sin huecos\n\nNo encontré ningún error de programación en `piezas_de_archivo`. La función cubre correctamente todas las líneas del archivo en todos los casos borde probados. Mi conclusión anterior sobre el caso de hijos contiguos era errónea porque no seguí el flujo de agrupación de tramos consecutivos que une los fragmentos cortados.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 1219,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nimport sys\\nsys.path.insert(0, 'backend')\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport backend.particion_proyecto as m\\n\\n# Reemplazar estimar_tokens con una versión simple\\ndef estimar_tokens_simple(texto):\\n    return len(texto.split())  # aproximación simple\\n\\nm._tokens_de = lambda lineas, ini, fin: estimar_tokens_simple",
+     "resultado_caracteres": 184
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nfrom collections import defaultdict\\nimport json\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport backend.particion_proyecto as m\\n\\n# Reemplazar estimar_tokens con una versión simple\\ndef estimar_tokens_simple(texto):\\n    return len(texto.split())  # aproximación simple\\n\\nm._tokens_de = lambda lineas, ini, fin: estimar_tokens",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nfrom collections import defaultdict\\nimport json\\nimport math\\nimport re\\nimport time\\nimport zlib\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport backend.particion_proyecto as m\\n\\n# Reemplazar estimar_tokens con una versión simple\\ndef estimar_tokens_simple(texto):\\n    return len(texto.split())  # aproximación simple\\n\\nm._t",
+     "resultado_caracteres": 185
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nfrom collections import defaultdict\\nimport json\\nimport math\\nimport re\\nimport zlib\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport backend.particion_proyecto as m\\n\\n# Reemplazar estimar_tokens con una versión simple\\ndef estimar_tokens_simple(texto):\\n    return len(texto.split())  # aproximación simple\\n\\nm._tokens_de = la",
+     "resultado_caracteres": 185
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nfrom collections import defaultdict\\nimport json\\nimport math\\nimport re\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport backend.particion_proyecto as m\\n\\n# Reemplazar estimar_tokens con una versión simple\\ndef estimar_tokens_simple(texto):\\n    return len(texto.split())  # aproximación simple\\n\\nm._tokens_de = lambda lineas, ",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Revisar piezas_de_archivo con casos de prueba\\nfrom collections import defaultdict\\nimport json\\nimport math\\nimport re\\n\\n# Cargar el módulo y reemplazar dependencias\\nimport importlib\\nspec = importlib.util.spec_from_file_location(\\\"particion_proyecto\\\", \\\"backend/particion_proyecto.py\\\")\\nm = importlib.util.module_from_spec(spec)\\n\\n# Reemplazar estimar_tokens con una versión si",
+     "resultado_caracteres": 190
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Copiar el código de piezas_de_archivo y ejecutarlo directamente\\nfrom collections import defaultdict\\nimport math\\n\\ndef _tokens_de(lineas, ini, fin):\\n    return len(\\\"\\\\n\\\".join(lineas[ini-1:fin]).split())\\n\\ndef piezas_de_archivo(ruta, lineas, simbolos, tokens, tope):\\n    \\\"\\\"\\\" Versión copiada del código fuente \\\"\\\"\\\"\\n    total = len(lineas)\\n    if tokens <= tope or total ==",
+     "resultado_caracteres": 770
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso 5 más detallado\\ndef _tokens_de(lineas, ini, fin):\\n    return len(\\\"\\\\n\\\".join(lineas[ini-1:fin]).split())\\n\\nlineas = [\\\"class A:\\\", \\\"    def m1(self):\\\", \\\"        pass\\\", \\\"    def m2(self):\\\", \\\"        pass\\\"]\\nsimbolos = [{\\\"nombre\\\": \\\"A\\\", \\\"padre\\\": None, \\\"ini\\\": 1, \\\"fin\\\": 5},\\n            {\\\"nombre\\\": \\\"m1\\\", \\\"padre\\\": \\\"A\\\", \\\"ini\\\": 2, \\\"fin\\\": 3},\\n         ",
+     "resultado_caracteres": 902
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Caso 1: archivo vacío\\nimport backend.particion_proyecto as mp\\nres = mp.piezas_de_archivo(\\\"x.py\\\", [], [], 0, 100)\\nprint(\\\"Caso vacío:\\\", res)\\n\\n# Caso 2: cabe entero\\nres = mp.piezas_de_archivo(\\\"x.py\\\", [\\\"a\\\", \\\"b\\\", \\\"c\\\"], [{\\\"nombre\\\": \\\"f\\\", \\\"padre\\\": None, \\\"ini\\\": 1, \\\"fin\\\": 3}], 3, 100)\\nprint(\\\"Cabe entero:\\\", res)\\n\\n# Caso 3: justo en el límite\\nres = mp.piezas_de_",
+     "resultado_caracteres": 392
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Usar P.cargar como indican los hechos\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\", sustituir={\\\"_tokens_de\\\": lambda lineas, ini, fin: fin - ini + 1})\\n\\n# Caso 1: vacío\\nres = m.piezas_de_archivo(\\\"x.py\\\", [], [], 0, 100)\\nprint(\\\"Caso vacío:\\\", res)\\n\\n# Caso 2: cabe entero\\nres = m.piezas_de_archivo(\\\"x.py\\\", [\\\"a\\\", \\\"b\\\", \\\"c\\\"], [{\\\"nombre\\\": \\\"f\\\", \\\"padre\\\": None, \\\"ini\\\"",
+     "resultado_caracteres": 795
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 459.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·et",
+   "prueba": "E8a",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "general",
+   "think": true,
+   "respuesta": "Sí, tiene un error de programación en `backend/particion_proyecto.py:108`.\n\n### El error\nEl bucle que subdivide un tramo que sigue excediendo el `tope` línea por línea tiene un fallo de índice y acumulación:\n\n```python\n        for n in range(ini, fin + 1):\n            t = _tokens_de(lineas, n, n)\n            if acumulado + t > tope and n > a:\n                cortados.append((a, n - 1, nombres if primero else []))\n                a, acumulado, primero = n + 1, 0, False  # ← LÍNEA 108\n            acumulado += t\n```\n\nAl detectar que la línea `n` hace que el tramo supere el límite, el código corta en `n-1`, pero establece `a = n + 1`, lo que **omite por completo la línea `n`**. Inmediatamente después, ejecuta `acumulado += t`, sumando los tokens de la línea omitida al acumulador de la siguiente línea. Esto provoca dos fallos: pérdida de contenido y conteo de tokens incorrecto para el siguiente fragmento.\n\n### Caso concreto\nArchivo de 3 líneas, cada una con `6` tokens. `tope = 10`.\n- **Comportamiento esperado:** Tres piezas de 1 línea cada una `[(1,1), (2,2), (3,3)]`, ya que `6+6=12 > 10`.\n- **Lo que devuelve el código actual:** `[(1,1), (3,3)]`. La línea 2 se pierde y sus `6` tokens se suman erróneamente al acumulador de la línea 3.\n\n### Corrección\nDebe iniciar el siguiente tramo en `n` y asignar su token directamente, evitando la suma duplicada o omitida:\n\n```python\n        for n in range(ini, fin + 1):\n            t = _tokens_de(lineas, n, n)\n            if acumulado + t > tope and n > a:\n                cortados.append((a, n - 1, nombres if primero else []))\n                a, acumulado, primero = n, t, False\n            else:\n                acumulado += t\n        cortados.append((a, fin, nombres if primero else []))\n```\n\nEl entorno restringido de `consola` impide inyectar mocks para `banco_proyecto` (no se puede importar `sys`), por lo que no puedo ejecutar la función con casos borde programáticamente. Sin embargo, **confirmo el error** mediante análisis estático del código en `backend/particion_proyecto.py:108-109`.\n\nEl bucle de corte por líneas tiene un fallo lógico:\n1.  **Salta la línea problemática:** Al detectar que la línea `n` supera el tope, establece `a = n + 1`, omitiendo por completo la línea `n` en el siguiente fragmento.\n2.  **Duplica el conteo:** Inmediatamente después, ejecuta `acumulado += t`, sumando el tamaño de la línea omitida (`t`) al acumulador de la siguiente línea.\n\n**Caso de fallo:**\nSi tienes líneas de 10 tokens y `tope = 15`:\n- Línea 1 (10): Cabe. Acumulado = 10.\n- Línea 2 (10): 10+10 > 15. Se corta antes.\n  - `a` pasa a ser 3 (se salta la línea 2).\n  - `acumulado` se reinicia a 0 y luego suma 10 (tamaño de la línea 2).\n- Línea 3 (10): El acumulador empieza en 10. 10+10 > 15. Se corta.\n  - Resultado: La línea 2 se pierde y la 3 empieza con un peso fantasma.\n\n**Corrección:**\nDebe iniciar el nuevo tramo en `n` y asignar su peso directamente, evitando la suma duplicada.\n\n```python\n        for n in range(ini, fin + 1):\n            t = _tokens_de(lineas, n, n)\n            if acumulado + t > tope and n > a:\n                cortados.append((a, n - 1, nombres if primero else []))\n                a, acumulado, primero = n, t, False\n            else:\n                acumulado += t\n        cortados.append((a, fin, nombres if primero else []))\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "modo unidad no disponible: con razonamiento",
+   "hechos_caracteres": 820,
+   "tokens": 14243,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"import backend.particion_proyecto as pp\\nimport banco_proyecto as bp\\n\\n# Mock: contar caracteres como tokens para simplificar\\npp.banco_proyecto.estimar_tokens = lambda t: sum(len(l) for l in t.split('\\\\n'))\\n\\n# Caso borde: 3 líneas de 10 caracteres cada una. Tope = 15.\\n# Esperado: 3 piezas de una línea (1,1), (2,2), (3,3).\\nlines = [\\\"A\\\" * 10, \\\"B\\\" * 10, \\\"C\\\" * 10]\\nres = pp.pie",
+     "resultado_caracteres": 207
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Cargar el módulo correctamente\\nm = P.cargar(\\\"backend/particion_proyecto.py\\\")\\n\\n# Patchear la función de tokenización para usar longitud de línea (simplificado)\\ndef mock_tokens(texto):\\n    return sum(len(l) for l in texto.split('\\\\n'))\\n\\nm.banco_proyecto.estimar_tokens = mock_tokens\\n\\n# Caso borde: 3 líneas de 10 caracteres. Tope = 15.\\n# Debería dar 3 piezas: (1,1), (2,2), (3",
+     "resultado_caracteres": 88
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"import sys\\n\\n# Crear un mock de banco_proyecto en sys.modules antes de cargar el módulo real\\nclass MockBP:\\n    @staticmethod\\n    def estimar_tokens(t):\\n        return sum(len(l) for l in t.split('\\\\n'))\\n    @staticmethod\\n    def _ES_TEST(ruta):\\n        return False\\n\\nsys.modules['banco_proyecto'] = MockBP()\\n\\n# Ahora cargar el módulo\\nm = P.cargar(\\\"backend/particion_proyecto",
+     "resultado_caracteres": 199
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 606.1,
+   "memoria_del_modelo": null
+  }
+ ]
+}

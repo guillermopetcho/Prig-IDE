@@ -1,0 +1,82 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 900,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 40
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5195,
+   "temp_c": 58
+  },
+  "segundos": 620,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2·t5",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "general",
+   "think": true,
+   "respuesta": "Sí, tiene un error de inicialización en la **línea 104**.\n\n### El error\n```python\nactual: Optional[Dict[str, Any]] = []  # Línea 104\n```\nLa variable `actual` se inicializa como una lista vacía `[]` en lugar de `None`.\n\n### Qué hace mal\nEl bucle de la línea 106 comprueba `if actual is not None`. Al ser `actual` una lista (que no es `None`), la condición devuelve `True`. Inmediatamente después, intenta acceder a `actual[\"tokens\"]` (línea 107). Como `actual` es una lista y no un diccionario, el código lanza un `TypeError`: *list indices must be integers or slices, not str*.\n\n### Caso concreto que falla\nIntenta particionar un archivo de código Python de producción (ej. `backend/app.py`) que tenga más tokens que `tope` (16000).\n\n1. El archivo es grande, así que pasa la validación inicial (línea 52) y se procesa hasta crear la lista `cortados` con varios tramos.\n2. Entra al bucle `for ini, fin, nombres in cortados:`.\n3. En la primera iteración, `actual` es `[]`.\n4. `actual is not None` es `True`.\n5. `actual[\"tokens\"]` provoca el crash.\n\n### Corrección\nCambiar la línea 104 por:\n```python\nactual: Optional[Dict[str, Any]] = None\n```\nCon esto, la primera iteración entrará en el `else` (línea 112) para crear el primer diccionario correctamente.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "modo unidad no disponible: con razonamiento",
+   "hechos_caracteres": 326,
+   "tokens": 3545,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 134.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·t6",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "general",
+   "think": true,
+   "respuesta": "",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "modo unidad no disponible: con razonamiento",
+   "hechos_caracteres": 326,
+   "tokens": 16384,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 485.1,
+   "memoria_del_modelo": null
+  }
+ ]
+}

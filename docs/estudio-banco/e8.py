@@ -4,6 +4,7 @@
   .venv/bin/python docs/estudio-banco/e8.py verdad       → corre los tests: base y cada error por separado
   .venv/bin/python docs/estudio-banco/e8.py preguntas    → escribe las preguntas (E8a, E8b, E8c)
   .venv/bin/python docs/estudio-banco/e8.py corregir     → ayudas automáticas para la auditoría a mano
+  .venv/bin/python docs/estudio-banco/e8.py pasada       → relee las unidades de la copia que cambiaron (con el caché alto)
   (la pasada de la copia y las preguntas se corren con lectura_unidades.py --pasada y sonda.py)
 
 Tres pruebas:
@@ -19,7 +20,7 @@ reutilizan las lecturas del motor y solo se releen las que cambiaron (eso tambi�
 El historial de cambios del banco se borra: si no, «Cambios desde tu última respuesta» y P.diff mostrarían los errores."""
 import glob, hashlib, json, os, random, re, shutil, sqlite3, subprocess, sys, tempfile, time
 ACCION = sys.argv[1]
-SISTEMA = "/home/ama-gi/Prig"
+SISTEMA = os.environ.get("PRIG_SISTEMA") or "/home/ama-gi/Prig"    # o una copia congelada (congelar_sistema.py)
 LIMPIA = os.path.expanduser("~/.cache/prig-estudio/repos/Prig")
 COPIA = os.path.expanduser("~/.cache/prig-estudio/repos-e8/Prig")
 BANCOS = os.path.expanduser("~/.cache/prig-estudio/bancos")
@@ -138,6 +139,38 @@ if ACCION == "preparar":
     json.dump(info, open(os.path.join(DIR, "preparacion.json"), "w"), ensure_ascii=False, indent=1)
     print(json.dumps({k: v for k, v in info.items() if k != "vencidas"}, ensure_ascii=False),
           "\nvencidas:", [(v["orden"], v["tokens"], v["rutas"][:3]) for v in info["vencidas"]])
+
+# ------------------------------------------------------------------------------------------------ pasada
+if ACCION == "pasada":
+    # Como lectura_unidades.main, pero con el tope del caché alto SOLO EN MEMORIA: con la configuración del usuario, un
+    # tope menor que lo guardado podaría lecturas que la medición necesita (docs/plan-texto-primero/T7-medicion.md)
+    import atexit
+    import banco_proyecto as bp, particion_proyecto as pp, lectura_unidades as lu
+    from ai_engine.ai_engine_class import AIEngine
+    ai = AIEngine()
+    ai.config["moe_contexto"] = "auto"
+    ai.config["moe_cache_gb"] = float(os.environ.get("PRIG_CACHE_GB", 60))
+    atexit.register(ai.unload_models)
+    banco = bp.BancoProyecto(COPIA)
+    assert banco.ruta_db.startswith(BANCOS), banco.ruta_db
+    banco.sincronizar()
+    pp.particionar(banco)
+
+    def sub(pregunta: str, contexto: str, max_tokens: int) -> str:
+        return "".join(ai.generate_response(f"{contexto}\n\n---\n{pregunta}", model=lector.modelo,
+                                            system_prompt="Answer briefly and precisely from the context only.",
+                                            think=False, options={"num_predict": int(max_tokens), "temperature": 0.3}))
+    lector = lu.LectorUnidades(banco, ai, generar_sub=sub)
+    total = len(lector._unidades)
+    t0 = time.time()
+    print(f"{time.strftime('%H:%M:%S')} pasada de la copia E8: {sum(lector.vigente(o) for o in lector._unidades)}/{total} vigentes", flush=True)
+
+    def progreso(r):
+        print(f"{time.strftime('%H:%M:%S')} [{time.time() - t0:6.0f} s] unidad {r['orden']:3d}/{total}: {r['origen']} "
+              f"{r['tokens']} tokens en {r['segundos']} s", flush=True)
+    hechas = lector.pasada(progreso=progreso)
+    print(f"FIN: {len(hechas)} leídas en {time.time() - t0:.0f} s; vigentes {sum(lector.vigente(o) for o in lector._unidades)}/{total}",
+          flush=True)
 
 # ------------------------------------------------------------------------------------------------ verdad (tests)
 def correr_tests(raiz, modulos, limite=240):

@@ -87,7 +87,9 @@ class TestLectura(unittest.TestCase):
         pregunta = self.lector.pregunta_con_contexto(u, "¿Qué hace usar?")
         self.assertIn("Uses from other units:", pregunta)
         self.assertIn("nucleo/base.py", pregunta)
-        self.assertTrue(pregunta.endswith("¿Qué hace usar?"))
+        # el pedido de idioma, pegado a la pregunta (T7: en castellano se respondía en inglés con código en inglés)
+        self.assertTrue(pregunta.endswith("QUESTION: ¿Qué hace usar?\n(Responde en castellano desde la primera línea.)"))
+        self.assertTrue(self.lector.pregunta_con_contexto(u, "What does usar return?").endswith("QUESTION: What does usar return?"))
 
     def test_tarjeta_congelada(self):
         tarjeta = self.lector.tarjeta_global()
@@ -196,6 +198,23 @@ class TestLectura(unittest.TestCase):
         self.lector.leer(con_util)
         self.assertTrue(self.lector.elegir_unidad("¿Qué devuelve `util` en nucleo/base.py?")["vigente"])
         self.assertIsNone(self.lector.elegir_unidad("xyzzy")["orden"])  # nada coincide
+
+    def test_enrutador_constantes_y_palabras_de_la_ruta(self):
+        """ T7: «¿Cuánto vale `MESETA_S` en `backend/recursos/termico.py`?» iba a general: la constante no es un símbolo
+        del banco y las palabras de la ruta sumaban puntos a otras unidades """
+        raiz = os.path.join(self.tmp, "q")
+        os.makedirs(os.path.join(raiz, "config"))
+        with open(os.path.join(raiz, "config", "limites.py"), "w") as f:
+            f.write("TOPE_MAXIMO = 10\n\n\ndef tope():\n    return TOPE_MAXIMO\n")
+        with open(os.path.join(raiz, "otro.py"), "w") as f:
+            f.write("def limites():\n    return 0\n\n\ndef config():\n    return {}\n")
+        banco = bp.BancoProyecto(raiz, carpeta=os.path.join(self.tmp, "banco_q"))
+        banco.sincronizar()
+        pp.particionar(banco, tope=20)
+        lector = lu.LectorUnidades(banco, self.ai)
+        con_tope = [o for o, u in lector._unidades.items() if "config/limites.py" in u["rutas"]][0]
+        r = lector.elegir_unidad("¿Cuánto vale la constante `TOPE_MAXIMO` en `config/limites.py`?")
+        self.assertEqual(r["orden"], con_tope)
 
     def test_cambiar_el_codigo_invalida_la_lectura(self):
         self.lector.leer(0)

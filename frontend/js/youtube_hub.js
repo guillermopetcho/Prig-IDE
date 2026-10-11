@@ -3524,6 +3524,7 @@ const VIDEOS_CURADOS = [
                 </div>
               </div>
               <div class="yt-header-right">
+                <button class="yt-btn" id="yt-btn-ver-grafo-yt" style="background:rgba(203,166,247,0.15); border:1px solid #cba6f7; color:#cba6f7;" title="Ver tema en el Grafo de Aprendizaje"><i class="fa-solid fa-diagram-project"></i> Grafo DAG</button>
                 <button class="yt-btn ${estado.ocultarTextoPlayer ? 'azul' : ''}" id="yt-btn-toggle-detalles" title="Ocultar o mostrar texto descriptivo del video (Modo Cine)"><i class="fa-solid ${estado.ocultarTextoPlayer ? 'fa-eye' : 'fa-eye-slash'}"></i> ${estado.ocultarTextoPlayer ? 'Mostrar texto' : 'Modo Cine'}</button>
                 <button class="yt-btn rojo" id="yt-btn-abrir-externo-header" title="Abrir video en el navegador web del sistema (Chrome, Firefox, etc.)"><i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir en Navegador</button>
                 <a class="yt-btn" href="${enlaceExterno}" target="_blank" rel="noopener noreferrer" title="Enlace directo a YouTube"><i class="fa-brands fa-youtube"></i> Ver en YouTube</a>
@@ -4199,6 +4200,16 @@ const VIDEOS_CURADOS = [
                 estado.ocultarTextoPlayer = !estado.ocultarTextoPlayer;
                 localStorage.setItem('prig_yt_ocultar_texto_player', estado.ocultarTextoPlayer);
                 pintar();
+            };
+        }
+
+        // Puente hacia el Grafo de Aprendizaje
+        const btnVerGrafo = $('yt-btn-ver-grafo-yt');
+        if (btnVerGrafo) {
+            btnVerGrafo.onclick = () => {
+                if (window.MotorAprendizajeGrafo) {
+                    window.MotorAprendizajeGrafo.abrirConBusqueda(v.titulo || v.id);
+                }
             };
         }
 

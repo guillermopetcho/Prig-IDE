@@ -3,7 +3,9 @@ condiciones que los lotes de E7 (lote.py) pero sin el examen.
 
   .venv/bin/python docs/estudio-banco/sonda.py RAIZ PREGUNTAS.json SALIDA.json [--memoria] [--limite 600]
 
-PREGUNTAS.json: [{"id": ..., "pregunta": ...}, ...] (los demás campos se copian al informe tal cual).
+PREGUNTAS.json: [{"id": ..., "pregunta": ...}, ...] (los demás campos se copian al informe tal cual). Cada pregunta
+puede traer su "modo" (pisa a --modo), "think": true y "hechos_al_final": true (solo modo general; segunda tanda de T7): los hechos del
+banco van después del paquete, pegados a la pregunta, como en el modo unidad, en vez de arriba de todo.
 El informe guarda, por pregunta: la respuesta, los segundos, el modo (unidad / general), las consultas a la consola
 y si se cortó por tiempo. La corrección va aparte (e8.py, e9.py y la auditoría a mano).
 
@@ -13,9 +15,11 @@ usuario no se toca). Los bancos de las copias viven en ~/.cache/prig-estudio/ban
 import asyncio, atexit, contextlib, json, os, subprocess, sys, time
 RAIZ, PREGUNTAS, SALIDA = (os.path.abspath(os.path.expanduser(x)) for x in sys.argv[1:4])
 MEMORIA = "--memoria" in sys.argv
+MODO = sys.argv[sys.argv.index("--modo") + 1] if "--modo" in sys.argv else None     # auto | general | unidad (T7)
 LIMITE_S = int(sys.argv[sys.argv.index("--limite") + 1]) if "--limite" in sys.argv else 600
 os.environ["PRIG_BANCOS"] = os.path.expanduser("~/.cache/prig-estudio/bancos")
-SISTEMA = "/home/ama-gi/Prig"
+# El sistema bajo prueba: el repositorio de trabajo, o una copia congelada (docs/estudio-banco/congelar_sistema.py)
+SISTEMA = os.environ.get("PRIG_SISTEMA") or "/home/ama-gi/Prig"
 sys.path.insert(0, os.path.join(SISTEMA, "backend"))
 import banco_proyecto as bp, lectura_unidades as lu
 bp.BancoProyecto._embebedor_ok = lambda self: False
@@ -61,7 +65,32 @@ os.chdir(os.path.join(SISTEMA, "backend"))
 import app as A
 A.bancos.embebedor_listo = lambda: False
 A.file_mgr.base_dir = RAIZ; A.ai_engine.config["moe_contexto"] = "auto"
+A.ai_engine.config["moe_cache_gb"] = float(os.environ.get("PRIG_CACHE_GB", 60))    # solo en memoria: no poda lecturas
+condiciones.update({"modo": MODO or "auto", "cache_gb": A.ai_engine.config["moe_cache_gb"]})
 atexit.register(A.ai_engine.unload_models)
+
+# «hechos al final» (T7, segunda tanda): el mismo bloque de hechos, después del paquete en vez de antes. Solo el arnés
+# cambia; el sistema congelado no. El modo unidad sigue recibiendo sus hechos (AL_FINAL solo se enciende en general).
+import memoria_consulta as MC
+_hechos_orig, _preparar_orig, AL_FINAL = MC.hechos_de_la_pregunta, A._preparar_banco, [False]
+
+
+def _hechos(banco, pregunta, *a, **k):
+    return "" if AL_FINAL[0] else _hechos_orig(banco, pregunta, *a, **k)
+
+
+def _preparar(req, modelo):
+    banco, info, mapa, ctx = _preparar_orig(req, modelo)
+    if AL_FINAL[0] and banco is not None:
+        h = _hechos_orig(banco, req.prompt)
+        if h:
+            ctx = f"{ctx}\n\n{h}" if ctx else h
+        if info is not None:
+            info["hechos_al_final_caracteres"] = len(h)
+    return banco, info, mapa, ctx
+
+
+MC.hechos_de_la_pregunta, A._preparar_banco = _hechos, _preparar
 
 
 def cortar_generacion():
@@ -93,9 +122,10 @@ def limpiar_memoria_escrita():
     return {"notas": notas, "resoluciones": resol} if (notas or resol) else None
 
 
-def preguntar(texto):
+def preguntar(texto, modo=None, think=False):
     """ Igual que lote.preguntar: el flujo del chat con banco, cortado como el botón Detener si pasa el límite """
-    req = A.AIChatRequest(prompt=texto, model="qwen3.6-35b-moe:prig", eventos=True, banco=True, think=False, memoria=MEMORIA)
+    req = A.AIChatRequest(prompt=texto, model="qwen3.6-35b-moe:prig", eventos=True, banco=True, think=think, memoria=MEMORIA,
+                          banco_modo=modo or MODO)
     res = A.ai_chat(req)
     trozos = []
     async def leer():
@@ -113,7 +143,7 @@ def preguntar(texto):
                 await it.aclose()
     corte = [None]
     agotada = asyncio.run(leer())
-    salida, tokens, modo, usadas, unidad = "", 0, "general", [], None
+    salida, tokens, modo, usadas, unidad, motivo, hechos = "", 0, "general", [], None, None, 0
     for linea in "".join((c.decode() if isinstance(c, bytes) else c) for c in trozos).splitlines():
         if not linea.strip(): continue
         try:
@@ -124,20 +154,27 @@ def preguntar(texto):
         if ev["t"] == "texto": salida += ev["v"]
         elif ev["t"] == "banco":
             modo = ev["v"].get("modo") or "general"; unidad = ev["v"].get("unidad", unidad)
+            motivo = ev["v"].get("motivo", motivo)
+            hechos = ev["v"].get("hechos_al_final_caracteres") or ev["v"].get("hechos_caracteres", hechos)
         elif ev["t"] == "stats": tokens += ev["v"].get("tokens_respuesta", 0)
         elif ev["t"] == "herramienta":
             usadas.append({"nombre": ev.get("nombre"), "argumentos": json.dumps(ev.get("argumentos"), ensure_ascii=False)[:400]})
         elif ev["t"] == "resultado" and usadas:
             usadas[-1]["resultado_caracteres"] = len(str(ev.get("v") or ""))
-    return {"respuesta": salida, "agotada": agotada, "corte": corte[0], "modo": modo, "unidad": unidad, "tokens": tokens,
-            "consultas": usadas}
+    return {"respuesta": salida, "agotada": agotada, "corte": corte[0], "modo": modo, "unidad": unidad, "motivo": motivo,
+            "hechos_caracteres": hechos, "tokens": tokens, "consultas": usadas}
 
 
 t0, resultados = time.time(), []
 for i, p in enumerate(preguntas, 1):
     t = time.time()
-    r = preguntar(p["pregunta"])
-    r = {**p, **r, "segundos": round(time.time() - t, 1)}
+    modo_p = p.get("modo") or MODO
+    if p.get("hechos_al_final") and modo_p != "general":
+        print("NO SE CORRE la sonda · hechos_al_final es solo para modo general:", p["id"]); sys.exit(1)
+    AL_FINAL[0] = bool(p.get("hechos_al_final"))
+    r = preguntar(p["pregunta"], modo_p, bool(p.get("think")))
+    AL_FINAL[0] = False
+    r = {**p, **r, "modo_pedido": modo_p, "segundos": round(time.time() - t, 1)}
     if not MEMORIA:
         r["memoria_del_modelo"] = limpiar_memoria_escrita()
     resultados.append(r)

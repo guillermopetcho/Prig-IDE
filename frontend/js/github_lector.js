@@ -209,11 +209,16 @@
             <button class="gh-nav-item" data-vista="buscar" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
             <button class="gh-nav-item" data-vista="guardados" title="Guardados"><i class="fa-solid fa-bookmark"></i> Guardados</button>
             <button class="gh-nav-item" data-vista="repo" id="gh-nav-repo" hidden><i class="fa-solid fa-book"></i> <span></span></button>
+            <button class="gh-nav-item" id="gh-nav-grafo" title="Ver en Grafo de Aprendizaje" style="color:#cba6f7;"><i class="fa-solid fa-diagram-project" style="color:#cba6f7;"></i> Grafo DAG</button>
             <span style="flex:1"></span>
             <div id="gh-token" class="gh-ayuda" style="padding:6px;"></div>
           </nav>
           <main class="gh-hoja" id="gh-hoja"></main>`;
         $('gh-nav').onclick = (e) => {
+            if (e.target.closest('#gh-nav-grafo')) {
+                if (window.MotorAprendizajeGrafo) window.MotorAprendizajeGrafo.abrir();
+                return;
+            }
             const b = e.target.closest('[data-vista]');
             if (b) ir(b.dataset.vista);
         };

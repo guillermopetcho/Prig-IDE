@@ -7,6 +7,7 @@
   <title>Prig IDE - Editor de Código & Tutor IA</title>
   <link rel="stylesheet" href="/static/css/style.css?v=9">
   <link rel="stylesheet" href="/static/css/rediseno.css?v=20">
+  <link rel="stylesheet" href="/static/css/editor_razonamiento.css?v=1">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -529,83 +530,128 @@
                       <span>Cerebro IA</span>
                       <span id="badge-cerebro-memoria" style="background: #cba6f7; color: #11111b; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 10px; margin-left: 2px;">0 leídos</span>
                     </button>
+                    <!-- BOTÓN RAZONAMIENTO DEL MODELO (25% Ancho Minimapa) -->
+                    <button id="btn-editor-razonamiento" class="btn-editor-hud-secundario activo" title="Panel de razonamiento del modelo sobre el código (25% ancho minimapa)" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('razonamiento');" style="display: flex; align-items: center; gap: 6px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-brain-circuit" style="font-size: 12px;"></i>
+                      <span>Razonamiento</span>
+                      <span id="badge-razonamiento-estado" style="background: rgba(137, 180, 250, 0.28); color: #89b4fa; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">CoT</span>
+                    </button>
+                    <!-- BOTÓN NOTAS TÉCNICAS SOBRE EL CÓDIGO -->
+                    <button id="btn-editor-notas" class="btn-editor-hud-secundario" title="Notas técnicas profesionales y anotaciones estructuradas sobre el código" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('notas');" style="display: flex; align-items: center; gap: 6px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-clipboard-list" style="font-size: 12px;"></i>
+                      <span>Notas</span>
+                      <span id="badge-notas-contador" style="background: rgba(166, 227, 161, 0.25); color: #a6e3a1; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">0</span>
+                    </button>
+                    <!-- BOTÓN RELACIÓN VISUAL (Corchetes y Flechas) -->
+                    <button id="btn-editor-relacion-visual" class="btn-editor-hud-secundario activo" title="Activar/Desactivar corchetes grandes y flechas de conexión sobre el código" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarConectores();" style="display: flex; align-items: center; gap: 5px; background: rgba(203, 166, 247, 0.14); border: 1px solid rgba(203, 166, 247, 0.35); color: #cba6f7; border-radius: 6px; padding: 4px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-diagram-project"></i>
+                      <span>Conectores</span>
+                    </button>
                   </div>
                 </div>
 
-                <!-- Cuadrícula flexible de columnas del editor -->
-                <div id="editor-grid-container" class="editor-grid-container">
-                  <!-- COLUMNA 0 (Principal / Izquierda) -->
-                  <div id="editor-col-0" class="editor-col activa" data-col="0" style="flex: 1 1 100%; width: 100%;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
-                        <!-- Open file tabs dynamically injected -->
+                <!-- Contenedor Wrapper del Área de Trabajo del Editor -->
+                <div id="editor-area-wrapper" class="editor-area-wrapper">
+                  <!-- SVG Overlay para flechas, corchetes grandes y anotaciones en código -->
+                  <svg id="editor-overlay-conectores" class="editor-overlay-conectores">
+                    <defs>
+                      <marker id="flecha-conector-azul" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#89b4fa" />
+                      </marker>
+                      <marker id="flecha-conector-verde" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#a6e3a1" />
+                      </marker>
+                      <marker id="flecha-conector-morado" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#cba6f7" />
+                      </marker>
+                    </defs>
+                    <g id="capa-corchetes-codigo"></g>
+                    <g id="capa-flechas-codigo"></g>
+                    <g id="capa-badges-codigo"></g>
+                  </svg>
+
+                  <!-- Cuadrícula flexible de columnas del editor -->
+                  <div id="editor-grid-container" class="editor-grid-container" style="flex: 1 1 75%; min-width: 0; width: auto;">
+                    <!-- COLUMNA 0 (Principal / Izquierda) -->
+                    <div id="editor-col-0" class="editor-col activa" data-col="0" style="flex: 1 1 100%; width: 100%;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
+                          <!-- Open file tabs dynamically injected -->
+                        </div>
+                        <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
+                          <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
+                          <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
                       </div>
-                      <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
-                        <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
-                        <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                      <div class="editor-col-body">
+                        <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
+                          <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
+                            Cuaderno Jupyter</button>
+                          <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
+                            Raw</button>
+                        </div>
+                        <div id="monaco-editor-container" class="monaco-container"></div>
+                        <div id="notebook-view-container" style="display:none;"></div>
                       </div>
                     </div>
-                    <div class="editor-col-body">
-                      <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
-                        <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
-                          Cuaderno Jupyter</button>
-                        <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
-                          Raw</button>
+
+                    <!-- DIVISOR 0 (Entre Col 0 y Col 1) -->
+                    <div id="editor-resizer-0" class="editor-col-resizer" data-resizer="0" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                    <!-- COLUMNA 1 (Centro o Derecha) -->
+                    <div id="editor-col-1" class="editor-col" data-col="1" style="display: none;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
+                          <!-- Pestañas de Columna 1 -->
+                        </div>
+                        <div class="editor-col-actions">
+                          <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
+                          <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                          <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                          <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
                       </div>
-                      <div id="monaco-editor-container" class="monaco-container"></div>
-                      <div id="notebook-view-container" style="display:none;"></div>
+                      <div class="editor-col-body">
+                        <div id="monaco-editor-container-1" class="monaco-container"></div>
+                        <div id="editor-col-empty-1" class="editor-col-empty" style="display: none;">
+                          <i class="fa-solid fa-code"></i>
+                          <p>Panel de código secundario</p>
+                          <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- DIVISOR 1 (Entre Col 1 y Col 2) -->
+                    <div id="editor-resizer-1" class="editor-col-resizer" data-resizer="1" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                    <!-- COLUMNA 2 (Derecha extrema) -->
+                    <div id="editor-col-2" class="editor-col" data-col="2" style="display: none;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
+                          <!-- Pestañas de Columna 2 -->
+                        </div>
+                        <div class="editor-col-actions">
+                          <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                          <button class="editor-col-action-btn cerrar" data-cerrar-col="2" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                      </div>
+                      <div class="editor-col-body">
+                        <div id="monaco-editor-container-2" class="monaco-container"></div>
+                        <div id="editor-col-empty-2" class="editor-col-empty" style="display: none;">
+                          <i class="fa-solid fa-code"></i>
+                          <p>Panel de código terciario</p>
+                          <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- DIVISOR 0 (Entre Col 0 y Col 1) -->
-                  <div id="editor-resizer-0" class="editor-col-resizer" data-resizer="0" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+                  <!-- DIVISOR REDIMENSIONABLE PARA EL PANEL DE RAZONAMIENTO -->
+                  <div id="editor-razonamiento-resizer" class="editor-razonamiento-resizer" title="Arrastra para ajustar el ancho del panel de razonamiento"></div>
 
-                  <!-- COLUMNA 1 (Centro o Derecha) -->
-                  <div id="editor-col-1" class="editor-col" data-col="1" style="display: none;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
-                        <!-- Pestañas de Columna 1 -->
-                      </div>
-                      <div class="editor-col-actions">
-                        <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
-                        <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
-                        <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
-                        <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
-                      </div>
-                    </div>
-                    <div class="editor-col-body">
-                      <div id="monaco-editor-container-1" class="monaco-container"></div>
-                      <div id="editor-col-empty-1" class="editor-col-empty" style="display: none;">
-                        <i class="fa-solid fa-code"></i>
-                        <p>Panel de código secundario</p>
-                        <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- DIVISOR 1 (Entre Col 1 y Col 2) -->
-                  <div id="editor-resizer-1" class="editor-col-resizer" data-resizer="1" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
-
-                  <!-- COLUMNA 2 (Derecha extrema) -->
-                  <div id="editor-col-2" class="editor-col" data-col="2" style="display: none;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
-                        <!-- Pestañas de Columna 2 -->
-                      </div>
-                      <div class="editor-col-actions">
-                        <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
-                        <button class="editor-col-action-btn cerrar" data-cerrar-col="2" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
-                      </div>
-                    </div>
-                    <div class="editor-col-body">
-                      <div id="monaco-editor-container-2" class="monaco-container"></div>
-                      <div id="editor-col-empty-2" class="editor-col-empty" style="display: none;">
-                        <i class="fa-solid fa-code"></i>
-                        <p>Panel de código terciario</p>
-                        <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
-                      </div>
-                    </div>
-                  </div>
+                  <!-- PANEL DE RAZONAMIENTO Y NOTAS DEL MODELO (25% ANCHO, 100% ALTURA) -->
+                  <aside id="editor-panel-razonamiento" class="editor-panel-razonamiento" style="width: 25%; min-width: 280px; max-width: 520px; height: 100%; display: flex; flex-direction: column;">
+                  </aside>
                 </div>
 
                 <!-- Sin archivos abiertos: nada de «Hola, mundo», solo cómo empezar -->
@@ -830,6 +876,22 @@
         </div>
         <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
           <div id="youtube-raiz" style="height:100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grafo de Aprendizaje: Motor Pedagógico Unificado (YouTube, GitHub, Kaggle, Prig Hub) -->
+    <div id="modal-aprendizaje-grafo" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1450px; height: 92vh; display: flex; flex-direction: column; background: var(--bg-panel, #181825); padding: 0;">
+        <div class="modal-header" style="padding: 10px 16px; border-bottom: 1px solid var(--border-color, #313244); display: flex; align-items: center; justify-content: space-between;">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px;">
+            <i class="fa-solid fa-diagram-project" style="color: #cba6f7; font-size: 16px;"></i>
+            <span>Grafo de Aprendizaje Prig · YouTube · GitHub · Kaggle · Prig Hub</span>
+          </div>
+          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="if (window.workArea && window.workArea.vistas.some(v => v.modalId === 'modal-aprendizaje-grafo')) window.workArea.cerrar('h:modal-aprendizaje-grafo'); else document.getElementById('modal-aprendizaje-grafo').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 0; flex: 1; min-height: 0; overflow: hidden;">
+          <div id="aprendizaje-grafo-raiz" style="height:100%; width: 100%;"></div>
         </div>
       </div>
     </div>
@@ -3007,6 +3069,7 @@
   <script src="/static/js/workarea.js?v=17"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
   <script src="/static/js/editor.js?v=16"></script>
+  <script src="/static/js/editor_razonamiento.js?v=1"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=9"></script>
   <script src="/static/js/menu_rueda_archivos.js?v=1"></script>
@@ -3018,6 +3081,7 @@
   <script src="/static/js/github_widget.js?v=1"></script>
   <script src="/static/js/youtube_hub.js?v=18"></script>
   <script src="/static/js/prig_hub.js?v=5"></script>
+  <script src="/static/js/motor_aprendizaje_grafo.js?v=1"></script>
   <script src="/static/js/inicio.js?v=7"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
