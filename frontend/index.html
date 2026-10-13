@@ -162,7 +162,7 @@
   <div id="app-container">
 
     <!-- Top Navigation & Toolbar Header -->
-    <!-- Barra superior única: todo se ordena dentro de estos seis menús -->
+    <!-- Barra superior de menús y plan de estudio -->
     <div id="prig-topbar">
       <div id="prig-menubar-mount"></div>
       <div id="prig-topbar-derecha">
@@ -177,7 +177,6 @@
         <span id="current-workspace-name">Prig</span>
       </div>
     </div>
-
     <!-- Entornos de trabajo, al estilo del selector de escritorios de Ubuntu -->
 
 
@@ -542,32 +541,13 @@
                       <span>Notas</span>
                       <span id="badge-notas-contador" style="background: rgba(166, 227, 161, 0.25); color: #a6e3a1; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">0</span>
                     </button>
-                    <!-- BOTÓN RELACIÓN VISUAL (Corchetes y Flechas) -->
-                    <button id="btn-editor-relacion-visual" class="btn-editor-hud-secundario activo" title="Activar/Desactivar corchetes grandes y flechas de conexión sobre el código" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarConectores();" style="display: flex; align-items: center; gap: 5px; background: rgba(203, 166, 247, 0.14); border: 1px solid rgba(203, 166, 247, 0.35); color: #cba6f7; border-radius: 6px; padding: 4px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                      <i class="fa-solid fa-diagram-project"></i>
-                      <span>Conectores</span>
-                    </button>
                   </div>
                 </div>
 
                 <!-- Contenedor Wrapper del Área de Trabajo del Editor -->
                 <div id="editor-area-wrapper" class="editor-area-wrapper">
-                  <!-- SVG Overlay para flechas, corchetes grandes y anotaciones en código -->
-                  <svg id="editor-overlay-conectores" class="editor-overlay-conectores">
-                    <defs>
-                      <marker id="flecha-conector-azul" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#89b4fa" />
-                      </marker>
-                      <marker id="flecha-conector-verde" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#a6e3a1" />
-                      </marker>
-                      <marker id="flecha-conector-morado" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#cba6f7" />
-                      </marker>
-                    </defs>
-                    <g id="capa-corchetes-codigo"></g>
-                    <g id="capa-flechas-codigo"></g>
-                    <g id="capa-badges-codigo"></g>
+                  <!-- SVG Overlay Oculto (Los números de línea brillantes reemplazan los corchetes) -->
+                  <svg id="editor-overlay-conectores" class="editor-overlay-conectores" style="display: none;">
                   </svg>
 
                   <!-- Cuadrícula flexible de columnas del editor -->
@@ -3058,8 +3038,8 @@
   <script src="/static/js/biblioteca_ascii.js?v=2"></script>
   <script src="/static/js/agentes_ascii.js?v=1"></script>
   <script src="/static/js/cerebro_memoria.js?v=1"></script>
-  <script src="/static/js/motor_movimiento.js?v=5"></script>
-  <script src="/static/js/audio_reactivo.js?v=1"></script>
+  <script src="/static/js/motor_grafico_fachada.js?v=1"></script>
+  <script src="/static/js/motor_movimiento.js?v=6"></script>
   <script src="/static/js/apariencia.js?v=21"></script>
   <script src="/static/js/sintaxis_personalizada.js?v=9"></script>
   <script src="/static/js/shortcuts.js?v=10"></script>

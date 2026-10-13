@@ -1,0 +1,14 @@
+[package]
+name = "prig-recursos"
+version = "0.1.0"
+edition = "2021"
+
+# Recursos de la máquina: sensores, gobernador térmico, modo frío, calculadora (backend/recursos/ en Python).
+# Rust puro: lo usa el backend de Python por PyO3 (prig-nativo-py) y, después, el servidor en Rust.
+
+[dependencies]
+libc = "0.2"
+# Ollama en local y el registro de modelos (las peticiones que hacía requests)
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+# La huella de la máquina (sha256, como hashlib)
+sha2 = "0.10"

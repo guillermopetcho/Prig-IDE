@@ -1,0 +1,20 @@
+[package]
+name = "prig-render-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Prig Team"]
+description = "Módulo WebAssembly para renderizado de alta performance en Prig"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+prig-render-core = { path = "../prig-render-core" }
+prig-ascii-engine = { path = "../prig-ascii-engine" }
+
+[features]
+default = []
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

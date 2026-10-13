@@ -11,6 +11,10 @@ sentido con el programa en marcha:
   · opciones para una petición: lo aplicado por el usuario manda; si no hay, la
     recomendación.
   · recuperación de falta de memoria en caliente, recordando lo que funcionó.
+
+Las decisiones (medidas válidas, estado en vivo y avisos, recomendación ajustada por lo probado)
+están en Rust (backend-rust/crates/prig-recursos, gestor.rs); aquí quedan las cachés y el
+encadenado con las demás piezas.
 """
 
 import threading
@@ -19,10 +23,15 @@ from typing import Any, Dict, List, Optional
 
 from . import calibracion, detector, ficha as fichas_mod, termico as termico_mod
 from .almacen import almacen
-from .calculadora import GB, Maquina, elegir_modelo, recomendar
+from .calculadora import Maquina, elegir_modelo, recomendar
 from .perfiles import PERFILES
 
 REFRESCO_S = 5
+
+
+def _rs():
+    from nativo_rust import rust
+    return rust().gestor
 
 
 class Gestor:
@@ -95,14 +104,7 @@ class Gestor:
     # ------------------------------------------------------------ recomendar
     def medidas(self) -> Dict[str, Dict[str, Any]]:
         """ Calidad del canario por modelo, de las pruebas en esta máquina """
-        por_modelo: Dict[str, Dict[str, Any]] = {}
-        for clave, p in almacen().pruebas().items():
-            modelo = clave.split("|")[0]
-            if p.get("ok") and p.get("calidad") is not None:
-                previa = por_modelo.get(modelo)
-                if not previa or p.get("fecha", "") > previa.get("fecha", ""):
-                    por_modelo[modelo] = p
-        return por_modelo
+        return _rs().medidas(almacen().pruebas())
 
     def veredictos(self, perfil: str = "tutor", tirador: str = "equilibrado") -> Dict[str, Any]:
         maq = self.maquina()
@@ -121,19 +123,8 @@ class Gestor:
         maq = self.maquina()
         f = self.ficha(modelo)
         rec = recomendar(f, maq, perfil, tirador)
-        p = almacen().prueba(f["nombre"], perfil)
-        if p:
-            rec["prueba"] = p
-            # Lo medido manda: si la prueba tuvo que bajar el contexto, se respeta
-            if p.get("ok") and p.get("opciones", {}).get("num_ctx", 1e9) < rec["opciones"].get("num_ctx", 0):
-                rec["opciones"]["num_ctx"] = p["opciones"]["num_ctx"]
-                rec["ajustada_por_prueba"] = True
-        rec["ficha"] = {k: f.get(k) for k in
-                        ("nombre", "origen", "arquitectura", "cuantizacion", "parametros",
-                         "parametros_activos", "es_moe", "capas", "contexto_max", "piensa",
-                         "vision", "herramientas", "estimada")}
-        rec["ficha"]["gb"] = round(f.get("bytes_peso", 0) / GB, 2)
-        return rec
+        # Lo medido manda: si la prueba tuvo que bajar el contexto, se respeta
+        return _rs().completar_recomendacion(rec, almacen().prueba(f["nombre"], perfil), f)
 
     def opciones_para(self, perfil: str, modelo: str) -> Dict[str, Any]:
         """ Lo que una petición de este uso debe mandar a Ollama """
@@ -148,46 +139,8 @@ class Gestor:
     # ------------------------------------------------------------ en vivo
     def estado_vivo(self) -> Dict[str, Any]:
         rad = self.radiografia()
-        g = (rad.get("gpus") or [{}])[0]
-        mem = rad.get("memoria") or {}
-        temp = g.get("temperatura_c")
         gob = termico_mod.gobernador()
-        if temp is None:
-            termico = "desconocido"
-        elif temp >= gob.limite:
-            termico = "caliente"
-        elif temp >= gob.reanudar:
-            termico = "templado"
-        else:
-            termico = "normal"
-        avisos = []
-        ajenos = g.get("otros_procesos") or []
-        if ajenos:
-            mb = sum(p.get("mb", 0) for p in ajenos)
-            avisos.append(f"Otros programas usan {mb / 1024:.1f} GB de la GPU "
-                          f"({', '.join(sorted({p['proceso'] for p in ajenos}))}): "
-                          f"queda menos sitio para los modelos.")
-        if mem.get("swap_usada", 0) > 1 * GB:
-            avisos.append(f"El sistema está usando {mem['swap_usada'] / GB:.1f} GB de swap: "
-                          f"con un modelo repartido en RAM irá muy lento.")
-        ener = rad.get("energia") or {}
-        if ener.get("con_bateria"):
-            avisos.append("Estás con batería: la GPU rinde menos y se agota rápido.")
-        if termico == "caliente":
-            avisos.append(f"La GPU está a {temp:.0f} °C (límite {gob.limite:.0f}). Los "
-                          f"flujos se pausan hasta que baje a {gob.reanudar:.0f}.")
-        return {
-            "gpu": {k: g.get(k) for k in ("nombre", "vram_total_mb", "vram_usada_mb",
-                                           "temperatura_c", "consumo_w", "uso_pct")},
-            "termico": termico,
-            "ram_disponible_gb": round(mem.get("ram_disponible", 0) / GB, 1),
-            "swap_usada_gb": round(mem.get("swap_usada", 0) / GB, 1),
-            "energia": ener,
-            "ollama": {k: (rad.get("ollama") or {}).get(k) for k in
-                       ("responde", "version", "dueno", "modelos_cargados")},
-            "otros_procesos_gpu": ajenos,
-            "avisos": avisos,
-        }
+        return _rs().estado_vivo(rad, gob.limite, gob.reanudar)
 
     # ------------------------------------------------------------ OOM
     def recuperar_oom(self, modelo: str, opciones: Dict[str, Any],

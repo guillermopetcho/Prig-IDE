@@ -1,0 +1,10 @@
+[package]
+name = "prig-ascii-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Prig Team"]
+description = "Motor de personajes ASCII analítico y HUD de telemetría"
+
+[dependencies]
+prig-render-core = { path = "../prig-render-core" }
+

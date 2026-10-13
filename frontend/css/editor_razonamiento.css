@@ -589,363 +589,124 @@
     color: #cdd6f4;
 }
 
-/* SVG Overlay de Relación Visual (Corchetes, Flechas y Badges) */
-.editor-overlay-conectores {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 10;
-    overflow: visible;
+/* ============================================================================
+   ILUMINACIÓN BRILLANTE DE NÚMEROS DE LÍNEA EN EL EDITOR (EN VEZ DE CORCHETES)
+   ============================================================================ */
+
+/* Iluminación Neon Cyan de Números de Línea Activos */
+.monaco-editor .margin .prig-line-number-bright,
+.monaco-editor .margin-view-overlays .prig-line-number-bright,
+.monaco-editor .margin-view-overlays .prig-line-number-bright .line-numbers,
+.monaco-editor .prig-line-number-bright,
+.monaco-editor .prig-line-number-bright .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright {
+    color: #00f0ff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #00f0ff, 0 0 16px rgba(0, 240, 255, 0.8) !important;
+    transition: color 0.15s ease, text-shadow 0.15s ease;
 }
 
-.conector-bracket-path {
-    stroke: #89b4fa;
-    stroke-width: 2.2;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    filter: drop-shadow(0 0 4px rgba(137, 180, 250, 0.5));
-    transition: d 0.1s ease;
+/* Indicador de barra vertical neón elegante en el margen izquierdo */
+.monaco-editor .prig-gutter-neon-bar {
+    background: #00f0ff !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #00f0ff, 0 0 14px rgba(0, 240, 255, 0.75) !important;
 }
 
-.conector-arrow-path {
-    stroke: #cba6f7;
-    stroke-width: 1.8;
-    stroke-dasharray: 6, 4;
-    fill: none;
-    stroke-linecap: round;
-    animation: flujoAnimadoFlecha 1.5s linear infinite;
-    filter: drop-shadow(0 0 5px rgba(203, 166, 247, 0.6));
+/* Tinte sutil en las líneas de código activas (limpio, sin tapar la sintaxis) */
+.monaco-editor .prig-code-active-tint {
+    background: rgba(0, 240, 255, 0.04) !important;
+    border-left: 2px solid rgba(0, 240, 255, 0.6) !important;
 }
 
-@keyframes flujoAnimadoFlecha {
-    from { stroke-dashoffset: 0; }
-    to { stroke-dashoffset: -20; }
+/* Variantes de color por tipo de diagnóstico o nota */
+.monaco-editor .margin .prig-line-number-bright-green,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-green,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-green .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright-green {
+    color: #a6e3a1 !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #a6e3a1, 0 0 16px rgba(166, 227, 161, 0.8) !important;
 }
 
-.conector-badge-callout {
-    pointer-events: auto;
-    cursor: pointer;
-    font-family: 'Fira Code', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    transition: transform 0.15s ease;
+.monaco-editor .prig-gutter-neon-bar-green {
+    background: #a6e3a1 !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #a6e3a1, 0 0 14px rgba(166, 227, 161, 0.75) !important;
 }
 
-.conector-badge-callout:hover {
-    transform: scale(1.05);
+.monaco-editor .prig-code-active-tint-green {
+    background: rgba(166, 227, 161, 0.04) !important;
+    border-left: 2px solid rgba(166, 227, 161, 0.6) !important;
 }
 
-/* Decoraciones en Monaco Editor para resaltar rangos de razonamiento */
-.prig-line-highlight-reasoning {
-    background: rgba(137, 180, 250, 0.08) !important;
-    border-left: 3px solid var(--accent-blue, #89b4fa) !important;
+.monaco-editor .margin .prig-line-number-bright-purple,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-purple,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-purple .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright-purple {
+    color: #cba6f7 !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #cba6f7, 0 0 16px rgba(203, 166, 247, 0.8) !important;
 }
 
-.prig-line-highlight-opt {
-    background: rgba(249, 226, 175, 0.08) !important;
-    border-left: 3px solid var(--accent-yellow, #f9e2af) !important;
-}
-
-.prig-line-highlight-note {
-    background: rgba(166, 227, 161, 0.08) !important;
-    border-left: 3px solid var(--accent-green, #a6e3a1) !important;
+.monaco-editor .prig-gutter-neon-bar-purple {
+    background: #cba6f7 !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #cba6f7, 0 0 14px rgba(203, 166, 247, 0.75) !important;
 }
 
 /* ============================================================================
-   BREADCRUMBS JERÁRQUICOS Y CONFIGURACIÓN DE ÁMBITO (AST SCOPE)
+   ÁMBITO ACTIVO (SCOPE HEADER) Y VISTA LIMPIA PROFESIONAL
    ============================================================================ */
 
-.razonamiento-breadcrumb-bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
-    background: rgba(14, 16, 26, 0.85);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 10px;
-    overflow-x: auto;
-    white-space: nowrap;
-    scrollbar-width: none;
-    flex-shrink: 0;
-}
-
-.razonamiento-breadcrumb-bar::-webkit-scrollbar {
-    display: none;
-}
-
-.razonamiento-crumb-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--text-muted, #a6adc8);
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: all 0.15s ease;
-    font-family: 'Fira Code', monospace;
-    font-size: 9.5px;
-    border: 1px solid transparent;
-}
-
-.razonamiento-crumb-item:hover {
-    color: #f8fafc;
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.razonamiento-crumb-item.activo {
-    color: var(--accent-blue, #89b4fa);
-    background: rgba(137, 180, 250, 0.14);
-    border-color: rgba(137, 180, 250, 0.35);
-    font-weight: 700;
-}
-
-.razonamiento-crumb-item.crumb-class {
-    color: #cba6f7;
-}
-
-.razonamiento-crumb-item.crumb-class.activo {
-    color: #cba6f7;
-    background: rgba(203, 166, 247, 0.16);
-    border-color: rgba(203, 166, 247, 0.4);
-}
-
-.razonamiento-crumb-sep {
-    color: rgba(255, 255, 255, 0.25);
-    font-size: 8px;
-    user-select: none;
-}
-
-/* Barra de configuración y herramientas de inspección */
-.razonamiento-config-toolbar {
+.razonamiento-scope-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 10px;
-    background: rgba(20, 22, 34, 0.7);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    font-size: 9.5px;
-    flex-shrink: 0;
-    gap: 6px;
-    user-select: none;
-}
-
-.razonamiento-toolbar-grupo {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.razonamiento-toggle-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 7px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.3);
-    color: #a6adc8;
-    cursor: pointer;
-    font-size: 9.5px;
-    font-weight: 600;
-    transition: all 0.15s ease;
-}
-
-.razonamiento-toggle-pill:hover {
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.25);
-}
-
-.razonamiento-toggle-pill.activo {
-    color: #89b4fa;
-    background: rgba(137, 180, 250, 0.14);
-    border-color: rgba(137, 180, 250, 0.4);
-}
-
-.razonamiento-toggle-pill.pill-purple.activo {
-    color: #cba6f7;
-    background: rgba(203, 166, 247, 0.14);
-    border-color: rgba(203, 166, 247, 0.4);
-}
-
-/* Árbol Jerárquico de Símbolos (AST Inspector) */
-.razonamiento-ast-card {
-    background: rgba(20, 22, 34, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 7px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.razonamiento-ast-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 10px;
-    background: rgba(15, 17, 26, 0.88);
+    padding: 7px 12px;
+    background: rgba(14, 16, 26, 0.88);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    cursor: pointer;
-    user-select: none;
     font-size: 10.5px;
-    font-weight: 700;
-    color: #cba6f7;
-    transition: background 0.15s ease;
-}
-
-.razonamiento-ast-header:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.razonamiento-ast-tree {
-    max-height: 240px;
-    overflow-y: auto;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.15) transparent;
-}
-
-.razonamiento-ast-node {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 7px;
-    border-radius: 5px;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.15s ease;
-    font-size: 10px;
-    font-family: 'Fira Code', monospace;
-    gap: 6px;
-}
-
-.razonamiento-ast-node:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
-}
-
-.razonamiento-ast-node.activo {
-    background: rgba(137, 180, 250, 0.15);
-    border-color: rgba(137, 180, 250, 0.45);
-    box-shadow: 0 0 8px rgba(137, 180, 250, 0.15);
-}
-
-.razonamiento-ast-node.nodo-class {
-    font-weight: 700;
-    color: #cba6f7;
-    background: rgba(203, 166, 247, 0.07);
-    border-color: rgba(203, 166, 247, 0.18);
-}
-
-.razonamiento-ast-node.nodo-class.activo {
-    background: rgba(203, 166, 247, 0.22);
-    border-color: #cba6f7;
-}
-
-.razonamiento-ast-node.nodo-hijo {
-    margin-left: 12px;
-    border-left: 2px solid rgba(203, 166, 247, 0.3);
-    border-radius: 0 5px 5px 0;
-}
-
-.razonamiento-ast-node-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-}
-
-.razonamiento-ast-badge-tipo {
-    font-size: 8.5px;
-    font-weight: 800;
-    padding: 1px 4px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
     flex-shrink: 0;
 }
 
-.badge-tipo-class {
-    background: rgba(203, 166, 247, 0.25);
-    color: #cba6f7;
-}
-
-.badge-tipo-def {
-    background: rgba(137, 180, 250, 0.25);
-    color: #89b4fa;
-}
-
-.badge-tipo-async {
-    background: rgba(166, 227, 161, 0.25);
-    color: #a6e3a1;
-}
-
-.badge-tipo-block {
-    background: rgba(249, 226, 175, 0.25);
-    color: #f9e2af;
-}
-
-.razonamiento-ast-meta {
+.razonamiento-scope-path {
     display: flex;
     align-items: center;
     gap: 5px;
-    flex-shrink: 0;
-    font-size: 9px;
-    color: var(--text-muted, #a6adc8);
-}
-
-/* ============================================================================
-   CORCHETES JERÁRQUICOS ANIDADOS EN SVG OVERLAY
-   ============================================================================ */
-
-.conector-bracket-outer {
-    stroke: #cba6f7;
-    stroke-width: 1.8;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    filter: drop-shadow(0 0 5px rgba(203, 166, 247, 0.45));
-    transition: d 0.1s ease;
-}
-
-.conector-bracket-inner {
-    stroke: #89b4fa;
-    stroke-width: 2.2;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    filter: drop-shadow(0 0 6px rgba(137, 180, 250, 0.5));
-    transition: d 0.1s ease;
-}
-
-.conector-bracket-guia-padre {
-    stroke: rgba(203, 166, 247, 0.45);
-    stroke-width: 1.2;
-    stroke-dasharray: 4, 3;
-    fill: none;
-}
-
-.conector-badge-parent {
-    pointer-events: auto;
-    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: 'Fira Code', monospace;
+    color: #cdd6f4;
+}
+
+.razonamiento-scope-lineas {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 9.5px;
     font-weight: 700;
-    transition: transform 0.15s ease, filter 0.15s ease;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
 }
 
-.conector-badge-parent:hover {
-    transform: scale(1.05);
-    filter: drop-shadow(0 2px 10px rgba(203, 166, 247, 0.4));
+.razonamiento-scope-lineas:hover {
+    background: rgba(0, 240, 255, 0.22);
+    border-color: #00f0ff;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
 }
 
 

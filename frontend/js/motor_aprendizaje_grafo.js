@@ -661,6 +661,18 @@
                 estado.nodos = res.nodos || [];
                 estado.aristas = res.aristas || [];
 
+                // Optimización física del grafo con Barnes-Hut en Rust WASM (O(N log N))
+                if (window.motorGraficoFachada && typeof window.motorGraficoFachada.calcularLayoutGrafoBarnesHut === 'function') {
+                    try {
+                        const nodosOpt = window.motorGraficoFachada.calcularLayoutGrafoBarnesHut(estado.nodos, estado.aristas);
+                        if (nodosOpt && nodosOpt.length === estado.nodos.length) {
+                            estado.nodos = nodosOpt;
+                        }
+                    } catch (eLayout) {
+                        // Fallback transparente al layout de cuadrícula estándar
+                    }
+                }
+
                 actualizarStats(res.progreso_global);
                 renderizarGrafo();
 

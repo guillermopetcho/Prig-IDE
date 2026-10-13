@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import queue
 import shutil
@@ -22,7 +23,6 @@ from audio_monitor import audio_monitor
 
 logger = logging.getLogger("prig")
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from file_manager import FileManager
 from runner import CodeRunner
 from ai_engine import AIEngine
@@ -3215,6 +3215,7 @@ def get_tree(path: Optional[str] = None):
     return file_mgr.get_file_tree(path)
 
 @app.get("/api/raw-file")
+@app.get("/api/file/raw")          # el nombre que usa el editor para las imágenes (antes solo existía en el servidor Rust)
 def get_raw_file(path: str):
     try:
         abs_path = file_mgr.resolve(path)

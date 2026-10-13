@@ -730,8 +730,26 @@
                 this.inspeccion.currentY_foco = (this.inspeccion.currentY_foco || targetFocoY) + this.inspeccion.vy_foco;
             }
 
-            // 3. Cinemática orbital elástica de drones satélite (con resorte radial escalable)
-            if (this.drones) {
+            // 3. Cinemática orbital elástica de drones satélite (Rust WASM con Fallback JS)
+            let dronesActualizadosPorWasm = false;
+            if (window.motorGraficoFachada && typeof window.motorGraficoFachada.actualizarActorYDrones === 'function') {
+                const focoPixelX = this.inspeccion ? ((this.inspeccion.currentX_foco || 0.35) * w) : 0;
+                const focoPixelY = this.inspeccion ? ((this.inspeccion.currentY_foco || 0.35) * h) : 0;
+                const wasmData = window.motorGraficoFachada.actualizarActorYDrones(0.016, focoPixelX, focoPixelY);
+                if (wasmData && wasmData.drones && wasmData.drones.length > 0) {
+                    wasmData.drones.forEach((dw, idx) => {
+                        if (this.drones[idx]) {
+                            this.drones[idx].x = dw.x;
+                            this.drones[idx].y = dw.y;
+                            this.drones[idx].scale = dw.scale;
+                            this.drones[idx].alpha = dw.alpha;
+                        }
+                    });
+                    dronesActualizadosPorWasm = true;
+                }
+            }
+
+            if (!dronesActualizadosPorWasm && this.drones) {
                 this.drones.forEach((drone, idx) => {
                     drone.angulo += drone.velocidad;
                     const radObj = (drone.radio || 38) * this.scaleChar;
@@ -1059,75 +1077,15 @@
                 });
             }
 
-            // 3. Selección y Corchetes de Rango Detrás del Código en Editor Prig
-            const numLineasRango = Math.max(1, lineaFin - linea + 1);
-            const altoRango = Math.min(260, Math.max(altoLinea, numLineasRango * altoLinea));
-            const yInicio = focoY - (altoLinea / 2);
-            const yFin = yInicio + altoRango;
-            const anchoSeleccion = Math.min(w * 0.48, 540);
-            const xInicioBloque = Math.max(25, focoX - 10);
-
-            // Franja translúcida de selección en el fondo (sin tapar el texto)
-            ctx.fillStyle = (this.inspeccion.tipo_relacion === 'seguridad') ? 'rgba(243, 139, 168, 0.05)' : 'rgba(166, 227, 161, 0.04)';
-            ctx.fillRect(xInicioBloque, yInicio, anchoSeleccion, altoRango);
-
-            // Corchete izquierdo delimitador
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = 1.3;
-            ctx.beginPath();
-            ctx.moveTo(xInicioBloque + 8, yInicio);
-            ctx.lineTo(xInicioBloque, yInicio);
-            ctx.lineTo(xInicioBloque, yFin);
-            ctx.lineTo(xInicioBloque + 8, yFin);
-            ctx.stroke();
-
-            // Corchete derecho delimitador
-            ctx.beginPath();
-            ctx.moveTo(xInicioBloque + anchoSeleccion - 8, yInicio);
-            ctx.lineTo(xInicioBloque + anchoSeleccion, yInicio);
-            ctx.lineTo(xInicioBloque + anchoSeleccion, yFin);
-            ctx.lineTo(xInicioBloque + anchoSeleccion - 8, yFin);
-            ctx.stroke();
-
-            // Puntero triangular afilado hacia la línea
+            // 3. Focalización sutil sin corchetes ni texto invasivo detrás del código.
+            // Los números de línea en Monaco ya brillan en cian neón (.prig-line-number-bright).
             ctx.fillStyle = this.color;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = this.color;
             ctx.beginPath();
-            ctx.moveTo(focoX - 14, focoY);
-            ctx.lineTo(focoX - 4, focoY);
-            ctx.lineTo(focoX - 9, focoY - 4);
+            ctx.arc(focoX, focoY, 2.5, 0, Math.PI * 2);
             ctx.fill();
-
-            // 4. Anotación técnica discreta en el fondo detrás del código
-            const tipo = this.inspeccion.tipo_relacion || 'buenas_practicas';
-            let etiqueta = `▶ Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
-            let colorBadge = '#89b4fa';
-
-            if (tipo === 'optimizacion') {
-                etiqueta = `⚡ Optimización en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
-                colorBadge = '#f9e2af';
-            } else if (tipo === 'seguridad') {
-                etiqueta = `🛡️ Validación en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
-                colorBadge = '#f38ba8';
-            } else if (tipo === 'buenas_practicas') {
-                etiqueta = `✨ Prácticas en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
-                colorBadge = '#a6e3a1';
-            } else if (tipo === 'flujo') {
-                etiqueta = `🔀 Flujo en Línea ${linea}${lineaFin > linea ? `-${lineaFin}` : ''}`;
-                colorBadge = '#cba6f7';
-            }
-
-            ctx.font = 'bold 8.5px "Fira Code", monospace';
-            ctx.fillStyle = colorBadge;
-            ctx.textAlign = 'left';
-            ctx.fillText(etiqueta, focoX + 6, focoY + 3);
-
-            // Anotación contextual en el fondo
-            if (this.consejo && this.consejo.titulo) {
-                ctx.font = 'italic 7.5px "Fira Code", monospace';
-                ctx.fillStyle = this.color;
-                ctx.globalAlpha = this.opacidadActual * 0.40;
-                ctx.fillText(`// [Nota Prig]: ${this.consejo.titulo.slice(0, 46)}`, xInicioBloque + 12, yFin + 11);
-            }
+            ctx.shadowBlur = 0;
 
             ctx.restore();
         }

@@ -162,7 +162,16 @@ class MotorMovimientoFondo {
                 document.body.prepend(el);
             }
             this.canvas = el;
-            this.ctx = el.getContext('2d', { alpha: true, desynchronized: true });
+
+            try {
+                this.ctx = el.getContext('2d', { alpha: true, desynchronized: true });
+            } catch (eCtx) {
+                this.ctx = el.getContext('2d');
+            }
+
+            if (window.motorGraficoFachada && typeof window.motorGraficoFachada.inicializar === 'function') {
+                window.motorGraficoFachada.inicializar(null, el.width || window.innerWidth, el.height || window.innerHeight);
+            }
         }
         this.redimensionar();
     }
@@ -173,17 +182,25 @@ class MotorMovimientoFondo {
         const anchoReal = Math.floor(window.innerWidth * escala);
         const altoReal = Math.floor(window.innerHeight * escala);
 
-        if (this.canvas.width !== anchoReal || this.canvas.height !== altoReal) {
-            this.canvas.width = anchoReal;
-            this.canvas.height = altoReal;
-            
-            // Si el efecto actual tiene hook de redimensionado o init, avisarle
-            if (this._efectoActivo && this._efectosRegistrados.has(this._efectoActivo)) {
-                const def = this._efectosRegistrados.get(this._efectoActivo);
-                if (typeof def.onResize === 'function') {
-                    def.onResize(anchoReal, altoReal, this._estadoEfecto);
+        try {
+            if (this.canvas.width !== anchoReal || this.canvas.height !== altoReal) {
+                this.canvas.width = anchoReal;
+                this.canvas.height = altoReal;
+
+                if (window.motorGraficoFachada && typeof window.motorGraficoFachada.redimensionar === 'function') {
+                    window.motorGraficoFachada.redimensionar(anchoReal, altoReal);
+                }
+                
+                // Si el efecto actual tiene hook de redimensionado o init, avisarle
+                if (this._efectoActivo && this._efectosRegistrados.has(this._efectoActivo)) {
+                    const def = this._efectosRegistrados.get(this._efectoActivo);
+                    if (typeof def.onResize === 'function') {
+                        def.onResize(anchoReal, altoReal, this._estadoEfecto);
+                    }
                 }
             }
+        } catch (eResize) {
+            console.warn('[Prig-Motor] Error seguro en redimensionado:', eResize);
         }
     }
 
@@ -342,6 +359,9 @@ class MotorMovimientoFondo {
 
         this._efectoActivo = id;
         this.config.efecto = id;
+        if (window.motorGraficoFachada && typeof window.motorGraficoFachada.cambiarEfecto === 'function') {
+            window.motorGraficoFachada.cambiarEfecto(id);
+        }
         this.guardarConfig();
 
         this._asegurarCanvas();
@@ -597,6 +617,18 @@ class MotorMovimientoFondo {
                 }
             },
             render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                // Aceleración Rust WebAssembly (Zero-Copy SIMD, 0 pausas GC)
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    ctx.clearRect(0, 0, w, h);
+                    if (mouse && mouse.activo) {
+                        window.motorGraficoFachada.actualizarMouse(mouse.x, mouse.y, true);
+                    } else {
+                        window.motorGraficoFachada.actualizarMouse(-1000, -1000, false);
+                    }
+                    window.motorGraficoFachada.renderizarParticulas(ctx, w, h, dt, state.distMax || 95);
+                    return;
+                }
+
                 ctx.clearRect(0, 0, w, h);
                 const p = state.particulas;
                 const boostTam = (audio && audio.reactivo) ? audio.boostTamano : 1.0;
@@ -669,6 +701,12 @@ class MotorMovimientoFondo {
                 }
             },
             render: (ctx, w, h, dt, mouse, state, time, audio) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    if (window.motorGraficoFachada.renderizarMatrix(ctx, w, h, dt)) {
+                        return;
+                    }
+                }
+
                 // Fondo con desvanecimiento para efecto estela
                 ctx.fillStyle = 'rgba(10, 10, 20, 0.09)';
                 ctx.fillRect(0, 0, w, h);
@@ -990,6 +1028,12 @@ class MotorMovimientoFondo {
                 }
             },
             render: (ctx, w, h, dt, mouse, state) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    if (window.motorGraficoFachada.renderizarPoligonos(ctx, w, h, dt)) {
+                        return;
+                    }
+                }
+
                 ctx.clearRect(0, 0, w, h);
                 const formas = state.formas;
 
@@ -1135,6 +1179,12 @@ class MotorMovimientoFondo {
                 state.rotacion += dt * 0.8;
             },
             render: (ctx, w, h, dt, mouse, state) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    if (window.motorGraficoFachada.renderizarVortex(ctx, w, h, dt)) {
+                        return;
+                    }
+                }
+
                 ctx.clearRect(0, 0, w, h);
                 const cx = w / 2;
                 const cy = h / 2;
@@ -1217,6 +1267,14 @@ class MotorMovimientoFondo {
                 state.angulo += dt * 0.4;
             },
             render: (ctx, w, h, dt, mouse, state) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    ctx.fillStyle = 'rgba(10, 8, 20, 0.25)';
+                    ctx.fillRect(0, 0, w, h);
+                    if (window.motorGraficoFachada.renderizarLorenz(ctx, w, h, dt)) {
+                        return;
+                    }
+                }
+
                 ctx.fillStyle = 'rgba(10, 8, 20, 0.25)';
                 ctx.fillRect(0, 0, w, h);
 
@@ -1286,6 +1344,14 @@ class MotorMovimientoFondo {
                 }
             },
             render: (ctx, w, h, dt, mouse, state) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    ctx.fillStyle = 'rgba(5, 5, 12, 0.28)';
+                    ctx.fillRect(0, 0, w, h);
+                    if (window.motorGraficoFachada.renderizarBlackHole(ctx, w, h, dt)) {
+                        return;
+                    }
+                }
+
                 ctx.fillStyle = 'rgba(5, 5, 12, 0.28)';
                 ctx.fillRect(0, 0, w, h);
 
@@ -1500,6 +1566,13 @@ class MotorMovimientoFondo {
                 state.angulo += dt * 0.6;
             },
             render: (ctx, w, h, dt, mouse, state) => {
+                if (window.motorGraficoFachada && window.motorGraficoFachada.modo === 'wasm') {
+                    ctx.clearRect(0, 0, w, h);
+                    if (window.motorGraficoFachada.renderizarTesseract(ctx, w, h, dt, 0.75)) {
+                        return;
+                    }
+                }
+
                 ctx.clearRect(0, 0, w, h);
                 const cx = w / 2;
                 const cy = h / 2;

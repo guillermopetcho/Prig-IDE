@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/prig-server",
+    "crates/prig-fs",
+    "crates/prig-integrations",
+    "crates/prig-hardware",
+    "crates/prig-runner",
+    "crates/banco-core",
+    "crates/prig-recursos",
+    "crates/prig-nativo-py",
+]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# Sin panic = "abort": dentro del proceso de Python (prig_nativo) un pánico tiene que llegar como excepción y no
+# cerrar Prig, y en el servidor un pánico en una petición no tiene que tirar el proceso entero
+strip = true
+
+[profile.dev]
+opt-level = 1
+

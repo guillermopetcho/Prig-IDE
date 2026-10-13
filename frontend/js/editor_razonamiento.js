@@ -168,10 +168,11 @@
                 // Mover gridContainer dentro del wrapper
                 wrapper.appendChild(gridContainer);
 
-                // Crear SVG Overlay de Conexiones Visuales
+                // Crear SVG Overlay de Conexiones Visuales (Oculto: los números de línea iluminados reemplazan los corchetes)
                 const svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 svgOverlay.id = 'editor-overlay-conectores';
                 svgOverlay.setAttribute('class', 'editor-overlay-conectores');
+                svgOverlay.style.display = 'none';
                 svgOverlay.innerHTML = `
                     <defs>
                         <marker id="flecha-conector-azul" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -243,21 +244,6 @@
                 `;
                 btnNotas.onclick = () => this.alternarTabOVisibilidad('notas');
                 accionesBar.appendChild(btnNotas);
-            }
-
-            // Botón "Conectores Visuales"
-            if (!document.getElementById('btn-editor-relacion-visual')) {
-                const btnConectores = document.createElement('button');
-                btnConectores.id = 'btn-editor-relacion-visual';
-                btnConectores.className = 'btn-editor-hud-secundario activo';
-                btnConectores.title = 'Activar / Desactivar corchetes grandes y flechas de conexión sobre el código';
-                btnConectores.style.cssText = 'display: flex; align-items: center; gap: 5px; background: rgba(203, 166, 247, 0.14); border: 1px solid rgba(203, 166, 247, 0.35); color: #cba6f7; border-radius: 6px; padding: 4px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;';
-                btnConectores.innerHTML = `
-                    <i class="fa-solid fa-diagram-project"></i>
-                    <span>Conectores</span>
-                `;
-                btnConectores.onclick = () => this.alternarConectores();
-                accionesBar.appendChild(btnConectores);
             }
         }
 
@@ -733,20 +719,19 @@
                 } : null
             };
 
-            if (enfocarMonaco) {
-                const ed = window.editorMgr ? window.editorMgr.editor : null;
-                if (ed) {
-                    try {
+            const ed = window.editorMgr ? window.editorMgr.editor : null;
+            if (ed) {
+                try {
+                    if (enfocarMonaco) {
                         ed.revealLineInCenter(activo.lineaInicio);
                         ed.setPosition({ lineNumber: activo.lineaInicio, column: 1 });
-                        this._aplicarDecoracionMonaco(ed, activo.lineaInicio, activo.lineaFin, colorActivo);
-                    } catch (e) {}
-                }
+                    }
+                    this._aplicarDecoracionMonaco(ed, activo.lineaInicio, activo.lineaFin, colorActivo);
+                } catch (e) {}
             }
 
             this.actualizarOverlay();
-            this._actualizarBreadcrumbsDOM();
-            this._actualizarArbolASTDOM();
+            this._actualizarScopeHeaderDOM();
         }
 
         alternarModoCorchetes() {
@@ -824,11 +809,8 @@
                     <span>${this.razonamiento.tokSeg} · CoT ${this.razonamiento.tiempoCoT}</span>
                 </div>
 
-                <!-- Breadcrumbs Jerárquicos de Ámbito (Scope) -->
-                ${esRaz ? this._renderizarBreadcrumbsHTML() : ''}
-
-                <!-- Barra de Configuración Profesional (Jerárquico / Auto-Sync) -->
-                ${esRaz ? this._renderizarConfigToolbarHTML() : ''}
+                <!-- Ámbito Activo / Scope Header -->
+                ${esRaz ? this._renderizarScopeHeaderHTML() : ''}
 
                 <!-- Cuerpo del Panel -->
                 <div class="razonamiento-body" id="razonamiento-body-scroll">
@@ -845,198 +827,80 @@
             this._conectarEventosInternos(panel);
         }
 
-        _renderizarBreadcrumbsHTML() {
-            const camino = this.estructuraCodigo.caminoJerarquico;
-            if (!camino || camino.length === 0) {
+        _renderizarScopeHeaderHTML() {
+            const sym = this.estructuraCodigo.simboloActivo;
+            const padre = this.estructuraCodigo.simboloPadre;
+            const ini = this.conectorFoco.lineaInicio || 1;
+            const fin = this.conectorFoco.lineaFin || ini;
+            const esClase = sym && sym.tipo === 'class';
+            const icono = esClase ? 'fa-solid fa-cube' : (sym && sym.tipo.includes('async') ? 'fa-solid fa-bolt-lightning' : 'fa-solid fa-bolt');
+            const colorIcono = esClase ? '#cba6f7' : '#00f0ff';
+
+            let textoAmbito = '';
+            if (padre && sym && padre.id !== sym.id) {
+                textoAmbito = `${padre.nombre} › ${sym.nombre}`;
+            } else if (sym) {
+                textoAmbito = `${sym.tipo} ${sym.nombre}`;
+            } else {
                 const nombreBase = this.archivoActivo.split('/').pop();
-                return `
-                    <div class="razonamiento-breadcrumb-bar" id="razonamiento-breadcrumb-bar">
-                        <span class="razonamiento-crumb-item activo" data-crumb-linea="1">
-                            <i class="fa-regular fa-file-code"></i> ${this._escaparHtml(nombreBase)}
-                        </span>
-                    </div>
-                `;
+                textoAmbito = `${nombreBase}`;
             }
 
             return `
-                <div class="razonamiento-breadcrumb-bar" id="razonamiento-breadcrumb-bar">
-                    ${camino.map((c, idx) => {
-                        const esUltimo = (idx === camino.length - 1);
-                        const esClase = (c.tipo === 'class');
-                        const icono = (c.tipo === 'file') ? 'fa-regular fa-file-code' : (esClase ? 'fa-solid fa-cube' : 'fa-solid fa-bolt');
-                        const claseItem = `razonamiento-crumb-item ${esClase ? 'crumb-class' : ''} ${esUltimo ? 'activo' : ''}`;
-                        return `
-                            <span class="${claseItem}" data-crumb-simbolo="${c.id || ''}" data-crumb-linea="${c.linea || 1}" title="${c.nombre} (Línea ${c.linea || 1})">
-                                <i class="${icono}"></i> ${this._escaparHtml(c.nombre)}
-                            </span>
-                            ${!esUltimo ? '<span class="razonamiento-crumb-sep">❯</span>' : ''}
-                        `;
-                    }).join('')}
+                <div class="razonamiento-scope-header" id="razonamiento-scope-header">
+                    <div class="razonamiento-scope-path" title="Ámbito activo en el editor">
+                        <i class="${icono}" style="color: ${colorIcono}; font-size: 10px;"></i>
+                        <span style="font-weight: 600;">${this._escaparHtml(textoAmbito)}</span>
+                    </div>
+                    <span class="razonamiento-scope-lineas" id="btn-scope-jump" title="Líneas resaltadas en el editor (Clic para centrar)" data-scope-ini="${ini}" data-scope-fin="${fin}">
+                        <i class="fa-solid fa-crosshairs"></i> L${ini}–L${fin}
+                    </span>
                 </div>
             `;
         }
 
-        _renderizarConfigToolbarHTML() {
-            const esJer = (this.configJerarquia.modoCorchetes === 'jerarquico');
-            const sync = this.configJerarquia.autoSincronizarCursor;
-            const svgAct = this.relacionVisualActiva;
-
-            return `
-                <div class="razonamiento-config-toolbar">
-                    <div class="razonamiento-toolbar-grupo">
-                        <button class="razonamiento-toggle-pill pill-purple ${esJer ? 'activo' : ''}" id="btn-cfg-modo-corchetes" title="Alternar entre corchetes jerárquicos (Class + Def anidados) o foco unitario">
-                            <i class="fa-solid fa-layer-group"></i> ${esJer ? 'Jerárquico' : 'Unitario'}
-                        </button>
-                        <button class="razonamiento-toggle-pill ${sync ? 'activo' : ''}" id="btn-cfg-sync-cursor" title="Sincronizar automáticamente corchetes con la posición del cursor en Monaco">
-                            <i class="fa-solid fa-crosshairs"></i> Sync: ${sync ? 'ON' : 'OFF'}
-                        </button>
-                    </div>
-                    <button class="razonamiento-toggle-pill ${svgAct ? 'activo' : ''}" id="btn-cfg-conectores-svg" title="Mostrar u ocultar corchetes y flechas visuales">
-                        <i class="fa-solid fa-draw-polygon"></i> SVG
-                    </button>
-                </div>
-            `;
-        }
-
-        _renderizarArbolASTHTML() {
-            const arbol = this.estructuraCodigo.arbol || [];
-            const totalSimbolos = this.estructuraCodigo.simbolos.length;
-            const expandido = this.configJerarquia.arbolExpandido;
-            const activoId = this.estructuraCodigo.simboloActivo ? this.estructuraCodigo.simboloActivo.id : null;
-
-            return `
-                <div class="razonamiento-ast-card">
-                    <div class="razonamiento-ast-header" id="ast-header-toggle">
-                        <span style="display: flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-sitemap" style="color: #cba6f7;"></i>
-                            <span>Jerarquía de Bloques (AST)</span>
-                            <span style="font-size: 9px; padding: 1px 5px; border-radius: 8px; background: rgba(203, 166, 247, 0.2); color: #cba6f7; font-weight: 800;">${totalSimbolos}</span>
-                        </span>
-                        <i class="fa-solid ${expandido ? 'fa-chevron-up' : 'fa-chevron-down'}" style="font-size: 10px; color: #a6adc8;"></i>
-                    </div>
-                    <div class="razonamiento-ast-tree" id="ast-tree-lista" style="display: ${expandido ? 'flex' : 'none'};">
-                        ${totalSimbolos === 0 ? `
-                            <div style="padding: 10px; text-align: center; color: #a6adc8; font-size: 10px;">
-                                No se detectaron declaraciones class o def en este archivo.
-                            </div>
-                        ` : arbol.map(nodo => this._renderizarNodoAST(nodo, activoId)).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        _renderizarNodoAST(nodo, activoId) {
-            const esClase = (nodo.tipo === 'class');
-            const esActivo = (nodo.id === activoId);
-            const badgeClass = esClase ? 'badge-tipo-class' : (nodo.tipo.includes('async') ? 'badge-tipo-async' : (nodo.tipo === 'bloque' ? 'badge-tipo-block' : 'badge-tipo-def'));
-            const icono = esClase ? 'fa-cube' : (nodo.tipo.includes('async') ? 'fa-bolt-lightning' : 'fa-bolt');
-
-            let htmlHijos = '';
-            if (nodo.hijos && nodo.hijos.length > 0) {
-                htmlHijos = nodo.hijos.map(h => {
-                    const hActivo = (h.id === activoId);
-                    const hBadge = h.tipo.includes('async') ? 'badge-tipo-async' : 'badge-tipo-def';
-                    return `
-                        <div class="razonamiento-ast-node nodo-hijo ${hActivo ? 'activo' : ''}" data-ast-simbolo="${h.id}" title="${h.firma}">
-                            <div class="razonamiento-ast-node-info">
-                                <span class="razonamiento-ast-badge-tipo ${hBadge}">${h.tipo === 'async def' ? 'ASYNC' : 'DEF'}</span>
-                                <span style="color: ${hActivo ? '#89b4fa' : '#cdd6f4'}; font-weight: ${hActivo ? '700' : '500'};">${this._escaparHtml(h.nombre)}</span>
-                            </div>
-                            <div class="razonamiento-ast-meta">
-                                <span>L${h.lineaInicio}-${h.lineaFin}</span>
-                                <span style="color: #6c7086;">·</span>
-                                <span style="color: #f9e2af;">CC:${h.complejidad}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            return `
-                <div class="razonamiento-ast-node ${esClase ? 'nodo-class' : ''} ${esActivo ? 'activo' : ''}" data-ast-simbolo="${nodo.id}" title="${nodo.firma}">
-                    <div class="razonamiento-ast-node-info">
-                        <span class="razonamiento-ast-badge-tipo ${badgeClass}">${nodo.tipo.toUpperCase()}</span>
-                        <span style="color: ${esClase ? '#cba6f7' : (esActivo ? '#89b4fa' : '#cdd6f4')}; font-weight: 700;">${this._escaparHtml(nodo.nombre)}</span>
-                    </div>
-                    <div class="razonamiento-ast-meta">
-                        <span>L${nodo.lineaInicio}-${nodo.lineaFin}</span>
-                        <span style="color: #6c7086;">·</span>
-                        <span style="color: #a6e3a1;">${nodo.totalLineas}L</span>
-                    </div>
-                </div>
-                ${htmlHijos}
-            `;
-        }
-
-        _actualizarBreadcrumbsDOM() {
-            const contenedor = document.getElementById('razonamiento-breadcrumb-bar');
-            if (contenedor && this.tabActiva === 'razonamiento') {
+        _actualizarScopeHeaderDOM() {
+            const header = document.getElementById('razonamiento-scope-header');
+            if (header && this.tabActiva === 'razonamiento') {
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = this._renderizarBreadcrumbsHTML();
+                tempDiv.innerHTML = this._renderizarScopeHeaderHTML();
                 const nuevo = tempDiv.firstElementChild;
                 if (nuevo) {
-                    contenedor.replaceWith(nuevo);
-                    this._conectarEventosBreadcrumbs(nuevo);
+                    header.replaceWith(nuevo);
+                    this._conectarEventosScopeHeader(nuevo);
                 }
             }
         }
 
+        _actualizarBreadcrumbsDOM() {
+            this._actualizarScopeHeaderDOM();
+        }
+
         _actualizarArbolASTDOM() {
-            const lista = document.getElementById('ast-tree-lista');
-            if (lista && this.tabActiva === 'razonamiento') {
-                const arbol = this.estructuraCodigo.arbol || [];
-                const activoId = this.estructuraCodigo.simboloActivo ? this.estructuraCodigo.simboloActivo.id : null;
-                lista.innerHTML = arbol.map(nodo => this._renderizarNodoAST(nodo, activoId)).join('');
-                this._conectarEventosNodosAST(lista);
+            // Unificado en el Scope Header para evitar redundancia visual
+        }
+
+        _conectarEventosScopeHeader(header) {
+            if (!header) return;
+            const btnJump = header.querySelector('#btn-scope-jump');
+            if (btnJump) {
+                btnJump.onclick = () => {
+                    const ini = parseInt(btnJump.dataset.scopeIni, 10) || 1;
+                    const fin = parseInt(btnJump.dataset.scopeFin, 10) || ini;
+                    this.enfocarEnCodigo(ini, fin, 'Ámbito Activo', '#00f0ff');
+                };
             }
-        }
-
-        _obtenerNombreBloqueParaRango(ini, fin) {
-            const sym = this.obtenerSimboloEnLinea(ini);
-            if (!sym) return `L${ini}-L${fin}`;
-            if (sym.padreNombre) return `${sym.padreNombre}.${sym.nombre}()`;
-            return `${sym.tipo} ${sym.nombre}()`;
-        }
-
-        _conectarEventosBreadcrumbs(bar) {
-            if (!bar) return;
-            bar.querySelectorAll('[data-crumb-simbolo]').forEach(el => {
-                el.onclick = () => {
-                    const symId = el.dataset.crumbSimbolo;
-                    const linea = parseInt(el.dataset.crumbLinea, 10);
-                    if (symId) {
-                        this.establecerAmbitoJerarquico(symId, true);
-                    } else if (linea) {
-                        this.enfocarEnCodigo(linea, linea, 'Inicio');
-                    }
-                };
-            });
-        }
-
-        _conectarEventosNodosAST(treeContainer) {
-            if (!treeContainer) return;
-            treeContainer.querySelectorAll('[data-ast-simbolo]').forEach(el => {
-                el.onclick = () => {
-                    const symId = el.dataset.astSimbolo;
-                    if (symId) {
-                        this.establecerAmbitoJerarquico(symId, true);
-                    }
-                };
-            });
         }
 
         _renderizarVistaRazonamiento() {
             const r = this.razonamiento;
             return `
-                <!-- Árbol Jerárquico de Símbolos (AST Scope Inspector) -->
-                ${this._renderizarArbolASTHTML()}
-
-                <!-- Acordeón de Proceso de Pensamiento (CoT) -->
+                <!-- Proceso de Razonamiento CoT (Cadena de Pensamiento) -->
                 <div class="razonamiento-cot-box">
-                    <div class="razonamiento-cot-header" id="cot-toggle-btn">
+                    <div class="razonamiento-cot-header" id="cot-toggle-btn" style="cursor: pointer;">
                         <span class="cot-titulo">
                             <i class="fa-solid fa-microchip" style="color: #cba6f7;"></i>
-                            Proceso de Razonamiento CoT (${r.cotPasos.length} pasos)
+                            Razonamiento CoT (${r.cotPasos.length} pasos)
                         </span>
                         <i class="fa-solid ${r.cotExpandido ? 'fa-chevron-up' : 'fa-chevron-down'}" style="font-size: 10px;"></i>
                     </div>
@@ -1045,77 +909,50 @@
                             <div class="razonamiento-cot-step">
                                 <span class="razonamiento-step-num">#${p.num}</span>
                                 <div>
-                                    <div style="font-weight: 700; color: #f8fafc; font-size: 10.5px;">${p.titulo}</div>
-                                    <div style="color: #bac2de; font-size: 10px; margin-top: 2px;">${p.detalle}</div>
+                                    <div style="font-weight: 700; color: #f8fafc; font-size: 10.5px;">${this._escaparHtml(p.titulo)}</div>
+                                    <div style="color: #bac2de; font-size: 10px; margin-top: 2px;">${this._escaparHtml(p.detalle)}</div>
                                 </div>
                             </div>
                         `).join('')}
-                        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08); font-size: 10.5px; color: #a6e3a1; font-family: 'Fira Code', monospace;">
-                            💬 ${r.dialogoTexto}
+                        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08); font-size: 10.5px; color: #a6e3a1; font-family: 'Fira Code', monospace; line-height: 1.4;">
+                            💬 ${this._escaparHtml(r.dialogoTexto)}
                         </div>
                     </div>
                 </div>
 
-                <!-- Tarjetas de Diagnóstico y Relación con Código -->
-                <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: #89b4fa; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-magnifying-glass-chart"></i> Hallazgos y Diagnóstico en Código
+                <!-- Diagnóstico y Mejoras Sugeridas -->
+                <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: #00f0ff; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; margin-bottom: 2px;">
+                    <span style="display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Hallazgos y Soluciones
+                    </span>
+                    <span style="font-size: 9.5px; color: #a6adc8; font-weight: 600;">${r.hallazgos.length} detectados</span>
                 </div>
 
-                ${r.hallazgos.map((h, i) => {
-                    const nombreBloque = h.bloqueNombre || this._obtenerNombreBloqueParaRango(h.lineaInicio, h.lineaFin);
+                ${r.hallazgos.map((h) => {
+                    const esActivo = (this.conectorFoco.lineaInicio === h.lineaInicio);
                     return `
-                    <div class="razonamiento-card ${this.conectorFoco.lineaInicio === h.lineaInicio ? 'activa' : ''}" data-hallazgo-id="${h.id}">
+                    <div class="razonamiento-card ${esActivo ? 'activa' : ''}" data-hallazgo-id="${h.id}">
                         <div class="razonamiento-card-meta">
-                            <div style="display: flex; align-items: center; gap: 5px; overflow: hidden;">
-                                <span class="razonamiento-badge-categoria ${h.categoria}">${h.categoriaTexto}</span>
-                                <span style="font-size: 9.5px; color: #cba6f7; font-family: 'Fira Code', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    <i class="fa-solid fa-code-commit" style="font-size: 8.5px;"></i> ${this._escaparHtml(nombreBloque)}
-                                </span>
-                            </div>
-                            <span class="razonamiento-badge-linea" title="Ir a líneas ${h.lineaInicio}-${h.lineaFin}">
-                                <i class="fa-solid fa-arrow-turn-down"></i> L${h.lineaInicio}-L${h.lineaFin}
+                            <span class="razonamiento-badge-categoria ${h.categoria}">${h.categoriaTexto}</span>
+                            <span class="razonamiento-badge-linea" title="Resaltar líneas en editor" data-accion="conectar" data-linea-ini="${h.lineaInicio}" data-linea-fin="${h.lineaFin}" data-titulo="${this._escaparHtml(h.titulo)}" data-color="${h.color}">
+                                <i class="fa-solid fa-crosshairs"></i> L${h.lineaInicio}–L${h.lineaFin}
                             </span>
                         </div>
-                        <div class="razonamiento-card-titulo">${h.titulo}</div>
-                        <div class="razonamiento-card-detalle">${h.detalle}</div>
+                        <div class="razonamiento-card-titulo">${this._escaparHtml(h.titulo)}</div>
+                        <div class="razonamiento-card-detalle">${this._escaparHtml(h.detalle)}</div>
                         ${h.codigoSugerido ? `<div class="razonamiento-codigo-snippet">${this._escaparHtml(h.codigoSugerido)}</div>` : ''}
                         <div class="razonamiento-card-acciones">
-                            <button class="razonamiento-btn-conectar" data-accion="conectar" data-linea-ini="${h.lineaInicio}" data-linea-fin="${h.lineaFin}" data-titulo="${h.titulo}" data-color="${h.color}">
-                                <i class="fa-solid fa-code-fork"></i> Conectar con Código
+                            <button class="razonamiento-btn-conectar" data-accion="conectar" data-linea-ini="${h.lineaInicio}" data-linea-fin="${h.lineaFin}" data-titulo="${this._escaparHtml(h.titulo)}" data-color="${h.color}">
+                                <i class="fa-solid fa-highlighter"></i> Resaltar Código
                             </button>
                             ${h.codigoSugerido ? `
                                 <button class="razonamiento-btn-aplicar" data-accion="aplicar" data-linea-ini="${h.lineaInicio}" data-linea-fin="${h.lineaFin}" data-codigo="${encodeURIComponent(h.codigoSugerido)}">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Aplicar
+                                    <i class="fa-solid fa-check-double"></i> Aplicar
                                 </button>
                             ` : ''}
                         </div>
                     </div>
                 `;}).join('')}
-
-                <!-- Grafo de Lógica de Ejecución -->
-                <div class="razonamiento-flujo-grafo">
-                    <div class="razonamiento-grafo-titulo">
-                        <i class="fa-solid fa-diagram-next"></i> Flujo Lógico de Ejecución
-                    </div>
-                    ${r.grafoNodos.map((n, idx) => `
-                        <div class="razonamiento-grafo-nodo ${this.conectorFoco.lineaInicio === n.linea ? 'activo' : ''}" data-linea="${n.linea}" data-nombre="${n.nombre}">
-                            <div>
-                                <div style="font-weight: 700; color: #ffffff;">${n.nombre}</div>
-                                <div style="font-size: 9.5px; color: #a6adc8;">${n.sub}</div>
-                            </div>
-                            <span class="razonamiento-badge-linea">L${n.linea}</span>
-                        </div>
-                        ${idx < r.grafoNodos.length - 1 ? '<div class="razonamiento-grafo-flecha">▼</div>' : ''}
-                    `).join('')}
-                </div>
-
-                <!-- Métricas de Código -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); font-size: 10.5px;">
-                    <div><span style="color: #a6adc8;">Complejidad:</span> <b style="color: #f9e2af;">${r.metricas.complejidad}</b></div>
-                    <div><span style="color: #a6adc8;">Calidad:</span> <b style="color: #a6e3a1;">${r.metricas.calidad}</b></div>
-                    <div><span style="color: #a6adc8;">Modularidad:</span> <b style="color: #89b4fa;">${r.metricas.modularidad}</b></div>
-                    <div><span style="color: #a6adc8;">Guardas:</span> <b style="color: #cba6f7;">${r.metricas.guardas}</b></div>
-                </div>
             `;
         }
 
@@ -1199,35 +1036,8 @@
         }
 
         _conectarEventosInternos(panel) {
-            // Breadcrumbs interactivos
-            this._conectarEventosBreadcrumbs(panel.querySelector('#razonamiento-breadcrumb-bar'));
-
-            // Botones de la barra de configuración profesional
-            const btnModo = panel.querySelector('#btn-cfg-modo-corchetes');
-            if (btnModo) btnModo.onclick = () => this.alternarModoCorchetes();
-
-            const btnSync = panel.querySelector('#btn-cfg-sync-cursor');
-            if (btnSync) btnSync.onclick = () => this.alternarSyncCursor();
-
-            const btnCon = panel.querySelector('#btn-cfg-conectores-svg');
-            if (btnCon) btnCon.onclick = () => this.alternarConectores();
-
-            // Desplegable del árbol AST
-            const astToggle = panel.querySelector('#ast-header-toggle');
-            if (astToggle) {
-                astToggle.onclick = () => {
-                    this.configJerarquia.arbolExpandido = !this.configJerarquia.arbolExpandido;
-                    const tree = panel.querySelector('#ast-tree-lista');
-                    const icon = astToggle.querySelector('i.fa-solid:last-child');
-                    if (tree) tree.style.display = this.configJerarquia.arbolExpandido ? 'flex' : 'none';
-                    if (icon) {
-                        icon.className = `fa-solid ${this.configJerarquia.arbolExpandido ? 'fa-chevron-up' : 'fa-chevron-down'}`;
-                    }
-                };
-            }
-
-            // Nodos del árbol AST
-            this._conectarEventosNodosAST(panel.querySelector('#ast-tree-lista'));
+            // Eventos del Scope Header
+            this._conectarEventosScopeHeader(panel.querySelector('#razonamiento-scope-header'));
 
             // Acordeón CoT
             const toggleCot = panel.querySelector('#cot-toggle-btn');
@@ -1238,14 +1048,14 @@
                 };
             }
 
-            // Conectar hallazgo visualmente con el código
+            // Conectar o resaltar hallazgo en el código
             panel.querySelectorAll('[data-accion="conectar"]').forEach(btn => {
                 btn.onclick = (e) => {
                     e.stopPropagation();
                     const ini = parseInt(btn.dataset.lineaIni, 10);
                     const fin = parseInt(btn.dataset.lineaFin, 10);
                     const tit = btn.dataset.titulo;
-                    const col = btn.dataset.color || '#89b4fa';
+                    const col = btn.dataset.color || '#00f0ff';
                     this.enfocarEnCodigo(ini, fin, tit, col);
                 };
             });
@@ -1258,15 +1068,6 @@
                     const fin = parseInt(btn.dataset.lineaFin, 10);
                     const codigo = decodeURIComponent(btn.dataset.codigo);
                     this.aplicarParcheEnCodigo(ini, fin, codigo);
-                };
-            });
-
-            // Clic en nodo del grafo de ejecución
-            panel.querySelectorAll('.razonamiento-grafo-nodo').forEach(nodo => {
-                nodo.onclick = () => {
-                    const l = parseInt(nodo.dataset.linea, 10);
-                    const nom = nodo.dataset.nombre;
-                    this.enfocarEnCodigo(l, l + 2, nom, '#a6e3a1');
                 };
             });
 
@@ -1341,8 +1142,8 @@
             });
         }
 
-        /** Enfoca en Monaco y actualiza los conectores visuales (corchete grande y flecha) */
-        enfocarEnCodigo(lineaInicio, lineaFin = null, etiqueta = '', color = '#89b4fa') {
+        /** Enfoca en Monaco y resalta las líneas en el editor con números de línea brillantes */
+        enfocarEnCodigo(lineaInicio, lineaFin = null, etiqueta = '', color = '#00f0ff') {
             const lIni = Math.max(1, lineaInicio);
             const sym = this.obtenerSimboloEnLinea(lIni);
             const padre = (sym && sym.padreId) ? this.estructuraCodigo.simbolos.find(s => s.id === sym.padreId) : null;
@@ -1357,7 +1158,7 @@
                 nombre: sym ? sym.nombre : tit,
                 etiqueta: tit,
                 firma: sym ? sym.firma : tit,
-                color: color || '#89b4fa',
+                color: color || '#00f0ff',
                 simboloId: sym ? sym.id : null,
                 padre: padre ? {
                     id: padre.id,
@@ -1383,8 +1184,7 @@
                 }
                 camino.push({ id: sym.id, tipo: sym.tipo, nombre: `${sym.tipo} ${sym.nombre}`, linea: sym.lineaInicio });
                 this.estructuraCodigo.caminoJerarquico = camino;
-                this._actualizarBreadcrumbsDOM();
-                this._actualizarArbolASTDOM();
+                this._actualizarScopeHeaderDOM();
             }
 
             const ed = window.editorMgr ? window.editorMgr.editor : null;
@@ -1402,20 +1202,37 @@
         _aplicarDecoracionMonaco(ed, lineaIni, lineaFin, color) {
             if (!ed || typeof monaco === 'undefined') return;
 
-            const claseResalte = color.includes('a6e3a1')
-                ? 'prig-line-highlight-note'
-                : color.includes('f9e2af')
-                ? 'prig-line-highlight-opt'
-                : 'prig-line-highlight-reasoning';
+            const esVerde = (color && color.includes('a6e3a1'));
+            const esMorado = (color && color.includes('cba6f7'));
+
+            const marginClase = esVerde
+                ? 'prig-line-number-bright-green'
+                : esMorado
+                ? 'prig-line-number-bright-purple'
+                : 'prig-line-number-bright';
+
+            const gutterClase = esVerde
+                ? 'prig-gutter-neon-bar-green'
+                : esMorado
+                ? 'prig-gutter-neon-bar-purple'
+                : 'prig-gutter-neon-bar';
+
+            const tintClase = esVerde
+                ? 'prig-code-active-tint-green'
+                : 'prig-code-active-tint';
+
+            const hexColor = esVerde ? '#a6e3a1' : (esMorado ? '#cba6f7' : '#00f0ff');
 
             this._decoracionesMonaco = ed.deltaDecorations(this._decoracionesMonaco, [
                 {
                     range: new monaco.Range(lineaIni, 1, lineaFin, 1),
                     options: {
                         isWholeLine: true,
-                        className: claseResalte,
+                        className: tintClase,
+                        marginClassName: marginClase,
+                        linesDecorationsClassName: gutterClase,
                         overviewRuler: {
-                            color: color,
+                            color: hexColor,
                             position: monaco.editor.OverviewRulerLane.Right
                         }
                     }
@@ -1466,198 +1283,14 @@
         _dibujarConectoresSVG() {
             const svg = document.getElementById('editor-overlay-conectores');
             if (!svg) return;
+            svg.style.display = 'none';
 
             const gCorchetes = svg.getElementById('capa-corchetes-codigo');
             const gFlechas = svg.getElementById('capa-flechas-codigo');
             const gBadges = svg.getElementById('capa-badges-codigo');
-            if (!gCorchetes || !gFlechas || !gBadges) return;
-
-            gCorchetes.innerHTML = '';
-            gFlechas.innerHTML = '';
-            gBadges.innerHTML = '';
-
-            if (!this.relacionVisualActiva || !this.conectorFoco.activo || !this.panelVisible) {
-                return;
-            }
-
-            const ed = window.editorMgr ? window.editorMgr.editor : null;
-            if (!ed) return;
-
-            const domNode = ed.getDomNode();
-            const wrapper = document.getElementById('editor-area-wrapper');
-            const panel = document.getElementById('editor-panel-razonamiento');
-            if (!domNode || !wrapper || !panel) return;
-
-            const wrapRect = wrapper.getBoundingClientRect();
-            const edRect = domNode.getBoundingClientRect();
-            const panelRect = panel.getBoundingClientRect();
-
-            const ini = this.conectorFoco.lineaInicio;
-            const fin = this.conectorFoco.lineaFin;
-            const padre = this.conectorFoco.padre;
-            const model = ed.getModel();
-            if (!model || ini > model.getLineCount()) return;
-
-            try {
-                const lineHeight = ed.getOption(monaco.editor.EditorOption.lineHeight) || 20;
-                const scrollTop = ed.getScrollTop();
-                const margenSuperior = edRect.top - wrapRect.top;
-                const margenInferior = margenSuperior + edRect.height;
-
-                // Posición X base del corchete en el editor
-                const xBaseEditor = (edRect.left - wrapRect.left);
-                const anchoEditor = edRect.width;
-                const xCorchete = Math.min(xBaseEditor + anchoEditor - 24, xBaseEditor + 480);
-                const profCorchete = 14;
-
-                // -------------------------------------------------------------
-                // 1. DIBUJAR CORCHETE PADRE EXTERIOR (JERÁRQUICO / CLASE)
-                // -------------------------------------------------------------
-                if (this.configJerarquia.modoCorchetes === 'jerarquico' && padre && padre.lineaInicio) {
-                    const yPadreTop = ed.getTopForLineNumber(padre.lineaInicio) - scrollTop;
-                    const yPadreBottom = ed.getTopForLineNumber(padre.lineaFin) - scrollTop + lineHeight - 4;
-                    const yPadreIniReal = margenSuperior + yPadreTop + 2;
-                    const yPadreFinReal = margenSuperior + yPadreBottom;
-
-                    if (yPadreFinReal >= margenSuperior - 30 && yPadreIniReal <= margenInferior + 30) {
-                        const yPadreDrawIni = Math.max(margenSuperior + 2, yPadreIniReal);
-                        const yPadreDrawFin = Math.min(margenInferior - 2, yPadreFinReal);
-
-                        const xCorchetePadre = xCorchete + 16;
-                        const profPadre = 10;
-                        const colorPadre = padre.color || '#cba6f7';
-
-                        const dPadre = `
-                            M ${xCorchetePadre} ${yPadreDrawIni}
-                            H ${xCorchetePadre - profPadre}
-                            V ${yPadreDrawFin}
-                            H ${xCorchetePadre}
-                        `;
-                        const pathPadre = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                        pathPadre.setAttribute('class', 'conector-bracket-outer');
-                        pathPadre.setAttribute('d', dPadre);
-                        pathPadre.setAttribute('stroke', colorPadre);
-                        gCorchetes.appendChild(pathPadre);
-
-                        // Badge superior del corchete padre (interactivo)
-                        const totalLineasPadre = padre.totalLineas || (padre.lineaFin - padre.lineaInicio + 1);
-                        const etiquetaPadre = `📦 class ${padre.nombre} · ${totalLineasPadre}L`;
-                        const anchoBadgePadre = Math.min(240, Math.max(100, etiquetaPadre.length * 6.5 + 20));
-                        const xBadgePadre = xCorchetePadre - profPadre - anchoBadgePadre - 4;
-                        const yBadgePadre = Math.max(margenSuperior + 4, yPadreDrawIni);
-
-                        const gBadgePadre = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                        gBadgePadre.setAttribute('class', 'conector-badge-parent');
-                        gBadgePadre.setAttribute('title', `Ámbito de Clase: ${padre.nombre} (L${padre.lineaInicio}-L${padre.lineaFin}). Clic para enfocar.`);
-                        gBadgePadre.innerHTML = `
-                            <rect x="${xBadgePadre}" y="${yBadgePadre}" width="${anchoBadgePadre}" height="17" rx="3.5"
-                                  fill="rgba(17, 17, 27, 0.95)" stroke="${colorPadre}" stroke-width="1.2"
-                                  filter="drop-shadow(0 2px 6px rgba(0,0,0,0.5))" />
-                            <text x="${xBadgePadre + anchoBadgePadre / 2}" y="${yBadgePadre + 12}" fill="#f8fafc"
-                                  text-anchor="middle" font-size="9" font-family="'Fira Code', monospace" font-weight="700">
-                                ${this._escaparHtml(etiquetaPadre)}
-                            </text>
-                        `;
-                        gBadgePadre.onclick = (e) => {
-                            e.stopPropagation();
-                            this.enfocarEnCodigo(padre.lineaInicio, padre.lineaFin, `class ${padre.nombre}`, colorPadre);
-                        };
-                        gBadges.appendChild(gBadgePadre);
-                    }
-                }
-
-                // -------------------------------------------------------------
-                // 2. DIBUJAR CORCHETE INTERIOR (MÉTODO / FUNCIÓN ACTIVA)
-                // -------------------------------------------------------------
-                const y1Top = ed.getTopForLineNumber(ini) - scrollTop;
-                const y2Top = ed.getTopForLineNumber(fin) - scrollTop;
-                const yInicio = margenSuperior + y1Top + 2;
-                const yFin = margenSuperior + y2Top + lineHeight - 4;
-                const yCentro = (yInicio + yFin) / 2;
-
-                if (yFin >= margenSuperior - 20 && yInicio <= margenInferior + 20) {
-                    const color = this.conectorFoco.color || '#89b4fa';
-                    const idMarcador = color.includes('a6e3a1')
-                        ? 'flecha-conector-verde'
-                        : color.includes('cba6f7')
-                        ? 'flecha-conector-morado'
-                        : 'flecha-conector-azul';
-
-                    const dCorchete = `
-                        M ${xCorchete} ${yInicio}
-                        H ${xCorchete - profCorchete}
-                        V ${yFin}
-                        H ${xCorchete}
-                    `;
-                    const pathCorchete = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    pathCorchete.setAttribute('class', 'conector-bracket-path conector-bracket-inner');
-                    pathCorchete.setAttribute('d', dCorchete);
-                    pathCorchete.setAttribute('stroke', color);
-                    gCorchetes.appendChild(pathCorchete);
-
-                    // Muesca central angular
-                    const dMuesca = `
-                        M ${xCorchete - profCorchete} ${yCentro - 6}
-                        L ${xCorchete - profCorchete - 5} ${yCentro}
-                        L ${xCorchete - profCorchete} ${yCentro + 6}
-                    `;
-                    const pathMuesca = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    pathMuesca.setAttribute('d', dMuesca);
-                    pathMuesca.setAttribute('stroke', color);
-                    pathMuesca.setAttribute('stroke-width', '2');
-                    pathMuesca.setAttribute('fill', 'none');
-                    gCorchetes.appendChild(pathMuesca);
-
-                    // -------------------------------------------------------------
-                    // 3. FLECHA CURVA BÉZIER DESDE EL PANEL DE RAZONAMIENTO
-                    // -------------------------------------------------------------
-                    const xPanel = (panelRect.left - wrapRect.left);
-                    const yPanelInicio = Math.min(wrapRect.height - 40, Math.max(60, yCentro));
-                    const cp1X = xPanel - (xPanel - xCorchete) * 0.45;
-                    const cp1Y = yPanelInicio;
-                    const cp2X = xCorchete + (xPanel - xCorchete) * 0.35;
-                    const cp2Y = yCentro;
-
-                    const dFlecha = `
-                        M ${xPanel} ${yPanelInicio}
-                        C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${xCorchete + 4} ${yCentro}
-                    `;
-                    const pathFlecha = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    pathFlecha.setAttribute('class', 'conector-arrow-path');
-                    pathFlecha.setAttribute('d', dFlecha);
-                    pathFlecha.setAttribute('stroke', color);
-                    pathFlecha.setAttribute('marker-end', `url(#${idMarcador})`);
-                    gFlechas.appendChild(pathFlecha);
-
-                    // -------------------------------------------------------------
-                    // 4. BADGE FLOTANTE DEL SÍMBOLO ACTIVO
-                    // -------------------------------------------------------------
-                    const totalLineasBloque = fin - ini + 1;
-                    const prefijoIcono = (this.conectorFoco.tipo === 'class') ? '📦' : ((this.conectorFoco.tipo || '').includes('async') ? '⚡' : '⚡');
-                    const etiquetaTexto = `${prefijoIcono} ${this.conectorFoco.etiqueta || `L${ini}-${fin}`} · ${totalLineasBloque}L`;
-                    const anchoBadge = Math.min(260, Math.max(90, etiquetaTexto.length * 6.6 + 22));
-                    const altoBadge = 18;
-                    const xBadge = xCorchete - profCorchete - anchoBadge - 8;
-                    const yBadge = yCentro - altoBadge / 2;
-
-                    const gBadge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    gBadge.setAttribute('class', 'conector-badge-callout');
-                    gBadge.setAttribute('title', `Bloque: ${this.conectorFoco.firma || this.conectorFoco.etiqueta}. Líneas ${ini}-${fin}.`);
-                    gBadge.innerHTML = `
-                        <rect x="${xBadge}" y="${yBadge}" width="${anchoBadge}" height="${altoBadge}" rx="4"
-                              fill="rgba(17, 24, 39, 0.94)" stroke="${color}" stroke-width="1.3"
-                              filter="drop-shadow(0 2px 8px rgba(0,0,0,0.5))" />
-                        <text x="${xBadge + anchoBadge / 2}" y="${yBadge + 12.5}" fill="#f8fafc"
-                              text-anchor="middle" font-size="9.5" font-family="'Fira Code', monospace" font-weight="700">
-                            ${this._escaparHtml(etiquetaTexto)}
-                        </text>
-                    `;
-                    gBadges.appendChild(gBadge);
-                }
-
-            } catch (err) {
-                // Monaco no listo o fuera de vista
-            }
+            if (gCorchetes) gCorchetes.innerHTML = '';
+            if (gFlechas) gFlechas.innerHTML = '';
+            if (gBadges) gBadges.innerHTML = '';
         }
 
         /** Notifica al manager el movimiento del cursor en Monaco */
