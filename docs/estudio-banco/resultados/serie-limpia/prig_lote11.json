@@ -1,0 +1,238 @@
+{
+ "lote": 11,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 40
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 60
+  }
+ },
+ "media": 0.917,
+ "segundos": 231,
+ "modos": {
+  "general": 3,
+  "unidad": 9
+ },
+ "por_tipo": {
+  "config": 1.0,
+  "recorrido": 1.0,
+  "ubicacion": 1.0,
+  "llamadores": 1.0,
+  "ejecucion": 1.0,
+  "entorno": 1.0,
+  "constante": 1.0,
+  "frontend": 1.0,
+  "endpoint": 1.0,
+  "impacto": 0.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "cba1100fb589",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 26.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "b2d2e38713bb",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 24.1,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "5ea5697e43ce",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "e8cf9fec09fd",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "24352314df02",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 36.8,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "28767fae33c0",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 34.6,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "2ebb3a79573a",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 12.3,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "a616e6f282d9",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 11.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "2f9814d9217b",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 16.8,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ea644710a333",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 21.8,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_04",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 9.8,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_05",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 15.6,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "cba1100fb589": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"max_chunk_tokens\\\")\"}",
+    "resultado_caracteres": 246
+   }
+  ],
+  "b2d2e38713bb": [],
+  "5ea5697e43ce": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/exercise/submit\\\")\"}",
+    "resultado_caracteres": 153
+   }
+  ],
+  "e8cf9fec09fd": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_SNIPPETS_FILE\\\")\"}",
+    "resultado_caracteres": 124
+   }
+  ],
+  "24352314df02": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar quién llama al endpoint descartar\\nconsumidores = P.hechos(r=\\\"llama_api\\\", o=\\\"%/hub/descartar%\\\")\\nprint(\\\"Consumidores directos:\\\", consumidores)\\n\\n# También buscar por la ruta canónica\\nruta_canonica = \\\"/api/hub/descartar\\\"\\nconsumidores2 = P.hechos(r=\\\"llama_api\\\", o=ruta_canonica)\\nprint(\\\"Consumidores por ruta canónica:\\\", consumidores2)\\n\\n# Buscar en el código front",
+    "resultado_caracteres": 392
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"vistaSiguiendo\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "28767fae33c0": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"palabras_clave\\\")\"}",
+    "resultado_caracteres": 254
+   }
+  ],
+  "2ebb3a79573a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"MenuBar._teclasPaleta\\\"))\"}",
+    "resultado_caracteres": 131
+   }
+  ],
+  "a616e6f282d9": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"AprendizajeGuiadoManager.toggleCompletion\\\"))\"}",
+    "resultado_caracteres": 180
+   }
+  ],
+  "2f9814d9217b": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.camino(\\\"kaggle_estudio_optimo\\\", \\\"vista_previa\\\"))\"}",
+    "resultado_caracteres": 216
+   }
+  ],
+  "ea644710a333": [],
+  "ind_04": [],
+  "ind_05": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"lenguaje_de\"}",
+    "resultado_caracteres": 374
+   }
+  ]
+ },
+ "respuestas": {
+  "cba1100fb589": "P.hechos(r=\"lee_config\", o=\"max_chunk_tokens\")Las funciones o métodos que leen la clave de configuración `max_chunk_tokens` son:\n\n1. **`JobExporter.preparar`** en `backend/job_exporter.py` (línea 93).\n2. **`SondeoLibro.recomendar`** en `backend/sondeo_libro.py` (línea 550).",
+  "b2d2e38713bb": "En `backend/ai_engine/motor_moe.py:70`:\n\n```python\nCONTEXTO_MAX = 262144\n```\n\nEl valor es **262.144** tokens.",
+  "5ea5697e43ce": "P.api(\"POST /api/exercise/submit\")El endpoint `POST /api/exercise/submit` está implementado por la función `submit_exercise` en el archivo `backend/app.py` (línea 1027).",
+  "e8cf9fec09fd": "P.hechos(r=\"lee_entorno\", o=\"PRIG_SNIPPETS_FILE\")La única función o método que lee la variable de entorno `PRIG_SNIPPETS_FILE` es `BookService.__init__`, ubicada en `backend/book_service.py` (línea 65).",
+  "24352314df02": "Para encontrar la función del frontend que llama al endpoint `/api/hub/descartar`, consulto el grafo de hechos del proyecto.\n\nLa función del frontend que llama al endpoint `/api/hub/descartar` es **`vistaSiguiendo`**, definida en `frontend/js/prig_hub.js:928-1419`.\n\nLa llamada se produce en la línea **982**:\n\n```javascript\nif (descartar) descartar.onclick = async () => { await enviar('/api/hub/descartar', { clave }).catch(() => {}); delete estado.novedades[clave]; await cargar(); };\n```\n\nEsta función gestiona la pestaña \"Siguiendo\" de Prig Hub, donde se muestran los perfiles y packs que el usuario sigue. Cuando el usuario hace clic en \"Ahora no\" (botón con `data-descartar`), se ejecuta esta llamada para descartar las novedades pendientes de ese repositorio.",
+  "28767fae33c0": "P.llamadores(\"palabras_clave\")El único endpoint HTTP del backend que llama directamente a `palabras_clave` es **`desafios_buscar`** (definido en `backend/app.py`, línea 6499).\n\nNo hay otros endpoints que la invoquen directa o indirectamente; la otra llamada es la prueba unitaria `test_palabras_clave` en `backend/tests/test_desafios.py`. Por tanto, cambiar el comportamiento de `palabras_clave` afecta **directamente** al endpoint `desafios_buscar` y **indirectamente** a cualquier cliente frontend que lo consuma (por ejemplo, la búsqueda de desafíos desde la interfaz).",
+  "2ebb3a79573a": "La función que llama a `MenuBar._teclasPaleta` es `MenuBar.abrirPaleta` (línea 114 de `frontend/js/menubar.js`).\n\n`_teclasPaleta` se adjunta como manejador de eventos `keydown` al input de la paleta dentro de `abrirPaleta`, por lo que se ejecuta cuando el usuario pulsa una tecla mientras la paleta está abierta.",
+  "a616e6f282d9": "`AprendizajeGuiadoManager.toggleCompletion` es llamada por:\n\n- **`AprendizajeGuiadoManager.renderCanvas`** (línea 638 de `frontend/js/aprendizaje_guiado.js`) — desde el HTML generado como `onclick=\"window.guiadoMgr.toggleCompletion('${id}')\"` en el botón \"Completar\" de cada bloque.",
+  "2f9814d9217b": "La ejecución pasa por las siguientes funciones, en orden:\n\n1. `kaggle_estudio_optimo` (endpoint en `backend/app.py`)\n2. `_obtener_contexto_datos` (en `backend/app.py`)\n3. `obtener_contexto_datasets_notebook` (en `backend/kaggle_explorar.py`)\n4. `vista_previa` (en `backend/kaggle_explorar.py`)",
+  "ea644710a333": "La función `AIEngine.interpret_change_request` está definida en **`backend/ai_engine/ai_engine_class.py`**, en la **línea 1773**.\n\nSu implementación convierte el texto natural del alumno en un objeto `ChangeRequest` estructurado para que el motor del plan de estudios pueda procesarlo.",
+  "ind_04": "La función `lenguaje_de` en `backend/banco_proyecto.py` toma la extensión del archivo y la busca en el diccionario `LENGUAJAS`.\n\nPara `\"frontend/js/app.js\"`:\n1. `os.path.basename(\"frontend/js/app.js\")` es `\"app.js\"`.\n2. `nombre.rsplit(\".\", 1)[1]` es `\"js\"`.\n3. `LENGUAJAS.get(\"js\")` devuelve `\"js\"`.\n\nPor lo tanto, `lenguaje_de(\"frontend/js/app.js\")` devuelve **`\"js\"`**.",
+  "ind_05": "`lenguaje_de(\"docs/notas.md\")` devuelve `\"md\"`.\n\nLa función toma la extensión del archivo (`.md`) y busca en el diccionario `LENGUAJES`, donde la clave `\"md\"` está mapeada a `\"md\"`."
+ }
+}

@@ -1,0 +1,227 @@
+{
+ "lote": 6,
+ "repeticion": false,
+ "ok": false,
+ "problemas": [
+  "ae2a7dfcab33: respuesta vacía",
+  "2022a2c40f5d: respuesta vacía",
+  "8a5faedaaa73: respuesta vacía"
+ ],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5261,
+   "temp_c": 60
+  }
+ },
+ "media": 0.636,
+ "segundos": 1024,
+ "modos": {
+  "unidad": 10,
+  "general": 2
+ },
+ "por_tipo": {
+  "diseno": null,
+  "llamadores": 0.5,
+  "config": 1.0,
+  "endpoint": 1.0,
+  "impacto": 0.0,
+  "entorno": 0.0,
+  "constante": 1.0,
+  "recorrido": 1.0,
+  "ejecucion": 1.0,
+  "ubicacion": 1.0,
+  "frontend": 0.0
+ },
+ "distintos_a_la_corrida_final": [
+  {
+   "id": "da28ac8f2d8e",
+   "antes": 1.0,
+   "ahora": 0.0
+  }
+ ],
+ "limite_s": 600,
+ "agotadas": [
+  "da28ac8f2d8e"
+ ],
+ "resultados": [
+  {
+   "id": "f1f5ee627914",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 28.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "3fe51ca1c35e",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 22.9,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "c029dfbd4817",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "da28ac8f2d8e",
+   "tipo": "entorno",
+   "puntaje": 0.0,
+   "segundos": 844.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ae2a7dfcab33",
+   "tipo": "frontend",
+   "puntaje": 0.0,
+   "segundos": 1.0,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "2022a2c40f5d",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 0.7,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "8a5faedaaa73",
+   "tipo": "llamadores",
+   "puntaje": 0.0,
+   "segundos": 0.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "a319bc224766",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 35.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "dc7e5fd1b6e6",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 19.7,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "df93be484452",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 22.2,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_22",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 18.6,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_03",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 19.0,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "f1f5ee627914": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_config\\\", o=\\\"recent_workspaces\\\")\"}",
+    "resultado_caracteres": 132
+   }
+  ],
+  "3fe51ca1c35e": [],
+  "c029dfbd4817": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/ai/status\\\")\"}",
+    "resultado_caracteres": 415
+   }
+  ],
+  "da28ac8f2d8e": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"_texto\": \"{\\\"codigo\\\":\\\"print(P.hechos(r=\\\\\\\"lee_entorno\\\\\\\", o=\\\\\\\"KAGGLE_USERNAME\\\\\\\", limite=50))</parameter>\\\\n</function>\\\\n</tool_call> <tool_call>\\\\n<function=consola>\\\\n<parameter=codigo>\\\\nprint(P.hechos(r=\\\\\\\"lee_entorno\\\\\\\", o=\\\\\\\"KAGGLE_USERNAME\\\\\\\", limite=50))</parameter>\\\\n</function>\\\\n</tool_call><tool_call>\\\\n<function=consola>\\\\n<parameter=codigo>\\\\nprint(P.hechos(r=\\\\\\\"lee_en",
+    "resultado_caracteres": 105
+   }
+  ],
+  "ae2a7dfcab33": [],
+  "2022a2c40f5d": [],
+  "8a5faedaaa73": [],
+  "a319bc224766": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"guardados\\\"))\"}",
+    "resultado_caracteres": 854
+   }
+  ],
+  "dc7e5fd1b6e6": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.camino(\\\"kaggle_preguntar\\\", \\\"dataset\\\"))\"}",
+    "resultado_caracteres": 206
+   }
+  ],
+  "df93be484452": [],
+  "ind_22": [],
+  "ind_03": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"estimar_tokens\"}",
+    "resultado_caracteres": 1122
+   }
+  ]
+ },
+ "respuestas": {
+  "f1f5ee627914": "P.hechos(r=\"lee_config\", o=\"recent_workspaces\")Según el grafo de hechos del proyecto, la función que lee la clave de configuración `recent_workspaces` es `ServiciosIDE.anotar_reciente`, ubicada en `backend/ide_servicios.py` (línea 283).",
+  "3fe51ca1c35e": "La constante `CITAS_MINIMAS` vale **2**.\n\nEstá definida en `backend/recursos/calibracion.py:103` y se usa en `puntuar_canario` (línea 130) para determinar si la respuesta del modelo es \"fiable\" (`\"fiable\": len(citas) >= CITAS_MINIMAS`). Esto asegura que al menos 2 citas literales se hayan extraído correctamente para considerar válida la prueba de canario.",
+  "c029dfbd4817": "P.api(\"GET /api/ai/status\")El endpoint `GET /api/ai/status` está implementado por la función `get_ai_status` en el archivo `backend/app.py` (línea 3128).",
+  "da28ac8f2d8e": "\n[agotada: cortada a los 600 s sin terminar]",
+  "ae2a7dfcab33": "",
+  "2022a2c40f5d": "",
+  "8a5faedaaa73": "",
+  "a319bc224766": "La función `guardados` (de `backend/kaggle_colecciones.py`) es llamada por:\n\n1. **`kaggle_colecciones_listar`** en `backend/app.py` (línea 2346) — endpoint de la API.\n2. **`TestColecciones.test_ciclo_completo`** en `backend/tests/test_kaggle_colecciones_pdf.py` (línea 129) — prueba unitaria.\n\nNota: el resultado también muestra llamadas a una función llamada `guardados` en otros módulos (`github_lector.py`, `app.py` para `github_repo`/`github_guardados`, y una prueba de GitHub), pero se trata de funciones con el mismo nombre en otros contextos, no de la `guardados` de `kaggle_colecciones.py`.",
+  "dc7e5fd1b6e6": "Let me trace the call chain from `kaggle_preguntar` to `dataset`.\n\nLa ejecución pasa por estas funciones, en este orden:\n\n1. `kaggle_preguntar` (endpoint en `backend/app.py:2853`)\n2. `_obtener_contexto_datos` (`backend/app.py:2810`)\n3. `obtener_contexto_datasets_notebook` (`backend/kaggle_explorar.py:626`)\n4. `dataset` (`backend/kaggle_explorar.py:157`)",
+  "df93be484452": "Está definida en **`backend/banco_proyecto.py`**, línea **1764**.",
+  "ind_22": "Porque el diseño de `lectura_unidades.py` separa lo que se **congela** en el estado del modelo (el prefijo guardado) de lo que **cambia** en cada pregunta.\n\nLos motivos exactos están en los comentarios y el código:\n\n1.  **El prefijo se guarda en el motor:** `mensajes()` construye el prefijo que se le pasa al motor MoE. Este prefijo incluye el sistema, la tarjeta global y el código de la unidad. El motor guarda el estado de atención (caché) y los expertos activados para este prefijo. Si este prefijo cambia, el motor tendría que releer la unidad desde cero, perdiendo la ventaja de velocidad (~0,1 s).\n2.  **El contexto del grafo es dinámico:** El método `contexto_unidad()` (que se llama en `pregunta_con_contexto`, no en `mensajes`) calcula qué usa la unidad de otras y quién la usa. Esto depende de la estructura actual del proyecto. Si se edita otro archivo, las interfaces de esta unidad pueden cambiar. Por tanto, no puede estar congelado en el prefijo guardado, o cada cambio en el proyecto obligaría a releer todas las unidades.\n3.  **La guía de la consola es externa:** La guía (`guia_consola()`) depende de `memoria_consulta.AYUDA`, que puede actualizarse sin cambiar el código de la unidad. Si estuviera en `mensajes()`, cualquier cambio en la API de la consola invalidaría todas las lecturas guardadas.\n\nEn resumen: `mensajes()` contiene solo lo **estable** para que el estado del motor se reuse. `pregunta_con_contexto()` añade lo **variable** (contexto del grafo y guía) en cada nueva pregunta, sin invalidar la lectura previa.",
+  "ind_03": "La función `estimar_tokens` en `backend/banco_proyecto.py` es:\n\n```python\ndef estimar_tokens(texto: str) -> int:\n    return int(len(texto or \"\") / CARACTERES_POR_TOKEN) + 1\n```\n\nY `CARACTERES_POR_TOKEN = 3.5`.\n\nPara `\"abcd\" * 30` la longitud es `4 * 30 = 120` caracteres.\n\nCálculo: `int(120 / 3.5) + 1 = int(34.2857...) + 1 = 34 + 1 = 35`.\n\n**Devuelve `35`.**"
+ }
+}

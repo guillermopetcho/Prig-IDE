@@ -29,6 +29,7 @@ IGNORADAS = {
     "__pycache__", "node_modules", "venv", ".venv", "env", ".git", ".github",
     ".ipynb_checkpoints", "dist", "build", ".cache", "site-packages", ".idea",
     ".vscode", ".gemini", ".mypy_cache", ".pytest_cache", ".tox",
+    "target",           # compilaciones de Rust (cargo): miles de archivos generados
 }
 MAX_ARCHIVOS = 20000
 MAX_BYTES_BUSQUEDA = 2 * 1024 * 1024

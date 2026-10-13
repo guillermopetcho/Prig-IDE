@@ -1,0 +1,126 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 38
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "general",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5197,
+   "temp_c": 55
+  },
+  "segundos": 116,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "0b5f93c17f28·w1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "El banco de hechos dice que el camino es:\n\n1. `modelos_borrar_parciales` (backend/app.py:5876)\n2. `_carpeta_modelos_servidor` (backend/app.py:5863)\n3. `estado` (backend/recursos/servidor.py:123)\n4. `librerias_disponibles` (backend/recursos/servidor.py:72)\n\nVamos a verificarlo revisando el código de `_carpeta_modelos_servidor` y `estado`.\n\n`estado` está definido en varios archivos. Necesito el de `backend/recursos/servidor.py`.\n\nNo apareció el de `servidor.py`. Busquemos directamente.\n\nAhora confirmemos que `_carpeta_modelos_servidor` llama a `recursos_srv.estado()`:\n\nPerfecto. Ahora confirmemos el punto de entrada:\n\nLa cadena está confirmada en el código literal:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5877`) → llama a `_carpeta_modelos_servidor()` en la línea 5878.\n2. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`) → llama a `recursos_srv.estado()` en la línea 5865.\n3. **`estado`** (`backend/recursos/servidor.py:123`) → llama a `librerias_disponibles()` en la línea 141.\n4. **`librerias_disponibles`** (`backend/recursos/servidor.py:72`) → es el destino.\n\nEl camino es:\n\n`modelos_borrar_parciales` → `_carpeta_modelos_servidor` → `estado` → `librerias_disponibles`",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2471,
+   "tokens": 207,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"_carpeta_modelos_servidor\"}",
+     "resultado_caracteres": 311
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"estado\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"servidor.estado\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar la definición de estado en backend/recursos/servidor.py\\nimport backend.recursos.servidor as srv\\nprint(srv.estado.__code__.co_filename)\\nprint(srv.estado.__code__.co_firstlineno)\\n\"}",
+     "resultado_caracteres": 206
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar la función estado en el código de servidor.py\\nlines = P.lineas(\\\"backend/recursos/servidor.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if 'def estado' in line:\\n        print(f\\\"Línea {i}: {line.strip()}\\\")\\n        # Mostrar las siguientes 20 líneas\\n        for j in range(i, min(i+20, len(lines)+1)):\\n            print(f\\\"{j}: {lines[j-1]}\\\")\\n        break\\n\"}",
+     "resultado_caracteres": 1124
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar que _carpeta_modelos_servidor llama a recursos_srv.estado\\nlines = P.lineas(\\\"backend/app.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if '_carpeta_modelos_servidor' in line and 'def ' in line:\\n        print(f\\\"Línea {i}: {line.strip()}\\\")\\n        for j in range(i, min(i+10, len(lines)+1)):\\n            print(f\\\"{j}: {lines[j-1]}\\\")\\n        break\\n\"}",
+     "resultado_caracteres": 422
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar modelos_borrar_parciales\\nlines = P.lineas(\\\"backend/app.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if 'modelos_borrar_parciales' in line:\\n        print(f\\\"Línea {i}: {line.strip()}\\\")\\n        for j in range(i, min(i+5, len(lines)+1)):\\n            print(f\\\"{j}: {lines[j-1]}\\\")\\n        break\\n\"}",
+     "resultado_caracteres": 244
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 77.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·w2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en este orden:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5876`): El endpoint DELETE `/api/modelos/parciales` se ejecuta y llama a `_carpeta_modelos_servidor()`.\n\n2. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`): Esta función interna llama a `recursos_srv.estado()` para obtener el entorno actual de Ollama.\n\n3. **`estado`** (`backend/recursos/servidor.py:123`): Dentro de esta función, en la línea 141, se construye el diccionario de retorno incluyendo `\"librerias\": librerias_disponibles()`.\n\n4. **`librerias_disponibles`** (`backend/recursos/servidor.py:72`): Finalmente se ejecuta esta función para listar las librerías disponibles.\n\nEl camino es: `modelos_borrar_parciales` → `_carpeta_modelos_servidor` → `estado` → `librerias_disponibles`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2471,
+   "tokens": 244,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 19.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·w3",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en este orden:\n\n1. **`modelos_borrar_parciales`** (`backend/app.py:5876`)\n2. **`_carpeta_modelos_servidor`** (`backend/app.py:5863`) — llamada en la línea 5878\n3. **`estado`** (`backend/recursos/servidor.py:123`) — llamada en la línea 5865\n4. **`librerias_disponibles`** (`backend/recursos/servidor.py:72`) — llamada en la línea 141\n\nEl camino es:\n\n```\nmodelos_borrar_parciales (app.py:5876)\n    → llama a _carpeta_modelos_servidor (app.py:5878)\n        → llama a estado (app.py:5865)\n            → llama a librerias_disponibles (servidor.py:141)\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 2471,
+   "tokens": 218,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 19.0,
+   "memoria_del_modelo": null
+  }
+ ]
+}

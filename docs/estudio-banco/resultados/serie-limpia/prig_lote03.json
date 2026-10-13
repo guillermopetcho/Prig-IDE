@@ -1,0 +1,238 @@
+{
+ "lote": 3,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 37
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5229,
+   "temp_c": 61
+  }
+ },
+ "media": 0.818,
+ "segundos": 256,
+ "modos": {
+  "unidad": 9,
+  "general": 3
+ },
+ "por_tipo": {
+  "ejecucion": 1.0,
+  "llamadores_independiente": 0.5,
+  "constante": 1.0,
+  "entorno": 1.0,
+  "endpoint": 1.0,
+  "frontend": 1.0,
+  "impacto": 1.0,
+  "diseno": null,
+  "endpoint_real": 1.0,
+  "recorrido": 0.0,
+  "config": 0.5,
+  "ubicacion": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "resultados": [
+  {
+   "id": "a84a7fe1bad7",
+   "tipo": "config",
+   "puntaje": 0.5,
+   "segundos": 44.7,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8caebf27e7ba",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 23.7,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "93470a7daa9c",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "e7c41fc9b8ee",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 21.8,
+   "modo": "unidad",
+   "herramientas": 2
+  },
+  {
+   "id": "40162c84477d",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 10.6,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "abb680bcc117",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 38.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "11c1e19dddbb",
+   "tipo": "recorrido",
+   "puntaje": 0.0,
+   "segundos": 29.3,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "5c64648aa59a",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_26",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 11.2,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_02",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 26.7,
+   "modo": "general",
+   "herramientas": 0,
+   "puntaje_original": 0.0
+  },
+  {
+   "id": "ind_19",
+   "tipo": "endpoint_real",
+   "puntaje": 1.0,
+   "segundos": 10.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ind_16",
+   "tipo": "llamadores_independiente",
+   "puntaje": 0.5,
+   "segundos": 18.8,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "a84a7fe1bad7": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"truncar\\\")\"}",
+    "resultado_caracteres": 2
+   }
+  ],
+  "8caebf27e7ba": [],
+  "93470a7daa9c": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/export/pdf-preview\\\")\"}",
+    "resultado_caracteres": 299
+   }
+  ],
+  "e7c41fc9b8ee": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"GEMINI_API_KEY\\\")\"}",
+    "resultado_caracteres": 2
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"GEMINI_API_KEY\\\")\"}",
+    "resultado_caracteres": 112
+   }
+  ],
+  "40162c84477d": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/workspace/directories\\\")\"}",
+    "resultado_caracteres": 311
+   }
+  ],
+  "abb680bcc117": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"flujos_ejecutar\\\")\"}",
+    "resultado_caracteres": 666
+   }
+  ],
+  "11c1e19dddbb": [],
+  "5c64648aa59a": [],
+  "ind_26": [],
+  "ind_02": [],
+  "ind_19": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/hub/todo\\\")\"}",
+    "resultado_caracteres": 369
+   }
+  ],
+  "ind_16": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"Gestor.radiografia\\\"))\"}",
+    "resultado_caracteres": 257
+   }
+  ]
+ },
+ "respuestas": {
+  "a84a7fe1bad7": "P.llamadores(\"truncar\")La búsqueda directa por el nombre de la clave \"truncar\" en el grafo de hechos del proyecto no devolvió resultados. Esto se debe a que `truncar` no se lee como una cadena literal en el código, sino que es una propiedad dentro de un diccionario devuelto por el método `embeddings()` de la clase `ConfigModelos` en `backend/ollama_opciones.py`.\n\nSin embargo, analizando el flujo de datos:\n\n1.  En `backend/indice_semantico.py`, el método `IndiceSemantico._ajustes()` llama a `config().embeddings()` para obtener el diccionario de configuración.\n2.  Dentro de `_ajustes()`, se accede a la clave `truncar` con: `e.get(\"truncar\", True)`.\n3.  El resultado de `_ajustes()` se usa en `IndiceSemantico.embeber()` para decidir si enviar o no el parámetro `truncate` en la petición a Ollama.\n\nPor lo tanto, la función que lee y utiliza esta clave de configuración es **`IndiceSemantico._ajustes`** (dentro de la clase `IndiceSemantico` en `backend/indice_semantico.py`).",
+  "8caebf27e7ba": "En `backend/recursos/termico.py:38`, la constante vale:\n\n```python\nMESETA_S = 20.0\n```\n\nSignifica 20 segundos: si la temperatura no baja al menos 1 °C en este tiempo, el sistema asume que no va a enfriar más y da por terminada la fase de enfriamiento.",
+  "93470a7daa9c": "P.api(\"POST /api/export/pdf-preview\")El endpoint `POST /api/export/pdf-preview` está implementado por la función `pdf_preview` en el archivo `backend/app.py`, en la línea 4994.",
+  "e7c41fc9b8ee": "P.llamadores(\"GEMINI_API_KEY\")\n\nP.hechos(r=\"lee_entorno\", o=\"GEMINI_API_KEY\")\n\nLa única función que lee la variable de entorno `GEMINI_API_KEY` es **`clave_actual`** en `backend/gemini_motor.py` (línea 79).",
+  "40162c84477d": "P.api(\"/api/workspace/directories\")La función del frontend que llama al endpoint `/api/workspace/directories` es `navegarExplorador` de la clase `FileTreeManager`, ubicada en el archivo `frontend/js/filetree.js` (línea 367).",
+  "abb680bcc117": "P.ficha(\"flujos_ejecutar\")Basado en el resultado de `P.ficha(\"flujos_ejecutar\")`:\n\nEl único endpoint HTTP afectado directamente es **`POST /api/flujos/ejecutar`**, ya que la función `flujos_ejecutar` es la que lo expone. La función `emitir` (y su variante `emitir_v2` para flujos v2) es una función anidada dentro de `flujos_ejecutar`, por lo que cualquier cambio en su comportamiento afecta exclusivamente a este endpoint. No hay otros endpoints que llamen a `flujos_ejecutar` o que dependan de sus funciones anidadas.",
+  "11c1e19dddbb": "Para entender por qué `desafios_evaluar_salida` puede llegar a `ErrorDesafio`, hay que seguir el hilo de ejecución en `backend/app.py` (líneas 6778-6846).\n\nLa función `desafios_evaluar_salida` llama a `des_ejec.comprobar` (que es `backend/desafios/ejecucion.comprobar`). Dentro de `comprobar`, se validan las páginas y se construye el entorno de ejecución. Si algo falla en la validación o en la construcción de las pruebas (por ejemplo, si hay páginas con nombres reservados, duplicados o mal formados), se lanza `ErrorDesafio`.\n\nLas funciones intermedias en orden son:\n\n1.  `desafios_evaluar_salida` (en `backend/app.py`, línea 6778)\n2.  `comprobar` (en `backend/desafios/ejecucion.py`, línea 376)\n3.  `validar_paginas` (en `backend/desafios/ejecucion.py`, línea 38)\n\nDentro de `validar_paginas`, si se detecta un nombre de página inválido, duplicado o reservado, se lanza `ErrorDesafio` (línea 34).\n\nPor lo tanto, el orden de las funciones intermedias es:\n\n1.  `desafios_evaluar_salida`\n2.  `comprobar`\n3.  `validar_paginas`",
+  "5c64648aa59a": "La función `desafios_borrar` está definida en **`backend/app.py`**, específicamente en la línea **6540**:\n\n```python\n@app.delete(\"/api/desafios/{id_}\")\ndef desafios_borrar(id_: str):\n    _desafio(desafios_almacen.obtener, id_)\n    return {\"borrado\": desafios_almacen.borrar(id_)}\n```",
+  "ind_26": "Consola del banco. El código que el modelo ejecuta en la consola P accede al banco mediante P.banco, que es de solo lectura: no hay métodos para insertar, borrar ni modificar en la interfaz de la consola. Si se quiere cambiar algo del banco, hay que hacerlo por la API REST (/api/banco/conocimiento, etc.) o llamando a P.banco.anotar() desde el backend, no desde la consola.",
+  "ind_02": "Devuelve: `/api/desafios/*/comprobar`\n\nLa función `ruta_http_canonica` (backend/banco_proyecto.py:624-632) aplica tres sustituciones en orden:\n\n1. `re.sub(r\"(?<=/)\\$\\{[^}]*\\}\", \"*\", ruta)` → reemplaza `${id}` seguido de `/` por `*`. Resultado intermedio: `/api/desafios/*/comprobar/`\n2. `re.sub(r\"\\$\\{[^}]*\\}\", \"\", ...)` → limpia cualquier `${...}` restante pegado a un segmento (no aplica aquí ya que el primero lo cambió).\n3. `re.sub(r\"\\{[^}]*\\}\", \"*\", ruta)` → por si hubiera llaves `{id}` en lugar de `${id}` (no aplica aquí).\n4. `.split(\"?\")[0].split(\"#\")[0]` → quita consulta y fragmento (no aplica).\n5. `.rstrip(\"/\")` → elimina la barra final.\n\nResultado final: `/api/desafios/*/comprobar`",
+  "ind_19": "P.api(\"GET /api/hub/todo\")El endpoint `GET /api/hub/todo` está implementado por la función `crear_router.todo` en el archivo `backend/hub/api.py` (línea 170).",
+  "ind_16": "Las funciones o métodos (fuera de los tests) que llaman a `Gestor.radiografia` son:\n\n1. **`Gestor.maquina`** (línea 55 de `backend/recursos/gestor.py`)\n2. **`Gestor.estado_vivo`** (línea 150 de `backend/recursos/gestor.py`)\n\nAmbos son métodos de la misma clase `Gestor` en el mismo archivo."
+ },
+ "recorregido": [
+  {
+   "cuando": "2026-10-03 10:28",
+   "cambios": [
+    [
+     "ind_02",
+     0.0,
+     1.0
+    ]
+   ]
+  }
+ ]
+}

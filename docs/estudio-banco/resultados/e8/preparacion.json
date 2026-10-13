@@ -1,0 +1,107 @@
+{
+ "copia": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+ "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+ "lineas_mutadas": {
+  "B1": 165,
+  "B2": 97,
+  "B3": 40,
+  "B4": 327,
+  "B5": 82,
+  "B6": 93,
+  "B7": 712,
+  "B8": 269
+ },
+ "sincronizacion": {
+  "nuevos": 0,
+  "modificados": 8,
+  "borrados": 0
+ },
+ "segundos_sincronizar": 1.01,
+ "segundos_particionar": 0.26,
+ "unidades": 96,
+ "vencidas": [
+  {
+   "orden": 41,
+   "tokens": 15437,
+   "rutas": [
+    "backend/recursos/motor_suave.py",
+    "backend/recursos/ritmo.py",
+    "backend/recursos/termico.py"
+   ]
+  },
+  {
+   "orden": 64,
+   "tokens": 11138,
+   "rutas": [
+    "backend/agent_flows.py",
+    "backend/particion_proyecto.py"
+   ]
+  },
+  {
+   "orden": 67,
+   "tokens": 13855,
+   "rutas": [
+    "backend/job_exporter.py",
+    "backend/knowledge/ingestion/__init__.py",
+    "backend/knowledge/ingestion/pdf_parser.py",
+    "backend/knowledge/ingestion/semantic_chunker.py",
+    "backend/knowledge/ingestion/structure_detector.py",
+    "backend/knowledge/ingestion/toc_extractor.py",
+    "kaggle_worker/domains.py"
+   ]
+  },
+  {
+   "orden": 73,
+   "tokens": 14396,
+   "rutas": [
+    "backend/desafios/almacen.py",
+    "backend/desafios/ejecucion.py",
+    "backend/progreso.py"
+   ]
+  },
+  {
+   "orden": 74,
+   "tokens": 14764,
+   "rutas": [
+    "backend/evals/run_eval.py",
+    "backend/exercise_engine.py",
+    "backend/kernel_session.py",
+    "backend/runner.py",
+    "ejemplo_aprender.py",
+    "launch_note.py",
+    "main.py"
+   ]
+  },
+  {
+   "orden": 75,
+   "tokens": 9515,
+   "rutas": [
+    "backend/file_manager.py",
+    "backend/ide_servicios.py"
+   ]
+  },
+  {
+   "orden": 78,
+   "tokens": 10062,
+   "rutas": [
+    "backend/banco_proyecto.py"
+   ]
+  },
+  {
+   "orden": 79,
+   "tokens": 15624,
+   "rutas": [
+    "backend/banco_proyecto.py"
+   ]
+  },
+  {
+   "orden": 80,
+   "tokens": 15652,
+   "rutas": [
+    "backend/banco_proyecto.py"
+   ]
+  }
+ ],
+ "tokens_a_releer": 120443,
+ "cambios_borrados": 8
+}

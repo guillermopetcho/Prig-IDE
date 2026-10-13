@@ -42,7 +42,8 @@ class BookLibraryManager {
 
         const btnRefresh = document.getElementById('btn-refresh-books');
         if (btnRefresh) btnRefresh.onclick = () => {
-            if (this.activeCategory === 'librerias') this.loadLibrariesList();
+            if (this.activeCategory === 'referencias' && window.ReferenciasML) window.ReferenciasML.mostrarLista(true);
+            else if (this.activeCategory === 'librerias') this.loadLibrariesList();
             else this.loadBooks();
         };
 
@@ -63,7 +64,9 @@ class BookLibraryManager {
         if (this.searchInput) {
             this.searchInput.oninput = () => {
                 const q = this.searchInput.value.trim().toLowerCase();
-                if (this.activeCategory === 'librerias') {
+                if (this.activeCategory === 'referencias' && window.ReferenciasML) {
+                    window.ReferenciasML.filtrar(q);
+                } else if (this.activeCategory === 'librerias') {
                     this.filterLibrariesList(q);
                 } else {
                     this.filterBooksList(q);
@@ -104,13 +107,15 @@ class BookLibraryManager {
 
         if (clickedBtn) {
             clickedBtn.classList.add('active');
-            clickedBtn.style.background = cat === 'librerias' ? 'var(--accent-green)' : 'var(--accent-purple)';
+            clickedBtn.style.background = cat === 'librerias' ? 'var(--accent-green)' : (cat === 'referencias' ? 'var(--accent-blue)' : 'var(--accent-purple)');
             clickedBtn.style.color = '#111';
             clickedBtn.style.fontWeight = 'bold';
             clickedBtn.style.border = 'none';
         }
 
-        if (cat === 'librerias') {
+        if (cat === 'referencias' && window.ReferenciasML) {
+            window.ReferenciasML.mostrarLista();
+        } else if (cat === 'librerias') {
             this.loadLibrariesList();
         } else {
             this.filterBooksList(this.searchInput ? this.searchInput.value.trim().toLowerCase() : '');
@@ -285,11 +290,14 @@ class BookLibraryManager {
         const btnMeta = document.getElementById('tab-btn-book-metadata');
         const btnReader = document.getElementById('tab-btn-book-reader');
         const btnLibs = document.getElementById('tab-btn-book-librerias');
+        const btnRefs = document.getElementById('tab-btn-book-referencias');
+        const paneRefs = document.getElementById('pane-book-referencias');
 
-        [btnMeta, btnReader, btnLibs].forEach(b => { if (b) b.classList.remove('active'); });
+        [btnMeta, btnReader, btnLibs, btnRefs].forEach(b => { if (b) b.classList.remove('active'); });
         if (this.metadataPane) this.metadataPane.style.display = 'none';
         if (this.readerPane) this.readerPane.style.display = 'none';
         if (this.libreriasPane) this.libreriasPane.style.display = 'none';
+        if (paneRefs) paneRefs.style.display = 'none';
 
         if (tabName === 'metadata') {
             if (btnMeta) btnMeta.classList.add('active');
@@ -297,6 +305,9 @@ class BookLibraryManager {
         } else if (tabName === 'librerias') {
             if (btnLibs) btnLibs.classList.add('active');
             if (this.libreriasPane) this.libreriasPane.style.display = 'block';
+        } else if (tabName === 'referencias') {
+            if (btnRefs) btnRefs.classList.add('active');
+            if (paneRefs) paneRefs.style.display = 'block';
         } else {
             if (btnReader) btnReader.classList.add('active');
             if (this.readerPane) this.readerPane.style.display = 'block';

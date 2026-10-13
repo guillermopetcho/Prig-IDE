@@ -1,0 +1,765 @@
+{
+ "criterio": "correcta / parcial / incorrecta, leyendo el código de la copia congelada; 'clave_incompleta' marca preguntas cuyo esperado (del grafo) está mal",
+ "lotes": {
+  "1": [
+   {
+    "id": "9728342dc751",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "GET /api/inicio también se ve afectado: inicio_resumen pasa lambda: progreso.resumen(...) a inicio.resumen; el grafo no ve llamadas dentro de lambda (E2). El modelo acertó por un motivo equivocado (mezcló las dos funciones resumen, ambigüedad de E5). El piloto razonó bien sobre el grafo y concluyó mal (decía que GET /api/inicio no se afecta) y también sacó 1,0."
+   },
+   {
+    "id": "851ee7b0111a",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "cadena esperada en orden; agrega _kaggle_ficha (llamada aparte del endpoint) y _registrar como pasos dudosos"
+   },
+   {
+    "id": "ind_23",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "correcta",
+    "nota": "cubre los dos puntos de la rúbrica (estado acumulativo y no reversible; específico de la secuencia exacta), con relleno impreciso sobre la caché KV; sin rastro de la clave"
+   },
+   {
+    "id": "ind_15",
+    "tipo": "llamadores_independiente",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "nota": "una sola consulta: P.llamadores devolvió [] (falta la arista: book_service es instancia global) y el modelo afirmó que nadie la llama; no lo contrastó con P.grep. Tercera vez igual: sistemático"
+   }
+  ],
+  "2": [
+   {
+    "id": "8b544b1c6e67",
+    "tipo": "impacto",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "nota": "confundió _ndjson (la de emitir: solo la usan POST /api/modelos/crear e importar, verificado en el código) con _ndjson_en_hilo, otra función de nombre parecido, y listó 21 endpoints equivocados con seguridad. Clave correcta."
+   },
+   {
+    "id": "ind_25",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "correcta",
+    "nota": "los tres puntos de la rúbrica (por carpeta de la más chica a la más grande; las muy chicas aunque sean de carpetas distintas; respetando el tope); sin consultas: lo leyó de su unidad"
+   },
+   {
+    "id": "ind_12",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "auto_original": 0.0,
+    "manual": "correcta",
+    "nota": "respondió la tupla (2048, 1803, 2580): correcto. El 0 era un error del corrector (la clave JSON guarda la tupla como lista), corregido y recorregido. Error menor: expande MTP como «Mixture of Tokens» (es Multi-Token Prediction)."
+   },
+   {
+    "id": "ind_14",
+    "tipo": "llamadores_independiente",
+    "auto": 0.75,
+    "manual": "parcial",
+    "nota": "encontró los 3 métodos de BookService; le faltó el endpoint get_book_citations de app.py, que llama por la instancia global book_service (el mismo hueco del grafo que ind_15). Una sola consulta."
+   }
+  ],
+  "3": [
+   {
+    "id": "a84a7fe1bad7",
+    "tipo": "config",
+    "auto": 0.5,
+    "manual": "parcial",
+    "clave_incompleta": true,
+    "nota": "la clave (embeber, estado) omite a IndiceSemantico._ajustes, que es la que lee la clave de la configuración (indice_semantico.py:92, e.get('truncar', True)); embeber (l.101) y estado (l.265) leen el diccionario que arma _ajustes. El modelo nombró _ajustes y a embeber como consumidor, pero no a estado. Usó P.llamadores en vez de P.hechos(r='lee_config'), y le devolvió []; una sola consulta."
+   },
+   {
+    "id": "11c1e19dddbb",
+    "tipo": "recorrido",
+    "auto": 0.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "hay dos caminos reales hasta ErrorDesafio: el de la clave (evaluar_con_salida → generar, tutor.py:57) y el que dio el modelo (comprobar → validar_paginas, ejecucion.py:41-57; comprobar se pasa como argumento a _desafio, app.py:6805, y con pruebas privadas se llama). La pregunta supone un único camino y la clave solo admite uno: defecto del generador para el tipo recorrido. El modelo omitió el envoltorio _desafio e incluyó al propio endpoint como «intermedio». Sin consultas: lo sacó de la lectura."
+   },
+   {
+    "id": "abb680bcc117",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "emitir es anidada de flujos_ejecutar (app.py:1995) y solo la usa ese endpoint; la otra emitir (l.2095) es de otro endpoint y el modelo no las mezcló."
+   },
+   {
+    "id": "ind_26",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "incorrecta",
+    "nota": "rúbrica: mode=ro, P.sql solo SELECT, escrituras por Prig. Dice «solo lectura» sin el mecanismo, no menciona el filtro de P.sql y afirma algo falso: que la consola no tiene métodos para escribir (P.anotar/afirmar/guardar existen y pasan por el proceso de Prig, memoria_consulta.py:25). Sin consultas, 11 s."
+   },
+   {
+    "id": "ind_02",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "auto_original": 0.0,
+    "manual": "correcta",
+    "nota": "respondió exactamente /api/desafios/*/comprobar, siguiendo las sustituciones en orden. El 0 era un error del corrector: la clave de texto se guarda con comillas JSON y el modelo la escribió entre backticks. Corregido (vale entre comillas o backticks, no suelto) y recorregido: los lotes 1-2 no cambian."
+   },
+   {
+    "id": "ind_16",
+    "tipo": "llamadores_independiente",
+    "auto": 0.5,
+    "manual": "parcial",
+    "nota": "nombró maquina y estado_vivo (gestor.py:55 y 150); le faltaron _num_gpus (app.py:5631) y recursos_servidor_aplicar (app.py:5387), que llaman por la fábrica recursos_gestor().radiografia(...), algo que el grafo no resuelve. Una sola consulta y ningún P.grep: el mismo patrón que ind_14/ind_15 (hueco del grafo → respuesta segura e incompleta)."
+   },
+   {
+    "id": "(constante, endpoint, entorno, frontend, ubicacion, ind_19)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "verificadas con grep en la copia: GEMINI_API_KEY solo en clave_actual (gemini_motor.py:79), /api/workspace/directories solo en filetree.js:367. Valores bien, pero los números de línea que da de memoria en modo general están mal (MESETA_S en l.60, dijo 38; desafios_borrar en l.6569, dijo 6540)."
+   }
+  ],
+  "4": [
+   {
+    "id": "acffcb751a15",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "parcial",
+    "clave_incompleta": true,
+    "nota": "pregunta ambigua: varias configuraciones usan la clave «activo». La clave del grafo solo tiene Ritmo.activo y Ritmo.fijar; también la leen el modo frío (ai_engine_class.py:758, termico.py:371, frio.py:317 y 323) y banco_proyecto.py:2595 (analisis['activo']). El modelo hizo una sola consulta (P.hechos lee_config) y repitió el grafo, sin P.grep."
+   },
+   {
+    "id": "cddd4484b32b",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "GET y POST /api/progreso/analisis (app.py:6398, 6404, 6418); recorrió llamadores → endpoints con 5 consultas. Es la pregunta que en el primer intento del lote 4 (10:28) entró en bucle: 31.937 tokens sin terminar, se cortó a mano; aquí, 72 s."
+   },
+   {
+    "id": "2e875dad3d95",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "anidada; solo la llama su contenedora (StreamingResponse(_flujo_cancelable(emitir())))."
+   },
+   {
+    "id": "bebce693b1a1",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "gobernador (termico.py:711) → Gobernador.__init__ (l.341) → Controlador; líneas bien (usó P.camino)."
+   },
+   {
+    "id": "ind_24",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "correcta",
+    "nota": "los dos puntos de la rúbrica con el código exacto (memoria_consulta.py:146-156: signal.alarm(0) y restaurar; numero[0] += 1 y descarte por id); 2 consultas leyendo el archivo."
+   },
+   {
+    "id": "ind_08",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "«metodo»."
+   },
+   {
+    "id": "(constante, endpoint, entorno, frontend, ubicacion, ind_21)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "no se verificaron una por una: sus claves son de respuesta única y salen de hechos ya verificados contra el código (endpoints 378/378 y frontend 328/328 en la corrección 1; constantes y ubicaciones por AST), así que un 1,0 es fiable; el control con grep del lote 3 dio 6 de 6."
+   }
+  ],
+  "5": [
+   {
+    "id": "ind_27",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "incorrecta",
+    "agotada": true,
+    "nota": "AGOTADA a los 600 s sin respuesta: 28 consultas. Intentó lo que la consola no permite (import backend..., open()), repitió 4 veces el mismo código con el mismo error (134 caracteres) y pidió dos veces los mismos símbolos; cada ronda restaura la unidad y relee la conversación creciente (~5K tokens a ~235 tok/s). No llegó al tope de 16 rondas por tiempo. Modo de falla nuevo: bucle de consultas que no aprende de los errores."
+   },
+   {
+    "id": "ind_17",
+    "tipo": "llamadores_independiente",
+    "auto": 0.333,
+    "manual": "parcial",
+    "clave_ambigua": true,
+    "nota": "hay DOS load_state en el archivo: StudyPlanRepository.load_state (l.656, la de la clave de jedi: la llaman StudyPlanEngine.load_state, build_and_save_dataset y migrate_legacy_plans) y StudyPlanEngine.load_state (l.847). El modelo eligió la segunda (legítimo) y dio sus 6 llamadores de la clase, pero le faltan los 5 endpoints de app.py (l.4387, 4402, 4448, 4487, 4592) que la llaman por la instancia global study_plan_engine: el mismo hueco del grafo (instancia global/fábrica), cuarta vez. Una sola consulta."
+   },
+   {
+    "id": "ace7c95ae520",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "la función tiene dos decoradores (POST /api/guided/explain y /api/seguimiento/explain); el modelo dio los dos y la clave solo uno. El grafo tiene ambos: el defecto es del generador del examen (examen_proyecto.py:178, endpoint_de es un dict por función y la segunda ruta pisa a la primera; afecta a las 7 funciones con dos rutas). P.impacto del sistema usa un conjunto y no tiene el defecto. 8 consultas, 97 s."
+   },
+   {
+    "id": "01c1ae535c93",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "agrega 3 tests como llamadores; la pregunta no los excluye."
+   },
+   {
+    "id": "7cf766c1b03a",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "escribió P.ficha(...) como texto al principio (eco de consulta); cadena correcta."
+   },
+   {
+    "id": "3354b61228b1",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "las dos de la clave; otras lecturas de «keep_alive» son de otros diccionarios (opciones del modelo, app.py:5039; base, ai_engine_class.py:946)."
+   },
+   {
+    "id": "7b3370acbb60",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "termico.py:374, línea exacta."
+   },
+   {
+    "id": "(constante, endpoint, frontend, ubicacion, ind_01)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "6": [
+   {
+    "id": "f1f5ee627914",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "parcial",
+    "clave_incompleta": true,
+    "nota": "la clave (del grafo) solo tiene ServiciosIDE.anotar_reciente; ServiciosIDE.recientes (ide_servicios.py:273) también lee recent_workspaces (lee_config cubre ~50 %, E2). El modelo repitió el grafo con una consulta."
+   },
+   {
+    "id": "8a5faedaaa73",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "nombra extraerTimestampsDeTexto y pintarReproductor (las otras llamadas están en guardarNuevaMarca y dos onclick anidados dentro de pintarReproductor), pero razonando de forma confusa, EN INGLÉS y con números de línea equivocados (dijo 2090/2108; son 1912/1937). Sin consultas."
+   },
+   {
+    "id": "a319bc224766",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "desambiguó bien: descartó los guardados homónimos de github_lector que mezclaba el grafo."
+   },
+   {
+    "id": "2022a2c40f5d",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "y explica por qué GET /api/progreso/analisis no se afecta; 5 consultas."
+   },
+   {
+    "id": "dc7e5fd1b6e6",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "P.camino; líneas correctas."
+   },
+   {
+    "id": "da28ac8f2d8e",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "kaggle_lector.py:95. Es la pregunta que en el primer intento del lote 6 entró en bucle de texto (11.459 tokens hasta llenar 32K, reinicio a 64K y de nuevo desde cero); aquí, 17,6 s."
+   },
+   {
+    "id": "ind_22",
+    "tipo": "diseno",
+    "auto": null,
+    "manual": "correcta",
+    "nota": "los tres puntos de la rúbrica (prefijo estable, invalidaría el estado, va con cada pregunta en pregunta_con_contexto); sin consultas."
+   },
+   {
+    "id": "(constante, endpoint, frontend, ubicacion, ind_03)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "7": [
+   {
+    "id": "12bb842411c5",
+    "tipo": "impacto",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "nota": "nombró la función correcta (api_shutdown) pero INVENTÓ la ruta: dijo POST /api/shutdown y es POST /api/app/shutdown (app.py:3121). Sin consultas, 13 s: respondió de memoria con seguridad."
+   },
+   {
+    "id": "3c07b79d8bbe",
+    "tipo": "config",
+    "auto": 0.5,
+    "manual": "parcial",
+    "nota": "usó P.llamadores sobre una clave (devuelve []) en vez de P.hechos(lee_config); encontró Gobernador.limite leyendo el código pero no Gobernador.olvidar (termico.py:490) y cerró con «la respuesta es ninguna» en sentido estricto: se contradice. Una consulta."
+   },
+   {
+    "id": "535b590ec9a1",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "cadena y líneas correctas, con la aclaración de que embeddings() no relee el disco."
+   },
+   {
+    "id": "b8cd029d7efe",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "estado → credenciales → _leer_json."
+   },
+   {
+    "id": "7dd65879dc1b",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "en C (prig_suave.c:120); explica el efecto."
+   },
+   {
+    "id": "1acc79de9a82",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "procesar."
+   },
+   {
+    "id": "(constante, endpoint, frontend, ubicacion x2, ind_10)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "8": [
+   {
+    "id": "29b468d8a2cb",
+    "tipo": "impacto",
+    "auto": 0.0,
+    "manual": "parcial",
+    "nota": "identificó los dos endpoints por su FUNCIÓN (open_workspace, browse_workspace) pero no dio las rutas HTTP (POST /api/workspace/open y /browse), que es lo que se pregunta; agrega un impacto indirecto amplio (los servicios que se reinician) que es defendible. El 0 castiga el formato; la sustancia es correcta."
+   },
+   {
+    "id": "530e800a411b",
+    "tipo": "frontend",
+    "auto": 0.667,
+    "manual": "parcial",
+    "nota": "ajustes y cargados (modelos.js) bien; vio la tercera llamada (ai_chat.js:96) pero no nombró su función (AIChatManager.liberarModelo). Buscó con texto y leyó el archivo: 5 consultas."
+   },
+   {
+    "id": "4480b3119585",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "comprobar; error menor: llama «recursiva» a registro_de, que en realidad llama a la homónima de recursos/ficha.py (buscador_modelos.py:144-145)."
+   },
+   {
+    "id": "c6ec7f7ca24a",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "config → ConfigModelos.__init__ → _leer bien; imprecisión: pone _modelos antes de config, pero config() se evalúa como argumento ANTES de llamar a _modelos (app.py:5691), y agrega fijar después de _leer."
+   },
+   {
+    "id": "92462378c98c",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_frio_estado (app.py:5465)."
+   },
+   {
+    "id": "99ac6130926e",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "las dos de la clave (en la corrida final del 30/09 había sacado 0,667)."
+   },
+   {
+    "id": "882da1634d8b",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_ayudante e instalacion."
+   },
+   {
+    "id": "(constante x2, endpoint, ubicacion, ind_09)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "9": [
+   {
+    "id": "0b5f93c17f28",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "incorrecta",
+    "falso_positivo_del_corrector": true,
+    "nota": "el camino existe: modelos_borrar_parciales → _carpeta_modelos_servidor (app.py:5865 llama recursos_srv.estado()) → estado (servidor.py:141 llama librerias_disponibles). El modelo vio las piezas por separado, no las unió, concluyó «no hay conexión» y le sugirió al usuario que se confundió. Los dos nombres de la clave aparecen en su texto y el corrector (presencia) le dio 1,0: FALSO POSITIVO."
+   },
+   {
+    "id": "03c545c743a8",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "Ritmo.pausa (ritmo.py:116)."
+   },
+   {
+    "id": "8323406d8dc6",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "los dos __init__."
+   },
+   {
+    "id": "f07fe5643c5f",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "ruta_biblioteca; agrega 2 tests (la pregunta no los excluye)."
+   },
+   {
+    "id": "23358f956144",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "cadena y consumidor del frontend."
+   },
+   {
+    "id": "8d4c39095fd6",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "applyProfile y selectCatalogModel."
+   },
+   {
+    "id": "(constante, endpoint x2, frontend, ubicacion, ind_06)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "10": [
+   {
+    "id": "1f14bd2a14dd",
+    "tipo": "entorno",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "agotada": true,
+    "nota": "AGOTADA a los 600 s con la respuesta VACÍA y sin consultas (bucle de texto que no emitió nada); el corte suave alcanzó («cancelada»). La respuesta es credenciales (kaggle_lector.py)."
+   },
+   {
+    "id": "02bd1db0d170",
+    "tipo": "llamadores",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "nota": "SALIDA DEGENERADA: 17 consultas en 283 s y la respuesta es «P.llamadores(...)» seguida de 12 líneas de «...». Los llamadores (Hub._crear y Hub.editar_manifiesto, hub/servicio.py:151 y 222) estaban a una consulta."
+   },
+   {
+    "id": "d408dee5873f",
+    "tipo": "recorrido",
+    "auto": 0.5,
+    "manual": "incorrecta",
+    "nota": "concluyó que «no pasa» por ControladorFrio, pero el camino existe: recursos_ritmo → gobernador() → Gobernador.__init__ (termico.py:365 crea frio.ControladorFrio). 17 consultas, repitió su introducción dos veces. Segunda vez que niega un camino real (como 0b5f93c17f28); el 0,5 es crédito por nombrar gobernador."
+   },
+   {
+    "id": "37eb32849f6f",
+    "tipo": "impacto",
+    "auto": 0.667,
+    "manual": "parcial",
+    "nota": "2 de 3 bien; la tercera la nombró por su función (get_ollama_version_info) pero INVENTÓ la ruta (/api/ollama/version; es GET /api/ai/ollama/version-info, app.py:3136). Segunda ruta inventada (como 12bb842411c5). Sin consultas de impacto: una sola, y escrita como texto."
+   },
+   {
+    "id": "f46b5c0819d3",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "más completa que la clave: además de POST /api/progreso/analisis dio GET /api/progreso/historial (llama por _desafio(progreso.historial, ...): función pasada como argumento, el grafo no la ve) y GET /api/progreso/resumen (progreso.resumen llama a historial, progreso.py:236). Le faltó GET /api/inicio (lambda en app.py:6361). Es la respuesta que escribió la nota con «anotar»."
+   },
+   {
+    "id": "97b588daee02",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "generar_svg; 8 consultas, buscó la línea literal."
+   },
+   {
+    "id": "(constante, endpoint, frontend x2, ubicacion, ind_13)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "11": [
+   {
+    "id": "28767fae33c0",
+    "tipo": "impacto",
+    "auto": 0.0,
+    "manual": "parcial",
+    "nota": "identificó el endpoint por su FUNCIÓN (desafios_buscar, app.py:6490) pero no dio la ruta (GET /api/desafios/internet/buscar), que es lo que se pregunta. Mismo patrón que 29b468d8a2cb (lote 8)."
+   },
+   {
+    "id": "ind_04",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "«js», con la traza (aunque escribe LENGUAJAS)."
+   },
+   {
+    "id": "ind_05",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "«md» entre comillas: el corrector no le dio el punto por un «md» suelto."
+   },
+   {
+    "id": "(config, entorno, llamadores x2, recorrido)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "claves completas y respuestas con líneas correctas."
+   },
+   {
+    "id": "(constante, endpoint, frontend, ubicacion)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "12": [
+   {
+    "id": "690398982a25",
+    "tipo": "frontend",
+    "auto": 0.0,
+    "manual": "parcial",
+    "clave_mal_granulada": true,
+    "nota": "la clave es «Flujos», el módulo IIFE (const Flujos = (() => {...})()); las llamadas reales están en dos funciones internas: cargarFlujos (flujos.js:88) y guardar (l.694). El modelo dio cargarFlujos (correcta y más precisa que la clave) y le faltó guardar. Defecto del examen: en módulos IIFE el grafo del frontend atribuye la llamada al módulo, no a la función."
+   },
+   {
+    "id": "75f12652872f",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_frio_estado → gobernador → Gobernador.__init__; agrega instalar y monitor, que no están en el camino (imprecisión menor)."
+   },
+   {
+    "id": "3008f99680fb",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "con citas de línea verificables."
+   },
+   {
+    "id": "ind_11",
+    "tipo": "ejecucion",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "True, con la traza (strip y comparación); no fue un «true» suelto."
+   },
+   {
+    "id": "(config, entorno, impacto, llamadores)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "completas."
+   },
+   {
+    "id": "(constante, endpoint, ubicacion x2)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "13": [
+   {
+    "id": "f16f03ae1e94",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "embeber y estado (las de la clave) y además explica que ambas lo obtienen por _ajustes(), que es la que lee la configuración: más completa que la clave (mismo defecto que «truncar», lote 3)."
+   },
+   {
+    "id": "609ee246f14e",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "cadena y líneas correctas."
+   },
+   {
+    "id": "1be5e71bac9f",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "los 3 de la clave más un test (la pregunta no los excluye)."
+   },
+   {
+    "id": "(config moe_calientes, entorno, frontend, impacto)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "completas."
+   },
+   {
+    "id": "(constante x2, endpoint x2, ubicacion)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "14": [
+   {
+    "id": "61949e22dbe5",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "clave_incompleta": true,
+    "nota": "la clave tiene 3 endpoints; el modelo dio 26 y el mecanismo es real: _motor_desafios (app.py:6127) llama gemini_motor.clave_actual() → _leer → ruta_config, y _motor_desafios aparece 23 veces en app.py (desafíos, Kaggle, GitHub, YouTube, progreso). Verificado el mecanismo, no los 26 uno por uno. Le faltó GET /api/inicio (lambda gemini_motor.estado, app.py:6370)."
+   },
+   {
+    "id": "4ddd9c884844",
+    "tipo": "entorno",
+    "auto": 1.0,
+    "manual": "parcial",
+    "nota": "ruta_config es la única que lee PRIG_GEMINI_ARCHIVO; agrega _leer, guardar_clave y borrar_clave, que solo llaman a ruta_config (lo dice, pero las lista como lectoras). El corrector no castiga los extras. Además usó P.llamadores en vez de P.hechos(lee_entorno)."
+   },
+   {
+    "id": "353ef0ab1484",
+    "tipo": "recorrido",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_ndjson → _flujo_cancelable → emitir; agrega importar_gguf, que se evalúa como argumento (imprecisión menor)."
+   },
+   {
+    "id": "82f0da41af3c",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "montar; descartó bien las «estilos» homónimas de otros archivos."
+   },
+   {
+    "id": "(config, entorno BROWSER, frontend x2, impacto analisis_guardado)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "completas."
+   },
+   {
+    "id": "(constante, endpoint, ubicacion)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ],
+  "15": [
+   {
+    "id": "f29f377d7d2f",
+    "tipo": "impacto",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "nota": "AGOTÓ LAS 16 RONDAS (323 s) sin escribir la respuesta. La mitad de sus consultas venían rotas: «print(P.x(...))\\n</print(P.x(...))» (una etiqueta de cierre inventada) → error de 50 caracteres → la repetía bien. Llegó a P.api('/api/kaggle/estado') y '/credenciales' (la respuesta correcta) y siguió buscando."
+   },
+   {
+    "id": "a60ed7033a43",
+    "tipo": "config",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_exec_timeout «lee directamente»; agrega run_code y run_cell aclarando que solo usan _exec_timeout()."
+   },
+   {
+    "id": "3bd4a1786164",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "_nombres_instalados como llamador directo, y la cadena hasta los endpoints."
+   },
+   {
+    "id": "(entorno, frontend, llamadores estadoLista, recorrido x2)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "completas."
+   },
+   {
+    "id": "(constante, endpoint, ubicacion x2)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única, claves verificadas por construcción."
+   }
+  ]
+ },
+ "pendiente": "lotes 1-2: auditadas a mano todas las de puntaje distinto de 1 y 2 de 1,0. Lote 3 en adelante: todas las distintas de 1, las de diseño y los 1,0 de tipos con varias respuestas (impacto, recorrido, llamadores), más un control con grep de los 1,0 simples",
+ "incidentes": [
+  {
+   "lote": 4,
+   "intento": 1,
+   "id": "cddd4484b32b",
+   "que": "bucle de texto: 31.937 tokens en 17,7 min, borrador MTP 99,7 %, contexto 64K → 128K y la petición vuelve a empezar; cortado a mano a los 23 min. Lote repetido."
+  },
+  {
+   "lote": 6,
+   "intento": 1,
+   "id": "da28ac8f2d8e",
+   "que": "bucle de texto: 11.459 tokens hasta llenar 32K, reinicio a 64K, de nuevo desde cero; el tope de 600 s cortó el flujo pero el hilo productor no vio la cancelación (no emitía trozos) y asyncio.run lo esperó; al matar el servidor desde fuera, las 3 preguntas siguientes salieron VACÍAS en 1 s. Lote repetido con el arnés corregido."
+  }
+ ],
+ "repeticiones": {
+  "3": {
+   "eleccion": "lotes 3 y 6, al azar con semilla fija (random.Random(7).sample(range(1,16),2)), antes de ver los resultados",
+   "auto": {
+    "original": 0.818,
+    "repeticion": 0.818,
+    "iguales": "11 de 11 con puntaje"
+   },
+   "manual": {
+    "original": "9 correctas, 2 parciales, 1 incorrecta",
+    "repeticion": "9 correctas, 3 parciales"
+   },
+   "cambios": [
+    {
+     "id": "ind_26",
+     "original": "incorrecta (sin consultas, 11 s, afirmación falsa)",
+     "repeticion": "parcial (4 consultas, 82 s: mode=ro y las capas de aislamiento; sin el filtro de P.sql ni las escrituras por Prig)"
+    },
+    {
+     "id": "abb680bcc117",
+     "nota": "misma respuesta correcta con 5 consultas y 167 s en vez de 1 y 38 s"
+    }
+   ],
+   "iguales": "config: otra vez _ajustes y embeber (parcial); recorrido: otra vez el camino real alternativo (correcta, 0 automático); ind_16: otra vez 2 de 4 (instancia/fábrica)",
+   "similitud_de_texto": "0,07 a 0,97 (difflib): las respuestas cambian mucho de redacción aunque el veredicto casi no cambie"
+  },
+  "6": {
+   "auto": {
+    "original": 1.0,
+    "repeticion": 1.0,
+    "iguales": "11 de 11 con puntaje"
+   },
+   "manual": {
+    "original": "11 correctas, 1 parcial",
+    "repeticion": "11 correctas, 1 parcial (la misma config, por la clave incompleta)"
+   },
+   "sistematico": "8a5faedaaa73 (parsearTimestamp) vuelve a salir EN INGLÉS: no es ruido, pasa con esa unidad",
+   "tiempos": "repetición 566 s frente a 292 s: la máquina estaba en uso (firefox, kdenlive, obs; carga 5,5) y la generación bajó de 33 a 12,7 tok/s (los expertos corren en CPU). La exactitud no cambia; los tiempos de las repeticiones no son comparables."
+  },
+  "conclusion": "en 24 preguntas repetidas el puntaje automático coincidió en 22 de 22 y el veredicto manual en 23 de 24 (ind_26: incorrecta → parcial); la redacción cambia mucho (similitud 0,07–0,97). El ruido del muestreo pesa poco en el resultado agregado, pero puede cambiar el veredicto de preguntas abiertas (diseño) y la duración (una misma pregunta: 38 s o 167 s)."
+ }
+}

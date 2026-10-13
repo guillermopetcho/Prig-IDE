@@ -125,6 +125,14 @@ class TerminalManager {
             this.appendLine(res.stderr, 'stderr');
             this.lastError = res.stderr;
             this.aiErrorBtn.style.display = 'inline-flex';
+
+            // Notificar automáticamente al Director ASCII / Depurador Walk
+            if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.capturarExcepcionRuntime === 'function') {
+                const match = res.stderr.match(/File\s+["']?([^"',\n]+)["']?,\s+line\s+(\d+)/i) || res.stderr.match(/line\s+(\d+)/i);
+                const lineNum = match ? parseInt(match[2] || match[1], 10) : 1;
+                const archivo = (match && match[1] && match[2]) ? match[1] : (window.editorMgr ? window.editorMgr.activeTab : 'main.py');
+                window.DIRECTOR_ASCII.evaluador.capturarExcepcionRuntime(archivo, lineNum, res.stderr.split('\n')[0]);
+            }
         } else if (!res.error) {
             this.aiErrorBtn.style.display = 'none';
         }

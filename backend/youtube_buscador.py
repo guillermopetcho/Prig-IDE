@@ -277,38 +277,59 @@ def _parsear_duracion_a_segundos(dur_str: str) -> int:
 
 
 def _parsear_vistas_a_numero(vistas_str: str) -> int:
-    """Convierte cadenas como '1.2M de vistas' o '75,292 views' a entero para ordenamiento."""
+    """Convierte '1,823,481 vistas', '1.2M views', '12 mil visualizaciones' o '3,4 M de vistas' a entero."""
     if not vistas_str:
         return 0
-    s = vistas_str.lower()
+    s = vistas_str.lower().replace("\xa0", " ")
+    m = re.search(r"(\d[\d.,]*)\s*(mil millones|mil|mill\.?|millones|m|k|b)?\b", s)
+    if not m:
+        return 0
+    numero, sufijo = m.group(1), (m.group(2) or "").rstrip(".")
+    multiplicador = {"k": 1e3, "mil": 1e3, "m": 1e6, "mill": 1e6, "millones": 1e6, "b": 1e9, "mil millones": 1e9}.get(sufijo, 1)
+    if multiplicador == 1:
+        # Sin sufijo el número va entero, con separadores de miles (',' o '.')
+        return int(re.sub(r"[.,]", "", numero) or 0)
+    # Con sufijo puede tener decimales: '1.2' o '3,4'
     try:
-        # Remover palabras
-        num_str = re.sub(r"[^\d,\.]", "", s).replace(",", "")
-        if "k" in s:
-            return int(float(num_str) * 1000)
-        if "m" in s:
-            return int(float(num_str) * 1000000)
-        return int(float(num_str)) if num_str else 0
-    except Exception:
+        return int(float(numero.replace(",", ".")) * multiplicador)
+    except ValueError:
         return 0
 
 
-def _detectar_idioma_heuristico(titulo: str, descripcion: str) -> str:
-    """Detecta si un video está en español ('es') o en inglés ('en')."""
+_UNIDADES_TIEMPO = {
+    "segundo": 1, "second": 1, "minuto": 60, "minute": 60, "hora": 3600, "hour": 3600,
+    "día": 86400, "dia": 86400, "day": 86400, "semana": 604800, "week": 604800,
+    "mes": 2592000, "month": 2592000, "año": 31536000, "ano": 31536000, "year": 31536000,
+}
+
+
+def _antiguedad_segundos(publicado: str) -> Optional[int]:
+    """'hace 3 meses' / '2 years ago' / 'Streamed 5 days ago' → segundos aproximados; None si no hay fecha"""
+    m = re.search(r"(\d+)\s+(segundo|second|minuto|minute|hora|hour|día|dia|day|semana|week|mes|month|año|ano|year)",
+                  (publicado or "").lower())
+    return int(m.group(1)) * _UNIDADES_TIEMPO[m.group(2)] if m else None
+
+
+_PALABRAS_ES = {"de", "la", "el", "en", "los", "las", "del", "para", "con", "que", "como", "una", "un", "por",
+                 "curso", "desde", "cero", "aprende", "aprender", "programación", "programacion", "completo",
+                 "español", "principiantes", "introducción", "introduccion", "clase", "qué", "cómo", "redes"}
+_PALABRAS_EN = {"the", "and", "for", "with", "how", "to", "of", "in", "is", "what", "your", "you", "course",
+                 "full", "beginners", "from", "scratch", "learn", "learning", "programming", "introduction",
+                 "lecture", "guide", "explained", "build"}
+
+
+def _detectar_idioma_heuristico(titulo: str, descripcion: str, por_defecto: str = "es") -> str:
+    """Detecta si un video está en español ('es') o en inglés ('en') contando palabras frecuentes de cada idioma.
+    Las palabras técnicas (machine, learning, python) aparecen en los dos, por eso pesan más las funcionales."""
     texto = f"{titulo} {descripcion}".lower()
-    tokens = set(re.findall(r"\b\w+\b", texto))
-    
-    palabras_es = {"curso", "desde", "cero", "aprende", "aprender", "programacion", "completo", "español", "para", "principiantes", "tutorial", "introduccion", "redes"}
-    palabras_en = {"course", "full", "beginners", "from", "scratch", "learn", "programming", "tutorial", "introduction", "lecture", "with", "deep", "guide"}
-    
-    coincidencias_es = len(tokens.intersection(palabras_es))
-    coincidencias_en = len(tokens.intersection(palabras_en))
-    
-    if coincidencias_es > coincidencias_en:
+    tokens = re.findall(r"[a-záéíóúñü]+", texto)
+    es = sum(t in _PALABRAS_ES for t in tokens) + 2 * len(re.findall(r"[ñ¿¡áéíóú]", texto))
+    en = sum(t in _PALABRAS_EN for t in tokens)
+    if es > en:
         return "es"
-    elif coincidencias_en > coincidencias_es:
+    if en > es:
         return "en"
-    return "es" if "el " in texto or "la " in texto or "de " in texto else "en"
+    return por_defecto
 
 
 def calcular_score_educativo(item: Dict[str, Any], query: str, idioma_pref: str = "todos") -> float:
@@ -448,8 +469,8 @@ def _extraer_items_de_yt_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                     if nav and "videoId" in nav:
                         primervid = nav["videoId"]
 
-                    desc = f"Lista de reproducción curricular con {conteo} sobre {titulo}"
-                    idioma = _detectar_idioma_heuristico(titulo, desc)
+                    desc = f"Lista de reproducción con {conteo} sobre {titulo}" if conteo else f"Lista de reproducción sobre {titulo}"
+                    idioma = _detectar_idioma_heuristico(titulo, "")
 
                     items.append({
                         "id": pid,
@@ -457,9 +478,9 @@ def _extraer_items_de_yt_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                         "titulo": titulo or "Lista de reproducción",
                         "canal": canal or "Canal YouTube",
                         "duracion": conteo or "Playlist",
-                        "duracion_segundos": 99999,  # Alta prioridad didáctica
+                        "duracion_segundos": 0,  # una lista no tiene duración: la prioridad va en el score
                         "vistas": "",
-                        "vistas_numero": 100000,
+                        "vistas_numero": 0,
                         "publicado": "",
                         "descripcion": desc,
                         "miniatura": thumb_url or (f"https://i.ytimg.com/vi/{primervid}/hqdefault.jpg" if primervid else ""),
@@ -469,6 +490,10 @@ def _extraer_items_de_yt_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                         "conteo_videos": conteo,
                         "idioma": idioma
                     })
+            elif "lockupViewModel" in nodo:
+                item = _item_de_lockup(nodo["lockupViewModel"])
+                if item:
+                    items.append(item)
             else:
                 for v in nodo.values():
                     recorrer(v)
@@ -480,23 +505,116 @@ def _extraer_items_de_yt_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return items
 
 
-def _buscar_innertube(query: str) -> Optional[List[Dict[str, Any]]]:
+def _textos_de(nodo: Any, clave: str) -> List[str]:
+    """Todos los valores de `clave` bajo `nodo`, en orden de aparición"""
+    salida: List[str] = []
+    pila = [nodo]
+    while pila:
+        n = pila.pop(0)
+        if isinstance(n, dict):
+            for k, v in n.items():
+                if k == clave and isinstance(v, (str, dict)):
+                    salida.append(v)
+                else:
+                    pila.append(v)
+        elif isinstance(n, list):
+            pila[:0] = n
+    return salida
+
+
+def _item_de_lockup(lk: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Las listas de reproducción llegan como lockupViewModel (formato nuevo de YouTube), no como playlistRenderer"""
+    cid = lk.get("contentId") or ""
+    tipo = lk.get("contentType") or ""
+    if not cid or len(cid) == 11 or (tipo and "PLAYLIST" not in tipo and "PODCAST" not in tipo):
+        return None  # un video en formato lockup: los videos siguen llegando como videoRenderer
+    meta = (lk.get("metadata") or {}).get("lockupMetadataViewModel") or {}
+    titulo = html.unescape(((meta.get("title") or {}).get("content") or "").strip())
+    filas = ((meta.get("metadata") or {}).get("contentMetadataViewModel") or {}).get("metadataRows") or []
+    canal = ""
+    for fila in filas:
+        for parte in fila.get("metadataParts") or []:
+            canal = ((parte.get("text") or {}).get("content") or "").strip()
+            if canal:
+                break
+        if canal:
+            break
+    imagen = lk.get("contentImage") or {}
+    fuentes = [f for f in _textos_de(imagen, "url") if isinstance(f, str) and f.startswith(("http", "//"))]
+    miniatura = fuentes[-1] if fuentes else ""
+    if miniatura.startswith("//"):
+        miniatura = "https:" + miniatura
+    conteo = next((t.get("text") for t in _textos_de(imagen, "thumbnailBadgeViewModel") if isinstance(t, dict) and t.get("text")), "")
+    primer_video = ""
+    for we in _textos_de(lk.get("itemPlayback") or lk, "watchEndpoint"):
+        if isinstance(we, dict) and we.get("videoId"):
+            primer_video = we["videoId"]
+            break
+    if not primer_video:
+        m = re.search(r"/vi/([\w-]{11})/", miniatura)
+        primer_video = m.group(1) if m else ""
+    desc = f"Lista de reproducción con {conteo} sobre {titulo}" if conteo else f"Lista de reproducción sobre {titulo}"
+    return {
+        "id": cid,
+        "tipo": "playlist",
+        "titulo": titulo or "Lista de reproducción",
+        "canal": canal or "Canal YouTube",
+        "duracion": conteo or "Playlist",
+        "duracion_segundos": 0,
+        "vistas": "",
+        "vistas_numero": 0,
+        "publicado": "",
+        "descripcion": desc,
+        "miniatura": miniatura or (f"https://i.ytimg.com/vi/{primer_video}/hqdefault.jpg" if primer_video else ""),
+        "url": f"https://www.youtube.com/playlist?list={cid}",
+        "es_playlist": True,
+        "video_inicial_id": primer_video,
+        "conteo_videos": conteo,
+        "idioma": _detectar_idioma_heuristico(titulo, ""),
+    }
+
+
+def _params_busqueda(tipo: str, duracion_filtro: str) -> str:
+    """El filtro nativo de YouTube (parámetro sp, protobuf en base64): tipo (2) y duración (3) dentro del campo 2.
+    Filtrar en YouTube trae 20 resultados que cumplen; filtrar después dejaba 2 o ninguno."""
+    import base64
+    campos = b""
+    if duracion_filtro == "playlists" or tipo == "playlist":
+        campos += b"\x10\x03"
+    elif tipo == "video" or duracion_filtro in ("cortos", "clases", "cursos"):
+        campos += b"\x10\x01"
+        if duracion_filtro in ("clases", "cursos"):
+            campos += b"\x18\x02"  # más de 20 minutos; el corte fino (30 min, 2 h) se hace después
+    return base64.b64encode(b"\x12" + bytes([len(campos)]) + campos).decode() if campos else ""
+
+
+def _idioma_cliente(idioma: str) -> Tuple[str, str, str]:
+    """(hl, gl, Accept-Language): YouTube prioriza resultados en el idioma de la interfaz"""
+    if idioma == "en":
+        return "en", "US", "en-US,en;q=0.9"
+    return "es-419", "US", "es-419,es;q=0.9,en;q=0.8"
+
+
+def _buscar_innertube(query: str, params: str = "", idioma: str = "todos") -> Optional[List[Dict[str, Any]]]:
     """
     Estrategia Primaria: Consulta directa al endpoint JSON de InnerTube.
     Mucho más rápido y sin necesidad de renderizar HTML.
     """
     url = "https://www.youtube.com/youtubei/v1/search"
+    hl, gl, aceptar = _idioma_cliente(idioma)
     payload = {
         "context": {
             "client": {
                 "clientName": "WEB",
                 "clientVersion": "2.20240401.00.00",
-                "hl": "es-419",
-                "gl": "US"
+                "hl": hl,
+                "gl": gl
             }
         },
         "query": query
     }
+    if params:
+        payload["params"] = params
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -506,7 +624,7 @@ def _buscar_innertube(query: str) -> Optional[List[Dict[str, Any]]]:
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             ),
-            "Accept-Language": "es-419,es;q=0.9,en;q=0.8"
+            "Accept-Language": aceptar
         }
     )
     try:
@@ -520,12 +638,15 @@ def _buscar_innertube(query: str) -> Optional[List[Dict[str, Any]]]:
     return None
 
 
-def _buscar_html_scraper(query: str) -> Optional[List[Dict[str, Any]]]:
+def _buscar_html_scraper(query: str, params: str = "", idioma: str = "todos") -> Optional[List[Dict[str, Any]]]:
     """
     Estrategia de Respaldo: Descarga HTML y extrae ytInitialData.
     Se activa si la llamada a InnerTube encuentra bloqueos o contingencias.
     """
-    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+    hl, _, aceptar = _idioma_cliente(idioma)
+    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl={hl}"
+    if params:
+        url += f"&sp={urllib.parse.quote(params)}"
     req = urllib.request.Request(
         url,
         headers={
@@ -533,7 +654,7 @@ def _buscar_html_scraper(query: str) -> Optional[List[Dict[str, Any]]]:
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             ),
-            "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
+            "Accept-Language": aceptar,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
     )
@@ -570,7 +691,7 @@ def buscar_cursos_youtube(
         filtro_educativo: Prioriza canales top, clases completas y temarios universitarios
         idioma: 'todos', 'es' (español), 'en' (inglés)
         duracion_filtro: 'todas', 'cortos' (<30m), 'clases' (30m-2h), 'cursos' (>2h), 'playlists'
-        orden: 'educativo' (por score), 'duracion', 'vistas', 'recientes'
+        orden: 'educativo' (por score), 'duracion', 'vistas', 'recientes' (por fecha de publicación)
         forzar_refresco: Si es True, ignora la caché
     """
     consulta_limpia = query.strip()
@@ -608,15 +729,20 @@ def buscar_cursos_youtube(
         meta = PALABRAS_REGISTRADAS[slug_registrado]
         consulta_para_yt = f"{meta['palabra']} curso completo tutorial"
 
-    # 2. Extracción Dual: Probar InnerTube primero, conmutar a Scraper si falla
-    items_crudos = _buscar_innertube(consulta_para_yt)
+    # 2. Extracción Dual: Probar InnerTube primero, conmutar a Scraper si falla.
+    # El tipo y la duración se piden a YouTube (sp) y el idioma va en hl: así los 20 resultados ya cumplen
+    params = _params_busqueda(tipo, duracion_filtro)
+    items_crudos = _buscar_innertube(consulta_para_yt, params, idioma)
     estrategia_usada = "innertube"
-    if not items_crudos:
+    if not items_crudos:  # None (falló) o vacío: el scraper a veces trae lo que la API no
         logger.info(f"Conmutando a scraper HTML de respaldo para '{consulta_para_yt}'...")
-        items_crudos = _buscar_html_scraper(consulta_para_yt)
-        estrategia_usada = "html_scraper"
+        respaldo = _buscar_html_scraper(consulta_para_yt, params, idioma)
+        if respaldo is not None or items_crudos is None:
+            # Si la API respondió vacío y el respaldo falló, vale el «sin resultados» de la API, no un error de red
+            items_crudos = respaldo
+            estrategia_usada = "html_scraper"
 
-    if not items_crudos:
+    if items_crudos is None:
         # Si fallaron ambas llamadas (por ejemplo, corte de red), intentar recuperar de caché previa
         with _CACHE_LOCK:
             if cache_key in _CACHE:
@@ -630,6 +756,10 @@ def buscar_cursos_youtube(
                     "palabra_registrada": PALABRAS_REGISTRADAS.get(slug_registrado) if slug_registrado else None
                 }
         return {"query": consulta_limpia, "total": 0, "resultados": [], "error": "No se pudo conectar con YouTube.", "palabra_registrada": None}
+    if not items_crudos:
+        return {"query": consulta_limpia, "total": 0, "resultados": [], "desde_cache": False, "motor": estrategia_usada,
+                "aviso": "YouTube no devolvió resultados para esta búsqueda.",
+                "palabra_registrada": PALABRAS_REGISTRADAS.get(slug_registrado) if slug_registrado else None}
 
     # 3. Filtrado por Tipo (video / playlist)
     if tipo == "video":
@@ -651,10 +781,11 @@ def buscar_cursos_youtube(
     # 5. Filtrado por Facetas (Idioma & Duración)
     candidatos = []
     for it in unicos:
-        # Filtro de Idioma
+        # Filtro de Idioma: el detector es heurístico; ante la duda vale el idioma pedido a YouTube (hl)
         if idioma != "todos":
-            if it.get("idioma") != idioma:
+            if _detectar_idioma_heuristico(it.get("titulo", ""), it.get("descripcion", ""), idioma) != idioma:
                 continue
+            it["idioma"] = idioma
 
         # Filtro de Duración
         dur_s = it.get("duracion_segundos", 0)
@@ -670,9 +801,10 @@ def buscar_cursos_youtube(
 
         candidatos.append(it)
 
-    # Si el filtro fue demasiado estricto y dejó vacío, relajamos al conjunto de únicos
+    # Sin resultados que cumplan: se dice, en vez de devolver otros que no cumplen el filtro
+    aviso = None
     if not candidatos and unicos:
-        candidatos = unicos
+        aviso = "Ningún resultado de YouTube cumple los filtros elegidos. Prueba con menos filtros u otra búsqueda."
 
     # 6. Cálculo de Score Didáctico y Ordenamiento
     for it in candidatos:
@@ -685,15 +817,20 @@ def buscar_cursos_youtube(
         candidatos.sort(key=lambda x: x.get("duracion_segundos", 0), reverse=True)
     elif orden == "vistas":
         candidatos.sort(key=lambda x: x.get("vistas_numero", 0), reverse=True)
+    elif orden == "recientes":
+        # Los que no tienen fecha (listas) van al final
+        candidatos.sort(key=lambda x: (_antiguedad_segundos(x.get("publicado", "")) is None,
+                                       _antiguedad_segundos(x.get("publicado", "")) or 0))
     else:
         # Ordenamiento didáctico por defecto
         candidatos.sort(key=lambda x: (x.get("score_educativo", 0), x.get("duracion_segundos", 0)), reverse=True)
 
     resultado_final = candidatos[:max_resultados]
 
-    # 7. Actualizar Caché en Memoria y Persistir en Disco
+    # 7. Actualizar Caché en Memoria y Persistir en Disco (lo vacío no se guarda: puede ser un fallo pasajero)
     with _CACHE_LOCK:
-        _CACHE[cache_key] = (ahora, resultado_final)
+        if resultado_final:
+            _CACHE[cache_key] = (ahora, resultado_final)
 
     # Disparar persistencia en hilo separado para no añadir latencia a la respuesta HTTP
     threading.Thread(target=_guardar_cache_disco, daemon=True).start()
@@ -704,5 +841,6 @@ def buscar_cursos_youtube(
         "resultados": resultado_final,
         "desde_cache": False,
         "motor": estrategia_usada,
+        "aviso": aviso,
         "palabra_registrada": PALABRAS_REGISTRADAS.get(slug_registrado) if slug_registrado else None
     }

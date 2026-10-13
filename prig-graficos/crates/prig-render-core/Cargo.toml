@@ -1,0 +1,13 @@
+[package]
+name = "prig-render-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Prig Team"]
+description = "Núcleo matemático puro y física SIMD para el motor gráfico de Prig"
+
+[dependencies]
+# Sin dependencias pesadas para máxima portabilidad y compilación instantánea
+
+[dev-dependencies]
+# Tests unitarios
+

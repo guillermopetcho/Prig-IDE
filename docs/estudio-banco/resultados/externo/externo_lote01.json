@@ -1,0 +1,455 @@
+{
+ "lote": 1,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/full-stack-fastapi-template",
+  "version_banco": "1",
+  "huella_codigo": "1b51a73815ffa75d",
+  "huella_sistema": "375d999bef8b8b11",
+  "vectores": 0,
+  "unidades_vigentes": 8,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 50
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "carga_cpu_antes": [
+   4.88,
+   4.66,
+   4.08
+  ],
+  "motor": {
+   "contexto": 32768,
+   "calientes_por_capa": 24,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5219,
+   "temp_c": 54
+  },
+  "carga_cpu_despues": [
+   4.17,
+   3.72,
+   3.55
+  ]
+ },
+ "media": 0.771,
+ "segundos": 1071,
+ "modos": {
+  "general": 3,
+  "unidad": 9
+ },
+ "por_tipo": {
+  "ubicacion": 1.0,
+  "llamadores": 1.0,
+  "frontend": 0.25,
+  "impacto": 1.0,
+  "endpoint": 0.833
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [
+  "073bfcc2da47"
+ ],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "a3b9deb2d9a5",
+   "tipo": "endpoint",
+   "puntaje": 0.5,
+   "segundos": 53.2,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ad77e7d6d216",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 19.7,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "e5dcaa694aae",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 14.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "073bfcc2da47",
+   "tipo": "frontend",
+   "puntaje": 0.0,
+   "segundos": 600.5,
+   "modo": "unidad",
+   "herramientas": 28
+  },
+  {
+   "id": "d350423a439a",
+   "tipo": "frontend",
+   "puntaje": 0.25,
+   "segundos": 214.9,
+   "modo": "unidad",
+   "herramientas": 12
+  },
+  {
+   "id": "dac1b36ce36f",
+   "tipo": "frontend",
+   "puntaje": 0.5,
+   "segundos": 55.1,
+   "modo": "unidad",
+   "herramientas": 4
+  },
+  {
+   "id": "002ba5b66654",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 47.4,
+   "modo": "unidad",
+   "herramientas": 3
+  },
+  {
+   "id": "39210d8965f9",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 19.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "53897b6f1836",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 13.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "5f69ce083bf3",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 12.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8a9d5c17a626",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 10.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "9f7550392084",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 10.1,
+   "modo": "general",
+   "herramientas": 0
+  }
+ ],
+ "consultas": {
+  "a3b9deb2d9a5": [],
+  "ad77e7d6d216": [],
+  "e5dcaa694aae": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"create_user\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "073bfcc2da47": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Find frontend functions that call /api/v1/users/* endpoints\\n# First, let's look at how the SDK is used in the frontend components\\n\\n# Search for imports and usages of UsersService\\nresult = P.grep(r\\\"UsersService\\\", rutas=[\\\"frontend/src\\\"])\\nprint(\\\"=== UsersService usages ===\\\")\\nfor r in result:\\n    print(f\\\"{r['ruta']}:{r['linea']}\\\")\\n\"}",
+    "resultado_caracteres": 52
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Search for UsersService usages in the frontend\\nresult = P.grep(r\\\"UsersService\\\", rutas=[\\\"frontend/src\\\"])\\nprint(\\\"=== UsersService usages ===\\\")\\nfor r in result:\\n    print(f\\\"{r['ruta']}:{r['linea']}\\\")\\n\"}",
+    "resultado_caracteres": 52
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Try with full path\\nresult = P.grep(r\\\"UsersService\\\", rutas=[\\\"frontend/src/client/sdk.gen.ts\\\", \\\"frontend/src/client/index.ts\\\"])\\nprint(\\\"=== UsersService usages ===\\\")\\nfor r in result:\\n    print(f\\\"{r['ruta']}:{r['linea']}\\\")\\n\"}",
+    "resultado_caracteres": 115
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Search for actual usages of UsersService in the frontend components\\nresult = P.grep(r\\\"UsersService\\\\.\\\", rutas=None)\\nprint(\\\"=== UsersService calls ===\\\")\\nfor r in result:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['texto']}\\\")\\n\"}",
+    "resultado_caracteres": 1098
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Now let's find the function names that contain these calls\\n# Let's look at each file to identify the function names\\n\\n# AddUser.tsx\\nlines = P.lineas(\\\"frontend/src/components/Admin/AddUser.tsx\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"UsersService.createUser\\\" in line:\\n        # Find enclosing function name\\n        for j in range(i-1, max(0, i-20), -1):\\n            if \\",
+    "resultado_caracteres": 452
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Let me get a cleaner picture - let's look at the actual function names more carefully\\n\\n# AddUser.tsx - find the onSubmit function\\nlines = P.lineas(\\\"frontend/src/components/Admin/AddUser.tsx\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"mutationFn: (data: UserCreate) => UsersService.createUser\\\" in line:\\n        # Go back to find function name\\n        for j in range(i-1, max",
+    "resultado_caracteres": 107
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"onSubmit\"}",
+    "resultado_caracteres": 948
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Let me trace the call chain from onSubmit to the UsersService calls\\n\\n# For DeleteUser.tsx: onSubmit -> mutation.mutate(id) -> UsersService.deleteUser\\n# For EditUser.tsx: onSubmit -> mutation.mutate(submitData) -> UsersService.updateUser\\n# For AddUser.tsx: onSubmit -> mutation.mutate(data) -> UsersService.createUser\\n# For ChangePassword.tsx: onSubmit -> mutation.mutate(data) -> U",
+    "resultado_caracteres": 313
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Let's trace the call chain for each file more carefully\\n# The pattern is: onSubmit -> mutation.mutate -> UsersService.X\\n\\n# Let's verify each one:\\n\\nfiles_to_check = [\\n    (\\\"frontend/src/components/Admin/AddUser.tsx\\\", \\\"AddUser\\\", \\\"createUser\\\"),\\n    (\\\"frontend/src/components/Admin/DeleteUser.tsx\\\", \\\"DeleteUser\\\", \\\"deleteUser\\\"),\\n    (\\\"frontend/src/components/Admin/EditU",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"ChangePassword\"}",
+    "resultado_caracteres": 71
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"DeleteConfirmation\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"useAuth\"}",
+    "resultado_caracteres": 1651
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"getUsersQueryOptions\"}",
+    "resultado_caracteres": 309
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Admin\"}",
+    "resultado_caracteres": 605
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Check the second UsersService.readUserMe call in admin.tsx\\nlines = P.lineas(\\\"frontend/src/routes/_layout/admin.tsx\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"UsersService.readUserMe\\\" in line:\\n        print(f\\\"Line {i}: {line}\\\")\\n        # Show context around it\\n        for j in range(max(0, i-10), i):\\n            if \\\"function\\\" in lines[j] or (\\\"const\\\" in lines[j] and",
+    "resultado_caracteres": 313
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"UsersTable\"}",
+    "resultado_caracteres": 257
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Obtener la ficha de cada función para ver sus llamadas\\nfunciones = [\\n    \\\"Admin.deleteUser\\\",\\n    \\\"Admin.updateUser\\\",\\n    \\\"Admin.createOrEditUser\\\",\\n    \\\"UserSettings.UserInformation.onSubmit\\\",\\n    \\\"UserSettings.DeleteAccount.DeleteAccount\\\",\\n    \\\"UserSettings.ChangePassword.onSubmit\\\",\\n    \\\"UsersService.readUserMe\\\",\\n    \\\"UsersService.createUser\\\",\\n    \\\"UsersS",
+    "resultado_caracteres": 202
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Verificar qué funciones exactas existen en admin.tsx\\nadmin_lines = P.lineas(\\\"frontend/src/routes/_layout/admin.tsx\\\")\\n# Buscar funciones exportadas o definidas\\nfunciones_admin = []\\nfor i, line in enumerate(admin_lines, 1):\\n    if 'function ' in line or 'const ' in line and '=' in line and '(' in line:\\n        funciones_admin.append((i, line.strip()))\\n\\nfunciones_admin[:20]\\",
+    "resultado_caracteres": 722
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver las funciones en Admin.tsx (componente)\\nadmin_lines = P.lineas(\\\"frontend/src/components/Admin/Admin.tsx\\\")\\nfunciones_admin = []\\nfor i, line in enumerate(admin_lines, 1):\\n    stripped = line.strip()\\n    if stripped.startswith('function ') or (stripped.startswith('export ') and 'function' in stripped):\\n        funciones_admin.append((i, stripped))\\n\\nfunciones_admin\\n\"}",
+    "resultado_caracteres": 244
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver qué archivos hay en Admin\\nP.archivos(patron=\\\"Admin\\\", lenguaje=\\\"tsx\\\")\\n\"}",
+    "resultado_caracteres": 167
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver qué archivos hay en la carpeta Admin\\nimport os\\nadmin_dir = \\\"frontend/src/components/Admin\\\"\\nif os.path.exists(admin_dir):\\n    os.listdir(admin_dir)\\nelse:\\n    \\\"No existe\\\"\\n\"}",
+    "resultado_caracteres": 348
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver archivos en Admin\\nP.archivos(patron=\\\"Admin\\\")\\n\"}",
+    "resultado_caracteres": 760
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Obtener fichas de las funciones clave que ya sabemos que llaman a /api/v1/users/\\nfunciones_a_verificar = [\\n    \\\"AddUser.onSubmit\\\",\\n    \\\"DeleteUser.onSubmit\\\",\\n    \\\"EditUser.onSubmit\\\",\\n    \\\"UserActionsMenu.onDelete\\\",\\n    \\\"UserSettings.UserInformation.onSubmit\\\",\\n    \\\"UserSettings.DeleteAccount.DeleteAccount\\\",\\n    \\\"UserSettings.ChangePassword.onSubmit\\\",\\n    \\\"use",
+    "resultado_caracteres": 220
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver qué hechos existen sobre llamadas al API\\nhechos = P.hechos(r=\\\"llama_api\\\", limite=200)\\n# Filtrar solo los que tienen /api/v1/users/\\nusers_calls = [h for h in hechos if '/api/v1/users/' in h.get('o', '') or '/api/v1/users/' in h.get('s', '')]\\nusers_calls\\n\"}",
+    "resultado_caracteres": 1798
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ahora buscar quién llama a las funciones de UsersService\\nhechos = P.hechos(r=\\\"llama\\\", limite=500)\\n# Filtrar los que llaman a UsersService\\nuserservice_calls = [h for h in hechos if 'UsersService' in h.get('s', '') or 'UsersService' in h.get('o', '')]\\nuserservice_calls\\n\"}",
+    "resultado_caracteres": 260
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Buscar todos los hechos que mencionan UsersService\\nhechos = P.hechos(limite=500)\\nuserservice_hechos = [h for h in hechos if 'UsersService' in h.get('s', '') or 'UsersService' in h.get('o', '') or 'UsersService' in h.get('r', '')]\\nuserservice_hechos\\n\"}",
+    "resultado_caracteres": 891
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Buscar todos los hechos de \\\"llama\\\" hacia funciones de UsersService\\nhechos = P.hechos(r=\\\"llama\\\", limite=500)\\n# Filtrar los que llaman a métodos de UsersService\\nllamadas_userservice = [h for h in hechos if any(m in h.get('o', '') for m in ['UsersService.readUserMe', 'UsersService.createUser', 'UsersService.deleteUser', 'UsersService.updateUser', 'UsersService.updateUserMe', 'U",
+    "resultado_caracteres": 302
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Buscar todos los hechos de \\\"llama\\\" sin filtrar\\nhechos = P.hechos(r=\\\"llama\\\", limite=500)\\n# Mostrar todos\\nhechos[:100]\\n\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "d350423a439a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/v1/users/me\\\")\"}",
+    "resultado_caracteres": 922
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar dónde se usan los métodos de UsersService relacionados con /me\\nimport re\\nfrom pathlib import Path\\n\\n# Buscar en el frontend todas las llamadas a UsersService.readUserMe, updateUserMe, deleteUserMe\\nfrontend_paths = list(Path(\\\"frontend/src\\\").rglob(\\\"*.ts\\\")) + list(Path(\\\"frontend/src\\\").rglob(\\\"*.tsx\\\"))\\n\\nresults = {}\\nfor fp in frontend_paths:\\n    content = fp.read_te",
+    "resultado_caracteres": 188
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"import re\\nimport os\\n\\n# Buscar en el frontend todas las llamadas a UsersService.readUserMe, updateUserMe, deleteUserMe\\nresults = {}\\nfor method in ['readUserMe', 'updateUserMe', 'deleteUserMe']:\\n    results[method] = []\\n\\nfor root, dirs, files in os.walk(\\\"frontend/src\\\"):\\n    for fname in files:\\n        if fname.endswith(('.ts', '.tsx')):\\n            fpath = os.path.join(root,",
+    "resultado_caracteres": 183
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"import re\\nimport fnmatch\\n\\n# Usar P.archivos y luego buscar en cada archivo\\nfiles = P.archivos(patron=\\\"frontend/src\\\", lenguaje=None)\\nresults = {}\\nfor method in ['readUserMe', 'updateUserMe', 'deleteUserMe']:\\n    results[method] = []\\n\\nfor f in files:\\n    ruta = f['ruta']\\n    if not (ruta.endswith('.ts') or ruta.endswith('.tsx')):\\n        continue\\n    texto = P.leer(ruta)\\n",
+    "resultado_caracteres": 400
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"useAuth\"}",
+    "resultado_caracteres": 1651
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Admin\"}",
+    "resultado_caracteres": 605
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"UserInformation\"}",
+    "resultado_caracteres": 72
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"DeleteConfirmation\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver el contenido del archivo admin.tsx para ver dónde se llama readUserMe\\nprint(P.leer(\\\"frontend/src/routes/_layout/admin.tsx\\\"))\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"UserInformation\"}",
+    "resultado_caracteres": 72
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.leer(\\\"frontend/src/components/UserSettings/UserInformation.tsx\\\"))\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Verificar si hay más llamadas a UsersService relacionadas con /me\\nimport re\\n\\nfiles = P.archivos(patron=\\\"frontend/src\\\", lenguaje=None)\\nfor f in files:\\n    ruta = f['ruta']\\n    if not (ruta.endswith('.ts') or ruta.endswith('.tsx')):\\n        continue\\n    texto = P.leer(ruta)\\n    # Buscar todas las llamadas a UsersService\\n    matches = list(re.finditer(r'\\\\bUsersService\\\\.(re",
+    "resultado_caracteres": 623
+   }
+  ],
+  "dac1b36ce36f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Find frontend code that calls /api/v1/password-recovery\\n# First, let's look at the LoginService in the SDK to understand the method names\\nprint(\\\"=== SDK methods for password-recovery ===\\\")\\nsdk_lines = P.lineas(\\\"frontend/src/client/sdk.gen.ts\\\")\\nfor i, line in enumerate(sdk_lines):\\n    if \\\"password-recovery\\\" in line.lower():\\n        print(f\\\"Line {i+1}: {line.strip()}\\\")\\n\\",
+    "resultado_caracteres": 289
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Fix: use correct path prefix\\nresults = P.grep(r\\\"recoverPassword\\\", rutas=None)\\nfor r in results:\\n    if r['ruta'].startswith('frontend/'):\\n        print(f\\\"{r['ruta']}:{r['linea']}: {r['texto'].strip()}\\\")\\n\"}",
+    "resultado_caracteres": 642
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"recoverPassword\"}",
+    "resultado_caracteres": 72
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Read the full context of recover-password.tsx to see the function name\\nlines = P.lineas(\\\"frontend/src/routes/recover-password.tsx\\\")\\nfor i, line in enumerate(lines):\\n    print(f\\\"{i+1}: {line}\\\", end=\\\"\\\")\\n\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "002ba5b66654": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"generate_reset_password_email\\\"))\"}",
+    "resultado_caracteres": 140
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"generate_reset_password_email\\\"))\"}",
+    "resultado_caracteres": 302
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# recover_password está en login.py, línea ~57\\n# recover_password_html_content está en login.py, línea ~106\\nprint(P.api(\\\"/password-recovery/{email}\\\"))\\nprint(P.api(\\\"/password-recovery-html-content/{email}\\\"))\"}",
+    "resultado_caracteres": 835
+   }
+  ],
+  "39210d8965f9": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.impacto(\\\"create_access_token\\\")\"}",
+    "resultado_caracteres": 181
+   }
+  ],
+  "53897b6f1836": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"parse_version\\\")\"}",
+    "resultado_caracteres": 243
+   }
+  ],
+  "5f69ce083bf3": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"isLoggedIn\\\")\"}",
+    "resultado_caracteres": 112
+   }
+  ],
+  "8a9d5c17a626": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"DropdownMenu\"}",
+    "resultado_caracteres": 204
+   }
+  ],
+  "9f7550392084": []
+ },
+ "respuestas": {
+  "a3b9deb2d9a5": "El endpoint `GET /users/` está implementado en **`backend/app/api/routes/users.py`**, en la función **`read_users`** (líneas 32-51).\n\n### Función\n\n```python\n@router.get(\n    \"/\",\n    dependencies=[Depends(get_current_active_superuser)],\n    response_model=UsersPublic,\n)\ndef read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:\n    \"\"\"\n    Retrieve users.\n    \"\"\"\n\n    count_statement = select(func.count()).select_from(User)\n    count = session.exec(count_statement).one()\n\n    statement = (\n        select(User).order_by(col(User.created_at).desc()).offset(skip).limit(limit)\n    )\n    users = session.exec(statement).all()\n\n    users_public = [UserPublic.model_validate(user) for user in users]\n    return UsersPublic(data=users_public, count=count)\n```\n\n### Qué hace\n\n1. **Requiere superusuario**: Solo usuarios con rol `get_current_active_superuser` pueden acceder.\n2. **Devuelve lista paginada**: Recibe `skip` (offset) y `limit` (límites) como parámetros de consulta.\n3. **Cuenta total**: Ejecuta `SELECT count(*) FROM user` para obtener el total de usuarios.\n4. **Ordena por creación**: Los usuarios se ordenan por `created_at` de más reciente a más antiguo.\n5. **Retorna `UsersPublic`**: Estructura con:\n   - `data`: lista de objetos `UserPublic` (usuario con campos públicos, sin contraseña).\n   - `count`: número total de usuarios en la base de datos.\n\n### Frontend\n\nEn `frontend/src/routes/_layout/admin.tsx` (líneas 12-18), se consume así:\n\n```javascript\nfunction getUsersQueryOptions() {\n  return {\n    queryFn: async () =>\n      (await UsersService.readUsers({ query: { skip: 0, limit: 100 } })).data,\n    queryKey: [\"users\"],\n  }\n}\n```\n\nLlama al SDK generado (`UsersService.readUsers`) con `skip=0, limit=100` y extrae `.data` para alimentar la tabla de administración.",
+  "ad77e7d6d216": "La función es **`login_access_token`** en **`backend/app/api/routes/login.py:23`**.\n\nSu comportamiento es:\n\n1. Recibe credenciales mediante `OAuth2PasswordRequestForm` (username/password)\n2. Busca al usuario con `crud.authenticate(session, email, password)`\n3. Si no existe o la contraseña es incorrecta → **400 \"Incorrect email or password\"**\n4. Si el usuario existe pero `is_active=False` → **400 \"Inactive user\"**\n5. Si todo es correcto → genera un JWT con `security.create_access_token()` (expiración configurable en `settings.ACCESS_TOKEN_EXPIRE_MINUTES`) y lo devuelve envuelto en el modelo `Token` (líneas 38-41):\n\n```python\nreturn Token(\n    access_token=security.create_access_token(\n        user.id, expires_delta=access_token_expires\n    )\n)\n```\n\nEs el endpoint de login OAuth2 del sistema: el cliente frontend (`frontend/src/routes/login.tsx`) envía el formulario de email+password, el hook `useAuth.login()` (línea 38-42) llama a `LoginService.loginAccessToken()`, guarda el token en `localStorage` y navega al dashboard.",
+  "e5dcaa694aae": "Hay dos funciones llamadas `create_user` que implementan el endpoint `POST /users`:\n\n1. **`backend/app/api/routes/users.py`** (línea 57): `create_user` — endpoint público para superusuarios (`POST /users/`), requiere `get_current_active_superuser`.\n2. **`backend/app/api/routes/private.py`** (línea 24): `create_user` — endpoint privado (`POST /users/`), accesible solo en entornos locales de desarrollo.\n\nAmbos están en archivos de rutas del backend FastAPI. La función del CRUD en `backend/app/crud.py` (línea 10) es la función de base de datos que ambas llaman internamente.",
+  "073bfcc2da47": "Ahora necesito identificar los nombres exactos de las funciones que contienen estas llamadas. Veo que en varios casos hay una función `onSubmit`, pero también hay casos donde la llamada está directamente en el hook o en una función de consulta.\n\nAhora necesito verificar la función `readUserMe` en admin.tsx y los detalles de las funciones restantes:\n\n\n\n\n[agotada: cortada a los 600 s sin terminar]",
+  "d350423a439a": "El endpoint `/api/v1/users/me` es consumido por el frontend a través de `UsersService` (generado automáticamente). Ahora busco qué funciones del frontend llaman a los métodos de `UsersService` relacionados con `/api/v1/users/me` (readUserMe, updateUserMe, deleteUserMe).\n\nAhora veo las 3 funciones que llaman a los métodos de `UsersService` para `/api/v1/users/me`. Pero necesito verificar que estas llamadas efectivamente van al endpoint `/api/v1/users/me` y no son falsos positivos. Déjame ver el código de cada una:\n\nAhora necesito ver el componente `UserInformation` (el símbolo no se llama `UserInformation` directamente, quizás tiene otro nombre). También necesito verificar la llamada en `admin.tsx` que aparece como llamadora de `readUserMe`.\n\nAhora veo que la llamada en `admin.tsx` está en `beforeLoad` (línea 23), que es una función anónima dentro de la configuración de la ruta. El nombre de la función es `beforeLoad` pero no es un nombre de función con identificador. Busco ahora el componente `UserInformation`:\n\nPerfecto. Ahora tengo toda la información. Las funciones del frontend que llaman al endpoint `/api/v1/users/me` son:\n\n1. **`useAuth`** (en `frontend/src/hooks/useAuth.ts`, línea 25): Llama a `UsersService.readUserMe()` dentro de un `useQuery` para obtener el usuario actual.\n\n2. **`beforeLoad`** (en `frontend/src/routes/_layout/admin.tsx`, línea 23): Llama a `UsersService.readUserMe()` dentro del `beforeLoad` de la ruta `/admin` para verificar si el usuario es superusuario. Sin embargo, `beforeLoad` es una función anónima dentro de la configuración de la ruta.\n\n3. **`UserInformation`** (en `frontend/src/components/UserSettings/UserInformation.tsx`, línea 53): Llama a `UsersService.updateUserMe()` dentro de una mutación `useMutation`.\n\n4. **`DeleteConfirmation`** (en `frontend/src/components/UserSettings/DeleteConfirmation.tsx`, línea 28): Llama a `UsersService.deleteUserMe()` dentro de una mutación `useMutation`.\n\nPero la pregunta pide nombrar la función con nombre que contiene la llamada, no el manejador anónimo. `beforeLoad` es una función anónima (es una función flecha inline), así que técnicamente no tiene nombre. Voy a verificar si hay alguna otra función que llame a estos métodos:\n\nLas 4 llamadas están confirmadas. Ahora, la pregunta pide \"la función con nombre que contiene la llamada (no el manejador anónimo)\". \n\n- `useAuth` → es una función con nombre (hook)\n- `UserInformation` → es una función con nombre (componente)\n- `DeleteConfirmation` → es una función con nombre (componente)\n- `beforeLoad` → es una función anónima (inline arrow function dentro de la configuración de la ruta), por lo tanto NO cumple el criterio de \"función con nombre\"\n\nAsí que las funciones con nombre son:\n\n1. **`useAuth`** — llama a `UsersService.readUserMe()` (GET `/api/v1/users/me`)\n2. **`UserInformation`** — llama a `UsersService.updateUserMe()` (PATCH `/api/v1/users/me`)\n3. **`DeleteConfirmation`** — llama a `UsersService.deleteUserMe()` (DELETE `/api/v1/users/me`)",
+  "dac1b36ce36f": "La función del frontend que llama al endpoint `/api/v1/password-recovery/{email}` es **`recoverPassword`**, definida en `frontend/src/routes/recover-password.tsx` (línea 60). Esta función es una función const dentro del componente `RecoverPassword` y hace la llamada directamente a `LoginService.recoverPassword({ path: { email: data.email } })`.",
+  "002ba5b66654": "Eso no muestra los llamadores. Veamos directamente quién llama a `generate_reset_password_email`:\n\nAhora veo los dos endpoints que llaman a esta función. Veamos sus rutas HTTP exactas:\n\nCon esto ya tengo la respuesta completa.\n\nCambiar el comportamiento de `generate_reset_password_email` en `backend/app/utils.py` afecta directamente a **dos endpoints HTTP del backend**:\n\n1. **`POST /api/v1/password-recovery/{email}`** — expuesto por la función `recover_password` en `backend/app/api/routes/login.py` (línea 54). Este endpoint es el que usan los usuarios para solicitar un enlace de recuperación de contraseña.\n\n2. **`POST /api/v1/password-recovery-html-content/{email}`** — expuesto por la función `recover_password_html_content` en `backend/app/api/routes/login.py` (línea 105). Este endpoint es solo accesible para superusuarios y devuelve el contenido HTML del email de recuperación.\n\nAmbos endpoints llaman a `generate_reset_password_email` para generar el cuerpo del email de recuperación de contraseña, por lo que cualquier cambio en esa función afectará el contenido del email que se envía en ambos casos.",
+  "39210d8965f9": "Si cambias el comportamiento de `create_access_token`, el único endpoint HTTP del backend que se ve afectado directa o indirectamente es:\n\n- **`POST /api/v1/login/access-token`** (definido en `backend/app/api/routes/login.py`, función `login_access_token`)\n\nEste es el único lugar en el backend donde se llama a `create_access_token`. El token generado allí es luego utilizado por el frontend y otros endpoints para la autenticación, pero esos no se ven afectados directamente por cambios en la lógica de generación del token, solo en su validación.",
+  "53897b6f1836": "Dos funciones en `scripts/prepare_release.py` llaman a `parse_version`:\n\n1. **`bump_version`** (línea 34): La usa para obtener los componentes mayor, menor y parche de la versión actual antes de incrementarlos según el tipo de bump.\n2. **`update_release_notes`** (línea 52): La usa para comparar que la nueva versión es mayor que la versión actual, evitando que se retroceda.",
+  "5f69ce083bf3": "La función `isLoggedIn` (definida en `frontend/src/hooks/useAuth.ts` línea 18) es llamada por:\n\n- **`useAuth`** (línea 18 del mismo archivo `frontend/src/hooks/useAuth.ts`), que es el hook principal que la invoca dentro de la condición `enabled` de la query `useQuery` para obtener el usuario actual.",
+  "8a9d5c17a626": "`DropdownMenu` está definida en el archivo:\n\n**`frontend/src/components/ui/dropdown-menu.tsx`** (líneas 9-11)",
+  "9f7550392084": "`ItemPublic` está definida en **backend/app/models.py** (líneas 104-107).\n\n```python\nclass ItemPublic(ItemBase):\n    id: uuid.UUID\n    owner_id: uuid.UUID\n    created_at: datetime | None = None\n```\n\nEs un modelo de SQLModel que hereda de `ItemBase` y añade los campos `id`, `owner_id` y `created_at` para la respuesta de lectura."
+ }
+}

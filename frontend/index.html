@@ -7,6 +7,7 @@
   <title>Prig IDE - Editor de Código & Tutor IA</title>
   <link rel="stylesheet" href="/static/css/style.css?v=9">
   <link rel="stylesheet" href="/static/css/rediseno.css?v=20">
+  <link rel="stylesheet" href="/static/css/editor_razonamiento.css?v=1">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +162,7 @@
   <div id="app-container">
 
     <!-- Top Navigation & Toolbar Header -->
-    <!-- Barra superior única: todo se ordena dentro de estos seis menús -->
+    <!-- Barra superior de menús y plan de estudio -->
     <div id="prig-topbar">
       <div id="prig-menubar-mount"></div>
       <div id="prig-topbar-derecha">
@@ -176,7 +177,6 @@
         <span id="current-workspace-name">Prig</span>
       </div>
     </div>
-
     <!-- Entornos de trabajo, al estilo del selector de escritorios de Ubuntu -->
 
 
@@ -518,103 +518,120 @@
 
             <div id="trabajo-vistas" class="trabajo-vistas">
               <div id="vista-editor" class="vista-trabajo">
-                <!-- Barra superior de disposición del editor (1, 2 y 3 columnas) -->
-                <div id="editor-layout-bar" class="editor-layout-bar">
-                  <div class="editor-layout-info">
+                <!-- Barra superior del editor con Acceso al Cerebro IA -->
+                <div id="editor-layout-bar" class="editor-layout-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: rgba(0,0,0,0.18); border-bottom: 1px solid var(--border-color);">
+                  <div class="editor-layout-info" style="display: flex; align-items: center; gap: 8px;">
                     <span class="editor-layout-badge"><i class="fa-solid fa-code"></i> Editor</span>
-                    <span id="editor-layout-info-cols" style="font-size:11px; opacity:0.75;">(1 Columna)</span>
                   </div>
-                  <div class="editor-layout-actions">
-                    <button id="btn-editor-cols-1" class="editor-layout-btn active" title="1 Columna (Editor individual)" data-cols="1">
-                      <i class="fa-regular fa-square"></i> 1 Col
+                  <div class="editor-layout-actions" style="display: flex; align-items: center; gap: 8px;">
+                    <button id="btn-cerebro-dialogo" class="btn-cerebro-hud" title="Abrir Cerebro IA: Historial de razonamiento, memoria comprimida y preguntas sobre archivos" onclick="window.CerebroMemoria && window.CerebroMemoria.alternarPanel();" style="display: flex; align-items: center; gap: 8px; background: rgba(203, 166, 247, 0.18); border: 1px solid #cba6f7; color: #f8fafc; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-brain" style="color: #cba6f7; font-size: 13px;"></i>
+                      <span>Cerebro IA</span>
+                      <span id="badge-cerebro-memoria" style="background: #cba6f7; color: #11111b; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 10px; margin-left: 2px;">0 leídos</span>
                     </button>
-                    <button id="btn-editor-cols-2" class="editor-layout-btn" title="2 Columnas (Lado a lado - Ver 2 códigos)" data-cols="2">
-                      <i class="fa-solid fa-table-columns"></i> 2 Cols
+                    <!-- BOTÓN RAZONAMIENTO DEL MODELO (25% Ancho Minimapa) -->
+                    <button id="btn-editor-razonamiento" class="btn-editor-hud-secundario activo" title="Panel de razonamiento del modelo sobre el código (25% ancho minimapa)" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('razonamiento');" style="display: flex; align-items: center; gap: 6px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-brain-circuit" style="font-size: 12px;"></i>
+                      <span>Razonamiento</span>
+                      <span id="badge-razonamiento-estado" style="background: rgba(137, 180, 250, 0.28); color: #89b4fa; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">CoT</span>
                     </button>
-                    <button id="btn-editor-cols-3" class="editor-layout-btn" title="3 Columnas (Tres lados - Ver 3 códigos)" data-cols="3">
-                      <i class="fa-solid fa-table-cells"></i> 3 Cols
-                    </button>
-                    <div class="editor-layout-sep"></div>
-                    <button id="btn-editor-split-side" class="editor-layout-btn" title="Abrir archivo al lado (Ctrl+\)">
-                      <i class="fa-solid fa-arrow-right-to-bracket"></i> Abrir al lado
+                    <!-- BOTÓN NOTAS TÉCNICAS SOBRE EL CÓDIGO -->
+                    <button id="btn-editor-notas" class="btn-editor-hud-secundario" title="Notas técnicas profesionales y anotaciones estructuradas sobre el código" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('notas');" style="display: flex; align-items: center; gap: 6px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-clipboard-list" style="font-size: 12px;"></i>
+                      <span>Notas</span>
+                      <span id="badge-notas-contador" style="background: rgba(166, 227, 161, 0.25); color: #a6e3a1; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">0</span>
                     </button>
                   </div>
                 </div>
 
-                <!-- Cuadrícula flexible de columnas del editor -->
-                <div id="editor-grid-container" class="editor-grid-container">
-                  <!-- COLUMNA 0 (Principal / Izquierda) -->
-                  <div id="editor-col-0" class="editor-col activa" data-col="0" style="flex: 1 1 100%; width: 100%;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
-                        <!-- Open file tabs dynamically injected -->
+                <!-- Contenedor Wrapper del Área de Trabajo del Editor -->
+                <div id="editor-area-wrapper" class="editor-area-wrapper">
+                  <!-- SVG Overlay Oculto (Los números de línea brillantes reemplazan los corchetes) -->
+                  <svg id="editor-overlay-conectores" class="editor-overlay-conectores" style="display: none;">
+                  </svg>
+
+                  <!-- Cuadrícula flexible de columnas del editor -->
+                  <div id="editor-grid-container" class="editor-grid-container" style="flex: 1 1 75%; min-width: 0; width: auto;">
+                    <!-- COLUMNA 0 (Principal / Izquierda) -->
+                    <div id="editor-col-0" class="editor-col activa" data-col="0" style="flex: 1 1 100%; width: 100%;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
+                          <!-- Open file tabs dynamically injected -->
+                        </div>
+                        <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
+                          <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
+                          <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
                       </div>
-                      <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
-                        <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
-                        <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                      <div class="editor-col-body">
+                        <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
+                          <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
+                            Cuaderno Jupyter</button>
+                          <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
+                            Raw</button>
+                        </div>
+                        <div id="monaco-editor-container" class="monaco-container"></div>
+                        <div id="notebook-view-container" style="display:none;"></div>
                       </div>
                     </div>
-                    <div class="editor-col-body">
-                      <div id="view-mode-bar" class="view-mode-bar" style="display:none;">
-                        <button id="btn-view-notebook" class="view-toggle-btn active"><i class="fa-solid fa-book-bookmark"></i> Vista
-                          Cuaderno Jupyter</button>
-                        <button id="btn-view-source" class="view-toggle-btn"><i class="fa-solid fa-code"></i> Código Fuente
-                          Raw</button>
+
+                    <!-- DIVISOR 0 (Entre Col 0 y Col 1) -->
+                    <div id="editor-resizer-0" class="editor-col-resizer" data-resizer="0" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                    <!-- COLUMNA 1 (Centro o Derecha) -->
+                    <div id="editor-col-1" class="editor-col" data-col="1" style="display: none;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
+                          <!-- Pestañas de Columna 1 -->
+                        </div>
+                        <div class="editor-col-actions">
+                          <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
+                          <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                          <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
+                          <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
                       </div>
-                      <div id="monaco-editor-container" class="monaco-container"></div>
-                      <div id="notebook-view-container" style="display:none;"></div>
+                      <div class="editor-col-body">
+                        <div id="monaco-editor-container-1" class="monaco-container"></div>
+                        <div id="editor-col-empty-1" class="editor-col-empty" style="display: none;">
+                          <i class="fa-solid fa-code"></i>
+                          <p>Panel de código secundario</p>
+                          <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- DIVISOR 1 (Entre Col 1 y Col 2) -->
+                    <div id="editor-resizer-1" class="editor-col-resizer" data-resizer="1" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+
+                    <!-- COLUMNA 2 (Derecha extrema) -->
+                    <div id="editor-col-2" class="editor-col" data-col="2" style="display: none;">
+                      <div class="editor-col-header">
+                        <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
+                          <!-- Pestañas de Columna 2 -->
+                        </div>
+                        <div class="editor-col-actions">
+                          <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+                          <button class="editor-col-action-btn cerrar" data-cerrar-col="2" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                      </div>
+                      <div class="editor-col-body">
+                        <div id="monaco-editor-container-2" class="monaco-container"></div>
+                        <div id="editor-col-empty-2" class="editor-col-empty" style="display: none;">
+                          <i class="fa-solid fa-code"></i>
+                          <p>Panel de código terciario</p>
+                          <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- DIVISOR 0 (Entre Col 0 y Col 1) -->
-                  <div id="editor-resizer-0" class="editor-col-resizer" data-resizer="0" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
+                  <!-- DIVISOR REDIMENSIONABLE PARA EL PANEL DE RAZONAMIENTO -->
+                  <div id="editor-razonamiento-resizer" class="editor-razonamiento-resizer" title="Arrastra para ajustar el ancho del panel de razonamiento"></div>
 
-                  <!-- COLUMNA 1 (Centro o Derecha) -->
-                  <div id="editor-col-1" class="editor-col" data-col="1" style="display: none;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
-                        <!-- Pestañas de Columna 1 -->
-                      </div>
-                      <div class="editor-col-actions">
-                        <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
-                        <button class="editor-col-action-btn" data-mover-izq="1" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
-                        <button class="editor-col-action-btn" data-mover-der="1" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
-                        <button class="editor-col-action-btn cerrar" data-cerrar-col="1" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
-                      </div>
-                    </div>
-                    <div class="editor-col-body">
-                      <div id="monaco-editor-container-1" class="monaco-container"></div>
-                      <div id="editor-col-empty-1" class="editor-col-empty" style="display: none;">
-                        <i class="fa-solid fa-code"></i>
-                        <p>Panel de código secundario</p>
-                        <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- DIVISOR 1 (Entre Col 1 y Col 2) -->
-                  <div id="editor-resizer-1" class="editor-col-resizer" data-resizer="1" title="Arrastra para redimensionar (doble clic para equilibrar)" style="display: none;"></div>
-
-                  <!-- COLUMNA 2 (Derecha extrema) -->
-                  <div id="editor-col-2" class="editor-col" data-col="2" style="display: none;">
-                    <div class="editor-col-header">
-                      <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
-                        <!-- Pestañas de Columna 2 -->
-                      </div>
-                      <div class="editor-col-actions">
-                        <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
-                        <button class="editor-col-action-btn cerrar" data-cerrar-col="2" title="Cerrar panel"><i class="fa-solid fa-xmark"></i></button>
-                      </div>
-                    </div>
-                    <div class="editor-col-body">
-                      <div id="monaco-editor-container-2" class="monaco-container"></div>
-                      <div id="editor-col-empty-2" class="editor-col-empty" style="display: none;">
-                        <i class="fa-solid fa-code"></i>
-                        <p>Panel de código terciario</p>
-                        <span class="editor-col-empty-msg">Arrastra una pestaña de código aquí o pulsa "Abrir al lado"</span>
-                      </div>
-                    </div>
-                  </div>
+                  <!-- PANEL DE RAZONAMIENTO Y NOTAS DEL MODELO (25% ANCHO, 100% ALTURA) -->
+                  <aside id="editor-panel-razonamiento" class="editor-panel-razonamiento" style="width: 25%; min-width: 280px; max-width: 520px; height: 100%; display: flex; flex-direction: column;">
+                  </aside>
                 </div>
 
                 <!-- Sin archivos abiertos: nada de «Hola, mundo», solo cómo empezar -->
@@ -687,8 +704,108 @@
       </span>
     </footer>
 
-    <!-- Inicio: se abre al arrancar (Herramientas → Inicio). js/inicio.js -->
-    <div id="modal-inicio" class="modal-overlay" style="display:none;">
+  <!-- Panel Lateral Derecho: Cerebro IA & Memoria Comprimida -->
+  <aside id="panel-cerebro-memoria" class="panel-cerebro-memoria" style="position: fixed; top: 40px; right: 0; bottom: 26px; width: 450px; max-width: 94vw; background: rgba(17, 17, 27, 0.97); backdrop-filter: blur(14px); border-left: 1.5px solid rgba(203, 166, 247, 0.4); z-index: 9995; display: flex; flex-direction: column; box-shadow: -8px 0 28px rgba(0,0,0,0.65); transform: translateX(100%); transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);">
+    
+    <!-- Cabecera del Panel Cerebro -->
+    <div style="padding: 12px 16px; background: rgba(24, 24, 37, 0.95); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(203, 166, 247, 0.15); border: 1px solid #cba6f7; display: flex; align-items: center; justify-content: center;">
+          <i class="fa-solid fa-brain" style="color: #cba6f7; font-size: 16px;"></i>
+        </div>
+        <div>
+          <div style="font-weight: 800; font-size: 13.5px; color: #f8fafc; letter-spacing: 0.3px;">CEREBRO IA &amp; MEMORIA</div>
+          <div style="font-size: 10.5px; color: #a6adc8;">Memoria semántica compacta (TC-AST)</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button onclick="window.CerebroMemoria.limpiarMemoria();" title="Limpiar y reiniciar memoria" style="background: rgba(243, 139, 168, 0.12); border: 1px solid rgba(243, 139, 168, 0.3); color: #f38ba8; font-size: 11px; cursor: pointer; padding: 4px 8px; border-radius: 4px;">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+        <button onclick="window.CerebroMemoria.cerrarPanel();" title="Cerrar panel (Esc)" style="background: transparent; border: none; color: #a6adc8; font-size: 18px; cursor: pointer; padding: 4px;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pestañas del Panel Cerebro -->
+    <div style="display: flex; border-bottom: 1px solid var(--border-color); background: rgba(30, 30, 46, 0.6); padding: 6px 10px; gap: 6px;">
+      <button class="cerebro-tab-btn activa" data-tab="dialogos" onclick="window.CerebroMemoria.setTab('dialogos');" style="flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #a6adc8; cursor: pointer; transition: all 0.2s ease;">
+        <i class="fa-regular fa-comments"></i> Diálogos
+      </button>
+      <button class="cerebro-tab-btn" data-tab="memoria" onclick="window.CerebroMemoria.setTab('memoria');" style="flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #a6adc8; cursor: pointer; transition: all 0.2s ease;">
+        <i class="fa-solid fa-database"></i> Memoria AST
+      </button>
+      <button class="cerebro-tab-btn" data-tab="preguntar" onclick="window.CerebroMemoria.setTab('preguntar');" style="flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #a6adc8; cursor: pointer; transition: all 0.2s ease;">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Preguntar
+      </button>
+    </div>
+
+    <!-- Hero de Ahorro de Tokens -->
+    <div id="cerebro-stats-hero" style="padding: 10px 14px; background: rgba(137, 180, 250, 0.08); border-bottom: 1px solid rgba(137, 180, 250, 0.15);"></div>
+
+    <!-- Vista 1: Historial de Razonamientos y Diálogos -->
+    <div id="cerebro-tab-dialogos" class="cerebro-tab-content" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column;">
+      <div id="cerebro-lista-dialogos" style="display: flex; flex-direction: column;"></div>
+    </div>
+
+    <!-- Vista 2: Memoria Estructurada de Archivos Leídos (AST) -->
+    <div id="cerebro-tab-memoria" class="cerebro-tab-content" style="flex: 1; overflow-y: auto; padding: 12px; display: none; flex-direction: column;">
+      <div id="cerebro-lista-archivos-memoria" style="display: flex; flex-direction: column;"></div>
+    </div>
+
+    <!-- Vista 3: Preguntar al Cerebro (Chat con Memoria) -->
+    <div id="cerebro-tab-preguntar" class="cerebro-tab-content" style="flex: 1; display: none; flex-direction: column; min-height: 0;">
+      <!-- Mensajes -->
+      <div id="cerebro-chat-mensajes" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column;">
+        <div style="background: rgba(30, 30, 46, 0.6); border: 1px solid rgba(203, 166, 247, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 11.5px; color: #cdd6f4;">
+          <div style="font-weight: 700; color: #cba6f7; margin-bottom: 4px;"><i class="fa-solid fa-circle-info"></i> Memoria Semántica Comprimida Activa</div>
+          Pregunta sobre cualquier archivo o función que el modelo haya leído. Responde utilizando las firmas AST memorizadas sin gastar tokens en texto plano redundante.
+        </div>
+      </div>
+
+      <!-- Chips de prompts rápidos -->
+      <div style="padding: 6px 12px; display: flex; gap: 6px; overflow-x: auto; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05);">
+        <button onclick="window.CerebroMemoria.enviarPromptRapido('¿Qué dependencias y funciones encontraste en los archivos?');" style="white-space: nowrap; background: rgba(137, 180, 250, 0.12); border: 1px solid #89b4fa; color: #89b4fa; border-radius: 12px; padding: 4px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer;">
+          📦 Funciones y Deps
+        </button>
+        <button onclick="window.CerebroMemoria.enviarPromptRapido('¿Dónde hay cuellos de botella u optimizaciones pendientes?');" style="white-space: nowrap; background: rgba(249, 226, 175, 0.12); border: 1px solid #f9e2af; color: #f9e2af; border-radius: 12px; padding: 4px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer;">
+          ⚡ Optimizaciones
+        </button>
+        <button onclick="window.CerebroMemoria.enviarPromptRapido('Resume la arquitectura en 3 puntos clave.');" style="white-space: nowrap; background: rgba(166, 227, 161, 0.12); border: 1px solid #a6e3a1; color: #a6e3a1; border-radius: 12px; padding: 4px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer;">
+          🏗️ Arquitectura
+        </button>
+      </div>
+
+      <!-- Input Bar -->
+      <div style="padding: 10px 12px; background: rgba(24, 24, 37, 0.95); border-top: 1px solid var(--border-color); display: flex; gap: 8px;">
+        <input type="text" id="cerebro-chat-input" placeholder="Pregunta sobre los archivos leídos..." onkeydown="if(event.key==='Enter') window.CerebroMemoria.enviarPregunta();" style="flex: 1; background: #11111b; border: 1px solid var(--border-color); color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12px; outline: none;">
+        <button onclick="window.CerebroMemoria.enviarPregunta();" style="background: #cba6f7; color: #11111b; border: none; border-radius: 6px; padding: 0 14px; font-weight: 700; cursor: pointer;">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+
+  </aside>
+
+  <style>
+    #panel-cerebro-memoria.abierto {
+      transform: translateX(0) !important;
+    }
+    .cerebro-tab-btn.activa {
+      background: rgba(203, 166, 247, 0.22) !important;
+      color: #ffffff !important;
+      border-color: #cba6f7 !important;
+    }
+    #btn-cerebro-dialogo:hover {
+      background: rgba(203, 166, 247, 0.30) !important;
+      border-color: #f5c2e7 !important;
+      transform: translateY(-1px);
+    }
+  </style>
+
+  <!-- Inicio: se abre al arrancar (Herramientas → Inicio). js/inicio.js -->
+  <div id="modal-inicio" class="modal-overlay" style="display:none;">
       <div class="modal-content modal-lg" style="padding:0; height:100%; max-width:none;">
         <div id="inicio-raiz"></div>
       </div>
@@ -739,6 +856,22 @@
         </div>
         <div class="modal-body" style="padding: 0; flex: 1; min-height: 0;">
           <div id="youtube-raiz" style="height:100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grafo de Aprendizaje: Motor Pedagógico Unificado (YouTube, GitHub, Kaggle, Prig Hub) -->
+    <div id="modal-aprendizaje-grafo" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="max-width: 1450px; height: 92vh; display: flex; flex-direction: column; background: var(--bg-panel, #181825); padding: 0;">
+        <div class="modal-header" style="padding: 10px 16px; border-bottom: 1px solid var(--border-color, #313244); display: flex; align-items: center; justify-content: space-between;">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px;">
+            <i class="fa-solid fa-diagram-project" style="color: #cba6f7; font-size: 16px;"></i>
+            <span>Grafo de Aprendizaje Prig · YouTube · GitHub · Kaggle · Prig Hub</span>
+          </div>
+          <button class="modal-close-btn" title="Cerrar (Esc)" onclick="if (window.workArea && window.workArea.vistas.some(v => v.modalId === 'modal-aprendizaje-grafo')) window.workArea.cerrar('h:modal-aprendizaje-grafo'); else document.getElementById('modal-aprendizaje-grafo').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 0; flex: 1; min-height: 0; overflow: hidden;">
+          <div id="aprendizaje-grafo-raiz" style="height:100%; width: 100%;"></div>
         </div>
       </div>
     </div>
@@ -996,8 +1129,10 @@
         </div>
 
         <!-- Body del Modal -->
+        <!-- flex-direction: row explícito: .modal-body es columna por defecto (style.css) y el panel derecho
+             (ficha, lector, librerías, referencias) quedaba debajo, con 2 px de alto -->
         <div class="modal-body"
-          style="padding: 12px; display: flex; gap: 12px; height: calc(100% - 48px); background: var(--bg-dark);">
+          style="padding: 12px; display: flex; flex-direction: row; gap: 12px; height: calc(100% - 48px); background: var(--bg-dark); overflow: hidden;">
 
           <!-- Panel Izquierdo: Categorías Repository, Lista & Filtro -->
           <div
@@ -1095,6 +1230,9 @@
               <button class="cat-pill" data-cat="librerias"
                 style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(166,227,161,0.15); color: var(--accent-green); border: 1px solid rgba(166,227,161,0.3); cursor: pointer;"
                 title="LIBRERÍAS DE ML/DL (NumPy, Matplotlib, PyTorch...)">📦 LIBRERÍAS</button>
+              <button class="cat-pill" data-cat="referencias"
+                style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(137,180,250,0.15); color: var(--accent-blue); border: 1px solid rgba(137,180,250,0.3); cursor: pointer;"
+                title="Libros, papers, formularios y documentación de todos los modelos de ML, con enlaces verificados">🔗 REFERENCIAS ML</button>
             </div>
 
             <div id="book-list-items"
@@ -1130,6 +1268,11 @@
                 <button id="tab-btn-book-librerias" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   onclick="if(window.bookLibraryMgr) window.bookLibraryMgr.switchTab('librerias');">
                   <i class="fa-solid fa-boxes-stacked" style="color: var(--accent-green);"></i> Analista de Librerías
+                </button>
+                <button id="tab-btn-book-referencias" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
+                  title="Leer los libros, papers y formularios de ML del catálogo"
+                  onclick="if(window.ReferenciasML) window.ReferenciasML.abrirPestana();">
+                  <i class="fa-solid fa-link" style="color: var(--accent-blue);"></i> Referencias ML
                 </button>
                 <button id="tab-btn-book-flujos" class="tool-btn" style="font-size: 12px; padding: 4px 10px;"
                   title="Encadenar varios modelos pequeños, cada uno con una tarea, para analizar en profundidad"
@@ -1172,6 +1315,11 @@
                   <p style="font-size: 13px; max-width: 500px; margin: 0 auto;">Selecciona una librería (NumPy, Matplotlib, Pandas, PyTorch...) para consultar su documentación oficial, analizar funciones con IA y guardar citas técnicas en <code>&lt;libreria&gt;.json</code>.</p>
                 </div>
               </div>
+            </div>
+
+            <!-- Contenido Pestaña 4: Referencias de ML (js/referencias_ml.js) -->
+            <div id="pane-book-referencias" style="flex: 1; overflow: hidden; display: none; background: var(--bg-dark);">
+              <div id="referencias-viewer-content" style="height: 100%; overflow-y: auto; padding: 16px;"></div>
             </div>
 
           </div>
@@ -1408,7 +1556,7 @@
   <!-- Modal Ejercicio: enunciado, editor y comprobación por ejecución -->
   <!-- Desafíos: enunciado, caja de razonamiento, plan, páginas de código y pruebas (js/desafios.js) -->
   <div id="modal-desafios" class="modal-overlay" style="display:none;">
-    <div class="modal-content modal-lg" style="max-width: 1400px; height: 90vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
+    <div class="modal-content modal-lg" style="width: 96vw; max-width: 1600px; height: 92vh; display: flex; flex-direction: column; background: var(--bg-panel, #1e1e2e);">
       <div class="modal-header">
 
         <div class="modal-title">
@@ -2065,16 +2213,27 @@
         <div style="font-weight: bold; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 8px;">
           <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> Configuración Global de Prig IDE
         </div>
-        <button onclick="window.closeGlobalConfigModal();" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div id="cfg-modal-top-perfil-container" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 8px; font-size: 11px;">
+            <i class="fa-solid fa-address-card" style="color: var(--accent-purple);"></i>
+            <span style="color: var(--text-muted);">Perfil:</span>
+            <select id="cfg-top-perfil-select" onchange="window.globalConfigMgr.onTopPerfilChange(this.value)" style="background: var(--bg-panel); border: 1px solid var(--accent-purple); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer; font-weight: 600;">
+            </select>
+          </div>
+          <button onclick="window.closeGlobalConfigModal();" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
 
       <!-- Tab Navigation Bar -->
-      <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap;">
         <button class="config-tab-btn active" data-tab="ai" onclick="window.globalConfigMgr.switchTab('ai');" style="padding: 8px 14px; background: rgba(137, 180, 250, 0.15); border: 1px solid var(--accent-blue); border-bottom: none; border-radius: 6px 6px 0 0; color: var(--accent-blue); font-size: 12px; font-weight: 600; cursor: pointer;">
           <i class="fa-solid fa-robot"></i> Modelos IA
         </button>
+          <button class="config-tab-btn" data-tab="perfiles" onclick="window.globalConfigMgr.switchTab('perfiles')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
+            <i class="fa-solid fa-address-card"></i> Perfiles
+          </button>
           <button class="config-tab-btn" data-tab="apariencia" onclick="window.globalConfigMgr.switchTab('apariencia')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
-            <i class="fa-solid fa-palette"></i> Apariencia
+            <i class="fa-solid fa-palette"></i> Colores y Fondos
           </button>
           <button class="config-tab-btn" data-tab="accesibilidad" onclick="window.globalConfigMgr.switchTab('accesibilidad')" style="background:none; border:none; color:var(--text-muted); padding:8px 14px; cursor:pointer; font-size:12px; border-bottom:2px solid transparent;">
             <i class="fa-solid fa-universal-access"></i> Accesibilidad
@@ -2096,52 +2255,13 @@
       <!-- Tab Content Area -->
       <div style="flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-dark); font-size: 12px;">
         
+        <!-- Tab Perfiles: Gestor Completo de Perfiles de Configuración -->
+        <div id="config-tab-perfiles" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
+        </div>
+
         <!-- Tab 1: Modelos IA & Gestor de Cuantizaciones -->
-        <!-- Apariencia: transparencia de la interfaz -->
-        <div id="config-tab-apariencia" class="config-tab-content" style="display: none; flex-direction: column; gap: 16px;">
-          <div>
-            <label style="font-weight: bold; color: var(--accent-purple); margin-bottom: 6px; display: block;">Opacidad de la interfaz</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <input type="range" id="ap-opacidad" min="0.35" max="1" step="0.01" value="0.92"
-                style="flex: 1; accent-color: var(--accent-purple);">
-              <span id="ap-opacidad-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-purple); min-width: 44px; text-align: right;">92%</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Cuanto más baja, más se ve lo que hay detrás de Prig. Con <b>Ctrl+Alt+↑</b> y <b>Ctrl+Alt+↓</b> se ajusta sin abrir esta ventana.
-            </div>
-          </div>
-
-          <div>
-            <label style="font-weight: bold; color: var(--accent-blue); margin-bottom: 6px; display: block;">Desenfoque del fondo</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <input type="range" id="ap-desenfoque" min="0" max="30" step="1" value="10"
-                style="flex: 1; accent-color: var(--accent-blue);">
-              <span id="ap-desenfoque-valor" style="font-family: 'Fira Code', monospace; font-size: 12px; color: var(--accent-blue); min-width: 44px; text-align: right;">10px</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-              Suaviza lo que se transparenta para que el texto siga leyéndose.
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-              <label style="font-weight: bold; color: var(--accent-green); margin-bottom: 6px; display: block;">Color de acento</label>
-              <input type="color" id="ap-acento" value="#89b4fa"
-                style="width: 100%; height: 34px; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;">
-            </div>
-            <div>
-              <label style="font-weight: bold; color: var(--accent-yellow); margin-bottom: 6px; display: block;">Densidad</label>
-              <select id="ap-densidad" style="width: 100%; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
-                <option value="compacta">Compacta</option>
-                <option value="normal" selected>Normal</option>
-                <option value="amplia">Amplia</option>
-              </select>
-            </div>
-          </div>
-
-          <button id="ap-restablecer" class="tool-btn" style="align-self: flex-start; background: rgba(243,139,168,0.12); color: var(--accent-red); border: 1px solid rgba(243,139,168,0.35); font-size: 11px;">
-            <i class="fa-solid fa-rotate-left"></i> Restablecer apariencia
-          </button>
+        <!-- Apariencia: personalización de colores, fondos por sección y efectos -->
+        <div id="config-tab-apariencia" class="config-tab-content" style="display: none; flex-direction: column; gap: 14px;">
         </div>
 
         <!-- Accesibilidad: Opciones visuales y Atajos de teclado reasignables con control estricto de colisiones -->
@@ -2669,6 +2789,64 @@
               <option value="hc-black">High Contrast Black</option>
             </select>
           </div>
+
+          <!-- Configuración del Menú Deslizante de Rueda del Ratón -->
+          <div style="margin-top: 10px; padding: 14px; background: rgba(137, 180, 250, 0.05); border: 1px solid rgba(137, 180, 250, 0.25); border-radius: 8px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-weight: bold; color: #89b4fa; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-computer-mouse"></i> Menú Deslizante de Archivos (Rueda del Mouse)
+              </div>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #cdd6f4;">
+                <input type="checkbox" id="cfg-menu-rueda-habilitado" checked style="accent-color: var(--accent-blue); cursor: pointer;">
+                Habilitado
+              </label>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="font-size: 11px; color: #a6adc8; margin-bottom: 4px; display: block;">Disparador de Apertura:</label>
+                <select id="cfg-menu-rueda-disparador" style="width: 100%; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+                  <option value="rueda_click">Clic Rueda / Botón Central</option>
+                  <option value="alt_click">Alt + Clic Izquierdo</option>
+                  <option value="shift_click">Shift + Clic Izquierdo</option>
+                  <option value="doble_rueda">Doble Clic en Rueda</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size: 11px; color: #a6adc8; margin-bottom: 4px; display: block;">Estilo Visual:</label>
+                <select id="cfg-menu-rueda-estilo" style="width: 100%; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+                  <option value="deslizante_neon">Neón Ciberpunk (Recomendado)</option>
+                  <option value="cristal_oscuro">Cristal Oscuro Glassmorphism</option>
+                  <option value="minimalista">Minimalista Oscuro</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="font-size: 11px; color: #a6adc8; margin-bottom: 4px; display: block;">Límite de Resultados Visibles:</label>
+                <select id="cfg-menu-rueda-max-items" style="width: 100%; padding: 6px 8px; background: var(--bg-panel); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-size: 12px;">
+                  <option value="8">8 archivos</option>
+                  <option value="12" selected>12 archivos (Óptimo)</option>
+                  <option value="16">16 archivos</option>
+                  <option value="24">24 archivos</option>
+                  <option value="0">Todos (Sin límite)</option>
+                </select>
+              </div>
+
+              <div style="display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-top: 14px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #cdd6f4;">
+                  <input type="checkbox" id="cfg-menu-rueda-busqueda" checked style="accent-color: var(--accent-blue);">
+                  Buscador rápido en tiempo real
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #cdd6f4;">
+                  <input type="checkbox" id="cfg-menu-rueda-recientes" checked style="accent-color: var(--accent-blue);">
+                  Mostrar archivos recientes
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Tab 4: Permisos -->
@@ -2857,28 +3035,38 @@
   <!-- Scripts -->
 
   <script src="/static/js/prig_net.js?v=7"></script>
-  <script src="/static/js/apariencia.js?v=7"></script>
+  <script src="/static/js/biblioteca_ascii.js?v=2"></script>
+  <script src="/static/js/agentes_ascii.js?v=1"></script>
+  <script src="/static/js/cerebro_memoria.js?v=1"></script>
+  <script src="/static/js/motor_grafico_fachada.js?v=1"></script>
+  <script src="/static/js/motor_movimiento.js?v=6"></script>
+  <script src="/static/js/apariencia.js?v=21"></script>
+  <script src="/static/js/sintaxis_personalizada.js?v=9"></script>
   <script src="/static/js/shortcuts.js?v=10"></script>
-  <script src="/static/js/commands.js?v=25"></script>
+  <script src="/static/js/commands.js?v=26"></script>
   <script src="/static/js/menubar.js?v=10"></script>
   <script src="/static/js/layout.js?v=8"></script>
   <script src="/static/js/workarea.js?v=17"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
-  <script src="/static/js/editor.js?v=15"></script>
+  <script src="/static/js/editor.js?v=16"></script>
+  <script src="/static/js/editor_razonamiento.js?v=1"></script>
   <script src="/static/js/notebook.js?v=7"></script>
   <script src="/static/js/filetree.js?v=9"></script>
+  <script src="/static/js/menu_rueda_archivos.js?v=1"></script>
   <script src="/static/js/terminal.js?v=7"></script>
-  <script src="/static/js/ai_chat.js?v=16"></script>
+  <script src="/static/js/ai_chat.js?v=18"></script>
   <script src="/static/js/banco_proyecto.js?v=2"></script>
   <script src="/static/js/kaggle_lector.js?v=10"></script>
-  <script src="/static/js/github_lector.js?v=6"></script>
+  <script src="/static/js/github_lector.js?v=7"></script>
   <script src="/static/js/github_widget.js?v=1"></script>
-  <script src="/static/js/youtube_hub.js?v=17"></script>
+  <script src="/static/js/youtube_hub.js?v=18"></script>
   <script src="/static/js/prig_hub.js?v=5"></script>
+  <script src="/static/js/motor_aprendizaje_grafo.js?v=1"></script>
   <script src="/static/js/inicio.js?v=7"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
-  <script src="/static/js/book_library.js?v=8"></script>
+  <script src="/static/js/book_library.js?v=9"></script>
+  <script src="/static/js/referencias_ml.js?v=1"></script>
   <script src="/static/js/base_conocimiento.js?v=3"></script>
   <script src="/static/js/explorador.js?v=3"></script>
   <script src="/static/js/flujos.js?v=7"></script>
@@ -2892,11 +3080,12 @@
   <script src="/static/js/progreso.js?v=2"></script>
   <script src="/static/js/perfil.js?v=10"></script>
   <script src="/static/js/note_window.js?v=6"></script>
-  <script src="/static/js/global_config.js?v=13"></script>
+  <script src="/static/js/perfiles_config.js?v=4"></script>
+  <script src="/static/js/global_config.js?v=23"></script>
   <script src="/static/js/pdf_exporter.js?v=6"></script>
-  <script src="/static/js/desafios.js?v=9"></script>
+  <script src="/static/js/desafios.js?v=11"></script>
   <script src="/static/js/ide.js?v=4"></script>
-  <script src="/static/js/app.js?v=8"></script>
+  <script src="/static/js/app.js?v=11"></script>
 
 </body>
 

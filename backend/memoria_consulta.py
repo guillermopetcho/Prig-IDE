@@ -19,6 +19,9 @@ Qué gana el modelo:
     esencial. Un bucle de `P.llm` es un map-reduce sobre el proyecto entero.
   · Memoria entre sesiones: `P.guardar(nombre, valor)` y `P.recuperar(nombre)`.
 
+Las consultas de datos de `P` (líneas, símbolos, grafo, caminos, hechos para la pregunta…) las responde el motor
+del banco (Rust, banco_motor.py); aquí quedan la consola aislada que ejecuta el código del modelo y la sesión.
+
 Seguridad (el código lo escribe un modelo): corre en un proceso aparte, con la base de datos en
 solo lectura, sin `open`, sin red y sin importar nada fuera de una lista corta; el código se
 revisa antes de ejecutarlo (sin atributos que empiecen por «_», sin eval/exec), con tope de
@@ -36,10 +39,14 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+from banco_motor import rust as _rust
+
 MAX_SALIDA = 6000
 TIEMPO_POR_EJECUCION = 30
 MEMORIA_MB = 2048
 MAX_LLM_POR_EJECUCION = 12
+MAX_LLM_POR_RESPUESTA = 24          # medido: sin tope por respuesta, una pregunta tardó 30 min en subllamadas
+TIEMPO_TOTAL_POR_EJECUCION = 180    # s, incluido lo que tarden las subllamadas a P.llm
 MODULOS_PERMITIDOS = {"re", "math", "json", "collections", "itertools", "functools", "statistics", "difflib",
                       "ast", "textwrap", "heapq", "bisect", "operator", "string", "fnmatch", "datetime"}
 NOMBRES_PROHIBIDOS = {"eval", "exec", "compile", "open", "__import__", "globals", "locals", "vars", "getattr",
@@ -61,6 +68,10 @@ AYUDA = """P — el proyecto entero, consultable con Python (las variables persi
   P.buscar(consulta, k=10)                      → fragmentos por significado y palabras [{ruta, ini, fin, simbolo, texto}]
   P.simbolos(nombre=None, ruta=None, tipo=None) → [{ruta, nombre, tipo, firma, doc, ini, fin}]
   P.codigo(nombre)                              → código completo del símbolo (con líneas)
+  P.cargar(ruta, sustituir={})                  → las funciones del archivo .py para EJECUTARLAS con un caso:
+        m = P.cargar("x.py"); m.f(...). Para «¿tiene algún error?», pruébala así con un caso borde en vez
+        de reescribirla. Lo que importa de otros módulos del proyecto queda en m.omitidos: pásalo en
+        sustituir={"nombre": lambda ...: ...}
   P.hechos(s=None, r=None, o=None, limite=500)  → [{s, r, o, ruta, linea}] grafo del proyecto; relaciones:
         define, llama, importa, hereda, lanza, captura, lee_config, lee_entorno, expone ("GET /api/x/*"),
         llama_api ("/api/x/*", fetch del frontend), usa_dom, define_dom, atributo, ejecuta  (% es comodín)
@@ -68,8 +79,14 @@ AYUDA = """P — el proyecto entero, consultable con Python (las variables persi
   P.ficha(nombre)                               → TODO sobre un símbolo: ubicación, firma, doc, llamadores, llamadas, hechos, notas
   P.recorrido(inicio, profundidad=4)            → árbol de llamadas hacia abajo desde una función o un endpoint ("/api/x")
   P.impacto(nombre)                             → qué se rompe si cambia: llamadores transitivos, endpoints y frontend
+  P.donde(x)                                    → dónde está y dónde se toca x (clave de config, endpoint, variable de entorno,
+                                                  id del DOM, archivo de datos o símbolo): hechos, implementación, consumidores
+                                                  y apariciones literales en el código
   P.llamadores(nombre) / P.llamados(simbolo)    → quién lo llama / a qué llama (aristas resueltas al símbolo exacto;
-                                                  nombre completo «Clase.metodo» o «ruta:nombre» si hay varios)
+                                                  nombre completo «Clase.metodo» o «ruta:nombre» si hay varios).
+                                                  P.llamadores agrega, con confianza «texto: …», llamadas que el grafo
+                                                  no resuelve (instancia global, fábrica, función pasada como valor):
+                                                  revisa su «codigo» antes de contarlas o descartarlas
   P.camino(desde, hasta)                        → cadena de llamadas más corta entre dos símbolos, o None
   P.api(ruta_http)                              → quién expone el endpoint y quién lo consume
   P.ast(ruta)                                   → árbol ast de un archivo Python
@@ -114,8 +131,60 @@ def revisar(codigo: str) -> ast.Module:
     return arbol
 
 
+def _importar_seguro(nombre, globales=None, locales=None, lista=(), nivel=0):
+    if nombre.split(".")[0] not in MODULOS_PERMITIDOS or nivel:
+        raise ImportError(f"No se puede importar «{nombre}» en la consola (para lo del proyecto: P.cargar(..., sustituir=))")
+    return __import__(nombre, globales, locales, lista, nivel)
+
+
+def _builtins_seguros() -> Dict[str, Any]:
+    """ Los builtins de la consola: los del código del modelo y los del código que carga P.cargar """
+    import builtins
+    seguros = {n: getattr(builtins, n) for n in BUILTINS_PERMITIDOS if hasattr(builtins, n)}
+    seguros["__import__"] = _importar_seguro
+    return seguros
+
+
+class _SinAnotaciones(ast.NodeTransformer):
+    """ Sin las anotaciones de tipo: se evalúan al definir (List[str]…) y `typing` no se importa en la consola """
+
+    def visit_arg(self, nodo):
+        nodo.annotation = None
+        return nodo
+
+    def visit_FunctionDef(self, nodo):
+        nodo.returns = None
+        self.generic_visit(nodo)
+        return nodo
+
+    def visit_AnnAssign(self, nodo):
+        if nodo.value is None:
+            return None
+        return ast.copy_location(ast.Assign(targets=[nodo.target], value=nodo.value), nodo)
+
+
+class Cargado:
+    """ Lo que devuelve P.cargar: las funciones, clases y constantes del archivo como atributos """
+
+    def __init__(self, ruta: str, espacio: Dict[str, Any], cargados: List[str], omitidos: Dict[str, str]):
+        for nombre in cargados:
+            if not nombre.startswith("_"):
+                setattr(self, nombre, espacio[nombre])
+        self.ruta, self.cargados, self.omitidos = ruta, cargados, omitidos
+
+    def __repr__(self):
+        omitidos = "; ".join(f"{k}: {v}" for k, v in list(self.omitidos.items())[:12])
+        return (f"<{self.ruta}: cargados {', '.join(self.cargados)}"
+                + (f" · omitidos (lo que usan no está en la consola) → {omitidos}" if omitidos else "") + ">")
+
+
 # ======================================================================
 # El proceso aislado (worker)
+# ======================================================================
+
+
+# ======================================================================
+# La API que ve el modelo
 # ======================================================================
 
 def _worker(ruta_db: str, raiz: str):
@@ -132,33 +201,45 @@ def _worker(ruta_db: str, raiz: str):
     entrada = sys.stdin
     salida_real = sys.stdout
 
+    numero = [0]
+
     def pedir(tipo: str, datos: Dict[str, Any]) -> Any:
-        """ Lo que el proceso aislado no puede hacer solo: escribir, llamar a un modelo """
-        salida_real.write(json.dumps({"peticion": tipo, "datos": datos}, ensure_ascii=False, default=str) + "\n")
-        salida_real.flush()
-        respuesta = json.loads(entrada.readline())
+        """ Lo que el proceso aislado no puede hacer solo: escribir, llamar a un modelo. La alarma de
+        30 s se pausa mientras tanto (mide el cómputo propio, no la espera a Prig) y cada petición
+        lleva un número: una respuesta vieja se descarta en vez de tomarse por la de otra petición. """
+        numero[0] += 1
+        restante = signal.alarm(0)
+        try:
+            salida_real.write(json.dumps({"peticion": tipo, "id": numero[0], "datos": datos}, ensure_ascii=False, default=str) + "\n")
+            salida_real.flush()
+            while True:
+                linea = entrada.readline()
+                if not linea:
+                    raise RuntimeError("Prig cerró la consola")
+                respuesta = json.loads(linea)
+                if respuesta.get("id") == numero[0]:
+                    break
+        finally:
+            if restante:
+                signal.alarm(restante)
         if respuesta.get("error"):
             raise RuntimeError(respuesta["error"])
         return respuesta.get("valor")
 
     P = API(conexion, raiz, pedir)
+    P._en_caja = True
 
     try:
         resource.setrlimit(resource.RLIMIT_AS, (MEMORIA_MB * 1024 * 1024, MEMORIA_MB * 1024 * 1024))
     except (ValueError, OSError):
         pass
 
-    def importar(nombre, globales=None, locales=None, lista=(), nivel=0):
-        if nombre.split(".")[0] not in MODULOS_PERMITIDOS or nivel:
-            raise ImportError(f"No se puede importar «{nombre}»")
-        return __import__(nombre, globales, locales, lista, nivel)
+    espacio: Dict[str, Any] = {"__builtins__": _builtins_seguros(), "P": P, "ayuda": lambda: print(AYUDA)}
 
-    seguros = {n: getattr(builtins, n) for n in BUILTINS_PERMITIDOS if hasattr(builtins, n)}
-    seguros["__import__"] = importar
-    espacio: Dict[str, Any] = {"__builtins__": seguros, "P": P, "ayuda": lambda: print(AYUDA)}
+    alarma = int(os.environ.get("PRIG_CONSOLA_ALARMA") or TIEMPO_POR_EJECUCION)
 
     def tiempo_agotado(*_):
-        raise TimeoutError(f"La ejecución pasó de {TIEMPO_POR_EJECUCION} s: divide el trabajo o usa P.sql.")
+        raise TimeoutError(f"La ejecución pasó de {alarma} s: divide el trabajo o usa P.sql.")
     signal.signal(signal.SIGALRM, tiempo_agotado)
 
     for linea in entrada:
@@ -178,7 +259,7 @@ def _worker(ruta_db: str, raiz: str):
             ultimo = None
             if arbol.body and isinstance(arbol.body[-1], ast.Expr):
                 ultimo = ast.Expression(arbol.body.pop().value)
-            signal.alarm(TIEMPO_POR_EJECUCION)
+            signal.alarm(alarma)
             with contextlib.redirect_stdout(buffer):
                 exec(compile(arbol, "<consola>", "exec"), espacio)
                 if ultimo is not None:
@@ -215,9 +296,6 @@ def _mostrar(valor: Any) -> str:
         return repr(valor)
 
 
-# ======================================================================
-# La API que ve el modelo
-# ======================================================================
 
 class API:
     """ Lo que el modelo puede hacer con el proyecto. Solo lectura sobre la base; lo demás, pidiéndolo. """
@@ -228,6 +306,10 @@ class API:
         self._pedir = pedir
         self._contenido: Dict[str, List[str]] = {}
         self.llamadas_llm = 0
+        self._en_caja = False           # True solo en el proceso aislado: P.cargar ejecuta código
+        # Las consultas de datos las responde el motor del banco (Rust, banco_motor.py); lo que ejecuta código, aquí
+        import banco_motor
+        self._rs = banco_motor.consulta(conexion, raiz)
 
     def reiniciar_contadores(self):
         self.llamadas_llm = 0
@@ -237,20 +319,13 @@ class API:
         return [dict(f) for f in self._c.execute(sql, args)]
 
     def _ruta(self, ruta: str) -> str:
-        ruta = (ruta or "").strip().lstrip("./")
-        if self._c.execute("SELECT 1 FROM archivos WHERE ruta = ?", (ruta,)).fetchone():
-            return ruta
-        cands = [f["ruta"] for f in self._c.execute("SELECT ruta FROM archivos WHERE ruta LIKE ?", (f"%{ruta}",))]
-        if len(cands) == 1:
-            return cands[0]
-        raise KeyError(f"No está en el banco: {ruta}" + (f" (¿{', '.join(cands[:6])}?)" if cands else ""))
+        return self._rs.ruta(ruta or "")
 
     def lineas(self, ruta: str) -> List[str]:
-        import zlib
+        # Una caché de listas: P.grep recorre todo el proyecto
         ruta = self._ruta(ruta)
         if ruta not in self._contenido:
-            f = self._c.execute("SELECT contenido FROM archivos WHERE ruta = ?", (ruta,)).fetchone()
-            self._contenido[ruta] = zlib.decompress(f["contenido"]).decode("utf-8", "replace").splitlines()
+            self._contenido[ruta] = self._rs.lineas(ruta)
             if len(self._contenido) > 400:
                 self._contenido.pop(next(iter(self._contenido)))
         return list(self._contenido[ruta])
@@ -267,10 +342,8 @@ class API:
         return filas
 
     def leer(self, ruta: str, desde: int = 1, hasta: Optional[int] = None) -> str:
-        lineas = self.lineas(ruta)
         desde = max(1, int(desde or 1))
-        hasta = min(len(lineas), int(hasta or desde + 199))
-        return "\n".join(f"{n:>5}  {lineas[n - 1]}" for n in range(desde, hasta + 1))
+        return self._rs.leer(ruta or "", desde, int(hasta) if hasta else None)
 
     def grep(self, regex: str, rutas: Optional[List[str]] = None, maximo: int = 200) -> List[Dict[str, Any]]:
         patron = re.compile(regex)
@@ -289,36 +362,60 @@ class API:
     # ------------------------------------------------------------------ símbolos y grafo
     def simbolos(self, nombre: Optional[str] = None, ruta: Optional[str] = None,
                  tipo: Optional[str] = None) -> List[Dict[str, Any]]:
-        sql, args = "SELECT ruta, nombre, tipo, firma, doc, ini, fin FROM simbolos WHERE 1=1", []
-        if nombre:
-            sql += " AND (nombre LIKE ? OR corto LIKE ?)"
-            args += [nombre, nombre]
-        if ruta:
-            sql += " AND ruta = ?"
-            args.append(self._ruta(ruta))
-        if tipo:
-            sql += " AND tipo = ?"
-            args.append(tipo)
-        return self._filas(sql + " ORDER BY ruta, ini LIMIT 2000", args)
+        return self._rs.simbolos(str(nombre) if nombre else None, str(ruta) if ruta else None, str(tipo) if tipo else None)
 
     def codigo(self, nombre: str) -> str:
-        filas = self._filas("SELECT ruta, nombre, ini, fin FROM simbolos WHERE nombre = ? OR corto = ? "
-                            "ORDER BY (nombre = ?) DESC LIMIT 5", (nombre, nombre.split(".")[-1], nombre))
-        if not filas:
-            raise KeyError(f"No hay ningún símbolo llamado «{nombre}»")
-        partes = []
-        for s in filas:
-            partes.append(f"# {s['ruta']}:{s['ini']}-{s['fin']} {s['nombre']}\n" + self.leer(s["ruta"], s["ini"], s["fin"]))
-        return "\n\n".join(partes)
+        return self._rs.codigo(str(nombre))
+
+    def cargar(self, ruta: str, sustituir: Optional[Dict[str, Any]] = None) -> "Cargado":
+        """ Las funciones, clases y constantes de un archivo Python del proyecto, para EJECUTARLAS con un caso
+        dentro de la consola (m = P.cargar("x.py"); m.f(...)). Revisando una función, el modelo solo podía
+        reescribirla a mano, y al reescribirla elegía mal el caso o corregía el error sin verlo (E8, B2: 2 de 6).
+        Cada definición pasa la MISMA revisión que el código del modelo (revisar: sin «_» en atributos, sin
+        open/exec/getattr…, solo los módulos permitidos) y corre con los mismos builtins, en el mismo proceso
+        aislado: no amplía lo que la consola puede hacer. Lo que no pasa queda en `.omitidos`, con el motivo.
+        `sustituir`: nombres que el archivo trae de otros módulos del proyecto, reemplazados por algo simple
+        ({"_tokens_de": lambda lineas, a, b: …}). """
+        if not self._en_caja:
+            raise RuntimeError("P.cargar solo funciona dentro de la consola")
+        ruta = self._ruta(ruta)
+        if not ruta.endswith(".py"):
+            raise ValueError("P.cargar carga archivos Python")
+        arbol = _SinAnotaciones().visit(ast.parse("\n".join(self.lineas(ruta))))
+        espacio: Dict[str, Any] = {"__builtins__": _builtins_seguros(), "__name__": "cargado"}
+        cargados: List[str] = []
+        omitidos: Dict[str, str] = {}
+        for nodo in arbol.body:
+            if isinstance(nodo, ast.Expr) and isinstance(nodo.value, ast.Constant):
+                continue                                                  # docstring
+            if isinstance(nodo, ast.FunctionDef) or isinstance(nodo, ast.ClassDef):
+                nombres = [nodo.name]
+            elif isinstance(nodo, ast.Assign):
+                nombres = [n.id for o in nodo.targets for n in ast.walk(o) if isinstance(n, ast.Name)]
+            elif isinstance(nodo, (ast.Import, ast.ImportFrom)):
+                nombres = [(a.asname or a.name).split(".")[0] for a in nodo.names]
+            else:
+                continue                                                  # if __name__…, llamadas sueltas
+            try:
+                modulo = ast.fix_missing_locations(ast.Module(body=[nodo], type_ignores=[]))
+                revisar(ast.unparse(modulo))
+                exec(compile(modulo, f"<{ruta}>", "exec"), espacio)
+                cargados += [n for n in nombres if not isinstance(nodo, (ast.Import, ast.ImportFrom))]
+            except CodigoNoPermitido as e:
+                if not isinstance(nodo, (ast.Import, ast.ImportFrom)):
+                    omitidos.update({n: str(e) for n in nombres})
+            except Exception as e:                                    # noqa: BLE001 — una definición que no carga
+                omitidos.update({n: f"{type(e).__name__}: {e}" for n in nombres})
+        for nombre, valor in (sustituir or {}).items():
+            espacio[nombre] = valor
+            if nombre not in cargados:
+                cargados.append(nombre)
+            omitidos.pop(nombre, None)
+        return Cargado(ruta, espacio, cargados, omitidos)
 
     def hechos(self, s: Optional[str] = None, r: Optional[str] = None, o: Optional[str] = None,
                limite: int = 500) -> List[Dict[str, Any]]:
-        sql, args = "SELECT s, r, o, ruta, linea FROM grafo WHERE 1=1", []
-        for campo, valor in (("s", s), ("r", r), ("o", o)):
-            if valor:
-                sql += f" AND {campo} LIKE ?"
-                args.append(valor)
-        return self._filas(sql + " LIMIT ?", args + [int(limite)])
+        return self._rs.hechos(str(s) if s else None, str(r) if r else None, str(o) if o else None, int(limite))
 
     # ------------------------------------------------------------------ grafo de llamadas resuelto
     # Cada arista va de un símbolo exacto (archivo + nombre completo) a otro: la resolución usa el
@@ -326,53 +423,40 @@ class API:
     def _nodos(self, nombre: str) -> List[tuple]:
         """ Símbolos que casan con un nombre: completo («Motor.asegurar»), corto («asegurar») o
         «ruta:nombre» para desambiguar """
-        if ":" in nombre and not nombre.startswith("/"):
-            ruta, n = nombre.split(":", 1)
-            return [(f["ruta"], f["nombre"]) for f in self._c.execute(
-                "SELECT ruta, nombre FROM simbolos WHERE ruta LIKE ? AND (nombre = ? OR corto = ?)", (f"%{ruta}", n, n))]
-        filas = [(f["ruta"], f["nombre"]) for f in self._c.execute("SELECT ruta, nombre FROM simbolos WHERE nombre = ?", (nombre,))]
-        return filas or [(f["ruta"], f["nombre"]) for f in self._c.execute(
-            "SELECT ruta, nombre FROM simbolos WHERE corto = ?", (nombre.split(".")[-1],))]
+        return self._rs.nodos(nombre)
 
-    def _ubicacion(self, nodo: tuple) -> str:
-        f = self._c.execute("SELECT ini FROM simbolos WHERE ruta = ? AND nombre = ?", nodo).fetchone()
-        return f"{nodo[0]}:{f['ini']}" if f else nodo[0]
-
-    def _salientes(self, nodo: tuple) -> List[tuple]:
-        return [(f["a_ruta"], f["a_nombre"]) for f in self._c.execute(
-            "SELECT DISTINCT a_ruta, a_nombre FROM llamadas WHERE ruta = ? AND desde = ? ORDER BY linea", nodo)]
-
-    def _entrantes(self, nodo: tuple) -> List[Dict[str, Any]]:
-        return [dict(f) for f in self._c.execute(
-            "SELECT ruta, desde, linea, confianza FROM llamadas WHERE a_ruta = ? AND a_nombre = ? ORDER BY ruta, linea", nodo)]
 
     def llamadores(self, nombre: str) -> List[Dict[str, Any]]:
-        return [{"s": f["desde"], "ruta": f["ruta"], "linea": f["linea"], "confianza": f["confianza"], "a": n[1]}
-                for n in self._nodos(nombre) for f in self._entrantes(n)]
+        """ Las aristas resueltas del grafo y, marcadas con confianza «texto: …», las llamadas que el grafo
+        no resuelve pero están en el código: por una instancia global o una fábrica (`servicio.f()`,
+        `gestor().f()`), una función pasada como valor (`_desafio(modulo.f, …)`) o una lambda. Medido en el
+        estudio del banco (docs/estudio-banco.md): esos huecos daban `[]` y el modelo concluía «nadie la
+        llama» con una sola consulta. Lo de texto puede ser una homónima: conviene mirarlo. """
+        return self._rs.llamadores(str(nombre))
+
+    def _simbolo_en(self, ruta: str, linea: int) -> Optional[str]:
+        return self._rs.simbolo_en(ruta, int(linea))
+
 
     def llamados(self, simbolo: str) -> List[Dict[str, Any]]:
-        return [{"o": d[1], "ruta": d[0]} for n in self._nodos(simbolo) for d in self._salientes(n)]
+        return self._rs.llamados(str(simbolo))
 
     def camino(self, desde: str, hasta: str, maximo: int = 10) -> Optional[List[str]]:
         """ Cadena de llamadas más corta entre dos símbolos (búsqueda en anchura sobre aristas resueltas) """
-        destinos = set(self._nodos(hasta))
-        previo: Dict[tuple, Optional[tuple]] = {n: None for n in self._nodos(desde)}
-        frontera = list(previo)
-        for _ in range(maximo):
-            nueva = []
-            for nodo in frontera:
-                for sig in self._salientes(nodo):
-                    if sig in previo:
-                        continue
-                    previo[sig] = nodo
-                    if sig in destinos:
-                        cadena = [sig]
-                        while previo[cadena[-1]] is not None:
-                            cadena.append(previo[cadena[-1]])
-                        return [f"{n[1]} ({self._ubicacion(n)})" for n in reversed(cadena)]
-                    nueva.append(sig)
-            frontera = nueva
-        return None
+        return self._rs.camino(str(desde), str(hasta), int(maximo))
+
+    def camino_con_llamadas(self, desde: str, hasta: str, maximo: int = 10) -> Optional[List[Dict[str, Any]]]:
+        """ El camino, con la línea de cada llamada: la evidencia de cada salto. En T7 el modelo negó un camino que le
+        daban los hechos porque, al leer el código, no vio dos de las llamadas (una dentro de un argumento, otra dentro
+        de un diccionario literal; docs/estudio-banco.md) """
+        return self._rs.camino_con_llamadas(str(desde), str(hasta), int(maximo))
+
+    def codigo_del_salto(self, nodo: tuple, linea_llamada: Optional[int], maximo: int = 14) -> str:
+        """ El código de una función intermedia de un camino: entera si es corta; si no, la firma y la línea de la
+        llamada con su vecina. En T7 el paquete del modo general traía las dos puntas de 0b5f pero no la función del
+        medio (la que llama a la siguiente), y el modelo negaba el camino con la evidencia en los hechos """
+        return self._rs.codigo_del_salto(list(nodo), int(linea_llamada) if linea_llamada else None, int(maximo))
+
 
     # ------------------------------------------------------------------ primitivas de alto nivel
     # Cada una evita que el modelo escriba 100-300 tokens de Python: escribir es 20-80 veces más caro
@@ -380,88 +464,36 @@ class API:
     def ficha(self, nombre: str) -> Dict[str, Any]:
         """ Todo lo que se sabe de un símbolo: dónde está, firma, doc, quién lo llama, a qué llama,
         sus hechos, el resumen de su archivo y las notas de memoria de ese archivo """
-        nodos = self._nodos(nombre)
-        if not nodos:
-            raise KeyError(f"No hay ningún símbolo llamado «{nombre}»")
-        nodo = nodos[0]
-        s = dict(self._c.execute("SELECT ruta, nombre, tipo, firma, doc, ini, fin FROM simbolos WHERE ruta = ? AND nombre = ?", nodo).fetchone())
-        archivo = self._c.execute("SELECT COALESCE(resumen_ia, resumen) r FROM archivos WHERE ruta = ?", (s["ruta"],)).fetchone()
-        return {
-            "simbolo": f"{s['nombre']} ({s['tipo']}) {s['ruta']}:{s['ini']}-{s['fin']}",
-            "firma": s["firma"], "doc": (s["doc"] or "")[:400],
-            "otros_con_ese_nombre": [f"{n[0]}:{n[1]}" for n in nodos[1:8]],
-            "llamado_por": [f"{f['desde']} ({f['ruta']}:{f['linea']})" + ("" if f["confianza"] == "exacta" else " ?")
-                            for f in self._entrantes(nodo)][:40],
-            "llama_a": [f"{d[1]} ({d[0]})" for d in self._salientes(nodo)][:40],
-            "hechos": [f"{h['r']} {h['o']}" for h in self._filas(
-                "SELECT r, o FROM hechos WHERE s = ? AND ruta = ? LIMIT 60", (s["nombre"], s["ruta"]))],
-            "archivo": archivo["r"] if archivo else "",
-            "notas": [f"({f['tipo']}) {f['titulo']}: {f['texto'][:200]}" for f in self._filas(
-                "SELECT tipo, titulo, texto FROM conocimiento WHERE rutas LIKE ? LIMIT 8", (f'%"{s["ruta"]}"%',))],
-        }
+        return self._rs.ficha(str(nombre))
 
-    def _inicio(self, inicio: str) -> List[tuple]:
-        """ Un símbolo, o un endpoint («GET /api/x» o «/api/x») resuelto a la función que lo expone """
-        if "/api" in inicio or inicio.startswith("/"):
-            from banco_proyecto import ruta_http_canonica
-            ruta = ruta_http_canonica(inicio.split(" ", 1)[-1])
-            return [(h["ruta"], h["s"]) for h in self._filas("SELECT s, ruta FROM hechos WHERE r = 'expone' AND o LIKE ?", (f"% {ruta}",))]
-        return self._nodos(inicio)[:1]
 
     def recorrido(self, inicio: str, profundidad: int = 4, maximo: int = 60) -> str:
         """ Árbol de llamadas hacia abajo, con ubicaciones (solo lo definido en el proyecto) """
-        lineas: List[str] = []
-        vistos = set()
-
-        def bajar(nodo: tuple, nivel: int):
-            if len(lineas) >= maximo:
-                return
-            repetido = nodo in vistos
-            lineas.append(f"{'  ' * nivel}{nodo[1]}  {self._ubicacion(nodo)}" + ("  (ya visto)" if repetido else ""))
-            if repetido or nivel >= profundidad:
-                return
-            vistos.add(nodo)
-            for sig in self._salientes(nodo):
-                bajar(sig, nivel + 1)
-        inicios = self._inicio(inicio)
-        if not inicios:
-            raise KeyError(f"No encontré «{inicio}» (ni como símbolo ni como endpoint)")
-        for nodo in inicios:
-            bajar(nodo, 0)
-        return "\n".join(lineas) + ("\n[… recortado]" if len(lineas) >= maximo else "")
+        return self._rs.recorrido(str(inicio), int(profundidad), int(maximo))
 
     def impacto(self, nombre: str, profundidad: int = 4) -> Dict[str, Any]:
         """ Qué se ve afectado si cambia `nombre`: quién lo llama (transitivamente, por aristas
         resueltas), qué endpoints exponen esos llamadores y qué partes del frontend los consumen """
-        afectados: Dict[tuple, int] = {}
-        frontera = self._nodos(nombre)[:1]
-        for nivel in range(1, profundidad + 1):
-            nueva = []
-            for nodo in frontera:
-                for f in self._entrantes(nodo):
-                    clave = (f["ruta"], f["desde"])
-                    if clave not in afectados:
-                        afectados[clave] = nivel
-                        nueva.append(clave)
-            frontera = nueva
-        todos = list(afectados) + self._nodos(nombre)[:1]
-        endpoints = sorted({h["o"] for r, s in todos for h in self._filas(
-            "SELECT o FROM hechos WHERE r = 'expone' AND s = ? AND ruta = ?", (s, r))})
-        consumidores = sorted({f"{h['s']} ({h['ruta']})" for e in endpoints for h in self._filas(
-            "SELECT s, ruta FROM hechos WHERE r = 'llama_api' AND o = ?", (e.split(" ", 1)[1],))})
-        es_test = lambda r: "/tests/" in r or os.path.basename(r).startswith("test_")
-        orden = sorted(afectados, key=lambda k: (afectados[k], k))
-        return {"llamadores": [f"{n[1]} ({n[0]}) nivel {afectados[n]}" for n in orden if not es_test(n[0])][:80],
-                "tests": sorted({n[1] for n in afectados if es_test(n[0])})[:40],
-                "total": len(afectados), "endpoints": endpoints, "frontend": consumidores}
+        return self._rs.impacto(str(nombre), int(profundidad))
+
+    def alcance_por_texto(self, nombre: str, profundidad: int = 3, maximo: int = 15) -> List[Dict[str, Any]]:
+        """ Endpoints a los que se llega subiendo por los llamadores del grafo Y por los de texto (instancia global,
+        fábrica, función pasada como valor, lambda), hasta `profundidad` llamadas. El grafo solo no veía, por ejemplo,
+        `GET /api/progreso/resumen` para `progreso.historial`: `resumen` la llama y a `resumen` se la pasa como valor
+        a `_desafio` (T7, f46b). `maximo` acota las búsquedas por texto (cada una recorre los archivos) """
+        return self._rs.alcance_por_texto(str(nombre), int(profundidad), int(maximo))
+
+    def donde(self, x: str, maximo: int = 40) -> Dict[str, Any]:
+        """ Dónde está y dónde se toca `x`, sea una clave de configuración, un endpoint, una variable de
+        entorno, un id del DOM, un archivo de datos o un símbolo: los hechos del grafo agrupados por
+        relación, la función que implementa el endpoint y quién lo consume, y dónde aparece como texto
+        literal en el código (defaults, formularios, rutas de archivos). """
+        return self._rs.donde(str(x or ""), int(maximo))
 
     def api(self, ruta_http: str) -> Dict[str, Any]:
-        """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*) """
-        from banco_proyecto import ruta_http_canonica
-        ruta_http = ruta_http_canonica(ruta_http)
-        expone = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'expone' AND o LIKE ?", (f"% {ruta_http}",))
-        consume = self._filas("SELECT s, o, ruta, linea FROM grafo WHERE r = 'llama_api' AND o = ?", (ruta_http,))
-        return {"expone": expone, "consume": consume}
+        """ Rutas canónicas: los parámetros son * (/api/x/{id} y `/api/x/${id}` → /api/x/*).
+        Acepta el método delante («GET /api/x»): filtra lo expuesto por ese método """
+        return self._rs.api(str(ruta_http))
 
     def ast(self, ruta: str):
         import ast as modulo_ast
@@ -469,34 +501,23 @@ class API:
 
     # ------------------------------------------------------------------ historia y memoria
     def cambios(self, desde_version: Optional[int] = None) -> List[Dict[str, Any]]:
-        if desde_version is None:
-            v = self._c.execute("SELECT valor FROM meta WHERE clave = 'version'").fetchone()
-            desde_version = max(0, int(v["valor"]) - 20) if v else 0
-        filas = self._filas("SELECT version, ruta, tipo, cuando, simbolos, mas, menos FROM cambios "
-                            "WHERE version > ? ORDER BY id DESC LIMIT 300", (desde_version,))
-        for f in filas:
-            f["simbolos"] = json.loads(f["simbolos"] or "{}")
-        return filas
+        return self._rs.cambios(int(desde_version) if desde_version is not None else None)
 
     def diff(self, ruta: str) -> str:
-        ruta = self._ruta(ruta)
-        filas = self._filas("SELECT cuando, diff FROM cambios WHERE ruta = ? AND diff != '' ORDER BY id DESC LIMIT 3", (ruta,))
-        return "\n\n".join(f"# {f['cuando']}\n{f['diff']}" for f in filas) or "Sin diffs registrados."
+        return self._rs.diff(str(ruta))
 
     def memoria(self, consulta: str = "") -> List[Dict[str, Any]]:
         if not consulta:
-            return self._filas("SELECT id, tipo, titulo, texto, rutas, origen, revisar FROM conocimiento ORDER BY actualizado DESC LIMIT 200")
+            return self._rs.memoria_toda()
         return self._pedir("memoria", {"consulta": consulta})
 
     def resoluciones(self, consulta: str = "") -> List[Dict[str, Any]]:
         if not consulta:
-            return self._filas("SELECT id, pregunta, resumen, rutas, cuando FROM resoluciones ORDER BY id DESC LIMIT 50")
+            return self._rs.resoluciones_todas()
         return self._pedir("resoluciones", {"consulta": consulta})
 
     def resumenes(self, nivel: Optional[str] = None) -> List[Dict[str, Any]]:
-        if nivel:
-            return self._filas("SELECT nivel, clave, texto FROM resumenes WHERE nivel = ? ORDER BY clave", (nivel,))
-        return self._filas("SELECT nivel, clave, texto FROM resumenes ORDER BY nivel, clave")
+        return self._rs.resumenes(str(nivel) if nivel else None)
 
     def sql(self, consulta: str, limite: int = 2000) -> List[Dict[str, Any]]:
         if not re.match(r"^\s*(select|with)\b", consulta, re.I):
@@ -545,15 +566,174 @@ class API:
 # Lado de Prig: la sesión
 # ======================================================================
 
+
+def _nombres_importados(lineas: List[str]) -> set:
+    """ Los nombres que un archivo trae con import, en cualquier línea (Prig importa también a mitad de archivo y
+    dentro de funciones), con los alias y los «from x import (a, b)» de varias líneas """
+    return _rust().nombres_importados(list(lineas))
+
+
+# ======================================================================
+# Hechos para una pregunta (modo unidad)
+# ======================================================================
+# En el estudio del banco (docs/estudio-banco.md) el modo unidad acertó 86 % frente a 97 % del modo general en
+# las mismas clases de pregunta: el general recibe en el prompt lo que el banco sabe de lo preguntado; el de
+# unidad tenía que saber qué consultar, y fallaba ahí (P.llamadores sobre una clave de configuración, una sola
+# consulta que el grafo no cubre, rutas inventadas). Esto le da lo mismo de entrada, sin tocar el prefijo
+# guardado: va con la pregunta.
+
+
+def terminos_de(pregunta: str, maximo: int = 4) -> List[str]:
+    """ Lo que la pregunta nombra del código: rutas HTTP, lo que va entre `comillas` e identificadores con
+    forma de código (snake_case, Clase.metodo, CONSTANTE). Las rutas de archivo no: ya están en la pregunta """
+    return _rust().terminos_de(pregunta or "", maximo)
+
+
+def _como_probarla(api: "API", nombre: str, rutas: Optional[List[str]] = None) -> str:
+    """ Para «¿tiene algún error?» sobre una función de Python: cómo ejecutarla con un caso en la consola y qué
+    dependencias del proyecto hay que sustituir. En E8 el modelo reescribía la función a mano (y elegía mal el caso o
+    corregía el error sin verlo) y, aun con P.cargar disponible, no la ejecutó (B2) """
+    filas = [f for f in api._filas("SELECT ruta, nombre FROM simbolos WHERE (nombre = ? OR corto = ?) AND ruta LIKE '%.py'",
+                                    (nombre, nombre.split(".")[-1]))
+             if not rutas or any(f["ruta"] == r or f["ruta"].endswith("/" + r) for r in rutas)]
+    if not filas:
+        return ""
+    ruta, completo = filas[0]["ruta"], filas[0]["nombre"]
+    arbol = ast.parse("\n".join(api.lineas(ruta)))
+    externos, con_import = set(), set()
+    for nodo in arbol.body:
+        if isinstance(nodo, (ast.Import, ast.ImportFrom)):
+            modulo = nodo.module if isinstance(nodo, ast.ImportFrom) else None
+            for a in nodo.names:
+                raiz = (modulo or a.name).split(".")[0]
+                if raiz not in MODULOS_PERMITIDOS:
+                    externos.add((a.asname or a.name).split(".")[0])
+        elif isinstance(nodo, ast.FunctionDef) and any(
+                isinstance(x, (ast.Import, ast.ImportFrom)) and ((x.module if isinstance(x, ast.ImportFrom) else x.names[0].name)
+                                                                 or "").split(".")[0] not in MODULOS_PERMITIDOS
+                for x in ast.walk(nodo)):
+            con_import.add(nodo.name)
+    objetivo = None
+    partes = completo.split(".")
+    for nodo in arbol.body:
+        if isinstance(nodo, ast.FunctionDef) and nodo.name == partes[-1] and len(partes) == 1:
+            objetivo = nodo
+        elif isinstance(nodo, ast.ClassDef) and len(partes) == 2 and nodo.name == partes[0]:
+            objetivo = next((m for m in nodo.body if isinstance(m, ast.FunctionDef) and m.name == partes[1]), None)
+    if objetivo is None:
+        return ""
+    usados = {n.id for n in ast.walk(objetivo) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    tipos = {"List", "Dict", "Optional", "Tuple", "Set", "Any", "Callable", "Iterable", "Sequence", "Union"}
+    sustituir = sorted((usados & con_import) - tipos)
+    # Solo funciones de primer nivel que no usan módulos de afuera (os, sqlite3, subprocess…) y cuyos ayudantes del
+    # proyecto se reemplazan fácil: un método hay que construirlo, y uno con E/S no se prueba así (y el modelo ya
+    # encontraba esos errores leyendo; la pista lo distraería)
+    if len(partes) != 1 or (usados & externos) - tipos or len(sustituir) > 2:
+        return ""
+    try:
+        revisar(ast.unparse(_SinAnotaciones().visit(objetivo)))      # P.cargar la omitiría (open, getattr, «_»…)
+    except CodigoNoPermitido:
+        return ""
+    llamada = f"m.{partes[0]}(...).{partes[1]}(...)" if len(partes) == 2 else f"m.{partes[0]}(...)"
+    texto = (f"· to check `{completo}`, RUN it with a case instead of re-reading it (the console executes the project's "
+             f"functions):\n  m = P.cargar(\"{ruta}\"" + (", sustituir={" + ", ".join(f'"{s}": ...' for s in sustituir) + "}"
+                                                         if sustituir else "") + f"); {llamada}\n"
+             "  try the edge cases: empty input, one element, exactly at the limit, just over it; compare what it returns "
+             "with what it should return")
+    if sustituir:
+        texto += (f"\n  {', '.join(sustituir)}: from modules the console does not load (other project modules, os, "
+                  "subprocess…): pass a simple version in sustituir")
+    return texto
+
+
+def sugiere_ejecutar(banco, pregunta: str) -> bool:
+    """ ¿Es una pregunta de revisión sobre una función que conviene EJECUTAR con un caso (la pista de los hechos)? El chat
+    lo usa para pedirle, una vez, que la ejecute si respondió sin hacerlo: con la pista sola, B2 de E8 la usó 1 de 3 """
+    if not _rust().es_revision(pregunta or ""):
+        return False
+    rutas = _rust().rutas_de(pregunta or "")
+    import sqlite3
+    try:
+        conexion = sqlite3.connect(f"file:{banco.ruta_db}?mode=ro", uri=True, timeout=10, check_same_thread=False)
+        conexion.row_factory = sqlite3.Row
+    except sqlite3.Error:
+        return False
+    try:
+        api = API(conexion, banco.raiz, lambda *a, **k: None)
+        for t in terminos_de(pregunta):
+            try:
+                if api._nodos(t) and _como_probarla(api, t, rutas):
+                    return True
+            except Exception:
+                continue
+        return False
+    finally:
+        conexion.close()
+
+
+def hechos_de_la_pregunta(banco, pregunta: str, maximo_caracteres: int = 5000) -> str:
+    """ Lo que el banco sabe de lo que nombra la pregunta, para el modo unidad: definición, hechos del grafo
+    (lee_config, lee_entorno, expone, llama_api…), llamadores (resueltos y por texto), endpoints alcanzados y
+    apariciones literales. Vacío si la pregunta no nombra nada del código o el banco no lo conoce. """
+    if not terminos_de(pregunta):
+        return ""
+    import sqlite3
+    try:
+        conexion = sqlite3.connect(f"file:{banco.ruta_db}?mode=ro", uri=True, timeout=10, check_same_thread=False)
+        conexion.row_factory = sqlite3.Row
+    except sqlite3.Error:
+        return ""
+    try:
+        api = API(conexion, banco.raiz, lambda *a, **k: None)
+        # El motor arma los bloques (camino entre los nombrados, hechos de cada término y, en una revisión, el código
+        # y las trampas); «cómo probarla» usa revisar, la regla de la consola aislada, y va aquí
+        partes = api._rs.hechos_de_la_pregunta(pregunta)
+        bloques = list(partes["bloques"])
+        if partes["revision"]:
+            # Primero lo de la revisión (el código, las trampas, cómo probarla): el total se recorta por el final
+            revision = []
+            for r in partes["revision"]:
+                try:
+                    como = _como_probarla(api, r["termino"], partes["rutas"])
+                except Exception:
+                    como = ""
+                revision += [b for b in (r["codigo"], r["trampas"], como) if b]
+            bloques = revision + bloques
+    finally:
+        conexion.close()
+    return _texto_de_hechos(bloques, maximo_caracteres)
+
+
+def _texto_de_hechos(bloques: List[str], maximo_caracteres: int) -> str:
+    if not bloques:
+        return ""
+    texto = ("FACTS FROM THE PROJECT BANK about what the question names (call graph + literal text of the code; "
+             "they can be incomplete — confirm with the console when it matters):\n" + "\n".join(bloques))
+    return texto if len(texto) <= maximo_caracteres else texto[:maximo_caracteres].rsplit("\n", 1)[0] + "\n  (…)"
+
+
+_CIERRE_INVENTADO = re.compile(r"^\s*</")
+_CERCA = re.compile(r"^\s*```\w*\s*$")
+
+
+def limpiar_codigo(codigo: str) -> str:
+    """ Lo que el modelo agrega al código y nunca es Python: cercas de Markdown y «etiquetas de cierre»
+    inventadas (visto en el estudio del banco: «print(P.api(...))\\n</print(P.api(...))» en la mitad de las
+    consultas de una respuesta, cada una con su error y su repetición; docs/estudio-banco.md) """
+    lineas = [l for l in (codigo or "").splitlines() if not _CIERRE_INVENTADO.match(l) and not _CERCA.match(l)]
+    return "\n".join(lineas)
+
+
 class Consola:
     """ Una sesión de la memoria de consulta: un proceso aislado cuyas variables duran lo que dura
     la respuesta del modelo. `generar(pregunta, contexto, max_tokens)` atiende P.llm. """
 
     def __init__(self, banco, generar: Optional[Callable[[str, str, int], str]] = None,
-                 al_llamar_llm: Optional[Callable[[Dict[str, Any]], None]] = None):
+                 al_llamar_llm: Optional[Callable[[Dict[str, Any]], None]] = None, escribir: bool = True):
         self.banco = banco
         self.generar = generar
         self.al_llamar_llm = al_llamar_llm
+        self.escribir = escribir        # False: el chat no tiene memoria; anotar/afirmar/guardar no escriben
         self._proc: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
         self.ejecuciones = 0
@@ -563,7 +743,8 @@ class Consola:
         if self._proc is not None and self._proc.poll() is None:
             return
         entorno = {"PATH": "/usr/bin:/bin", "PYTHONPATH": os.path.dirname(os.path.abspath(__file__)),
-                   "PYTHONDONTWRITEBYTECODE": "1", "LANG": "C.UTF-8"}
+                   "PYTHONDONTWRITEBYTECODE": "1", "LANG": "C.UTF-8",
+                   "PRIG_CONSOLA_ALARMA": str(int(TIEMPO_POR_EJECUCION))}
         self._proc = subprocess.Popen(
             [sys.executable, "-I", "-c",
              "import sys; sys.path.insert(0, sys.argv[1]); import memoria_consulta as m; m._worker(sys.argv[2], sys.argv[3])",
@@ -571,7 +752,9 @@ class Consola:
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1,
             env=entorno, cwd="/", start_new_session=True)
 
-    def ejecutar(self, codigo: str, timeout: float = TIEMPO_POR_EJECUCION + 600) -> Dict[str, Any]:
+    def ejecutar(self, codigo: str, timeout: float = TIEMPO_TOTAL_POR_EJECUCION) -> Dict[str, Any]:
+        import select
+        codigo = limpiar_codigo(codigo)
         with self._lock:
             self._arrancar()
             self.ejecuciones += 1
@@ -580,9 +763,12 @@ class Consola:
             proc.stdin.flush()
             limite = time.time() + timeout
             while True:
-                if time.time() > limite:
+                # Esperar con plazo real: readline() solo se bloquearía sin límite
+                listo, _, _ = select.select([proc.stdout], [], [], max(0.0, limite - time.time()))
+                if not listo:
                     self.cerrar()
-                    return {"salida": "", "error": "La consola no respondió a tiempo y se reinició (se perdieron las variables).",
+                    return {"salida": "", "error": f"La ejecución pasó de {timeout:.0f} s (subllamadas incluidas) y la "
+                                                   f"consola se reinició (se perdieron las variables). Divide el trabajo.",
                             "variables": []}
                 linea = proc.stdout.readline()
                 if not linea:
@@ -598,9 +784,9 @@ class Consola:
                 if "peticion" in mensaje:
                     try:
                         valor = self._atender(mensaje["peticion"], mensaje.get("datos") or {})
-                        respuesta = {"valor": valor}
+                        respuesta = {"id": mensaje.get("id"), "valor": valor}
                     except Exception as e:       # vuelve al código del modelo como excepción
-                        respuesta = {"error": f"{type(e).__name__}: {e}"}
+                        respuesta = {"id": mensaje.get("id"), "error": f"{type(e).__name__}: {e}"}
                     proc.stdin.write(json.dumps(respuesta, ensure_ascii=False, default=str) + "\n")
                     proc.stdin.flush()
 
@@ -612,6 +798,8 @@ class Consola:
             return b.buscar_conocimiento(d["consulta"], k=12, vector=b._vector_consulta(d["consulta"]))
         if tipo == "resoluciones":
             return b.buscar_resoluciones(d["consulta"], k=8, vector=b._vector_consulta(d["consulta"]))
+        if tipo in ("anotar", "afirmar", "guardar") and not self.escribir:
+            return "No se guardó: este chat tiene la memoria desactivada."
         if tipo == "anotar":
             r = b.anotar(d.get("tipo", "nota"), d.get("titulo", ""), d.get("texto", ""), d.get("rutas") or [], origen="modelo")
             return f"{'Actualizado' if r['actualizado'] else 'Guardado'}: ({r['tipo']}) {r['titulo']}"
@@ -624,6 +812,9 @@ class Consola:
         if tipo == "llm":
             if self.generar is None:
                 raise RuntimeError("No hay un modelo disponible para P.llm en esta sesión.")
+            if self.llamadas_llm >= MAX_LLM_POR_RESPUESTA:
+                raise RuntimeError(f"Se agotaron las {MAX_LLM_POR_RESPUESTA} llamadas a P.llm de esta respuesta: "
+                                   f"responde con lo que ya tienes o usa P.hechos / P.sql / P.grep.")
             self.llamadas_llm += 1
             if self.al_llamar_llm:
                 self.al_llamar_llm({"pregunta": d["pregunta"][:200], "tokens_contexto": len(d["contexto"]) // 4})

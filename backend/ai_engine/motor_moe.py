@@ -87,7 +87,20 @@ CACHE_RAM_MB = 16384            # prompts ya leídos que llama-server guarda en 
 # Tiene que ser el estado EXACTO al final del bloque: las capas SSM de este modelo no retroceden.
 CARPETA_PROYECTOS = os.path.expanduser("~/.cache/prig-moe/proyectos")
 PROYECTO_MIN_CARACTERES = 12000     # por debajo, leerlo cuesta menos que guardarlo
-PROYECTOS_MAX_MB = 20480            # se borran los usados hace más tiempo
+PROYECTOS_MAX_MB = 32768            # se borran los usados hace más tiempo; las ~94 unidades de Prig ocupan ~27 GB
+# El tope real lo pone la configuración (moe_cache_gb, 0 = no se guarda ninguno) junto con una reserva de disco libre
+# que el caché nunca toca (moe_cache_reserva_gb): Motor.tope_cache_mb. Sin ajuste, PROYECTOS_MAX_MB. Los estados son un
+# caché descartable: la memoria del proyecto es el banco de texto (docs/plan-texto-primero.md)
+
+# Tamaño de un estado guardado, medido (docs/estudio-banco.md, E4): 10.904 bytes por token (la caché KV de las capas
+# de atención, en q8) + 65,9 MB fijos (el estado de las capas recurrentes). Sirve para decidir si uno entra en el caché
+BYTES_POR_TOKEN_ESTADO = 10_904
+BYTES_FIJOS_ESTADO = 65_900_000
+
+
+def estimar_estado_mb(tokens: int) -> float:
+    """ MB que ocupará en disco el estado tras leer `tokens` """
+    return (max(0, int(tokens or 0)) * BYTES_POR_TOKEN_ESTADO + BYTES_FIJOS_ESTADO) / 1e6
 
 
 def contexto_para(tokens: int) -> Optional[int]:
@@ -169,9 +182,20 @@ def proyectos_guardados(carpeta: Optional[str] = None) -> Dict[str, Any]:
     return {"archivos": len(archivos), "mb": round(total / 1e6), "carpeta": carpeta}
 
 
-def podar_proyectos(carpeta: Optional[str] = None, limite_mb: float = PROYECTOS_MAX_MB) -> int:
-    """ Borra los proyectos usados hace más tiempo hasta quedar bajo el límite """
+def _libre_mb(carpeta: str) -> Optional[int]:
+    """ Disco libre donde viven los estados (o donde vivirán, si la carpeta todavía no existe) """
+    try:
+        return int(shutil.disk_usage(carpeta if os.path.isdir(carpeta) else os.path.expanduser("~")).free / 1e6)
+    except OSError:
+        return None
+
+
+def podar_proyectos(carpeta: Optional[str] = None, limite_mb: Optional[float] = None, reserva_mb: float = 0.0) -> int:
+    """ Borra los proyectos usados hace más tiempo (restaurar uno cuenta como uso) hasta quedar bajo el límite y, si
+    el disco tiene menos libre que `reserva_mb`, sigue hasta recuperar la diferencia o vaciar el caché. Sin límite, el
+    de siempre (PROYECTOS_MAX_MB, leído ahora: un valor por defecto del parámetro quedaría fijo al importar) """
     carpeta = carpeta or CARPETA_PROYECTOS
+    limite_mb = PROYECTOS_MAX_MB if limite_mb is None else max(0.0, float(limite_mb))
     archivos = []
     for a in glob.glob(os.path.join(carpeta, "*.bin")):
         try:
@@ -179,8 +203,15 @@ def podar_proyectos(carpeta: Optional[str] = None, limite_mb: float = PROYECTOS_
         except OSError:
             pass
     total, borrados = sum(t for _, t, _ in archivos), 0
+    falta_libre = 0.0
+    if reserva_mb and reserva_mb > 0 and archivos:
+        try:
+            falta_libre = max(0.0, reserva_mb * 1e6 - shutil.disk_usage(carpeta).free)
+        except OSError:
+            falta_libre = 0.0             # sin poder medir el disco, solo el límite
+    objetivo = min(limite_mb * 1e6, total - falta_libre)
     for _, tam, a in sorted(archivos):
-        if total <= limite_mb * 1e6:
+        if total <= objetivo:
             break
         try:
             os.remove(a)
@@ -801,7 +832,32 @@ class Motor:
                 "nucleo_q8_disponible": modelo_para("q8") != blob_del_modelo(),
                 "contexto": self.contexto, "nucleos": self.nucleos, "activas": self._activas,
                 "keep_alive_s": self._keep_alive_s, "ultimo_error": self.ultimo_error, "version": version,
-                "proyectos": {**proyectos_guardados(), "ultimo": self.ultimo_proyecto}}
+                "proyectos": {**proyectos_guardados(), "ultimo": self.ultimo_proyecto, "tope_mb": self.tope_cache_mb(),
+                              "reserva_mb": self.reserva_mb(), "libre_mb": _libre_mb(CARPETA_PROYECTOS)}}
+
+    # -- caché de estados en disco ---------------------------------------------------------------
+    def tope_cache_mb(self) -> float:
+        """ Tope del caché de estados (MB), de la configuración (`moe_cache_gb`; 0 = no se guarda ninguno). Sin
+        ajuste o con uno inválido, el de siempre (PROYECTOS_MAX_MB) """
+        valor = (self.ajustes() or {}).get("cache_gb")
+        if valor in (None, ""):
+            return float(PROYECTOS_MAX_MB)
+        try:
+            return max(0.0, float(valor)) * 1000
+        except (TypeError, ValueError):
+            return float(PROYECTOS_MAX_MB)
+
+    def reserva_mb(self) -> float:
+        """ Disco libre (MB) que el caché nunca toca (`moe_cache_reserva_gb`) """
+        valor = (self.ajustes() or {}).get("cache_reserva_gb")
+        try:
+            return max(0.0, float(valor)) * 1000 if valor not in (None, "") else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    def podar(self) -> int:
+        """ Deja el caché de estados dentro del tope y de la reserva de disco """
+        return podar_proyectos(CARPETA_PROYECTOS, self.tope_cache_mb(), self.reserva_mb())
 
     # -- ciclo de vida ---------------------------------------------------------------------
     def _registro(self, texto: str):
@@ -924,6 +980,10 @@ class Motor:
                     # (precalentar) lo paraba el vigía enseguida (la marca seguía en 0)
                     self._ultimo_uso = time.time()
                     self._arrancar_vigia()
+                    try:
+                        self.podar()                # el tope del caché pudo bajar mientras estaba parado
+                    except Exception:
+                        pass
                     return time.time() - t0
                 self._registro(f"no arrancó con {n} calientes/capa{' y MTP' if con_mtp else ''}")
             self.ultimo_error = f"llama-server no arrancó (ver {REGISTRO})"
@@ -935,6 +995,11 @@ class Motor:
         que sigue solo lee lo nuevo. None si la conversación no empieza con un bloque grande. """
         prefijo = prefijo_de(cuerpo)
         if not prefijo:
+            return None
+        tope = self.tope_cache_mb()
+        if tope <= 0:
+            # Caché apagado: ni se restaura ni se guarda; el prefijo se lee con la petición, como cualquier otra.
+            # La memoria del proyecto es el banco de texto (docs/plan-texto-primero.md)
             return None
         base = f"http://127.0.0.1:{self._puerto}"
         try:
@@ -966,7 +1031,7 @@ class Motor:
                     self._proyecto_cargado = clave
                     self._aplicar_calientes(clave)
                     self.ultimo_proyecto = {"origen": "disco", "tokens": r.json().get("n_restored"),
-                                            "segundos": round(time.time() - t0, 2)}
+                                            "segundos": round(time.time() - t0, 2), "clave": clave}
                     self._registro(f"proyecto {clave[:8]} restaurado: {self.ultimo_proyecto}")
                     return dict(self.ultimo_proyecto)
             except requests.RequestException:
@@ -985,15 +1050,20 @@ class Motor:
             datos = r.json()
             leidos = int(datos.get("tokens_evaluated") or 0)
             lectura_ms = float((datos.get("timings") or {}).get("prompt_ms") or 0)
-            g = requests.post(base + "/slots/0?action=save", json={"filename": archivo}, timeout=600)
+            # Un estado que no entra ni solo en el caché no se escribe (se borraría enseguida al podar)
+            g = (requests.post(base + "/slots/0?action=save", json={"filename": archivo}, timeout=600)
+                 if estimar_estado_mb(leidos) <= tope else None)
         except (requests.RequestException, ValueError):
             return None
-        if g.status_code == 200:
+        guardado = g is not None and g.status_code == 200
+        if guardado:
             self._proyecto_cargado = clave
             self._calientes_del_proyecto(clave)
-            podar_proyectos()
+            self.podar()
         self.ultimo_proyecto = {"origen": "leido", "tokens": leidos, "segundos": round(time.time() - t0, 1),
-                                "guardado": g.status_code == 200}
+                                "guardado": guardado, "clave": clave}
+        if g is None:
+            self.ultimo_proyecto["motivo"] = "no cabe en el caché"
         self._registro(f"proyecto {clave[:8]} leído: {self.ultimo_proyecto}")
         return {**self.ultimo_proyecto, "leidos": leidos, "lectura_ms": lectura_ms}
 
@@ -1103,6 +1173,25 @@ class Motor:
                     self._parar_proceso()
 
     # -- peticiones ------------------------------------------------------------------------
+    def directo(self, metodo: str, ruta: str, cuerpo: Optional[Dict[str, Any]] = None, timeout: float = 900) -> Any:
+        """ Petición cruda a llama-server (/apply-template, /completion, /slots, /aipc…) para la lectura
+        por unidades (lectura_unidades.py). Cuenta como actividad, así el vigía no lo para en medio, y
+        marca que el slot ya no tiene cargado ningún proyecto (se restaurará si hace falta). """
+        with self._cerrojo:
+            self.asegurar()
+            self._activas += 1
+            self._ultimo_uso = time.time()
+        try:
+            r = requests.request(metodo, f"http://127.0.0.1:{self._puerto}{ruta}", json=cuerpo, timeout=timeout)
+            if r.status_code != 200:
+                raise RuntimeError(f"llama-server {r.status_code} en {ruta}: {r.text[:300]}")
+            return r.json() if r.content else {}
+        finally:
+            with self._cerrojo:
+                self._activas = max(0, self._activas - 1)
+                self._ultimo_uso = time.time()
+            self._proyecto_cargado = None
+
     def post(self, url: str, pedido: Dict[str, Any], timeout: float = 600, _reintento: bool = False) -> Respuesta:
         """ Una petición de Ollama (/api/chat o /api/generate) servida por este motor """
         ruta = url.split("?", 1)[0]

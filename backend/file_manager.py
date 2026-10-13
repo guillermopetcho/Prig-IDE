@@ -132,7 +132,8 @@ class FileManager:
         ignored = {
             '__pycache__', 'node_modules', 'venv', '.venv', 'env', '.env',
             '.git', '.github', '.ipynb_checkpoints', 'dist', 'build',
-            '.cache', 'site-packages', '.idea', '.vscode', '.gemini'
+            '.cache', 'site-packages', '.idea', '.vscode', '.gemini',
+            'target',       # compilaciones de Rust (cargo): miles de archivos generados
         }
 
         tree = []

@@ -1,0 +1,142 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 900,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 38
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5195,
+   "temp_c": 56
+  },
+  "segundos": 502,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2·t3",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "general",
+   "think": true,
+   "respuesta": "",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "modo unidad no disponible: con razonamiento",
+   "hechos_caracteres": 326,
+   "tokens": 4096,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 161.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·a2",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar `piezas_de_archivo` en detalle.\n\nAhora voy a analizar el código con más detalle. Veo un problema potencial en el bucle de líneas (líneas 92-98). El problema es que cuando se crea la última pieza con `cortados.append((a, fin, nombres if primero else []))`, `a` podría ser mayor que `fin` si el bucle ya avanzó `a` más allá del final. Pero el problema más grave está en el bucle de líneas: si `acumulado + t > tope` y `n > a`, se crea una pieza y se reinicia. Pero al final del bucle, se añade `cortados.append((a, fin, ...))`. Si `a` se movió hacia adelante en el último corte, y luego `acumulado` se reinició a 0, pero el bucle continúa añadiendo `t` a `acumulado`... espera, el `acumulado` se reinicia a 0 en el `if`, pero el `acumulado += t` está DESPUÉS del `if`, fuera de él. Releamos:\n\n```python\na, acumulado, primero = ini, 0, True\nfor n in range(ini, fin + 1):\n    t = _tokens_de(lineas, n, n)\n    if acumulado + t > tope and n > a:\n        cortados.append((a, n - 1, nombres if primero else []))\n        a, acumulado, primero = n + 1, 0, False\n    acumulado += t\ncortados.append((a, fin, nombres if primero else []))\n```\n\nEl problema: cuando se hace el `if` y se reinicia `a = n + 1, acumulado = 0`, luego se ejecuta `acumulado += t` donde `t` es los tokens de la línea `n`. Pero `a = n + 1`, así que la línea `n` queda en un hueco: no pertenece a la pieza anterior (que terminó en `n-1`) ni a la nueva (que empieza en `n+1`). La línea `n` se pierde.\n\nEl bug está confirmado. Veamos también si hay otro problema: en la línea 96, `nombres if primero else []`. Cuando `primero` se vuelve `False`, las piezas intermedias pierden sus nombres. Esto podría ser intencional (solo el primer tramo conserva nombres), pero es otro detalle.\n\nEl bug principal es en las **líneas 92-98** de `backend/particion_proyecto.py`.\n\n## Error encontrado\n\n**Líneas 92-98**: En el bucle que corta por líneas cuando un tramo no cabe en el tope, la línea que dispara el corte se pierde.\n\n**Qué hace mal:** Cuando `acumulado + t > tope`, se crea una pieza que termina en `n - 1`, y se reinicia `a = n + 1`. Luego, inmediatamente después, se ejecuta `acumulado += t`, donde `t` corresponde a la línea `n`. Esto hace que `acumulado` tenga el peso de la línea `n`, pero `a` apunta a `n + 1`. La línea `n` queda en un hueco: no pertenece a la pieza anterior (que terminó en `n-1`) ni a la nueva (que empieza en `n+1`).\n\n**Caso concreto:** Supongamos `tope = 3` tokens y un archivo con tres líneas cuyos tokens son `[2, 2, 2]`:\n\n1. `n=0`: `t=2`, `0+2=2 ≤ 3`, no corta. `acumulado = 2`.\n2. `n=1`: `t=2`, `2+2=4 > 3` y `1 > 0` → **corta**: pieza `(0, 0)`. Se reinicia `a = 2`, `acumulado = 0`, `primero = False`. Luego `acumulado += 2` → `acumulado = 2`.\n3. `n=2`: `t=2`, `2+2=4 > 3` pero `2 > 2` es **False**, no corta. `acumulado = 4`.\n4. Final: pieza `(2, 2)`.\n\nResultado: piezas `(0, 0)` y `(2, 2)`. **La línea 1 se pierde completamente.** El archivo no queda cubierto en su totalidad.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 524,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.leer(\\\"backend/particion_proyecto.py\\\", desde=47, hasta=100))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.leer(\\\"backend/particion_proyecto.py\\\", desde=100, hasta=120))\"}",
+     "resultado_caracteres": 999
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verifiquemos este bug con un ejemplo concreto\\n# Si tope = 5, y las líneas tienen tokens: [3, 4, 2]\\n# n=0: t=3, acumulado=0+3=3 <= 5, no corta. acumulado=3\\n# n=1: t=4, acumulado=3+4=7 > 5 y 1>0 → corta: pieza (0, 0, ...). a=2, acumulado=0, primero=False\\n#       luego acumulado += 4 → acumulado=4\\n# n=2: t=2, acumulado=4+2=6 > 5 y 2>2 → FALSO (2 > 2 es False). No corta. acumulado=6",
+     "resultado_caracteres": 156
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 78.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·t4",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "general",
+   "think": true,
+   "respuesta": "",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "modo unidad no disponible: con razonamiento",
+   "hechos_caracteres": 326,
+   "tokens": 4096,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 128.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·a3",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Vamos a revisar `piezas_de_archivo` en `backend/particion_proyecto.py` para detectar errores de programación.\n\nVeo un error en la línea 96. Cuando se corta un tramo grande por líneas, la pieza que se cierra usa `nombres if primero else []`. El problema es que `nombres` puede ser una lista de nombres de símbolos (p. ej. `[\"mi_funcion\"]`), y `primero` indica si es la primera sub-pieza del tramo.\n\nPero el error real está en la lógica de `finos` (líneas 70-84). Cuando un tramo no cabe y tiene hijos (línea 76), se iteran los hijos y se crean piezas para cada uno. Sin embargo, si `hijos` está vacío (porque `s` es None o no tiene hijos), el código sigue el camino de `nombres if not hijos else []` en la línea 84, lo cual es correcto.\n\nEl error está en la línea 96: cuando se hace el corte por líneas dentro de un tramo que ya fue subdividido por símbolos/hijos, la variable `nombres` puede contener los nombres de los símbolos padre del tramo original, pero después de la subdivisión, las sub-piezas que se crean para los hijos tienen sus propios nombres (línea 81: `finos.append((cur, h[\"fin\"], [h[\"nombre\"]]))`). Cuando el tramo restante (línea 83-84) se va a subdividir por líneas, `nombres` sigue siendo la lista del tramo original (que podría ser `[s[\"nombre\"]]` si era un símbolo padre, o `[]` si era código suelto). Esto no es un error grave per se, pero...\n\nEspera, revisemos más cuidadosamente. El error está en la línea 96 y la lógica de corte por líneas. Cuando `primero` es `True` (primera sub-pieza), se usa `nombres`. Cuando `primero` es `False` (sub-piezas subsiguientes), se usa `[]`. Esto está bien para código suelto sin símbolos. Pero si el tramo original tenía nombres de símbolos, las sub-piezas subsiguientes perderán esa información.\n\nPero el error más grave está en la línea 96: `cortados.append((a, n - 1, nombres if primero else []))`. Cuando se cierra una sub-pieza intermedia (no la última), se usa `[]` si `primero` es `False`. Pero `primero` solo se establece a `False` DESPUÉS de cerrar la primera sub-pieza. Entonces la primera sub-pieza usa `nombres` y las siguientes usan `[]`. Esto es correcto en el sentido de que los nombres de símbolos solo se asignan a la primera pieza del tramo.\n\nPero hay un problema más sutil: en la línea 84, `finos.append((cur, fin, nombres if not hijos else []))`. Si hay hijos, se usa `[]` para el código restante después de los hijos. Esto es correcto. Pero si NO hay hijos y el tramo no cabe, se usa `nombres` (que puede ser `[s[\"nombre\"]]` o `[]`). Luego, en la línea 92-98, si este tramo se subdivide por líneas, la primera sub-pieza usa `nombres` y las siguientes `[]`. Esto parece correcto.\n\nEl error real está en la línea 96: cuando `primero` es `True`, se usa `nombres`, pero `nombres` puede ser una lista vacía `[]` si el tramo original era código suelto sin símbolos. Esto no es un error, solo produce piezas sin nombres de símbolos, lo cual es correcto.\n\nDéjame revisar si hay un error de off-by-one o de cobertura. El cursor inicia en 1 (línea 59), y los símbolos se procesan en orden. Si un símbolo tiene `fin` menor que `cursor`, se salta (línea 61-62). Luego `cursor` se actualiza a `s[\"fin\"] + 1` (línea 64). Si al final `cursor <= total`, se añade un tramo de código suelto (línea 65-66). Esto parece correcto.\n\nPero hay un error: en la línea 63, `tramos.append((cursor, s[\"fin\"], [s[\"nombre\"]], s))`. Si `cursor > s[\"fin\"]`, esto no debería pasar porque se filtra en la línea 61. Pero si `cursor == s[\"fin\"]`, el tramo sería de una sola línea, lo cual es válido.\n\nEl error está en la línea 96. Cuando se cierra una sub-pieza intermedia durante el corte por líneas, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos (porque el código restante no corresponde al símbolo padre, sino a código suelto después de los hijos). La línea 84 ya maneja esto correctamente: `nombres if not hijos else []`.\n\nPero el error está en la línea 96: cuando se hace el corte por líneas, la variable `nombres` puede ser una lista de nombres de símbolos del tramo original, pero si el tramo ya fue subdividido por hijos en la línea 76-84, los nombres de los hijos ya se asignaron en la línea 81. Entonces, cuando el tramo restante (línea 83-84) se subdivide por líneas, las sub-piezas deberían tener nombres vacíos (porque el código restante no corresponde a ningún símbolo padre). La línea 84 ya maneja esto: si hay hijos, se usa `[]`. Pero si NO hay hijos, se usa `nombres`, que puede ser `[s[\"nombre\"]]` (si el tramo era un símbolo padre sin hijos) o `[]` (si era código suelto). Esto parece correcto.\n\nEl error está en la línea 96: cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero el error está en la línea 96: cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre sin hijos, `nombres` sería `[s[\"nombre\"]]`. Entonces, cuando el tramo se subdivide por líneas, la primera sub-pieza usa `[s[\"nombre\"]]` y las siguientes usan `[]`. Esto es correcto, porque el símbolo padre abarca todo el tramo.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nEspera, revisemos el caso concreto. Supongamos un tramo que es un símbolo padre con hijos. `nombres` sería `[s[\"nombre\"]]`. En la línea 76-84, se crean sub-tramos para los hijos. Si hay hijos, en la línea 84 se añade el tramo restante con `[]` (porque `hijos` no está vacío). Luego, en la línea 87-98, si ese tramo restante no cabe, se subdivide por líneas. En ese caso, `nombres` sería `[]` (porque se asignó en la línea 84), y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero si el tramo original era un símbolo padre sin hijos, `nombres` sería `[s[\"nombre\"]]`. En la línea 76-84, `hijos` estaría vacío, así que no se crearían sub-tramos. Luego, en la línea 83-84, se añadiría el tramo restante con `nombres` (porque `hijos` está vacío). Luego, en la línea 87-98, si ese tramo no cabe, se subdivide por líneas. En ese caso, `nombres` sería `[s[\"nombre\"]]`, y la primera sub-pieza usaría `[s[\"nombre\"]]` y las siguientes `[]`. Esto es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nEl error está en la línea 96: cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nEspera, creo que encontré el error. En la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nEl error está en la línea 96. Cuando se cierra una sub-pieza intermedia durante el corte por líneas, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya se asignaron en la línea 81, entonces el tramo restante (después de los hijos) debería tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nEspera, creo que el error está en la línea 96. Cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `nombres` es la lista de nombres del tramo original (antes de la subdivisión). Si el tramo original era un símbolo padre con hijos, `nombres` sería `[s[\"nombre\"]]`. Pero las sub-piezas que se crearon para los hijos ya tienen sus propios nombres (línea 81). Entonces, cuando el tramo restante (después de los hijos) se subdivide por líneas, las sub-piezas de ese tramo restante deberían tener nombres vacíos. La línea 84 ya maneja esto: `nombres if not hijos else []`. Entonces, si hay hijos, `nombres` en la línea 92-98 sería `[]`, y las sub-piezas tendrían nombres vacíos, lo cual es correcto.\n\nPero hay un error: en la línea 96, cuando se cierra una sub-pieza intermedia, se usa `nombres if primero else []`. Pero `primero` se establece a `False` después de cerrar la primera sub-pieza. Entonces, si el tramo se subdivide en múltiples sub-piezas, la primera usa `nombres` y las siguientes usan `[]`. Esto es correcto para código suelto sin símbolos. Pero si el tramo original era un símbolo padre con hijos, y los hijos ya",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 4096,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"piezas_de_archivo\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 133.5,
+   "memoria_del_modelo": null
+  }
+ ]
+}

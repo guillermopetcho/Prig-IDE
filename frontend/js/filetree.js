@@ -22,10 +22,15 @@ class FileTreeManager {
     }
 
     async loadTree() {
+        if (!this.container) {
+            this.container = document.getElementById('file-tree-container');
+        }
         try {
             const res = await fetch('/api/tree');
             this.rawTreeData = await res.json();
-            this.render(this.rawTreeData, this.container);
+            if (this.container) {
+                this.render(this.rawTreeData, this.container);
+            }
             this.syncWorkspaceIndicator();
         } catch (e) {
             console.error('Error al cargar árbol de archivos:', e);
@@ -91,7 +96,19 @@ class FileTreeManager {
     render(items, parentEl, expandAll = false) {
         parentEl.innerHTML = '';
         if (!items || items.length === 0) {
-            parentEl.innerHTML = '<div style="padding: 10px; color: var(--text-muted);">Sin resultados</div>';
+            if (parentEl === this.container) {
+                parentEl.innerHTML = `
+                    <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                        <i class="fa-solid fa-folder-open" style="font-size: 28px; margin-bottom: 10px; color: var(--accent-yellow); opacity: 0.7;"></i>
+                        <p style="margin: 0 0 12px 0;">Esta carpeta está vacía o no tiene archivos legibles.</p>
+                        <button onclick="window.fileTreeMgr && window.fileTreeMgr.openFolderManagerModal('guardados');" style="background: rgba(203,166,247,0.15); border: 1px solid var(--accent-purple); color: var(--accent-purple); padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600;">
+                            <i class="fa-solid fa-folder"></i> Cambiar Carpeta
+                        </button>
+                    </div>
+                `;
+            } else {
+                parentEl.innerHTML = '<div style="padding: 6px 12px; color: var(--text-muted); font-size: 11px;">(vacío)</div>';
+            }
             return;
         }
 

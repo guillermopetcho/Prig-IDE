@@ -1,0 +1,23 @@
+[
+ {
+  "id": "a84a7fe1bad7·r1",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+  "base": "a84a7fe1bad7",
+  "modo": "unidad"
+ },
+ {
+  "id": "a84a7fe1bad7·r2",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+  "base": "a84a7fe1bad7",
+  "modo": "unidad"
+ },
+ {
+  "id": "a84a7fe1bad7·r3",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+  "base": "a84a7fe1bad7",
+  "modo": "unidad"
+ }
+]

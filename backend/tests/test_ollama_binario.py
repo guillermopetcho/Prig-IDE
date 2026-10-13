@@ -167,9 +167,19 @@ class PruebaMensaje(unittest.TestCase):
     def test_en_la_cola_de_descargas_y_en_la_prueba_de_recursos(self):
         import descargas_modelos
         self.assertEqual(descargas_modelos.explicar_error(self.ERROR_REAL), aec.MENSAJE_RUNTIME_INCOMPLETO)
+        # La prueba de recursos explica el error del motor igual: un motor que falla con el error real
+        # devuelve el mensaje explicado (sin GPU, sin Ollama y con un almacén temporal)
         from recursos import calibracion
-        import inspect
-        self.assertIn("explicar_error_motor", inspect.getsource(calibracion.probar))
+
+        def generar(cuerpo):
+            raise RuntimeError(self.ERROR_REAL)
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, {"PRIG_RECURSOS_ARCHIVO": os.path.join(tmp, "r.json")}), \
+                mock.patch.object(calibracion, "estado_gpu", return_value=None), \
+                mock.patch.object(calibracion, "descargar"):
+            r = calibracion.probar({"nombre": "m", "capas": 28}, {"num_ctx": 4096}, generar=generar, ps=lambda m: None)
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["error"], aec.MENSAJE_RUNTIME_INCOMPLETO[:500])
 
 
 if __name__ == "__main__":

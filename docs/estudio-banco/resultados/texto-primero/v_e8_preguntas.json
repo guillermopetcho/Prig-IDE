@@ -1,0 +1,122 @@
+[
+ {
+  "id": "E8a_B8·v",
+  "prueba": "E8a",
+  "objetivo": "B8",
+  "pregunta": "Revisa `CodeRunner.run_file` en `backend/runner.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B8",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C1·v",
+  "prueba": "E8a",
+  "objetivo": "C1",
+  "pregunta": "Revisa `Gobernador.reanudar` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C1",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B5·v",
+  "prueba": "E8a",
+  "objetivo": "B5",
+  "pregunta": "Revisa `Ritmo.activo` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B5",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B2·v",
+  "prueba": "E8a",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C2·v",
+  "prueba": "E8a",
+  "objetivo": "C2",
+  "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C2",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B1·v",
+  "prueba": "E8a",
+  "objetivo": "B1",
+  "pregunta": "Revisa `racha` en `backend/progreso.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B1",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C3·v",
+  "prueba": "E8a",
+  "objetivo": "C3",
+  "pregunta": "Revisa `perfil` en `backend/inicio.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C4·v",
+  "prueba": "E8a",
+  "objetivo": "C4",
+  "pregunta": "Revisa `Ritmo.marcar` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C4",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·v",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B7·v",
+  "prueba": "E8a",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B7",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B6·v",
+  "prueba": "E8a",
+  "objetivo": "B6",
+  "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B6",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B4·v",
+  "prueba": "E8a",
+  "objetivo": "B4",
+  "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B4",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B2·v2",
+  "prueba": "E8a",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B8·v2",
+  "prueba": "E8a",
+  "objetivo": "B8",
+  "pregunta": "Revisa `CodeRunner.run_file` en `backend/runner.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B8",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B2·v3",
+  "prueba": "E8a",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto"
+ }
+]

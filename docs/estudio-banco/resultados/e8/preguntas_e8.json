@@ -1,0 +1,140 @@
+[
+ {
+  "id": "E8a_B8",
+  "prueba": "E8a",
+  "objetivo": "B8",
+  "pregunta": "Revisa `CodeRunner.run_file` en `backend/runner.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_C1",
+  "prueba": "E8a",
+  "objetivo": "C1",
+  "pregunta": "Revisa `Gobernador.reanudar` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B5",
+  "prueba": "E8a",
+  "objetivo": "B5",
+  "pregunta": "Revisa `Ritmo.activo` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B2",
+  "prueba": "E8a",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_C2",
+  "prueba": "E8a",
+  "objetivo": "C2",
+  "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B1",
+  "prueba": "E8a",
+  "objetivo": "B1",
+  "pregunta": "Revisa `racha` en `backend/progreso.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_C3",
+  "prueba": "E8a",
+  "objetivo": "C3",
+  "pregunta": "Revisa `perfil` en `backend/inicio.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_C4",
+  "prueba": "E8a",
+  "objetivo": "C4",
+  "pregunta": "Revisa `Ritmo.marcar` en `backend/recursos/ritmo.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B3",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B7",
+  "prueba": "E8a",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B6",
+  "prueba": "E8a",
+  "objetivo": "B6",
+  "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8a_B4",
+  "prueba": "E8a",
+  "objetivo": "B4",
+  "pregunta": "Revisa `Tramo.pico_real` en `backend/recursos/termico.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo."
+ },
+ {
+  "id": "E8b_B1",
+  "prueba": "E8b",
+  "objetivo": "B1",
+  "pregunta": "En `backend/progreso.py` (`racha`) se acaba de hacer este cambio.\n\nAntes:\n```python\nseguidos = seguidos + 1 if anterior and (f - anterior).days == 1 else 1\n```\nAhora:\n```python\nseguidos = seguidos + 1 if anterior and (f - anterior).days == 1 else 0\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B2",
+  "prueba": "E8b",
+  "objetivo": "B2",
+  "pregunta": "En `backend/particion_proyecto.py` (`piezas_de_archivo`) se acaba de hacer este cambio.\n\nAntes:\n```python\na, acumulado, primero = n, 0, False\n```\nAhora:\n```python\na, acumulado, primero = n + 1, 0, False\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B3",
+  "prueba": "E8b",
+  "objetivo": "B3",
+  "pregunta": "En `backend/file_manager.py` (`FileManager.is_path_allowed`) se acaba de hacer este cambio.\n\nAntes:\n```python\nif os.path.commonpath([abs_path, root]) == root:\n```\nAhora:\n```python\nif abs_path.startswith(root):\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B4",
+  "prueba": "E8b",
+  "objetivo": "B4",
+  "pregunta": "En `backend/recursos/termico.py` (`Tramo.pico_real`) se acaba de hacer este cambio.\n\nAntes:\n```python\nreturn max(picos) if picos else None\n```\nAhora:\n```python\nreturn max(picos)\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B5",
+  "prueba": "E8b",
+  "objetivo": "B5",
+  "pregunta": "En `backend/recursos/ritmo.py` (`Ritmo.activo`) se acaba de hacer este cambio.\n\nAntes:\n```python\nreturn bool(self.ajustes.get(\"activo\"))\n```\nAhora:\n```python\nreturn bool(self.ajustes.get(\"activa\"))\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B6",
+  "prueba": "E8b",
+  "objetivo": "B6",
+  "pregunta": "En `backend/job_exporter.py` (`JobExporter.preparar`) se acaba de hacer este cambio.\n\nAntes:\n```python\ntope = int(ajustes.get(\"max_chunk_tokens\") or max_chunk_tokens)\n```\nAhora:\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B7",
+  "prueba": "E8b",
+  "objetivo": "B7",
+  "pregunta": "En `backend/banco_proyecto.py` (`BancoProyecto.conectar`) se acaba de hacer este cambio.\n\nAntes:\n```python\n        try:\n            yield c\n            c.commit()\n        finally:\n            c.close()\n```\nAhora:\n```python\n        yield c\n        c.commit()\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8b_B8",
+  "prueba": "E8b",
+  "objetivo": "B8",
+  "pregunta": "En `backend/runner.py` (`CodeRunner.run_file`) se acaba de hacer este cambio.\n\nAntes:\n```python\n            self._unregister(run_id)\n            process.kill()\n            stdout, stderr = process.communicate()\n```\nAhora:\n```python\n            self._unregister(run_id)\n            stdout, stderr = process.communicate()\n```\n¿Qué tests de `backend/tests/` fallan (o se cuelgan) con este cambio? Nombra el archivo y el método de cada uno, o di que no falla ninguno."
+ },
+ {
+  "id": "E8c_F1",
+  "prueba": "E8c",
+  "objetivo": "F1",
+  "pregunta": "Explica paso a paso qué ocurre en el backend cuando el frontend llama a `POST /api/desafios/{id}/comprobar`, desde el endpoint hasta que se devuelve el resultado. Cita `archivo:línea` en cada paso."
+ },
+ {
+  "id": "E8c_F2",
+  "prueba": "E8c",
+  "objetivo": "F2",
+  "pregunta": "¿Cómo decide el motor MoE (`backend/ai_engine/motor_moe.py`) el tamaño del contexto en modo automático y qué hace cuando una petición no cabe? Cita `archivo:línea` en cada afirmación."
+ },
+ {
+  "id": "E8c_F3",
+  "prueba": "E8c",
+  "objetivo": "F3",
+  "pregunta": "Cuando un archivo del proyecto cambia en el disco, ¿cómo se entera el banco del proyecto y qué actualiza (archivos, símbolos, grafo, unidades, lecturas)? Cita `archivo:línea` en cada paso."
+ }
+]

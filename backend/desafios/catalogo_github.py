@@ -1132,6 +1132,14 @@ def obtener_repositorio(ref: str) -> Optional[Dict[str, Any]]:
     return next((dict(r) for r in CATALOGO_REPOSITORIOS_GITHUB if r["ref"].lower() == (ref or "").lower()), None)
 
 
+def _dentro_de(ruta: str, carpeta: str) -> bool:
+    """ ¿`ruta` está dentro de `carpeta` (o es ella)? Con startswith solo, «ejercicios» dejaba pasar
+    «ejercicios_avanzados/…» (lo encontró la revisión de código del banco; docs/estudio-banco.md) """
+    carpeta = (carpeta or "").strip("/")
+    ruta = (ruta or "").lstrip("/")
+    return not carpeta or ruta == carpeta or ruta.startswith(carpeta + "/")
+
+
 def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Dict[str, Any]:
     """ Lista archivos de ejercicios sugeridos en un repositorio de GitHub """
     repo_meta = obtener_repositorio(ref)
@@ -1156,7 +1164,7 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
         # Filtrar archivos relevantes de código (.py, .cpp, .hpp, .h, .md con ejercicios)
         for a in archivos:
             path = a["ruta"]
-            if ruta_sub and not path.startswith(ruta_sub):
+            if ruta_sub and not _dentro_de(path, ruta_sub):
                 continue
             ext = os.path.splitext(path)[1].lower()
             if ext in (".py", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".md", ".ipynb"):
@@ -1204,7 +1212,7 @@ def listar_ejercicios_repo(ref: str, ruta_sub: str = "", limite: int = 50) -> Di
     if not salida and destacados:
         for d in destacados:
             path = d["ruta"]
-            if ruta_sub and not path.startswith(ruta_sub):
+            if ruta_sub and not _dentro_de(path, ruta_sub):
                 continue
             salida.append({
                 "ruta": path,

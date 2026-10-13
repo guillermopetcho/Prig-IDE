@@ -12,12 +12,14 @@ class MenuBar {
     }
 
     montar(contenedor) {
-        this.contenedor = contenedor;
-        if (!contenedor) return;
-        contenedor.innerHTML = '';
-        contenedor.className = 'prig-menubar';
+        const mount = contenedor || document.getElementById('prig-menubar-mount');
+        this.contenedor = mount;
+        if (!mount) return;
+        mount.innerHTML = '';
+        mount.className = 'prig-menubar';
 
-        window.PrigCommands.MENUS.forEach(menu => {
+        const menus = (window.PrigCommands && Array.isArray(window.PrigCommands.MENUS)) ? window.PrigCommands.MENUS : [];
+        menus.forEach(menu => {
             const raiz = document.createElement('div');
             raiz.className = 'menu-raiz';
             raiz.dataset.menu = menu;
@@ -44,7 +46,7 @@ class MenuBar {
 
             raiz.appendChild(titulo);
             raiz.appendChild(panel);
-            contenedor.appendChild(raiz);
+            mount.appendChild(raiz);
         });
 
         document.addEventListener('click', () => this._cerrar());
@@ -186,3 +188,12 @@ class MenuBar {
 }
 
 window.menuBar = new MenuBar();
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.menuBar.montar());
+    } else {
+        window.menuBar.montar();
+    }
+}
+

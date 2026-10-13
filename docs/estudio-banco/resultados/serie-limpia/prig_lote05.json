@@ -1,0 +1,411 @@
+{
+ "lote": 5,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 47
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 60
+  }
+ },
+ "media": 0.939,
+ "segundos": 946,
+ "modos": {
+  "general": 5,
+  "unidad": 7
+ },
+ "por_tipo": {
+  "entorno": 1.0,
+  "constante": 1.0,
+  "frontend": 1.0,
+  "ejecucion": 1.0,
+  "config": 1.0,
+  "diseno": null,
+  "ubicacion": 1.0,
+  "llamadores_independiente": 0.333,
+  "impacto": 1.0,
+  "recorrido": 1.0,
+  "endpoint": 1.0,
+  "llamadores": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [
+  "ind_27"
+ ],
+ "resultados": [
+  {
+   "id": "3354b61228b1",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 42.8,
+   "modo": "general",
+   "herramientas": 1
+  },
+  {
+   "id": "ebf8908081d4",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 25.3,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "dd9a33e475e0",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 27.0,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "7b3370acbb60",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 26.2,
+   "modo": "general",
+   "herramientas": 2
+  },
+  {
+   "id": "16fc1e63dc7b",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 9.9,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ace7c95ae520",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 97.1,
+   "modo": "general",
+   "herramientas": 8
+  },
+  {
+   "id": "01c1ae535c93",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 16.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "7cf766c1b03a",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 21.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "d9b51731a649",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 25.4,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_17",
+   "tipo": "llamadores_independiente",
+   "puntaje": 0.333,
+   "segundos": 19.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ind_27",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 616.2,
+   "modo": "unidad",
+   "herramientas": 28
+  },
+  {
+   "id": "ind_01",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 19.6,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "3354b61228b1": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar hechos donde el objeto es 'keep_alive' y la relación es 'lee_config'\\nhechos_keep_alive = P.hechos(r=\\\"lee_config\\\", o=\\\"keep_alive\\\", limite=100)\\n[(h['s'], h['ruta']) for h in hechos_keep_alive]\\n\"}",
+    "resultado_caracteres": 163
+   }
+  ],
+  "ebf8908081d4": [],
+  "dd9a33e475e0": [],
+  "7b3370acbb60": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Buscar hechos de lee_entorno para PRIG_SIN_MOTOR_SUAVE\\nhechos = P.hechos(r=\\\"lee_entorno\\\", o=\\\"PRIG_SIN_MOTOR_SUAVE\\\")\\nhechos\\n\"}",
+    "resultado_caracteres": 150
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/recursos/termico.py\", \"desde_linea\": 370, \"hasta_linea\": 380}",
+    "resultado_caracteres": 890
+   }
+  ],
+  "16fc1e63dc7b": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/books/read\\\")\"}",
+    "resultado_caracteres": 261
+   }
+  ],
+  "ace7c95ae520": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# 1. Verificar la definición exacta en app.py\\nprint(\\\"=== DEFINICION EN app.py ===\\\")\\nlines = P.leer(\\\"backend/app.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"explain_seguimiento_block\\\" in line and not line.strip().startswith(\\\"#\\\"):\\n        print(f\\\"{i}: {line.rstrip()}\\\")\\n\\n# 2. Buscar todos los endpoints que llaman a esta función\\nprint(\\\"\\\\n=== ENDPOINTS QUE LA LLAMAN",
+    "resultado_caracteres": 110
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar el endpoint que invoca a ai_engine.explain_seguimiento_block\\nlines = P.leer(\\\"backend/app.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"ai_engine.explain_seguimiento_block\\\" in line:\\n        # Buscar el decorador anterior\\n        for j in range(i-1, max(0, i-10), -1):\\n            if \\\"@app.post\\\" in lines[j] or \\\"@app.get\\\" in lines[j]:\\n                import re\\n ",
+    "resultado_caracteres": 104
+   },
+   {
+    "nombre": "buscar_en_archivos",
+    "argumentos": "{\"texto\": \"explain_seguimiento_block\"}",
+    "resultado_caracteres": 370
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"backend/app.py\", \"desde_linea\": 4680, \"hasta_linea\": 4700}",
+    "resultado_caracteres": 1055
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Verificar si hay otros lugares que llamen a este endpoint o método\\n# 1. Buscar llamadas a ai_engine.explain_seguimiento_block en todo el proyecto\\nprint(\\\"=== Llamadas a ai_engine.explain_seguimiento_block ===\\\")\\nresultados = P.grep(\\\"ai_engine\\\\\\\\.explain_seguimiento_block\\\")\\nfor r in resultados:\\n    print(f\\\"{r['ruta']}:{r['linea']}: {r['texto'].strip()}\\\")\\n\\n# 2. Buscar llama",
+    "resultado_caracteres": 707
+   },
+   {
+    "nombre": "leer_archivo",
+    "argumentos": "{\"ruta\": \"frontend/js/aprendizaje_guiado.js\", \"desde_linea\": 875, \"hasta_linea\": 900}",
+    "resultado_caracteres": 1892
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Verificar si hay otros métodos de ai_engine que llamen a explain_seguimiento_block\\n# o si hay alguna dependencia en cadena\\nprint(\\\"=== Dependencias de ai_engine.explain_seguimiento_block ===\\\")\\n# Buscar si hay otros endpoints que usen el mismo generador o función interna\\nlines = P.leer(\\\"backend/app.py\\\")\\nfor i, line in enumerate(lines, 1):\\n    if \\\"_flujo_cancelable\\\" in line ",
+    "resultado_caracteres": 251
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar tests correctamente\\nresultados = P.grep(\\\"guided/explain|seguimiento/explain\\\")\\nfor r in resultados:\\n    if \\\"test\\\" in r['ruta']:\\n        print(f\\\"{r['ruta']}:{r['linea']}: {r['texto'].strip()}\\\")\\n\"}",
+    "resultado_caracteres": 145
+   }
+  ],
+  "01c1ae535c93": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"BookService.save_metadata\\\"))\\n\"}",
+    "resultado_caracteres": 717
+   }
+  ],
+  "7cf766c1b03a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"sondeo_preparar\\\", 5))\"}",
+    "resultado_caracteres": 1462
+   }
+  ],
+  "d9b51731a649": [],
+  "ind_17": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"StudyPlanEngine.load_state\\\"))\"}",
+    "resultado_caracteres": 972
+   }
+  ],
+  "ind_27": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Voy a examinar las funciones clave que determinan cuántos expertos calientes cargar:\\n# 1. calientes_para() - calcula cuántos expertos caben\\n# 2. vram_libre_estable() - mide la VRAM libre\\n# 3. asegurar() - el método principal que arranca el motor\\n\\n# Primero veamos la función calientes_para\\nimport backend.ai_engine.motor_moe as mm\\n\\n# Obtener el código de calientes_para\\nprint(\\",
+    "resultado_caracteres": 208
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Voy a leer directamente el código relevante de motor_moe.py\\nwith open('backend/ai_engine/motor_moe.py', 'r') as f:\\n    lines = f.readlines()\\n\\n# Buscar las funciones clave\\nprint(\\\"=== Buscando calientes_para ===\\\")\\nfor i, line in enumerate(lines):\\n    if 'def calientes_para' in line:\\n        print(f\\\"Línea {i+1}: {line.strip()}\\\")\\n        # Imprimir las siguientes 20 líneas\\n",
+    "resultado_caracteres": 30
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"calientes_para\"}",
+    "resultado_caracteres": 523
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"vram_libre_estable\"}",
+    "resultado_caracteres": 615
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"asegurar\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"base_mb\"}",
+    "resultado_caracteres": 421
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"cabe_mtp\"}",
+    "resultado_caracteres": 315
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"mb_por_caliente\"}",
+    "resultado_caracteres": 408
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"mb_nucleo_extra\"}",
+    "resultado_caracteres": 404
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"lanzar\"}",
+    "resultado_caracteres": 63
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Motor._lanzar\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"RESERVA_CUDA_MB\"}",
+    "resultado_caracteres": 72
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"MARGEN_MB\"}",
+    "resultado_caracteres": 66
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"MAX_CALIENTES\"}",
+    "resultado_caracteres": 70
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"MB_POR_CALIENTE\"}",
+    "resultado_caracteres": 72
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Motor\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver las funciones clave para calcular expertos calientes y VRAM\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\n# Buscar calientes_para, cabe_mtp, vram_libre_estable, y asegurar\\nimport re\\n\\n# Extraer las funciones relevantes\\nfunciones_clave = [\\\"calientes_para\\\", \\\"cabe_mtp\\\", \\\"vram_libre_estable\\\", \\\"mb_por_caliente\\\", \\\"mb_nucleo_extra\\\", \\\"modelo_para\\\"]\\nfor fun",
+    "resultado_caracteres": 134
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver las funciones clave para calcular expertos calientes y VRAM\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\nimport re\\n\\nfunciones_clave = [\\\"calientes_para\\\", \\\"cabe_mtp\\\", \\\"vram_libre_estable\\\", \\\"mb_por_caliente\\\", \\\"mb_nucleo_extra\\\", \\\"modelo_para\\\"]\\nfor func in funciones_clave:\\n    patron = rf'^def {func}\\\\('\\n    lineas = codigo_motor.split('\\\\n')\\n    for",
+    "resultado_caracteres": 134
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver las funciones clave para calcular expertos calientes y VRAM\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\nimport re\\n\\nfunciones_clave = [\\\"calientes_para\\\", \\\"cabe_mtp\\\", \\\"vram_libre_estable\\\", \\\"mb_por_caliente\\\", \\\"mb_nucleo_extra\\\", \\\"modelo_para\\\"]\\nfor func in funciones_clave:\\n    patron = rf'^def {func}\\\\('\\n    lineas = codigo_motor.split('\\\\n')\\n    for",
+    "resultado_caracteres": 84
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"calientes_para\"}",
+    "resultado_caracteres": 523
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"cabe_mtp\"}",
+    "resultado_caracteres": 315
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"vram_libre_estable\"}",
+    "resultado_caracteres": 615
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"base_mb\"}",
+    "resultado_caracteres": 421
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"mb_por_caliente\"}",
+    "resultado_caracteres": 408
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"mb_nucleo_extra\"}",
+    "resultado_caracteres": 404
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Extraer la función asegurar del motor\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\nlineas = codigo_motor.split('\\\\n')\\nfor i, linea in enumerate(lineas):\\n    if 'def asegurar(self)' in linea:\\n        # Encontrar el final de la función\\n        fin = i\\n        for j in range(i+1, len(lineas)):\\n            if lineas[j].strip() and not lineas[j].startswith(' ') and ",
+    "resultado_caracteres": 134
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\nlineas = codigo_motor.split('\\\\n')\\nfor i, linea in enumerate(lineas):\\n    if 'def asegurar(self)' in linea:\\n        fin = i\\n        for j in range(i+1, len(lineas)):\\n            if lineas[j].strip() and not lineas[j].startswith(' ') and not lineas[j].startswith('\\\\t'):\\n                fin = j\\n                break\\n   ",
+    "resultado_caracteres": 134
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\ncodigo_motor = P.leer(\\\"backend/ai_engine/motor_moe.py\\\")\\nlineas = codigo_motor.split('\\\\n')\\nfor i, linea in enumerate(lineas):\\n    if 'def asegurar(self)' in linea:\\n        fin = i\\n        for j in range(i+1, len(lineas)):\\n            if lineas[j].strip() and not lineas[j].startswith(' ') and not lineas[j].startswith('\\\\t'):\\n                fin = j\\n                break\\n   ",
+    "resultado_caracteres": 134
+   }
+  ],
+  "ind_01": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"ruta_http_canonica\"}",
+    "resultado_caracteres": 759
+   }
+  ]
+ },
+ "respuestas": {
+  "3354b61228b1": "Para responder a la pregunta del examen sobre qué funciones o métodos leen la clave de configuración `keep_alive`, necesito consultar el grafo de hechos del proyecto, específicamente las relaciones `lee_config`.\n\nVoy a usar la consola para obtener esta información precisa.\n\nSegún el grafo de hechos del proyecto, las funciones que leen la clave de configuración `keep_alive` son:\n\n1. **`AIEngine._completar_payload`** (en `backend/ai_engine/ai_engine_class.py`)\n2. **`modelos_precargar`** (en `backend/app.py`)\n\nEstas son las únicas dos funciones identificadas en el sistema que leen explícitamente el valor de `keep_alive` desde la configuración.",
+  "ebf8908081d4": "En el archivo `backend/banco_proyecto.py`, la constante `RRF_K` vale **60**.\n\nSe define en la línea 44 del código proporcionado:\n```python\nRRF_K = 60\n```",
+  "dd9a33e475e0": "La función que implementa el endpoint `POST /api/hub/manifiesto` es `manifiesto` dentro de la función `crear_router` en el archivo **`backend/hub/api.py`** (líneas 216-218).\n\nSu implementación es:\n\n```python\n    @r.post(\"/manifiesto\")\n    def manifiesto(req: Manifiesto):\n        return h(servicio().editar_manifiesto, propio(req.destino), req.cambios)\n```\n\nEsta función:\n1. Recibe un objeto `Manifiesto` (definido en la misma línea 63-65 del mismo archivo) con los campos `destino` y `cambios`.\n2. Llama al método `editar_manifiesto` del servicio Hub, pasándole el destino propio y los cambios.\n3. El método `editar_manifiesto` está implementado en **`backend/hub/servicio.py`** (líneas 194-224), donde actualiza el manifiesto YAML del repositorio Hub especificado.",
+  "7b3370acbb60": "Voy a buscar qué funciones o métodos del proyecto leen la variable de entorno `PRIG_SIN_MOTOR_SUAVE`.\n\nPerfecto. La variable de entorno `PRIG_SIN_MOTOR_SUAVE` es leída por la función `Gobernador.__init__` en el archivo `backend/recursos/termico.py` en la línea 374.\n\nDéjame verificar el código relevante para confirmar:\n\nLa variable de entorno `PRIG_SIN_MOTOR_SUAVE` es leída por la función **`Gobernador.__init__`** en el archivo **`backend/recursos/termico.py`** en la **línea 374**.\n\nSegún el comentario en el código (línea 372-373), esta variable se usa para desactivar la instalación y arranque del controlador del modo suave. Cuando `PRIG_SIN_MOTOR_SUAVE=1`, el Gobernador no inicia el hilo que prepara el motor suave, evitando así escribir en el archivo de control si hay otro proceso de Prig abierto simultáneamente.",
+  "16fc1e63dc7b": "P.api(\"/api/books/read\")La función del frontend que llama al endpoint `/api/books/read` es `loadBookViewer`, ubicada en el archivo `frontend/js/book_library.js`.",
+  "ace7c95ae520": "Para determinar qué endpoints se ven afectados, primero localizo dónde se define la función y luego busco todas las rutas HTTP que la invocan (directa o indirectamente).\n\nLa función `explain_seguimiento_block` no está definida en `app.py`, sino que es un método de `ai_engine` (instancia de `AIEngine`) que es invocado por un endpoint. Vamos a buscar el endpoint exacto que la llama.\n\nNo aparece en app.py. Busquemos en todo el proyecto quién llama a `explain_seguimiento_block`.\n\nPerfecto. Ahora veo que hay una función local `explain_seguimiento_block` en `app.py:4685` que llama al método del motor. Busquemos los decoradores de ese endpoint.\n\nAhora verifiquemos si hay algún otro endpoint que llame a este endpoint o a `ai_engine.explain_seguimiento_block` indirectamente (por ejemplo, a través de `P.recorrido` o `P.impacto`).\n\nAhora veamos cómo el frontend llama a este endpoint para confirmar el flujo completo:\n\nPerfecto. Ahora tengo toda la información. Déjame verificar si hay algún otro endpoint que pueda llamar indirectamente a través de `ai_engine`:\n\nNo hay tests para este endpoint. Ahora tengo toda la información necesaria para responder.\n\n---\n\n## Endpoints afectados por cambios en `explain_seguimiento_block`\n\n### 1. Endpoints HTTP directos (backend)\n\nModificando `explain_seguimiento_block` en `backend/app.py:4685`, afectas directamente a **dos rutas HTTP idénticas** (mismo comportamiento, dos URLs alternativas):\n\n- **`POST /api/guided/explain`** (línea 4683)\n- **`POST /api/seguimiento/explain`** (línea 4684)\n\nAmbos endpoints comparten la misma función `explain_seguimiento_block` y devuelven un `StreamingResponse` con el flujo de chunks generados por `ai_engine.explain_seguimiento_block`.\n\n### 2. Consumidor frontend\n\nEl frontend consume exclusivamente `/api/guided/explain`:\n\n**`frontend/js/aprendizaje_guiado.js:881`**:\n```javascript\nconst response = await fetch('/api/guided/explain', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(reqData)\n});\n```\n\nEste código está dentro del flujo de **Aprendizaje Guiado**, donde el alumno solicita la explicación de un bloque temático de una ruta de estudio.\n\n### 3. Flujo de impacto\n\n```\n/frontend/js/aprendizaje_guiado.js:881\n    ↓ (POST /api/guided/explain)\n/backend/app.py:4685 (explain_seguimiento_block)\n    ↓ (llama a)\n/backend/ai_engine/ai_engine_class.py:1925 (AIEngine.explain_seguimiento_block)\n    ↓ (genera chunks con)\n/backend/ai_engine/ai_engine_class.py:1948 (self.generate_response)\n```\n\n### 4. Parámetros que el endpoint acepta\n\nLa función recibe un objeto `SeguimientoExplainRequest` con:\n- `goal`: meta del alumno\n- `block`: diccionario con `title`, `topics`, `learning_objective`, `validation_check`\n- `model`: modelo a usar (default: `qwen2.5-coder:7b`)\n- `use_web`: si busca contexto en internet (default: `True`)\n\n### 5. Dependencias internas a considerar\n\nLa función local en `app.py` también invoca `_con_referencias(tema, \"\")[0]` (línea 4690), que inyecta referencias ML al contexto. Si cambias `explain_seguimiento_block` para modificar cómo se construye el prompt o cómo se procesan los chunks, ese helper también es relevante.\n\n### Resumen\n\n| Nivel | Qué cambia | Archivo |\n|-------|-----------|---------|\n| **Backend** | 2 endpoints POST idénticos | `backend/app.py:4683-4695` |\n| **Frontend** | 1 consumidor JS | `frontend/js/aprendizaje_guiado.js:881` |\n| **Motor** | 1 método de `AIEngine` | `backend/ai_engine/ai_engine_class.py:1925` |\n| **Tests** | Ninguno encontrado | — |\n\nSi modificas la lógica de generación de chunks, el error handling o los parámetros de `explain_seguimiento_block`, el impacto se propaga a toda la experiencia de \"Explicar bloque\" en el sistema de Aprendizaje Guiado.",
+  "01c1ae535c93": "Las funciones/métodos que llaman a `BookService.save_metadata` son:\n\n1. **`BookService.analyze_document`** (en `backend/book_service.py`, línea 542) — el método principal que analiza un documento y guarda sus metadatos.\n2. **`TestBiblioteca.test_titulo_nunca_es_nulo`** (en `backend/tests/test_datos_usuario.py`, línea 78) — prueba unitaria.\n3. **`TestBiblioteca.test_homonimos_en_categorias_distintas_no_comparten_ficha`** (en `backend/tests/test_datos_usuario.py`, línea 86) — prueba unitaria.\n4. **`TestBiblioteca.test_borrar_lleva_su_ficha_y_respeta_al_homonimo`** (en `backend/tests/test_datos_usuario.py`, línea 109) — prueba unitaria.",
+  "7cf766c1b03a": "P.ficha(\"sondeo_preparar\")\n\nLa ejecución pasa por estas funciones en este orden:\n\n1. **`sondeo_preparar`** (endpoint `/api/sondeo/preparar`)\n2. **`job_prepare`**\n3. **`_preparar_trabajo`**\n4. **`_libro_aceptable`**\n\nEl camino es: `sondeo_preparar` → `job_prepare` → `_preparar_trabajo` → `_libro_aceptable`.",
+  "d9b51731a649": "`BancoProyecto.registrar_resolucion` está definida en **backend/banco_proyecto.py**, línea **2006**.\n\n```python\n# backend/banco_proyecto.py:2006-2034\ndef registrar_resolucion(self, pregunta: str, respuesta: str, modelo: str = \"\",\n                         rutas: Optional[Iterable[str]] = None) -> Optional[int]:\n    ...\n```",
+  "ind_17": "Las funciones/métodos fuera de los tests que llaman a `load_state` (definida en `StudyPlanEngine`) son:\n\n1. **`StudyPlanEngine.approve_knowledge_step`** (línea 858)\n2. **`StudyPlanEngine.approve_practical_step`** (línea 875)\n3. **`StudyPlanEngine.approve_learning_step`** (línea 892)\n4. **`StudyPlanEngine.apply_change_request`** (línea 910)\n5. **`StudyPlanEngine.toggle_validation_criterion`** (línea 974)\n6. **`StudyPlanEngine.toggle_notebook_completion`** (línea 990)\n\nTodos ellos son métodos de la misma clase `StudyPlanEngine` en `backend/study_plan_engine.py`.",
+  "ind_27": "Voy a analizar el código de `motor_moe.py` para entender cómo el motor decide cuántos expertos calientes cargar y qué hace si no caben en la GPU.\n\n\n\nEl problema es que las funciones están en un archivo grande. Voy a usar `ver_simbolo` directamente:\n\nAhora veamos la función `asegurar` que es la que orquesta todo el proceso de arranque:\n\n\n[agotada: cortada a los 600 s sin terminar]",
+  "ind_01": "`ruta_http_canonica(\"/api/x/{id}/y?z=1\")` devuelve **`\"/api/x/*/y\"`**.\n\nEl proceso es:\n1. La primera sustitución (`\\$\\{...\\}`) no afecta porque no hay `${...}`.\n2. `.split(\"?\")[0]` corta la cadena de consulta `?z=1`, quedando `\"/api/x/{id}/y\"`.\n3. `.split(\"#\")[0]` no cambia nada (no hay fragmento).\n4. La segunda sustitución `\\{[^}]*\\}` → `*` convierte `{id}` en `*`, quedando `\"/api/x/*/y\"`.\n5. `.rstrip(\"/\")` no elimina nada porque no termina en barra."
+ }
+}

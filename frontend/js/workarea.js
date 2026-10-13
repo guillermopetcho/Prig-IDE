@@ -55,6 +55,84 @@ class WorkAreaManager {
         this.aplicarDisposicion();
         this.pintar();
         this.initTabsModelo();
+        this.initSeccionesBar();
+    }
+
+    // ------------------------------------------------------------------
+    // Barra superior de Secciones del Programa (Workspaces)
+    // ------------------------------------------------------------------
+
+    initSeccionesBar() {
+        const barra = document.getElementById('prig-secciones-bar');
+        if (!barra) return;
+        barra.addEventListener('click', (e) => {
+            const btn = e.target.closest('.seccion-btn');
+            if (!btn) return;
+            const sec = btn.dataset.seccion;
+            this.irASeccion(sec);
+        });
+    }
+
+    actualizarBarraSecciones(seccionActiva) {
+        const barra = document.getElementById('prig-secciones-bar');
+        if (!barra) return;
+        barra.querySelectorAll('.seccion-btn').forEach(btn => {
+            btn.classList.toggle('activo', btn.dataset.seccion === seccionActiva);
+        });
+    }
+
+    irASeccion(sec) {
+        this.actualizarBarraSecciones(sec);
+        switch (sec) {
+            case 'editor':
+                this.abrir('editor');
+                break;
+            case 'cuaderno':
+                this.abrir('cuaderno');
+                break;
+            case 'consola':
+                this.abrir('consola');
+                break;
+            case 'archivos':
+                this.verEnModelo('archivos');
+                break;
+            case 'inicio':
+                if (window.Inicio) window.Inicio.abrir();
+                break;
+            case 'biblioteca':
+                this.abrirHerramienta('modal-book-library', 'Biblioteca', 'fa-book-bookmark');
+                break;
+            case 'desafios':
+                if (window.Desafios) window.Desafios.abrir();
+                break;
+            case 'grafo':
+                if (window.MotorAprendizajeGrafo) window.MotorAprendizajeGrafo.abrir();
+                break;
+            case 'agenticos':
+                this.abrirHerramienta('modal-agent-workflow', 'Agenticos', 'fa-diagram-project');
+                break;
+            case 'kaggle':
+                if (window.KaggleLector) window.KaggleLector.abrir();
+                else this.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle');
+                break;
+            case 'github':
+                if (window.GitHubLector) window.GitHubLector.abrir();
+                break;
+            case 'youtube':
+                if (window.YouTubeHub) window.YouTubeHub.abrir();
+                break;
+            case 'hub':
+                if (window.PrigHub) window.PrigHub.abrir();
+                break;
+            case 'modelos':
+                if (window.Modelos) window.Modelos.abrir();
+                break;
+            case 'hardware':
+                if (window.Temperaturas) window.Temperaturas.abrir();
+                break;
+            default:
+                this.abrir(sec);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -83,6 +161,15 @@ class WorkAreaManager {
         }
         const sel = document.getElementById('model-select');
         if (sel) sel.style.visibility = (vista === 'modelo') ? 'visible' : 'hidden';
+
+        if (vista === 'archivos') {
+            const sLeft = document.getElementById('sidebar-left');
+            if (sLeft) sLeft.style.display = 'flex';
+            if (window.fileTreeMgr) {
+                window.fileTreeMgr.loadTree();
+            }
+        }
+        this.actualizarBarraSecciones(vista);
     }
 
     // ------------------------------------------------------------------
@@ -146,6 +233,7 @@ class WorkAreaManager {
         }
 
         this.pintar();
+        this.actualizarBarraSecciones(id);
         setTimeout(() => {
             if (window.editorMgr && window.editorMgr.editor) window.editorMgr.editor.layout();
             if (window.editorMgr && typeof window.editorMgr.refreshEditorLayouts === 'function') {

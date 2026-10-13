@@ -179,6 +179,18 @@ class PruebaCatalogoGitHub(unittest.TestCase):
             self.assertIn(ref, cat.EJERCICIOS_DESTACADOS_REPO, f"Falta lista destacada para {repo['ref']}")
             self.assertGreater(len(cat.EJERCICIOS_DESTACADOS_REPO[ref]), 0)
 
+    def test_filtro_por_carpeta_sin_prefijos_ajenos(self):
+        # «ejercicios» no debe dejar pasar «ejercicios_avanzados/…»
+        self.assertTrue(cat._dentro_de("ejercicios/a.py", "ejercicios"))
+        self.assertTrue(cat._dentro_de("ejercicios/a.py", "/ejercicios/"))
+        self.assertFalse(cat._dentro_de("ejercicios_avanzados/a.py", "ejercicios"))
+        self.assertTrue(cat._dentro_de("otro/a.py", ""))
+        destacados = [{"ruta": "ejercicios/a.py", "nombre": "a"}, {"ruta": "ejercicios_avanzados/b.py", "nombre": "b"}]
+        with mock.patch("github_lector.abrir", side_effect=Exception("sin red")), \
+                mock.patch.dict(cat.EJERCICIOS_DESTACADOS_REPO, {"x/y": destacados}):
+            rutas = [a["ruta"] for a in cat.listar_ejercicios_repo("x/y", ruta_sub="ejercicios")["archivos"]]
+        self.assertEqual(rutas, ["ejercicios/a.py"])
+
     def test_listar_ejercicios_repo_fallback(self):
         # Incluso simulando fallo en github_lector o sin conexión / límite superado
         with mock.patch("github_lector.abrir", side_effect=Exception("API rate limit exceeded")):

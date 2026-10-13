@@ -247,6 +247,134 @@ class PruebaMotor(_Temporal):
         self.assertEqual(segunda[-1], {"role": "tool", "tool_name": "sumar", "content": "5"})
         self.assertIn("tool_calls", segunda[-2])
 
+    def test_chat_eventos_tope_de_tokens(self):
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion"])}
+        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"message": {"content": "ok"}, "done": True}])) as p:
+            list(motor.chat_eventos([{"role": "user", "content": "x"}], "m", max_tokens=4096))
+        self.assertEqual(p.call_args.kwargs["json"]["options"]["num_predict"], 4096)
+
+    def test_con_razonamiento_el_tope_supera_al_de_la_configuracion(self):
+        """ num_predict de 4096 en la configuración: sin razonar manda la configuración; con «Pensar», el razonamiento
+        cuenta dentro del tope y con 4096 la respuesta salía vacía (B2 de E8, 2 de 2) """
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion", "thinking"])}
+        motor.config["num_predict"] = 4096
+        for think, esperado in ((False, 4096), (True, 16384)):
+            with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"message": {"content": "ok"}, "done": True}])) as p:
+                list(motor.chat_eventos([{"role": "user", "content": "x"}], "m", think=think, max_tokens=16384 if think else 4096))
+            self.assertEqual(p.call_args.kwargs["json"]["options"]["num_predict"], esperado)
+
+    def test_chat_eventos_consulta_repetida_no_se_repite_y_termina_respondiendo(self):
+        """ Estudio del banco: una respuesta repitió 4 veces el mismo código fallido y otra agotó 16 rondas sin
+        responder. Una consulta idéntica no se vuelve a ejecutar; a la segunda repetición se le pide que
+        responda (las herramientas siguen en la petición: quitarlas cambia el prefijo guardado del motor MoE) """
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
+        llamada = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 2, "b": 3}}}]}}
+        fin = {"message": {}, "done": True, "done_reason": "stop"}
+        rondas = [[llamada, fin], [llamada, fin], [llamada, fin], [{"message": {"content": "Da 5."}}, fin]]
+        enviados, ejecutadas = [], []
+
+        def post(url, json=None, **kw):
+            enviados.append(json)
+            return Res(rondas.pop(0))
+
+        class Herr:
+            def definiciones(self):
+                return [{"type": "function", "function": {"name": "sumar"}}]
+
+            def ejecutar(self, nombre, argumentos):
+                ejecutadas.append(argumentos)
+                return str(argumentos["a"] + argumentos["b"])
+        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
+            eventos = list(motor.chat_eventos([{"role": "user", "content": "2+3"}], "m", herramientas=Herr(), max_rondas=9))
+        self.assertEqual(len(ejecutadas), 1)                                      # las repetidas no se ejecutan
+        resultados = [e["v"] for e in eventos if e["t"] == "resultado"]
+        self.assertEqual(resultados[0], "5")
+        self.assertTrue(all("Ya hiciste exactamente esta consulta" in r for r in resultados[1:]))
+        self.assertEqual(enviados[-1]["tools"], enviados[0]["tools"])            # el mismo prefijo: no relee nada
+        self.assertIn("No hay más consultas", enviados[-1]["messages"][-1]["content"])
+        self.assertEqual([e["v"] for e in eventos if e["t"] == "texto"], ["Da 5."])
+
+    def test_chat_eventos_la_ultima_ronda_responde(self):
+        """ En la última ronda se le pide responder con las herramientas todavía en la petición (T7: sacarlas hacía
+        que el motor MoE releyera la unidad guardada, 26 s, y guardara otro estado de 246 MB) """
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
+        fin = {"message": {}, "done": True, "done_reason": "stop"}
+        rondas = [[{"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 1, "b": 1}}}]}}, fin],
+                  [{"message": {"content": "Da 2."}}, fin]]
+        enviados = []
+
+        def post(url, json=None, **kw):
+            enviados.append(json)
+            return Res(rondas.pop(0))
+        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "sumar"}}],
+                         ejecutar=lambda n, a: "2")
+        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
+            eventos = list(motor.chat_eventos([{"role": "user", "content": "1+1"}], "m", herramientas=herr, max_rondas=2))
+        self.assertIn("tools", enviados[0])
+        self.assertEqual(enviados[1]["tools"], enviados[0]["tools"])
+        self.assertIn("No hay más consultas", enviados[1]["messages"][-1]["content"])
+        self.assertIn("Da 2.", [e.get("v") for e in eventos])
+
+    def test_chat_eventos_si_en_la_ultima_ronda_consulta_igual(self):
+        """ Si en la última ronda pide otra consulta en vez de responder: no se ejecuta y hay una ronda más, esa sí
+        sin herramientas (el único caso en que cambia el prefijo) """
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
+        fin = {"message": {}, "done": True, "done_reason": "stop"}
+        llamada = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 1, "b": 1}}}]}}
+        otra = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 5, "b": 5}}}]}}
+        rondas = [[llamada, fin], [otra, fin], [{"message": {"content": "Da 2."}}, fin]]
+        enviados, ejecutadas = [], []
+
+        def post(url, json=None, **kw):
+            enviados.append(json)
+            return Res(rondas.pop(0))
+        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "sumar"}}],
+                         ejecutar=lambda n, a: ejecutadas.append(a) or "2")
+        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
+            eventos = list(motor.chat_eventos([{"role": "user", "content": "1+1"}], "m", herramientas=herr, max_rondas=2))
+        self.assertEqual(ejecutadas, [{"a": 1, "b": 1}])                          # la de la última ronda, no
+        self.assertEqual(len(enviados), 3)
+        self.assertIn("tools", enviados[1])
+        self.assertNotIn("tools", enviados[2])
+        self.assertEqual([e["v"] for e in eventos if e["t"] == "texto"], ["Da 2."])
+        self.assertFalse(any(e["t"] == "herramienta" and e["argumentos"] == {"a": 5, "b": 5} for e in eventos))
+        self.assertNotIn("Se alcanzó el máximo", " ".join(str(e.get("v")) for e in eventos))
+
+    def test_chat_eventos_corta_un_bucle_de_texto_y_pide_la_conclusion(self):
+        """ Revisando una función, una respuesta repitió el mismo párrafo hasta el tope (B2 de E8): se corta al
+        repetirse y se le pide la conclusión, con las herramientas todavía en la petición """
+        motor = _motor()
+        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
+        parrafo = ("Espera, creo que el error está en la línea 96. Cuando se cierra una sub-pieza intermedia se usa "
+                   "`nombres if primero else []`, pero `nombres` es la lista del tramo original, así que esto es correcto. ")
+        enbucle = [{"message": {"content": "Reviso. "}}] + [{"message": {"content": parrafo}} for _ in range(40)] + \
+                  [{"message": {}, "done": True, "done_reason": "length"}]
+        rondas = [enbucle, [{"message": {"content": "Conclusión: la línea 97 pierde una línea."}},
+                            {"message": {}, "done": True, "done_reason": "stop"}]]
+        enviados = []
+
+        def post(url, json=None, **kw):
+            enviados.append(json)
+            return Res(rondas.pop(0))
+        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "consola"}}], ejecutar=lambda n, a: "")
+        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
+            eventos = list(motor.chat_eventos([{"role": "user", "content": "¿Tiene algún error?"}], "m", herramientas=herr, max_rondas=9))
+        textos = "".join(e["v"] for e in eventos if e["t"] == "texto")
+        self.assertLess(textos.count("Espera, creo"), 10)                         # se cortó, no llegó a las 40
+        self.assertIn("Conclusión: la línea 97", textos)
+        segunda = enviados[1]["messages"]
+        from ai_engine.ai_engine_class import SALIR_DEL_BUCLE, corte_de_bucle
+        self.assertEqual(segunda[-1]["content"], SALIR_DEL_BUCLE)
+        self.assertEqual(segunda[-2]["role"], "assistant")
+        self.assertLessEqual(segunda[-2]["content"].count("Espera, creo"), 2)     # sin el bucle
+        self.assertEqual(enviados[1]["tools"], enviados[0]["tools"])              # el mismo prefijo
+        self.assertIsNone(corte_de_bucle(parrafo * 2 + "Fin."))                   # repetir una vez no es un bucle
+
     def test_herramientas_a_modelo_sin_capacidad(self):
         motor = _motor()
         motor._caps_cache = {"m": (1e18, ["completion"])}

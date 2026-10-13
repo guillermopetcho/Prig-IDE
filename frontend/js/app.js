@@ -148,6 +148,19 @@ class App {
 
             window.editorMgr.markSaved(path, content);
             if (!silencioso) window.terminalMgr.appendLine(`[Guardado exitoso: ${path}]`, 'info');
+
+            // Disparar re-análisis completo en el Director IA y actualizar la memoria comprimida
+            try {
+                if (window.DIRECTOR_ASCII) {
+                    window.DIRECTOR_ASCII.dispararDecisionDirector('guardado_archivo');
+                }
+                if (window.CerebroMemoria && typeof window.CerebroMemoria.actualizarMemoria === 'function') {
+                    window.CerebroMemoria.actualizarMemoria(true);
+                }
+            } catch (errDirector) {
+                console.warn('Error al notificar guardado al Director IA:', errDirector);
+            }
+
             return true;
         } catch (e) {
             if (!silencioso) alert('Error al guardar archivo: ' + e);
@@ -227,24 +240,68 @@ class App {
 
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Orden importante: apariencia y atajos antes de pintar la barra, para que los
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Orden importante: apariencia y atajos antes de pintar la barra, para que los
     // menús muestren ya las teclas correctas y no haya un parpadeo de estilo.
-    window.aparienciaMgr.aplicar();
-    window.shortcutMgr.instalar();
-    window.menuBar.montar(document.getElementById('prig-menubar-mount'));
-    window.layoutMgr.init();
-    window.layoutMgr.initResizer();
-    window.workArea.init();
-    window.planActualMgr.init();
+    try { if (window.aparienciaMgr) window.aparienciaMgr.aplicar(); } catch (e) { console.error('Error en aparienciaMgr.aplicar:', e); }
+    try { if (window.sintaxisMgr) window.sintaxisMgr.aplicar(); } catch (e) { console.error('Error en sintaxisMgr.aplicar:', e); }
+    try { if (window.shortcutMgr) window.shortcutMgr.instalar(); } catch (e) { console.error('Error en shortcutMgr.instalar:', e); }
+    try { if (window.menuBar) window.menuBar.montar(document.getElementById('prig-menubar-mount')); } catch (e) { console.error('Error en menuBar.montar:', e); }
+    try {
+        if (window.layoutMgr) {
+            window.layoutMgr.init();
+            window.layoutMgr.initResizer();
+        }
+    } catch (e) { console.error('Error en layoutMgr.init:', e); }
+    try { if (window.workArea) window.workArea.init(); } catch (e) { console.error('Error en workArea.init:', e); }
+    try { if (window.planActualMgr) window.planActualMgr.init(); } catch (e) { console.error('Error en planActualMgr.init:', e); }
 
-    window.app = new App();
+    // 2. Sincronizar configuraciones persistentes del backend
+    try { if (window.perfilesConfigMgr) window.perfilesConfigMgr.init(); } catch (e) { console.error('Error en perfilesConfigMgr.init:', e); }
+    try { if (window.globalConfigMgr) window.globalConfigMgr.sincronizarAccesibilidad(); } catch (e) { console.error('Error en globalConfigMgr.sincronizarAccesibilidad:', e); }
+
+    try {
+        window.app = new App();
+    } catch (e) {
+        console.error('Error inicializando App:', e);
+    }
+
+    // Asegurar carga inmediata del árbol de archivos del explorador
+    try {
+        if (window.fileTreeMgr && typeof window.fileTreeMgr.loadTree === 'function') {
+            window.fileTreeMgr.loadTree();
+        }
+    } catch (e) {
+        console.error('Error cargando fileTreeMgr:', e);
+    }
     
     // Restore tabs after a brief delay to ensure Monaco is ready
     setTimeout(() => {
-        if (window.editorMgr) {
-            window.editorMgr.restoreSessionState();
-        }
+        try {
+            if (window.editorMgr) {
+                window.editorMgr.restoreSessionState();
+            }
+            if (window.sintaxisMgr) {
+                window.sintaxisMgr.aplicar();
+            }
+        } catch (e) {}
     }, 500);
 });
+
+// Asegurar que las configuraciones queden grabadas en disco antes de cerrar la ventana o salir
+window.addEventListener('beforeunload', () => {
+    if (window.aparienciaMgr && typeof window.aparienciaMgr._guardarBackendInmediato === 'function') {
+        window.aparienciaMgr._guardarBackendInmediato();
+    }
+    if (window.sintaxisMgr && typeof window.sintaxisMgr._guardarBackendInmediato === 'function') {
+        window.sintaxisMgr._guardarBackendInmediato();
+    }
+    if (window.motorMovimiento && typeof window.motorMovimiento._guardarBackendInmediato === 'function') {
+        window.motorMovimiento._guardarBackendInmediato();
+    }
+    if (window.perfilesConfigMgr && typeof window.perfilesConfigMgr.guardarTodo === 'function') {
+        window.perfilesConfigMgr.guardarTodo();
+    }
+});
+
 

@@ -1,0 +1,21 @@
+[package]
+name = "banco-core"
+version = "0.1.0"
+edition = "2021"
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+ruff_python_parser = "0.0.17"
+ruff_python_ast = "0.0.17"
+ruff_text_size = "0.0.17"
+regex = "1"
+fancy-regex = "0.19"
+unicode-normalization = "0.1"
+sha1_smol = "1"
+flate2 = "1"
+indexmap = "2"
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+rayon = "1"
+num-bigint = "0.4"
+num-traits = "0.2"
+unicode-general-category = "1"

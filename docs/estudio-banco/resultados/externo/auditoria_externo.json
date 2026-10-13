@@ -1,0 +1,82 @@
+{
+ "criterio": "igual que auditoria_prig.json, sobre la copia de full-stack-fastapi-template",
+ "lotes": {
+  "1": [
+   {
+    "id": "a3b9deb2d9a5",
+    "tipo": "endpoint",
+    "auto": 0.5,
+    "manual": "incorrecta",
+    "pregunta_defectuosa": true,
+    "nota": "la pregunta dice «GET /users/*» (la forma canónica interna de /users/{user_id}); el modelo la leyó como GET /users/ y dio read_users en vez de read_user_by_id. Error del modelo, pero la redacción con «*» es un artefacto del generador: un usuario escribiría {user_id}."
+   },
+   {
+    "id": "e5dcaa694aae",
+    "tipo": "endpoint",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "create_user de users.py; agrega el create_user de private.py como si fuera POST /users/, pero ese router tiene prefix='/private' (imprecisión)."
+   },
+   {
+    "id": "073bfcc2da47",
+    "tipo": "frontend",
+    "auto": 0.0,
+    "manual": "incorrecta",
+    "agotada": true,
+    "nota": "AGOTADA a los 600 s (corte suave), sin respuesta."
+   },
+   {
+    "id": "d350423a439a",
+    "tipo": "frontend",
+    "auto": 0.25,
+    "manual": "correcta",
+    "clave_defectuosa": true,
+    "nota": "la clave mezcla el servicio generado (UsersService) con NOMBRES DE TIPOS de TypeScript (usersDeleteUserMeData, usersReadUserMeData...) como si fueran funciones. El modelo nombró UsersService y sus métodos (readUserMe, updateUserMe, deleteUserMe) y las funciones de la aplicación que los usan (useAuth, UserInformation, DeleteConfirmation; descartó beforeLoad por anónima): mejor que la clave."
+   },
+   {
+    "id": "dac1b36ce36f",
+    "tipo": "frontend",
+    "auto": 0.5,
+    "manual": "correcta",
+    "clave_defectuosa": true,
+    "nota": "recoverPassword, que llama LoginService.recoverPassword; la clave tiene LoginService y un tipo (loginRecoverPasswordData)."
+   },
+   {
+    "id": "5f69ce083bf3",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "parcial",
+    "clave_incompleta": true,
+    "nota": "isLoggedIn también se llama en el beforeLoad de 5 rutas (login, reset-password, recover-password, signup, _layout); el grafo de TS no ve llamadas a funciones importadas y la clave solo tiene useAuth. El modelo repitió el grafo."
+   },
+   {
+    "id": "002ba5b66654",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "los dos, con el prefijo /api/v1 (más preciso que la clave)."
+   },
+   {
+    "id": "39210d8965f9",
+    "tipo": "impacto",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "POST /api/v1/login/access-token."
+   },
+   {
+    "id": "53897b6f1836",
+    "tipo": "llamadores",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "bump_version y update_release_notes."
+   },
+   {
+    "id": "(endpoint ad77e7d6d216, ubicacion x2)",
+    "tipo": "varios",
+    "auto": 1.0,
+    "manual": "correcta",
+    "nota": "respuesta única."
+   }
+  ]
+ }
+}

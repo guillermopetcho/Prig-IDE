@@ -1,0 +1,264 @@
+{
+ "lote": 3,
+ "repeticion": true,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 43
+  },
+  "repeticion": true,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 60
+  }
+ },
+ "media": 0.818,
+ "segundos": 445,
+ "modos": {
+  "general": 3,
+  "unidad": 9
+ },
+ "por_tipo": {
+  "endpoint": 1.0,
+  "entorno": 1.0,
+  "recorrido": 0.0,
+  "config": 0.5,
+  "diseno": null,
+  "impacto": 1.0,
+  "llamadores_independiente": 0.5,
+  "frontend": 1.0,
+  "ubicacion": 1.0,
+  "ejecucion": 1.0,
+  "constante": 1.0,
+  "endpoint_real": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "a84a7fe1bad7",
+   "tipo": "config",
+   "puntaje": 0.5,
+   "segundos": 37.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "8caebf27e7ba",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 22.3,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "93470a7daa9c",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.1,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "e7c41fc9b8ee",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 13.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "40162c84477d",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 11.2,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "abb680bcc117",
+   "tipo": "impacto",
+   "puntaje": 1.0,
+   "segundos": 167.4,
+   "modo": "unidad",
+   "herramientas": 5
+  },
+  {
+   "id": "11c1e19dddbb",
+   "tipo": "recorrido",
+   "puntaje": 0.0,
+   "segundos": 35.6,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "5c64648aa59a",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 8.5,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_26",
+   "tipo": "diseno",
+   "puntaje": null,
+   "segundos": 81.6,
+   "modo": "unidad",
+   "herramientas": 4
+  },
+  {
+   "id": "ind_02",
+   "tipo": "ejecucion",
+   "puntaje": 1.0,
+   "segundos": 29.1,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "ind_19",
+   "tipo": "endpoint_real",
+   "puntaje": 1.0,
+   "segundos": 10.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "ind_16",
+   "tipo": "llamadores_independiente",
+   "puntaje": 0.5,
+   "segundos": 17.9,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "a84a7fe1bad7": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"truncar\\\")\"}",
+    "resultado_caracteres": 2
+   }
+  ],
+  "8caebf27e7ba": [],
+  "93470a7daa9c": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/export/pdf-preview\\\")\"}",
+    "resultado_caracteres": 299
+   }
+  ],
+  "e7c41fc9b8ee": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.hechos(r=\\\"lee_entorno\\\", o=\\\"GEMINI_API_KEY\\\")\"}",
+    "resultado_caracteres": 112
+   }
+  ],
+  "40162c84477d": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"/api/workspace/directories\\\")\\n\"}",
+    "resultado_caracteres": 311
+   }
+  ],
+  "abb680bcc117": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Buscar el endpoint que expone flujos_ejecutar\\nhechos = P.hechos(r=\\\"expone\\\", o=\\\"/api/flujos/ejecutar\\\")\\nprint(\\\"Endpoints que exponen /api/flujos/ejecutar:\\\")\\nfor h in hechos:\\n    print(f\\\"  {h['s']} en {h['ruta']}:{h['linea']}\\\")\\n\\n# Ver quién llama a flujos_ejecutar\\nprint(\\\"\\\\nLlamadores de flujos_ejecutar:\\\")\\nfor h in P.hechos(s=\\\"flujos_ejecutar\\\", r=\\\"llama\\\"):\\n    p",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver quién expone el endpoint /api/flujos/ejecutar\\nhechos = P.hechos(s=None, r=\\\"expone\\\", o=\\\"/api/flujos/ejecutar\\\")\\nprint(\\\"Endpoints expuestos:\\\")\\nfor h in hechos:\\n    print(f\\\"  {h['s']} en {h['ruta']}:{h['linea']}\\\")\\n\\n# Ver quién llama a /api/flujos/ejecutar (frontend)\\nhechos_frontend = P.hechos(s=None, r=\\\"llama_api\\\", o=\\\"/api/flujos/ejecutar\\\")\\nprint(\\\"\\\\nFrontend q",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# Ver qué otros endpoints están en la misma función o usan el mismo motor\\n# El endpoint /api/flujos/ejecutar es el único que expone POST /api/flujos/ejecutar\\n# Pero hay que ver si hay otros que usan flujos_ejecutar.emitir directamente\\n\\n# Ver todos los endpoints relacionados con flujos\\nhechos_flujos = P.hechos(o=\\\"%/flujos%\\\", r=\\\"expone\\\")\\nprint(\\\"Endpoints relacionados con flu",
+    "resultado_caracteres": 1156
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# run_workflow también es un endpoint. Ver si llama a flujos_ejecutar\\nprint(\\\"run_workflow:\\\", P.ficha(\\\"run_workflow\\\"))\\n\"}",
+    "resultado_caracteres": 458
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"\\n# run_workflow llama a run_workflow.event_stream. Ver si event_stream llama a flujos_ejecutar\\nprint(\\\"run_workflow.event_stream:\\\", P.ficha(\\\"run_workflow.event_stream\\\"))\\n\"}",
+    "resultado_caracteres": 552
+   }
+  ],
+  "11c1e19dddbb": [],
+  "5c64648aa59a": [],
+  "ind_26": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"Consola\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"_consola_usuario\"}",
+    "resultado_caracteres": 73
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"_worker\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"API\"}",
+    "resultado_caracteres": 2000
+   }
+  ],
+  "ind_02": [],
+  "ind_19": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"GET /api/hub/todo\\\")\"}",
+    "resultado_caracteres": 369
+   }
+  ],
+  "ind_16": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"Gestor.radiografia\\\")\"}",
+    "resultado_caracteres": 636
+   }
+  ]
+ },
+ "respuestas": {
+  "a84a7fe1bad7": "P.llamadores(\"truncar\")Ninguna función o método del proyecto lee explícitamente la clave de configuración `truncar` a través del grafo de hechos (hechos de tipo `lee_config`). Sin embargo, analizando el código:\n\n1. En `backend/knowledge_base.py`, la función `PALABRAS_VACIAS` y `normalizar_nombre` no están relacionadas con `truncar`.\n\n2. En `backend/indice_semantico.py`, la clase `IndiceSemantico` tiene un método `_ajustes()` que lee la configuración de embeddings desde `ollama_opciones.config().embeddings()`. Este método devuelve un diccionario que incluye la clave `\"truncar\"`:\n\n```python\ndef _ajustes(self) -> Dict[str, Any]:\n    try:\n        from ollama_opciones import config\n        e = config().embeddings()\n    except Exception:\n        e = {}\n    return {\"modelo\": e.get(\"modelo\") or self.modelo, \"dimensiones\": e.get(\"dimensiones\"),\n            \"truncar\": e.get(\"truncar\", True)}\n```\n\n3. El valor de `truncar` se usa en el método `embeber()` de `IndiceSemantico`:\n\n```python\nif not ajustes[\"truncar\"]:\n    cuerpo[\"truncate\"] = False\n```\n\nPor lo tanto, aunque no aparece en el grafo de hechos como `lee_config`, la función `IndiceSemantico._ajustes()` es la que accede a esta clave de configuración, y `IndiceSemantico.embeber()` es la que la utiliza para controlar si se debe truncar el embebedor.",
+  "8caebf27e7ba": "En `backend/recursos/termico.py` línea 39, `MESETA_S` vale **20.0**.",
+  "93470a7daa9c": "P.api(\"POST /api/export/pdf-preview\")El endpoint `POST /api/export/pdf-preview` está implementado por la función `pdf_preview` en el archivo `backend/app.py` (línea 4994).",
+  "e7c41fc9b8ee": "P.hechos(r=\"lee_entorno\", o=\"GEMINI_API_KEY\")La función que lee la variable de entorno `GEMINI_API_KEY` es `clave_actual()` en `backend/gemini_motor.py`.",
+  "40162c84477d": "La función del frontend que llama al endpoint `/api/workspace/directories` es **`FileTreeManager.navegarExplorador`** (ubicada en `frontend/js/filetree.js`, línea 367).",
+  "abb680bcc117": "Based on the analysis, here is the answer:\n\n**El único endpoint HTTP directamente afectado es `POST /api/flujos/ejecutar`**, ya que `flujos_ejecutar.emitir` es una función anidada dentro de esa vista.\n\n**Indirectamente**, el cambio también afecta a:\n\n1. **`POST /api/ai/workflow/run`** (función `run_workflow`), que expone su propio `event_stream` interno. Sin embargo, este endpoint **NO llama a `flujos_ejecutar`** — usa `_motor_flujos_v2()` directamente y tiene su propia lógica de streaming. Por lo tanto, un cambio en `flujos_ejecutar.emitir` **no afecta** a este endpoint.\n\n2. **Los consumidores frontend** que llaman a `POST /api/flujos/ejecutar`:\n   - `AgentWorkflowManager.runWorkflow` en `frontend/js/agent_workflow.js:820`\n   - `Flujos` en `frontend/js/flujos.js:739`\n\n**En resumen:** Solo el endpoint `POST /api/flujos/ejecutar` se ve afectado directa e indirectamente. Los demás endpoints de flujos (`/api/flujos/catalogo`, `/api/flujos`, `/api/flujos/validar`, `/api/flujos/historial`, etc.) y el endpoint `/api/ai/workflow/run` no dependen de `flujos_ejecutar.emitir`.",
+  "11c1e19dddbb": "Para entender la ruta de ejecución desde el endpoint hasta la posible elevación de `ErrorDesafio`, debemos trazar el flujo de datos a través de las capas de la aplicación.\n\nAquí está el orden de las funciones intermedias:\n\n1.  **`desafios_evaluar_salida`** (`backend/app.py:6778`): Es el punto de entrada (endpoint `/api/desafios/evaluar-salida`). Recibe la solicitud del cliente.\n2.  **`_desafio`** (`backend/app.py`, impl. interna no mostrada en el banco pero llamada en l. 6781 y 6803): Es una función de utilidad local en `app.py` que actúa como puente para llamar a funciones del almacén o de ejecución con el contexto adecuado (como `runner` o el almacén de desafíos). En la línea 6803, se llama a `_desafio(des_ejec.comprobar, ...)`.\n3.  **`comprobar`** (`backend/desafios/ejecucion.py:376`): Es la función principal que recibe el runner, las páginas de código y la configuración privada (incluyendo las pruebas). Es aquí donde se decide qué tipo de comprobación realizar (unittest, doctest, asserts, etc.).\n4.  **`validar_paginas`** (`backend/desafios/ejecucion.py:38`): Llamada al inicio de `comprobar` (línea 379). Si las páginas de código enviadas por el usuario tienen nombres inválidos, están vacías o exceden los límites, esta función lanza `ErrorDesafio`.\n\n**Resumen del flujo:**\n`desafios_evaluar_salida` -> `_desafio` (envoltura) -> `comprobar` -> `validar_paginas` -> `ErrorDesafio`.\n\nEs importante notar que `ErrorDesafio` también puede ser lanzada por:\n*   **`ejecutar_pagina`** (`backend/desafios/ejecucion.py:349`), que también llama a `validar_paginas`.\n*   Dentro de **`comprobar`** mismo, al validar tipos de comprobación C++ o choques de nombres de archivos (líneas 400-405, 415-417).\n\nPero la ruta principal desde el endpoint de evaluación hacia la lógica de validación de estructuras de datos es la descrita arriba.",
+  "5c64648aa59a": "`desafios_borrar` está definida en **`backend/app.py`** (línea 6567).",
+  "ind_26": "Consola del banco (memoria de consulta) es un objeto programable donde el modelo puede ejecutar código Python sobre el proyecto. La pregunta es qué impide que ese código modifique la base del banco (banco_proyecto.py).\n\nVoy a revisar cómo se implementa la consola y qué permisos tiene sobre el banco.\n\nAhora veo la clave. En la línea 135 del `_worker`:\n\n```python\nconexion = sqlite3.connect(f\"file:{ruta_db}?mode=ro\", uri=True, timeout=30, check_same_thread=False)\n```\n\nLa base de datos se abre en modo **solo lectura** (`mode=ro`). Esto es lo que impide que el código ejecutado en la consola modifique la base del banco.\n\nAdemás, hay otras capas de protección:\n\n1. **Proceso aislado**: El código se ejecuta en un `subprocess.Popen` separado, no en el proceso principal.\n2. **Imports restringidos**: Solo se permiten imports de `MODULOS_PERMITIDOS` (línea 173-174).\n3. **Builtins restringidos**: Solo se permiten `BUILTINS_PERMITIDOS` (línea 177-178).\n4. **Límite de memoria**: `resource.setrlimit(resource.RLIMIT_AS, ...)` (línea 168-170).\n5. **Alarma de tiempo**: `signal.alarm(alarma)` (línea 181-185).\n6. **AST check**: `revisar(codigo)` (línea 199) que lanza `CodigoNoPermitido` si detecta código no permitido.\n\nPero la barrera principal contra modificaciones del banco es el modo `mode=ro` de SQLite.",
+  "ind_02": "Devuelve `\"/api/desafios/*/comprobar\"`.\n\nLa función `ruta_http_canonica` (backend/banco_proyecto.py:624-632) transforma los parámetros de ruta a `*` para unificar la comparación entre backend y frontend:\n\n1. **Línea 629**: Reemplaza los `${...}` pegados a `/` por `*`. En este caso, `${id}` está precedido por `/`, así que se convierte en `*`:\n   ```\n   \"/api/desafios/*/comprobar/\"\n   ```\n\n2. **Línea 630**: Limpia cualquier `${...}` que quede pegado a un segmento (sin `/` delante), quita query strings (`?...`) y fragmentos (`#...`). En este caso no aplica porque ya se procesó en el paso anterior.\n\n3. **Línea 631**: Reemplaza `{...}` (notación de Flask/FastAPI) por `*`. No aplica aquí.\n\n4. **Línea 632**: Quita la barra final. Resultado final:\n   ```\n   \"/api/desafios/*/comprobar\"\n   ```",
+  "ind_19": "P.api(\"GET /api/hub/todo\")El endpoint `GET /api/hub/todo` está implementado por la función `crear_router.todo` en el archivo `backend/hub/api.py`, en la línea 170.",
+  "ind_16": "P.ficha(\"Gestor.radiografia\")Los métodos que llaman a `Gestor.radiografia` (fuera de los tests) son:\n\n1. `Gestor.maquina` (en `backend/recursos/gestor.py`, línea 55)\n2. `Gestor.estado_vivo` (en `backend/recursos/gestor.py`, línea 150)"
+ }
+}

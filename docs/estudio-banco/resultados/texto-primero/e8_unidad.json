@@ -1,0 +1,188 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 48
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   64,
+   67,
+   73,
+   74,
+   75,
+   78,
+   79,
+   80
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "unidad",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 60
+  },
+  "segundos": 687,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "Vamos a revisar `piezas_de_archivo` en `backend/particion_proyecto.py` para detectar errores de programación.\n\nAhora voy a analizar la lógica con más detalle, especialmente la parte de subdivisión de tramos que no caben (líneas 70-84) y la parte de corte por líneas (líneas 86-99).\n\nVoy a revisar el caso de un símbolo grande sin hijos que no cabe. El problema potencial está en las líneas 76-84:\n\nSí, `piezas_de_archivo` tiene un error de programación.\n\n**Línea 76-84:** Cuando un tramo que no cabe se subdivide en sus hijos (métodos), el código asume que el primer hijo comienza en `cur = ini` (línea 77), pero `ini` puede ser anterior al inicio del primer hijo si hay código suelto antes del primer símbolo en ese tramo.\n\n**Qué hace mal:** En la subdivisión de un tramo grande en sus hijos, se usa `cur = ini` como punto de partida para asignar hijos. Sin embargo, `ini` es el inicio del tramo completo (que puede incluir código suelto antes del primer símbolo), mientras que el primer hijo comienza en `h[\"ini\"]`. Si `h[\"ini\"] > ini`, el código entre `ini` y `h[\"ini\"]` se asigna incorrectamente al primer hijo, incluso si ese código no pertenece a ese hijo.\n\n**Caso concreto de fallo:**\n- Archivo con 50 líneas.\n- Código suelto en líneas 1-10.\n- `func_a` en líneas 11-30 (símbolo de primer nivel, padre=None).\n- `func_a` tiene un método `m1` en líneas 11-20.\n- `func_a` tiene un método `m2` en líneas 21-30.\n- Supongamos que `func_a` no cabe (tokens > tope).\n\nEn la subdivisión:\n- `tramo = (1, 30, ['func_a'], func_a)`\n- `cur = 1` (línea 77)\n- `hijos = [m1, m2]`\n- Para `m1` (ini=11, fin=20):\n  - `h[\"fin\"] < cur` → 20 < 1 → False\n  - `finos.append((1, 20, ['m1']))` ← **Error**: se asigna el tramo (1, 20) a `m1`, pero `m1` solo va de la línea 11 a la 20. El código suelto de las líneas 1-10 se incluye incorrectamente en `m1`.\n- Para `m2` (ini=21, fin=30):\n  - `h[\"fin\"] < cur` → 30 < 21 → False\n  - `finos.append((21, 30, ['m2']))` ← Correcto, pero ahora hay un hueco: las líneas 21-30 se asignan a `m2`, pero el código entre 20 y 21 (si lo hubiera) se perdería.\n- `cur = 31`\n- `if cur <= fin` → 31 <= 30 → False\n\nEl resultado es que el código suelto de las líneas 1-10 se incluye en `m1`, lo cual es incorrecto porque `m1` solo abarca las líneas 11-20. Además, si hubiera código entre `m1` y `m2` (líneas 20-21), ese código se perdería porque `cur` se salta ese rango.\n\nEste error ocurre siempre que un tramo que no cabe tiene código suelto antes de su primer hijo, y el primer hijo no comienza en `ini` del tramo.",
+   "agotada": false,
+   "corte": null,
+   "modo": "unidad",
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "forzado: «backend: agent_flows, particion_proyecto» no tiene lectura guardada; se lee ahora",
+   "hechos_caracteres": 0,
+   "tokens": 759,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Leer la función piezas_de_archivo\\ncodigo = P.leer(\\\"backend/particion_proyecto.py\\\", desde=47, hasta=100)\\nprint(codigo)\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\ncodigo = P.leer(\\\"backend/particion_proyecto.py\\\", desde=100, hasta=110)\\nprint(codigo)\\n\"}",
+     "resultado_caracteres": 567
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\ncodigo = P.leer(\\\"backend/particion_proyecto.py\\\", desde=110, hasta=115)\\nprint(codigo)\\n\"}",
+     "resultado_caracteres": 309
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Analizar el caso donde un símbolo grande no tiene hijos\\n# Línea 76: hijos = sorted((h for h in simbolos if s is not None and h[\\\"padre\\\"] == s[\\\"nombre\\\"]), key=lambda h: h[\\\"ini\\\"])\\n# Si s es None (tramo sin símbolo), hijos = []\\n# Luego cur = ini, y el bucle for h in hijos no se ejecuta\\n# Luego: if cur <= fin: finos.append((cur, fin, nombres if not hijos else []))\\n# nombres e",
+     "resultado_caracteres": 47
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora voy a revisar un caso más específico: ¿qué pasa cuando hay código suelto entre símbolos?\\n# Por ejemplo:\\n# Líneas 1-10: código suelto\\n# Líneas 11-30: func_a\\n# Líneas 31-40: código suelto\\n# Líneas 41-60: func_b\\n# \\n# tramos se construye así:\\n# cursor = 1\\n# s = func_a (ini=11, fin=30):\\n#   si s[\\\"fin\\\"] < cursor → 30 < 1 → False\\n#   tramos.append((1, 30, ['func_a'], fu",
+     "resultado_caracteres": 48
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora voy a revisar un caso crítico: el bucle de corte por líneas (líneas 92-99)\\n# ¿Qué pasa si el primer trozo EXACTAMENTE alcanza el tope?\\n# a = ini, primero = True, acumulado = 0\\n# n = ini: t = tokens_de(lineas, ini, ini)\\n# if acumulado + t > tope and n > a → 0 + t > tope and ini > ini → False (n > a es False)\\n# acumulado += t\\n# n = ini+1: t = tokens_de(lineas, ini+1, ini+",
+     "resultado_caracteres": 54
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a revisar un caso más delicado: el tramo que cubre TODO el archivo cuando no hay símbolos\\n# Si total > 0 y no hay símbolos:\\n# tramos = [(1, total, [], None)]\\n# Luego, si _tokens_de(lineas, 1, total) > tope:\\n# hijos = [] (porque s is None)\\n# cur = 1\\n# for h in hijos: no se ejecuta\\n# if cur <= fin → 1 <= total → True\\n# finos.append((1, total, nombres if not hijos else [])",
+     "resultado_caracteres": 57
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a revisar un caso específico: ¿qué pasa cuando un símbolo de primer nivel NO es el primero?\\n# Es decir, hay código suelto al inicio del archivo.\\n# Ejemplo:\\n# Líneas 1-10: código suelto\\n# Líneas 11-30: func_a\\n# Líneas 31-50: func_b\\n#\\n# primer = [func_a, func_b] (ordenados por ini)\\n# cursor = 1\\n# s = func_a (ini=11, fin=30):\\n#   s[\\\"fin\\\"] < cursor → 30 < 1 → False\\n#  ",
+     "resultado_caracteres": 46
+    }
+   ],
+   "segundos": 389.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "No tiene ningún error de programación. La implementación es correcta y robusta:\n\n1. **Normaliza la ruta** (`os.path.abspath`) para eliminar `.` y `..` y trabajar con rutas absolutas.\n2. **Itera sobre todas las raíces permitidas** (workspace + `~/.prig_books` + repositorios propios de Prig Hub).\n3. **Verifica que la ruta absoluta comience por alguna raíz permitida** usando `startswith`, lo que impide ataques de tipo `/workspace/malicioso` si el workspace es `/workspace`.\n4. **Captura `ValueError`** que lanza `os.path.commonpath` (aunque en el código actual no se usa `commonpath`, el bloque `try/except` está ahí por si se cambia la implementación o por compatibilidad con volúmenes distintos en otros sistemas operativos).\n\nEl caso límite que suele fallar en otras implementaciones (ej. `/workspace` vs `/workspace2`) está protegido porque `startswith` se aplica sobre la ruta ya normalizada y las raíces también son absolutas.",
+   "agotada": false,
+   "corte": null,
+   "modo": "unidad",
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "forzado: «backend: file_manager, ide_servicios» no tiene lectura guardada; se lee ahora",
+   "hechos_caracteres": 0,
+   "tokens": 229,
+   "consultas": [],
+   "segundos": 63.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "Let me analyze the `JobExporter.preparar` method carefully.\n\nHay un error en la línea 159. El código hace:\n\n```python\nsalida.write(json.dumps({...}) + \"\\n\")\n```\n\n`salida.write()` espera un solo argumento (la cadena a escribir), pero aquí se está llamando a `json.dumps({...}) + \"\\n\"` como argumento de `write`. Eso en realidad **sí funciona** porque `json.dumps({...}) + \"\\n\"` es una sola expresión que produce una cadena, y `write` recibe esa cadena. \n\nEspera, revisemos mejor. `salida.write(json.dumps({...}) + \"\\n\")` — esto es correcto: `write` recibe una cadena. No hay error ahí.\n\nRevisemos el problema real. Veo que en la línea 117:\n\n```python\ncon_texto = sum(1 for pg in parsed[\"pages\"] if len(pg.get(\"text\") or \"\") > 120)\n```\n\nY en la línea 145:\n\n```python\nif len(texto) < min_chars:\n```\n\nEl parámetro `min_chars` tiene valor por defecto 120 (línea 43), pero la comprobación de PDF escaneado en la línea 117 usa el literal `120` en lugar de `min_chars`. Esto no es un error funcional, solo inconsistencia.\n\nEl error real está en la **línea 117**: usa el literal `120` para filtrar páginas con texto, pero el parámetro `min_chars` (por defecto 120) se usa más abajo para descartar fragmentos. Si el usuario cambia `min_chars`, la detección de PDF escaneado no se ajusta. Pero eso es inconsistencia, no un bug funcional grave.\n\nBusquemos algo más concreto. Revisemos la línea 159 otra vez con más cuidado:\n\n```python\nsalida.write(json.dumps({...}) + \"\\n\")\n```\n\nEsto es `salida.write( resultado_de_dumps + \"\\n\" )` — eso está bien.\n\nAhora veamos la línea 145-146. `texto = (c.get(\"content\") or \"\").strip()` y `if len(texto) < min_chars:`. Esto descarta fragmentos cortos. Pero `min_chars` se pasa como parámetro con valor por defecto 120. La línea 117 usa el literal `120` en lugar de `min_chars`. Eso es inconsistencia pero no un bug funcional si se usa el valor por defecto.\n\nEl verdadero bug está en la **línea 117**: la detección de PDF escaneado usa `120` como umbral de texto por página, pero este valor debería ser `min_chars` para ser consistente. Si el usuario llama con `min_chars=200`, la detección de PDF escaneado seguirá usando 120, lo que significa que un PDF con páginas de 150 caracteres de texto (más que 120 pero menos que 200) no sería descartado como escaneado, pero luego sus fragmentos sí serían descartados por ser cortos. Esto produce un resultado inconsistente.\n\nPero hay un error más grave. Veamos la **línea 159**:\n\n```python\nsalida.write(json.dumps({...}) + \"\\n\")\n```\n\n`write()` acepta un string. `json.dumps({...}) + \"\\n\"` es un string. Esto está bien.\n\nEspera, déjame revisar si hay un error más sutil. La línea 117:\n\n```python\ncon_texto = sum(1 for pg in parsed[\"pages\"] if len(pg.get(\"text\") or \"\") > 120)\n```\n\nUsa `> 120` (estrictamente mayor), mientras que la línea 145 usa `< min_chars` (estrictamente menor). Si `min_chars=120`, una página con exactamente 120 caracteres cuenta como \"con texto\" en la línea 117, pero un fragmento con exactamente 120 caracteres NO se descarta en la línea 145 (porque 120 < 120 es False). Esto es consistente.\n\nEl error real está en la **línea 117**: usa el literal `120` en lugar de `min_chars`. Esto hace que la detección de PDF escaneado no respete el parámetro `min_chars`. Si alguien llama con `min_chars=200`, un PDF con páginas de texto de 150 caracteres no se detectará como escaneado (porque 150 > 120), pero sus fragmentos serán descartados (porque 150 < 200). El resultado es un libro que pasa la detección de escaneado pero produce cero fragmentos, lo cual es engañoso.\n\nSí, tiene un error de programación:\n\n**Línea 117**: `con_texto = sum(1 for pg in parsed[\"pages\"] if len(pg.get(\"text\") or \"\") > 120)`\n\nEl código usa el literal `120` para detectar si un PDF es escaneado, pero debería usar el parámetro `min_chars` (por defecto 120). Esto hace que la detección de PDF escaneado no respete el umbral configurado por el usuario.\n\n**Caso concreto de fallo**: Si alguien llama a `preparar` con `min_chars=200`, un PDF cuyas páginas tengan 150 caracteres de texto cada una no se detectará como escaneado (porque 150 > 120), pero luego sus fragmentos serán descartados en la línea 145 porque 150 < 200. El resultado es un libro que pasa la detección de escaneado pero produce cero fragmentos útiles, quedando en el manifiesto como un libro procesado exitosamente aunque no aporte nada.",
+   "agotada": false,
+   "corte": null,
+   "modo": "unidad",
+   "unidad": ".: job_exporter, __init__, pdf_parser, semantic_chunker +3",
+   "motivo": "forzado: «.: job_exporter, __init__, pdf_parser, semantic_chunker +3» no tiene lectura guardada; se lee ahora",
+   "hechos_caracteres": 0,
+   "tokens": 239,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.codigo(\\\"JobExporter.preparar\\\"))\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"lines = P.lineas(\\\"backend/job_exporter.py\\\")\\nfor i in range(138, 206):\\n    print(f\\\"{i+1}: {lines[i]}\\\")\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "anotar",
+     "argumentos": "{\"tipo\": \"nota\", \"titulo\": \"Bug en JobExporter.preparar línea 117\", \"texto\": \"La línea 117 usa el literal 120 para detectar PDFs escaneados en lugar de usar el parámetro min_chars. Esto hace que la detección no respete el umbral configurado por el usuario. Si se llama con min_chars=200, un PDF con páginas de 150 caracteres no se detecta como escaneado (150 > 120) pero luego sus fragmentos se desca",
+     "resultado_caracteres": 74
+    }
+   ],
+   "segundos": 146.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B7",
+   "prueba": "conexión SQLite que nunca se cierra",
+   "objetivo": "B7",
+   "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "No hay error en `BancoProyecto.conectar`. El método abre una conexión, establece `row_factory = sqlite3.Row`, entrega el cursor en el `yield`, y al salir del bloque `with` (al final de la función o por `return`/excepción) el decorador `@contextmanager` ejecuta `c.commit()` para confirmar los cambios. Es correcto.",
+   "agotada": false,
+   "corte": null,
+   "modo": "unidad",
+   "unidad": "backend: banco_proyecto",
+   "motivo": "forzado: «backend: banco_proyecto» no tiene lectura guardada; se lee ahora",
+   "hechos_caracteres": 0,
+   "tokens": 82,
+   "consultas": [],
+   "segundos": 72.7,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_C2",
+   "prueba": "control: función sin error",
+   "objetivo": "C2",
+   "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "respuesta": "No tiene ningún error de programación.\n\nLa función `FileManager.resolve` (línea 47 de `backend/file_manager.py`) hace lo siguiente:\n1. Valida que se proporcione una ruta.\n2. Normaliza la ruta: si es relativa, la concatena con `self.base_dir`; si es absoluta, la usa tal cual. En ambos casos aplica `os.path.abspath()` para eliminar `.` y `..`.\n3. Llama a `self.is_path_allowed(abs_path)` para verificar que la ruta normalizada cae dentro de una de las raíces permitidas (workspace o extras).\n4. Lanza `PermissionError` si no está permitida, o devuelve la ruta absoluta si sí lo está.\n\nEl uso de `os.path.abspath()` asegura que `os.path.join(self.base_dir, path)` se comporte correctamente incluso si `path` es una ruta absoluta (en ese caso, `os.path.join` descarta `self.base_dir` y devuelve `path`, que luego `abspath` normaliza). La verificación de seguridad se hace sobre la ruta ya normalizada, por lo que no hay huecos de seguridad por rutas relativas maliciosas.",
+   "agotada": false,
+   "corte": null,
+   "modo": "unidad",
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 247,
+   "consultas": [],
+   "segundos": 14.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

@@ -38,8 +38,54 @@ class EditorManager {
     }
 
     initMonaco() {
-        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
-        require(['vs/editor/editor.main'], () => {
+        // Enlazar contenedores DOM de cada panel inmediatamente
+        this.panes[0].containerEl = document.getElementById('monaco-editor-container');
+        this.panes[0].tabsEl = document.getElementById('editor-tabs');
+
+        this.panes[1].containerEl = document.getElementById('monaco-editor-container-1');
+        this.panes[1].tabsEl = document.getElementById('editor-tabs-1');
+
+        this.panes[2].containerEl = document.getElementById('monaco-editor-container-2');
+        this.panes[2].tabsEl = document.getElementById('editor-tabs-2');
+
+        // Instancia inmediata para Col 0: si Monaco está disponible se usa, si no, fallback nativo
+        this.panes[0].editor = this.createMonacoInstance(this.panes[0].containerEl, 0)
+            || this.createFallbackEditorInstance(this.panes[0].containerEl, 0);
+
+        // Iniciar cuaderno Jupyter
+        if (window.notebookMgr) {
+            window.notebookMgr.init(document.getElementById('notebook-view-container'));
+        }
+
+        // Iniciar controles de disposición y divisores redimensionables
+        this.initLayoutControls();
+        this.setupResizers();
+        this.setupTabDragAndDrop();
+        this.pintarVacio();
+
+        // Restaurar disposición y sesión de inmediato
+        this.restoreLayoutState();
+        this.restoreSessionState();
+
+        // Carga diferida o actualización con Monaco si require está presente
+        if (typeof require !== 'undefined' && typeof require.config === 'function') {
+            try {
+                require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+                require(['vs/editor/editor.main'], () => {
+                    this._onMonacoAvailable();
+                });
+            } catch (e) {
+                console.warn('Monaco offline fallback activo:', e);
+            }
+        }
+    }
+
+    _onMonacoAvailable() {
+        if (typeof monaco === 'undefined' || !monaco.editor) return;
+
+        if (window.sintaxisMgr) {
+            window.sintaxisMgr.aplicar();
+        } else {
             monaco.editor.defineTheme('prig-dark', {
                 base: 'vs-dark',
                 inherit: true,
@@ -52,126 +98,362 @@ class EditorManager {
                     'editorIndentGuide.background': '#333333'
                 }
             });
+        }
 
-            // Enlazar contenedores DOM de cada panel
-            this.panes[0].containerEl = document.getElementById('monaco-editor-container');
-            this.panes[0].tabsEl = document.getElementById('editor-tabs');
-
-            this.panes[1].containerEl = document.getElementById('monaco-editor-container-1');
-            this.panes[1].tabsEl = document.getElementById('editor-tabs-1');
-
-            this.panes[2].containerEl = document.getElementById('monaco-editor-container-2');
-            this.panes[2].tabsEl = document.getElementById('editor-tabs-2');
-
-            // Instancia principal de Monaco (Col 0)
-            this.panes[0].editor = this.createMonacoInstance(this.panes[0].containerEl, 0);
-
-            // Iniciar cuaderno Jupyter
-            if (window.notebookMgr) {
-                window.notebookMgr.init(document.getElementById('notebook-view-container'));
+        // Si alguna columna usaba el editor fallback, reemplazarla por Monaco conservando contenido
+        for (let i = 0; i < this.numColumns; i++) {
+            const pane = this.panes[i];
+            if (pane.editor && pane.editor.isFallback) {
+                const currentVal = pane.editor.getValue();
+                pane.containerEl.innerHTML = '';
+                pane.editor = this.createMonacoInstance(pane.containerEl, i);
+                if (pane.activePath && this.openTabs.has(pane.activePath)) {
+                    const tab = this.openTabs.get(pane.activePath);
+                    const ext = (tab.name || '').split('.').pop().toLowerCase();
+                    const lang = this.getLanguageForExt(ext);
+                    tab.model = monaco.editor.createModel(currentVal || tab.savedContent || '', lang);
+                    pane.editor.setModel(tab.model);
+                }
             }
+        }
 
-            // Iniciar controles de disposición y divisores redimensionables
-            this.initLayoutControls();
-            this.setupResizers();
-            this.setupTabDragAndDrop();
-
-            this.pintarVacio();
-
-            // Registrar CodeLens interactivo para prompts en línea "Prig//: " (global a Monaco)
-            const supportedLangs = [
-                'python', 'javascript', 'typescript', 'html', 'css', 'scss', 'less', 'json',
-                'markdown', 'shell', 'c', 'cpp', 'java', 'go', 'rust', 'ruby', 'php',
-                'sql', 'yaml', 'xml', 'ini', 'r', 'julia', 'lua', 'kotlin', 'swift',
-                'csharp', 'dockerfile', 'plaintext'
-            ];
-            const codeLensProvider = {
-                provideCodeLenses: (model) => {
-                    const lenses = [];
-                    const lines = model.getLinesContent();
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i];
-                        const match = line.match(/Prig\/\/:\s*(.*)$/i);
-                        if (match) {
-                            const promptText = match[1].replace(/(-->|\*\/)\s*$/, '').trim();
-                            const lineNumber = i + 1;
-                            lenses.push({
-                                range: new monaco.Range(lineNumber, 1, lineNumber, line.length + 1),
-                                id: `prig-lens-${lineNumber}`,
-                                command: {
-                                    id: 'prig.executeInlinePrompt',
-                                    title: promptText ? '✨ Prig: Generar código (Ctrl+Enter)' : '✨ Prig: Escribe una instrucción y presiona Ctrl+Enter',
-                                    arguments: [lineNumber, promptText]
-                                }
-                            });
-                        }
-                    }
-                    return { lenses, dispose: () => {} };
-                },
-                resolveCodeLens: (model, codeLens) => codeLens
-            };
-            supportedLangs.forEach(lang => {
-                try {
-                    monaco.languages.registerCodeLensProvider(lang, codeLensProvider);
-                } catch (e) {}
-            });
-
-            try {
-                monaco.editor.registerCommand('prig.executeInlinePrompt', (accessor, lineNumber, promptText) => {
-                    this.executeInlinePrompt(lineNumber, promptText);
+        // Actualizar modelos que se hayan creado como fallback
+        for (const [p, tab] of this.openTabs.entries()) {
+            if (tab.model && tab.model.isFallback && !tab.isImage) {
+                const ext = (tab.name || '').split('.').pop().toLowerCase();
+                const lang = this.getLanguageForExt(ext);
+                const currentContent = typeof tab.model.getValue === 'function' ? tab.model.getValue() : (tab.savedContent || '');
+                tab.model = monaco.editor.createModel(currentContent, lang);
+                tab.model.onDidChangeContent(() => {
+                    this.checkAutoComment(tab.path);
+                    this.onContentChanged(tab.path);
                 });
-            } catch (e) {}
+            }
+        }
 
-            // Registrar Autocompletado de Código (Ghost Text IA)
-            if (monaco.languages.registerInlineCompletionsProvider) {
-                monaco.languages.registerInlineCompletionsProvider('python', {
-                    provideInlineCompletions: async (model, position, context, token) => {
-                        const lineContent = model.getLineContent(position.lineNumber);
-                        if (!lineContent.trim() || lineContent.trim().length < 3) {
-                            return { items: [] };
-                        }
-
-                        const prefix = model.getValueInRange({
-                            startLineNumber: Math.max(1, position.lineNumber - 60),
-                            startColumn: 1,
-                            endLineNumber: position.lineNumber,
-                            endColumn: position.column
-                        });
-                        const ultima = model.getLineCount();
-                        const suffix = model.getValueInRange({
-                            startLineNumber: position.lineNumber,
-                            startColumn: position.column,
-                            endLineNumber: Math.min(ultima, position.lineNumber + 40),
-                            endColumn: model.getLineMaxColumn(Math.min(ultima, position.lineNumber + 40))
-                        });
-
-                        try {
-                            const res = await fetch('/api/ai/inline-complete', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ code_prefix: prefix, code_suffix: suffix })
-                            });
-                            if (!res.ok) return { items: [] };
-                            const data = await res.json();
-                            if (data.completion) {
-                                return {
-                                    items: [{
-                                        insertText: data.completion,
-                                        range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
-                                    }]
-                                };
+        // Registrar CodeLens interactivo para prompts en línea "Prig//: " (global a Monaco)
+        const supportedLangs = [
+            'python', 'javascript', 'typescript', 'html', 'css', 'scss', 'less', 'json',
+            'markdown', 'shell', 'c', 'cpp', 'java', 'go', 'rust', 'ruby', 'php',
+            'sql', 'yaml', 'xml', 'ini', 'r', 'julia', 'lua', 'kotlin', 'swift',
+            'csharp', 'dockerfile', 'plaintext'
+        ];
+        const codeLensProvider = {
+            provideCodeLenses: (model) => {
+                const lenses = [];
+                const lines = model.getLinesContent();
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const match = line.match(/Prig\/\/:\s*(.*)$/i);
+                    if (match) {
+                        const promptText = match[1].replace(/(-->|\*\/)\s*$/, '').trim();
+                        const lineNumber = i + 1;
+                        lenses.push({
+                            range: new monaco.Range(lineNumber, 1, lineNumber, line.length + 1),
+                            id: `prig-lens-${lineNumber}`,
+                            command: {
+                                id: 'prig.executeInlinePrompt',
+                                title: promptText ? '✨ Prig: Generar código (Ctrl+Enter)' : '✨ Prig: Escribe una instrucción y presiona Ctrl+Enter',
+                                arguments: [lineNumber, promptText]
                             }
-                        } catch (e) {}
-                        return { items: [] };
-                    },
-                    freeInlineCompletions: () => {}
-                });
-            }
-
-            // Restaurar disposición y sesión
-            this.restoreLayoutState();
-            this.restoreSessionState();
+                        });
+                    }
+                }
+                return { lenses, dispose: () => {} };
+            },
+            resolveCodeLens: (model, codeLens) => codeLens
+        };
+        supportedLangs.forEach(lang => {
+            try {
+                monaco.languages.registerCodeLensProvider(lang, codeLensProvider);
+            } catch (e) {}
         });
+
+        try {
+            monaco.editor.registerCommand('prig.executeInlinePrompt', (accessor, lineNumber, promptText) => {
+                this.executeInlinePrompt(lineNumber, promptText);
+            });
+        } catch (e) {}
+
+        // Registrar Autocompletado de Código (Ghost Text IA)
+        if (monaco.languages.registerInlineCompletionsProvider) {
+            monaco.languages.registerInlineCompletionsProvider('python', {
+                provideInlineCompletions: async (model, position, context, token) => {
+                    const lineContent = model.getLineContent(position.lineNumber);
+                    if (!lineContent.trim() || lineContent.trim().length < 3) {
+                        return { items: [] };
+                    }
+
+                    const prefix = model.getValueInRange({
+                        startLineNumber: Math.max(1, position.lineNumber - 60),
+                        startColumn: 1,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    });
+                    const ultima = model.getLineCount();
+                    const suffix = model.getValueInRange({
+                        startLineNumber: position.lineNumber,
+                        startColumn: position.column,
+                        endLineNumber: Math.min(ultima, position.lineNumber + 40),
+                        endColumn: model.getLineMaxColumn(Math.min(ultima, position.lineNumber + 40))
+                    });
+
+                    try {
+                        const res = await fetch('/api/ai/inline-complete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code_prefix: prefix, code_suffix: suffix })
+                        });
+                        if (!res.ok) return { items: [] };
+                        const data = await res.json();
+                        if (data.completion) {
+                            return {
+                                items: [{
+                                    insertText: data.completion,
+                                    range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
+                                }]
+                            };
+                        }
+                    } catch (e) {}
+                    return { items: [] };
+                },
+                freeInlineCompletions: () => {}
+            });
+        }
+    }
+
+    getLanguageForExt(ext) {
+        const langMap = {
+            'py': 'python', 'pyw': 'python', 'js': 'javascript', 'mjs': 'javascript', 'cjs': 'javascript',
+            'ts': 'typescript', 'tsx': 'typescript', 'jsx': 'javascript', 'html': 'html', 'htm': 'html',
+            'css': 'css', 'scss': 'scss', 'less': 'less', 'json': 'json', 'md': 'markdown',
+            'sh': 'shell', 'bash': 'shell', 'zsh': 'shell', 'c': 'c', 'h': 'c', 'cpp': 'cpp', 'hpp': 'cpp',
+            'cc': 'cpp', 'java': 'java', 'go': 'go', 'rs': 'rust', 'rb': 'ruby', 'php': 'php',
+            'sql': 'sql', 'yaml': 'yaml', 'yml': 'yaml', 'xml': 'xml', 'svg': 'xml', 'toml': 'ini',
+            'ini': 'ini', 'cfg': 'ini', 'r': 'r', 'jl': 'julia', 'lua': 'lua', 'kt': 'kotlin',
+            'swift': 'swift', 'cs': 'csharp', 'dockerfile': 'dockerfile', 'tex': 'latex', 'ipynb': 'python'
+        };
+        return (ext && langMap[ext.toLowerCase()]) || 'plaintext';
+    }
+
+    createFallbackModel(content, lang = 'plaintext') {
+        let val = String(content || '');
+        const listeners = [];
+        return {
+            isFallback: true,
+            language: lang,
+            getValue: () => val,
+            setValue: (newVal) => {
+                val = String(newVal || '');
+                listeners.forEach(cb => { try { cb(); } catch (e) {} });
+            },
+            onDidChangeContent: (cb) => {
+                listeners.push(cb);
+                return { dispose: () => { const idx = listeners.indexOf(cb); if (idx >= 0) listeners.splice(idx, 1); } };
+            },
+            getLineCount: () => val.split('\n').length,
+            getLinesContent: () => val.split('\n'),
+            getLineContent: (ln) => val.split('\n')[ln - 1] || '',
+            getLineMaxColumn: (ln) => (val.split('\n')[ln - 1] || '').length + 1,
+            getValueInRange: (range) => {
+                const lines = val.split('\n');
+                if (!range) return val;
+                const sl = Math.max(1, range.startLineNumber || 1) - 1;
+                const el = Math.min(lines.length, range.endLineNumber || lines.length) - 1;
+                if (sl === el) {
+                    return (lines[sl] || '').substring((range.startColumn || 1) - 1, (range.endColumn || 1) - 1);
+                }
+                return lines.slice(sl, el + 1).join('\n');
+            },
+            dispose: () => { listeners.length = 0; }
+        };
+    }
+
+    createFallbackEditorInstance(containerEl, colIndex) {
+        if (!containerEl) return null;
+        containerEl.innerHTML = '';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'prig-fallback-editor';
+        wrapper.style.display = 'flex';
+        wrapper.style.width = '100%';
+        wrapper.style.height = '100%';
+        wrapper.style.background = '#181825';
+        wrapper.style.color = '#cdd6f4';
+        wrapper.style.fontFamily = "'Fira Code', 'Cascadia Code', Consolas, monospace";
+        wrapper.style.fontSize = '13.5px';
+        wrapper.style.position = 'relative';
+        wrapper.style.overflow = 'hidden';
+
+        // Gutter de números de línea
+        const gutter = document.createElement('div');
+        gutter.className = 'prig-fallback-gutter';
+        gutter.style.width = '48px';
+        gutter.style.padding = '8px 6px 8px 0';
+        gutter.style.textAlign = 'right';
+        gutter.style.background = '#11111b';
+        gutter.style.color = '#585b70';
+        gutter.style.borderRight = '1px solid #313244';
+        gutter.style.userSelect = 'none';
+        gutter.style.lineHeight = '1.5';
+        gutter.style.overflow = 'hidden';
+        gutter.style.flexShrink = '0';
+        gutter.textContent = '1';
+
+        // Textarea nativa de alto rendimiento
+        const textarea = document.createElement('textarea');
+        textarea.className = 'prig-fallback-textarea';
+        textarea.style.flex = '1';
+        textarea.style.height = '100%';
+        textarea.style.padding = '8px 12px';
+        textarea.style.background = 'transparent';
+        textarea.style.color = '#cdd6f4';
+        textarea.style.border = 'none';
+        textarea.style.outline = 'none';
+        textarea.style.resize = 'none';
+        textarea.style.fontFamily = 'inherit';
+        textarea.style.fontSize = 'inherit';
+        textarea.style.lineHeight = '1.5';
+        textarea.style.whiteSpace = 'pre';
+        textarea.style.overflow = 'auto';
+        textarea.style.tabSize = '4';
+        textarea.spellcheck = false;
+        textarea.setAttribute('autocomplete', 'off');
+        textarea.setAttribute('autocorrect', 'off');
+        textarea.setAttribute('autocapitalize', 'off');
+
+        wrapper.appendChild(gutter);
+        wrapper.appendChild(textarea);
+        containerEl.appendChild(wrapper);
+
+        const updateGutter = () => {
+            const lines = (textarea.value || '').split('\n').length;
+            let gText = '';
+            for (let i = 1; i <= lines; i++) {
+                gText += i + '\n';
+            }
+            gutter.textContent = gText;
+        };
+
+        textarea.addEventListener('scroll', () => {
+            gutter.scrollTop = textarea.scrollTop;
+        });
+
+        const commands = new Map();
+
+        const instance = {
+            isFallback: true,
+            colIndex,
+            containerEl,
+            wrapper,
+            gutter,
+            textarea,
+            currentModel: null,
+            focus: () => textarea.focus(),
+            layout: () => updateGutter(),
+            getValue: () => textarea.value,
+            setValue: (val) => {
+                textarea.value = val || '';
+                updateGutter();
+                if (instance.currentModel && typeof instance.currentModel.setValue === 'function') {
+                    if (instance.currentModel.getValue() !== textarea.value) {
+                        instance.currentModel.setValue(textarea.value);
+                    }
+                }
+            },
+            setModel: (model) => {
+                instance.currentModel = model;
+                const content = model ? (typeof model.getValue === 'function' ? model.getValue() : '') : '';
+                textarea.value = content;
+                updateGutter();
+            },
+            getModel: () => instance.currentModel,
+            getPosition: () => {
+                const pos = textarea.selectionStart || 0;
+                const lines = textarea.value.substring(0, pos).split('\n');
+                const line = lines.length;
+                const col = lines[lines.length - 1].length + 1;
+                return { lineNumber: line, column: col };
+            },
+            setPosition: (pos) => {
+                if (!pos) return;
+                const lines = textarea.value.split('\n');
+                let offset = 0;
+                const targetLine = Math.min(lines.length, Math.max(1, pos.lineNumber || 1));
+                for (let i = 0; i < targetLine - 1; i++) {
+                    offset += lines[i].length + 1;
+                }
+                offset += Math.max(0, (pos.column || 1) - 1);
+                textarea.selectionStart = textarea.selectionEnd = offset;
+            },
+            getSelection: () => {
+                const start = textarea.selectionStart || 0;
+                const end = textarea.selectionEnd || 0;
+                return {
+                    isEmpty: () => start === end,
+                    startOffset: start,
+                    endOffset: end
+                };
+            },
+            executeEdits: (source, edits) => {
+                if (!edits || edits.length === 0) return;
+                edits.forEach(e => {
+                    if (e.text !== undefined) {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        textarea.setRangeText(e.text, start, end, 'end');
+                    }
+                });
+                updateGutter();
+                if (instance.currentModel && typeof instance.currentModel.setValue === 'function') {
+                    instance.currentModel.setValue(textarea.value);
+                }
+            },
+            addCommand: (keybinding, handler) => {
+                commands.set(keybinding, handler);
+            },
+            onDidFocusEditorWidget: (cb) => {
+                textarea.addEventListener('focus', cb);
+            },
+            onDidChangeCursorPosition: (cb) => {
+                textarea.addEventListener('keyup', cb);
+                textarea.addEventListener('click', cb);
+            }
+        };
+
+        textarea.addEventListener('input', () => {
+            updateGutter();
+            if (instance.currentModel && typeof instance.currentModel.setValue === 'function') {
+                instance.currentModel.setValue(textarea.value);
+            }
+        });
+
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                textarea.setRangeText('    ', start, end, 'end');
+                updateGutter();
+                if (instance.currentModel && typeof instance.currentModel.setValue === 'function') {
+                    instance.currentModel.setValue(textarea.value);
+                }
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                if (window.editorMgr && typeof window.editorMgr.saveActiveFile === 'function') {
+                    window.editorMgr.saveActiveFile();
+                }
+                return;
+            }
+        });
+
+        textarea.addEventListener('focus', () => {
+            this.setActivePane(colIndex);
+        });
+
+        return instance;
     }
 
     /** Crea una instancia de Monaco Editor para una columna dada */
@@ -181,7 +463,7 @@ class EditorManager {
         const ed = monaco.editor.create(containerEl, {
             value: '',
             language: 'python',
-            theme: localStorage.getItem('prig_editor_theme') || 'prig-dark',
+            theme: window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'),
             automaticLayout: true,
             fontSize: parseInt(localStorage.getItem('prig_editor_font_size') || '14', 10),
             fontFamily: "'Fira Code', monospace",
@@ -193,6 +475,74 @@ class EditorManager {
         // Evento de foco: actualizar la columna activa
         ed.onDidFocusEditorWidget(() => {
             this.setActivePane(colIndex);
+        });
+
+        // Sincronización del cursor y mecanografía con el motor de efectos de fondo (Robot Matrix Artillero)
+        let _ultimoDisparoTiempo = 0;
+        const obtenerCoordsCursor = () => {
+            const pos = ed.getPosition();
+            if (!pos) return null;
+            const coords = ed.getScrolledVisiblePosition(pos);
+            const domNode = ed.getDomNode();
+            if (!coords || !domNode) return null;
+            const rect = domNode.getBoundingClientRect();
+            return {
+                x: rect.left + coords.left,
+                y: rect.top + coords.top + (coords.height ? coords.height / 2 : 10)
+            };
+        };
+
+        ed.onDidChangeCursorPosition((e) => {
+            if (window.motorMovimiento) {
+                const pt = obtenerCoordsCursor();
+                if (pt) window.motorMovimiento.notificarPosicionCursor(pt.x, pt.y);
+            }
+            if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.notificarCursor === 'function') {
+                const pos = ed.getPosition();
+                if (pos) {
+                    window.DIRECTOR_ASCII.evaluador.notificarCursor(pos.lineNumber, pos.column);
+                }
+            }
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.notificarCursor(ed);
+            }
+        });
+
+        // Sincronización continua de corchetes y flechas con el scroll de Monaco
+        ed.onDidScrollChange(() => {
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.actualizarOverlay();
+            }
+        });
+
+        ed.onKeyDown((e) => {
+            if (!window.motorMovimiento) return;
+            const ahora = performance.now();
+            if (ahora - _ultimoDisparoTiempo < 35) return; // Throttling 35ms para evitar saturación
+            _ultimoDisparoTiempo = ahora;
+
+            const key = (e.browserEvent && e.browserEvent.key && e.browserEvent.key.length === 1) ? e.browserEvent.key : '1';
+            const pt = obtenerCoordsCursor();
+            if (pt) {
+                window.motorMovimiento.dispararHaciaCursor(pt.x, pt.y, key);
+            }
+        });
+
+        // Disparo de evaluación de código por el Evaluador ASCII e impulso físico de resortes
+        let _timerEvaluacionCodigo = null;
+        ed.onDidChangeModelContent(() => {
+            if (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.evaluador && typeof window.DIRECTOR_ASCII.evaluador.aplicarImpulso === 'function') {
+                window.DIRECTOR_ASCII.evaluador.aplicarImpulso((Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 0.8);
+            }
+            if (window.EditorRazonamiento) {
+                window.EditorRazonamiento.alCambiarCodigo(ed);
+            }
+            if (_timerEvaluacionCodigo) clearTimeout(_timerEvaluacionCodigo);
+            _timerEvaluacionCodigo = setTimeout(() => {
+                if (window.DIRECTOR_ASCII) {
+                    window.DIRECTOR_ASCII.dispararDecisionDirector('pausa_escritura');
+                }
+            }, 6000);
         });
 
         // --- Atajos Nativos VS Code Registrados Directamente en Monaco ---
@@ -395,7 +745,8 @@ class EditorManager {
     getOrCreatePaneEditor(colIndex) {
         if (colIndex < 0 || colIndex >= 3) return null;
         if (!this.panes[colIndex].editor) {
-            this.panes[colIndex].editor = this.createMonacoInstance(this.panes[colIndex].containerEl, colIndex);
+            this.panes[colIndex].editor = this.createMonacoInstance(this.panes[colIndex].containerEl, colIndex)
+                || this.createFallbackEditorInstance(this.panes[colIndex].containerEl, colIndex);
         }
         return this.panes[colIndex].editor;
     }
@@ -820,35 +1171,48 @@ class EditorManager {
 
     /** Abre un archivo en el editor, asegurando la existencia del modelo y agregándolo al panel correspondiente */
     openFile(path, name, content, notebookData = null, targetCol = null) {
+        if (!this.panes[0].editor) {
+            this.panes[0].editor = this.createMonacoInstance(this.panes[0].containerEl, 0)
+                || this.createFallbackEditorInstance(this.panes[0].containerEl, 0);
+        }
         if (!this.panes[0].editor) return;
 
-        const isNotebook = name.endsWith('.ipynb');
-        const ext = name.split('.').pop().toLowerCase();
-        const langMap = {
-            'py': 'python', 'pyw': 'python', 'js': 'javascript', 'mjs': 'javascript', 'cjs': 'javascript',
-            'ts': 'typescript', 'tsx': 'typescript', 'jsx': 'javascript', 'html': 'html', 'htm': 'html',
-            'css': 'css', 'scss': 'scss', 'less': 'less', 'json': 'json', 'md': 'markdown',
-            'sh': 'shell', 'bash': 'shell', 'zsh': 'shell', 'c': 'c', 'h': 'c', 'cpp': 'cpp', 'hpp': 'cpp',
-            'cc': 'cpp', 'java': 'java', 'go': 'go', 'rs': 'rust', 'rb': 'ruby', 'php': 'php',
-            'sql': 'sql', 'yaml': 'yaml', 'yml': 'yaml', 'xml': 'xml', 'svg': 'xml', 'toml': 'ini',
-            'ini': 'ini', 'cfg': 'ini', 'r': 'r', 'jl': 'julia', 'lua': 'lua', 'kt': 'kotlin',
-            'swift': 'swift', 'cs': 'csharp', 'dockerfile': 'dockerfile', 'tex': 'latex', 'ipynb': 'python'
-        };
-        const lang = langMap[ext] || 'plaintext';
+        const isNotebook = name && name.endsWith('.ipynb');
+        const ext = (name || '').split('.').pop().toLowerCase();
+        const lang = this.getLanguageForExt(ext);
+        const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'].includes(ext);
 
         if (!this.openTabs.has(path)) {
-            const model = monaco.editor.createModel(content, lang);
-            const tab = { name, path, model, isNotebook, notebookData, savedContent: content };
+            let model = null;
+            if (isImage) {
+                model = this.createFallbackModel(`[Imagen: ${name}]`, 'plaintext');
+            } else if (typeof monaco !== 'undefined' && monaco.editor && monaco.editor.createModel) {
+                model = monaco.editor.createModel(content || '', lang);
+            } else {
+                model = this.createFallbackModel(content || '', lang);
+            }
+            const tab = {
+                name,
+                path,
+                model,
+                isNotebook,
+                notebookData,
+                savedContent: content,
+                isImage,
+                imageUrl: `/api/file/raw?path=${encodeURIComponent(path)}`
+            };
             this.openTabs.set(path, tab);
 
-            model.onDidChangeContent(() => {
-                this.checkAutoComment(tab.path);
-                this.onContentChanged(tab.path);
-            });
+            if (model && typeof model.onDidChangeContent === 'function') {
+                model.onDidChangeContent(() => {
+                    this.checkAutoComment(tab.path);
+                    this.onContentChanged(tab.path);
+                });
+            }
         } else {
             const tab = this.openTabs.get(path);
-            if (tab.model.getValue() !== content) {
-                tab.model.setValue(content);
+            if (tab.model && typeof tab.model.getValue === 'function' && tab.model.getValue() !== content) {
+                tab.model.setValue(content || '');
             }
             tab.savedContent = content;
             tab.notebookData = notebookData;
@@ -912,13 +1276,36 @@ class EditorManager {
             ed.setModel(tabData.model);
         }
 
-        // Si la columna es 0 y es un cuaderno, manejar vista de cuaderno
+        // Si la columna es 0 y es un cuaderno o imagen, manejar contenedores visuales
         if (colIndex === 0) {
             const monacoContainer = document.getElementById('monaco-editor-container');
             const notebookContainer = document.getElementById('notebook-view-container');
             const viewModeBar = document.getElementById('view-mode-bar');
+            let imageContainer = document.getElementById('image-view-container');
+            if (!imageContainer) {
+                imageContainer = document.createElement('div');
+                imageContainer.id = 'image-view-container';
+                imageContainer.style.cssText = 'display:none; flex:1; align-items:center; justify-content:center; background:#11111b; overflow:auto; padding:20px;';
+                if (monacoContainer && monacoContainer.parentElement) {
+                    monacoContainer.parentElement.appendChild(imageContainer);
+                }
+            }
 
-            if (tabData.isNotebook && tabData.notebookData) {
+            if (tabData.isImage) {
+                if (viewModeBar) viewModeBar.style.display = 'none';
+                if (monacoContainer) monacoContainer.style.display = 'none';
+                if (notebookContainer) notebookContainer.style.display = 'none';
+                imageContainer.style.display = 'flex';
+                imageContainer.innerHTML = `
+                    <div style="text-align:center; max-width:90%; max-height:85%;">
+                        <div style="margin-bottom:10px; color:var(--text-muted); font-size:12px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                            <i class="fa-solid fa-image" style="color:var(--accent-blue);"></i> <span>${this.escapeHtml ? this.escapeHtml(tabData.name) : tabData.name}</span>
+                        </div>
+                        <img src="${tabData.imageUrl}" alt="${this.escapeHtml ? this.escapeHtml(tabData.name) : tabData.name}" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 30px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1);">
+                    </div>
+                `;
+            } else if (tabData.isNotebook && tabData.notebookData) {
+                if (imageContainer) imageContainer.style.display = 'none';
                 if (viewModeBar) viewModeBar.style.display = 'flex';
                 if (monacoContainer) monacoContainer.style.display = 'none';
                 if (notebookContainer) {
@@ -926,6 +1313,7 @@ class EditorManager {
                     if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
                 }
             } else {
+                if (imageContainer) imageContainer.style.display = 'none';
                 if (viewModeBar) viewModeBar.style.display = 'none';
                 if (monacoContainer) monacoContainer.style.display = 'block';
                 if (notebookContainer) notebookContainer.style.display = 'none';
@@ -981,7 +1369,9 @@ class EditorManager {
 
         // Si ya no está en ninguna columna, liberar modelo
         if (!openInOtherPanes && tabData) {
-            tabData.model.dispose();
+            if (tabData.model && typeof tabData.model.dispose === 'function') {
+                tabData.model.dispose();
+            }
             this.openTabs.delete(path);
             if (this._lastDirty) delete this._lastDirty[path];
             window.dispatchEvent(new CustomEvent('prig:pestana-cerrada', { detail: { path } }));
@@ -994,7 +1384,10 @@ class EditorManager {
             } else {
                 pane.activePath = null;
                 if (pane.editor) {
-                    pane.editor.setModel(monaco.editor.createModel('', 'plaintext'));
+                    const emptyModel = (typeof monaco !== 'undefined' && monaco.editor)
+                        ? monaco.editor.createModel('', 'plaintext')
+                        : this.createFallbackModel('', 'plaintext');
+                    pane.editor.setModel(emptyModel);
                 }
                 if (colIndex === 0) {
                     const viewModeBar = document.getElementById('view-mode-bar');
@@ -1033,7 +1426,10 @@ class EditorManager {
             if (sourcePane.activePath) {
                 this.setActiveTabInPane(fromCol, sourcePane.activePath);
             } else if (sourcePane.editor) {
-                sourcePane.editor.setModel(monaco.editor.createModel('', 'plaintext'));
+                const emptyModel = (typeof monaco !== 'undefined' && monaco.editor)
+                    ? monaco.editor.createModel('', 'plaintext')
+                    : this.createFallbackModel('', 'plaintext');
+                sourcePane.editor.setModel(emptyModel);
             }
         }
 

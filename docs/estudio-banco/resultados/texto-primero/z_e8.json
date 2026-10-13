@@ -1,0 +1,260 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos-e8/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-d031fde37d/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 46
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [
+   41,
+   73,
+   74,
+   78,
+   79
+  ],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "auto",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5231,
+   "temp_c": 58
+  },
+  "segundos": 811,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "E8a_B2·z1",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Sí, tiene un error de programación.\n\n**Dónde:** Línea 121 de `backend/particion_proyecto.py`.\n\n**Qué hace mal:**\n```python\n    for s in primer:\n        if s[\"fin\"] < cursor:\n            continue\n```\nEsta condición salta los símbolos cuyo `fin` es menor que `cursor`. Sin embargo, el problema es que un símbolo puede terminar exactamente en la línea `cursor` (es decir, `s[\"fin\"] == cursor`), lo cual es válido porque `cursor` representa la siguiente línea disponible para procesar. Si un símbolo termina en la línea `cursor - 1`, su `fin` sería `cursor - 1`, y la condición `s[\"fin\"] < cursor` sería verdadera, saltándolo correctamente. Pero si un símbolo termina en `cursor`, la condición `s[\"fin\"] < cursor` es falsa, así que **no lo salta**, lo cual parece correcto... \n\nEspera, déjame revisar con más cuidado. El problema real está en cómo se manejan los tramos de código suelto entre símbolos.\n\n**El error real (línea 121):**\nLa condición `if s[\"fin\"] < cursor: continue` es correcta para saltar símbolos que terminan antes del cursor actual. Pero el problema está en la lógica de construcción de `tramos`: cuando un símbolo no cabe solo y se subdivide en sus hijos (líneas 126-138), si el símbolo padre no tiene hijos o los hijos no cubren todo el rango, el código suelto restante se asigna con `nombres` vacío (línea 137), pero luego en la subdivisión fina (líneas 142-156), cuando un tramo no cabe y se corta por líneas, se pierde la información de qué símbolos estaban en ese tramo original.\n\nPero hay un error más grave:\n\n**Error real (línea 121 y lógica de `cursor`):**\nCuando se procesan los símbolos de primer nivel, si hay código suelto antes del primer símbolo, se crea un tramo inicial con `cursor = 1`. Pero si el primer símbolo empieza en la línea 10, por ejemplo, el tramo inicial cubre líneas 1-9. Luego, cuando se procesa el primer símbolo (línea 10 en adelante), `cursor` se actualiza a `s[\"fin\"] + 1`. Esto está bien.\n\nSin embargo, el problema está en **línea 121**: la condición `if s[\"fin\"] < cursor` salta símbolos que terminan antes del cursor, pero **no considera que un símbolo puede empezar antes de `cursor` y terminar después**. Si un símbolo empieza en la línea 5 y termina en la línea 15, y `cursor` está en 10 (porque ya se procesó un símbolo anterior que terminó en 9), entonces `s[\"fin\"] = 15 >= 10`, así que no se salta. Pero el símbolo empezó en 5, que es antes de `cursor = 10`, lo cual indica un solapamiento o un error en el orden de los símbolos.\n\nEn realidad, el error más claro está en **línea 121**: la condición debería ser `if s[\"fin\"] < cursor or s[\"ini\"] < cursor`, porque si un símbolo empieza antes de `cursor`, ya fue procesado (o su código suelto ya se asignó), y no debería volver a procesarse.\n\n**Caso concreto de fallo:**\nSupongamos un archivo con:\n- Símbolo A: líneas 1-10\n- Símbolo B: líneas 11-20\n\nAl procesar:\n1. `cursor = 1`\n2. Se procesa A: `tramos.append((1, 10, [\"A\"], A))`, `cursor = 11`\n3. Se procesa B: `s[\"fin\"] = 20 >= 11`, así que no se salta. `tramos.append((11, 20, [\"B\"], B))`, `cursor = 21`\n\nEsto funciona bien. Pero si los símbolos están desordenados o hay solapamientos, la lógica falla.\n\n**El error real está en la línea 121:** la condición `if s[\"fin\"] < cursor` es insuficiente. Debería ser `if s[\"fin\"] < cursor or s[\"ini\"] < cursor`, porque si un símbolo empieza antes de `cursor`, significa que ya fue procesado (o su rango ya fue cubierto por un símbolo anterior), y no debería añadirse de nuevo.\n\nEspera, revisando el código de nuevo, veo que los símbolos se ordenan por `ini` (línea 116: `primer = sorted(..., key=lambda s: s[\"ini\"])`), así que no deberían haber solapamientos si los datos son consistentes. Pero si hay un error en los datos (un símbolo que empieza antes que otro pero se procesa después), la condición `s[\"fin\"] < cursor` no lo detecta.\n\n**Conclusión:** El error está en **línea 121**. La condición `if s[\"fin\"] < cursor` debería ser `if s[\"fin\"] < cursor or s[\"ini\"] < cursor` para evitar procesar símbolos que ya fueron cubiertos por símbolos anteriores. Esto puede causar duplicación de código o tramos incorrectos si los símbolos están desordenados o hay solapamientos.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 1189,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 55.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B3·z",
+   "prueba": "seguridad: startswith en vez de commonpath",
+   "objetivo": "B3",
+   "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B3",
+   "modo": "unidad",
+   "respuesta": "Sí, `FileManager.is_path_allowed` tiene un error de programación.\n\n**Línea:** 37 de `backend/file_manager.py`\n\n**Qué hace mal:** Usa `abs_path.startswith(root)`. Esto es inseguro porque no añade un separador de directorios al final del `root`. Como consecuencia, una ruta que comparta el prefijo pero que esté en un directorio diferente puede pasar como permitida.\n\n**Caso concreto de fallo:**\nSupongamos que `root` es `/home/usuario/workspace` (sin barra final).\nLa ruta `/home/usuario/workspace_extra/archivo.py` también empieza por `/home/usuario/workspace`.\nEl `startswith` devuelve `True`, pero esa ruta está fuera del workspace permitido.\n\nEl fix habitual es asegurar que `root` termine en `/` o comprobar que el carácter siguiente (si existe) sea un separador:\n\n```python\n# Corrección:\nif abs_path == root or abs_path.startswith(root + os.sep):\n    return True\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: file_manager, ide_servicios",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 215,
+   "consultas": [],
+   "modo_pedido": "auto",
+   "segundos": 13.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·z2",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Vamos a revisar `piezas_de_archivo` con cuidado.\n\nAhora tengo una comprensión clara del error. Vamos a verificar un caso concreto con el código:\n\nSí, `piezas_de_archivo` tiene un error de programación.\n\n**Línea responsable:** Línea 81 de `backend/particion_proyecto.py`.\n\n**Qué hace mal:** El docstring dice *\"el código suelto entre medias va con el símbolo que sigue\"*, pero cuando un símbolo de primer nivel tiene hijos (métodos, clases internas, etc.) y el tramo que lo contiene no cabe en el tope, el código se subdivide por hijos. En esa subdivisión, el código suelto que precede al primer hijo se etiqueta con el nombre del **primer hijo**, no con el nombre del **símbolo padre** que \"sigue\".\n\nEl bucle de la línea 78-82 hace:\n```python\ncur = ini  # cur empieza en el inicio del tramo, que puede ser código suelto\nfor h in hijos:\n    if h[\"fin\"] < cur:\n        continue\n    finos.append((cur, h[\"fin\"], [h[\"nombre\"]]))  # <-- etiqueta con el hijo, no con s\n    cur = h[\"fin\"] + 1\n```\n\nAsí que `cur` (el código suelto) se incluye en el primer tramo hijo, y ese tramo lleva `[h[\"nombre\"]]` (el nombre del hijo), no `[s[\"nombre\"]]` (el nombre del padre).\n\n**Caso concreto de fallo:**\n\nUn archivo con:\n- Función `A`: líneas 1-10\n- Código suelto (sin función): líneas 11-15\n- Función `B`: líneas 16-25, con dos métodos `B1` (líneas 16-20) y `B2` (líneas 21-25)\n- Total: 25 líneas\n- El tramo que contiene a B (líneas 11-25) tiene más tokens que el `tope`, así que se subdivide.\n\nResultado esperado según el docstring: el código suelto (11-15) debería ir con `B` (\"el símbolo que sigue\").\n\nResultado real: el código suelto (11-15) se etiqueta como `B1` (el primer hijo de `B`), porque el primer tramo hijo empieza en `cur=11` y lleva `[h[\"nombre\"]]` = `[\"B1\"]`.\n\nEl mismo error ocurre con código suelto **antes** del primer símbolo: si el primer símbolo tiene hijos, el código suelto previo se etiqueta con el primer hijo, no con el símbolo padre.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 566,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\nprint(P.codigo(\\\"piezas_de_archivo\\\"))\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Vamos a analizar el caso edge: archivo con 0 líneas y simbolos\\n# Si total == 0, la línea 53 retorna. Veamos qué pasa con max(1, 0) = 1.\\n# Eso está bien, no hay error ahí.\\n\\n# El problema potencial está en la lógica de \\\"código suelto entre medias va con el símbolo que sigue\\\".\\n# Revisemos los tramos:\\n# cursor = 1\\n# Para cada símbolo de primer nivel s:\\n#   si s[\\\"fin\\\"] < cur",
+     "resultado_caracteres": 180
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Vamos a verificar esto con más detalle. El docstring dice:\\n# \\\"el código suelto entre medias va con el símbolo que sigue\\\"\\n# \\n# Pero el código hace:\\n# cursor = 1\\n# for s in primer:\\n#     if s[\\\"fin\\\"] < cursor:\\n#         continue\\n#     tramos.append((cursor, s[\\\"fin\\\"], [s[\\\"nombre\\\"]], s))\\n#     cursor = s[\\\"fin\\\"] + 1\\n#\\n# Ejemplo: \\n# Símbolo A: ini=1, fin=10\\n# Símbol",
+     "resultado_caracteres": 151
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Vamos a verificar si este caso es realmente un error o si es un caso que no debería ocurrir.\\n# En un AST bien formado, los símbolos de primer nivel (funciones, clases) no deberían superponerse.\\n# Pero si los símbolos están mal calculados (por un bug en el extractor de símbolos), podría pasar.\\n#\\n# Sin embargo, hay otro problema más sutil. Revisemos la lógica de agrupación.\\n#\\n#",
+     "resultado_caracteres": 249
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Vamos a verificar esto con un ejemplo concreto.\\n# Archivo con:\\n# - Función A: líneas 1-10\\n# - Código suelto: líneas 11-19\\n# - Función B: líneas 20-30, con métodos B1 (20-25) y B2 (26-30)\\n# - total = 30\\n# - tokens del tramo (11, 30) = 500, tope = 200\\n\\n# tramos = [(1, 10, [A], A), (11, 30, [B], B)]\\n# El tramo (11, 30) no cabe (500 > 200).\\n# s = B (no es None)\\n# hijos = [B1",
+     "resultado_caracteres": 178
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Vamos a verificar si hay otro error más grave. Revisemos el caso donde hay código suelto\\n# ANTES del primer símbolo.\\n#\\n# Archivo con:\\n# - Código suelto: líneas 1-5\\n# - Función A: líneas 6-15\\n# - total = 20\\n#\\n# cursor = 1\\n# s=A: fin=15 >= 1 → tramos.append((1, 15, [A], A)), cursor=16\\n# cursor=16 <= total=20 → tramos.append((16, 20, [], None))\\n# tramos = [(1, 15, [A], A), ",
+     "resultado_caracteres": 181
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Ahora vamos a verificar si hay otro error. Revisemos la lógica de \\\"código suelto entre medias\\\".\\n# El docstring dice: \\\"el código suelto entre medias va con el símbolo que sigue\\\".\\n# Pero en realidad, el código suelto va con el símbolo que COMIENZA DESPUÉS del código suelto.\\n# Esto es correcto según el docstring.\\n#\\n# Pero hay un problema más sutil: ¿qué pasa si hay código sue",
+     "resultado_caracteres": 192
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Caso concreto de fallo:\\n# \\n# Archivo con:\\n# - Función A: líneas 1-10\\n# - Código suelto: líneas 11-15\\n# - Función B: líneas 16-25, con métodos B1 (16-20) y B2 (21-25)\\n# - total = 25\\n# - tokens del tramo (11, 25) = 500, tope = 200\\n#\\n# Paso 1: Construcción de tramos\\n# cursor = 1\\n# s=A: fin=10 >= 1 → tramos.append((1, 10, [A], A)), cursor=11\\n# s=B: fin=25 >= 11 → tramos.app",
+     "resultado_caracteres": 329
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 425.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B6·z",
+   "prueba": "clave de configuración mal escrita",
+   "objetivo": "B6",
+   "pregunta": "Revisa `JobExporter.preparar` en `backend/job_exporter.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B6",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar el código de `JobExporter.preparar` para identificar posibles errores de programación.\n\nVeo que el código se recortó. Déjame leer las líneas restantes del método:\n\nAhora veo el error claramente. En la línea 93:\n\n```python\ntope = int(ajustes.get(\"max_chunks_tokens\") or max_chunk_tokens)\n```\n\nEl parámetro del método se llama `max_chunk_tokens` (sin la 's' en \"chunk\"), pero dentro de `ajustes` se busca la clave `\"max_chunks_tokens\"` (con 's'). Esta inconsistencia de nombres significa que:\n\n1. Si el usuario pasa `ajustes={\"max_chunks_tokens\": 300}`, funciona porque la clave coincide.\n2. Pero si el usuario pasa `ajustes={\"max_chunk_tokens\": 300}` (sin 's', igual que el parámetro del método), la búsqueda falla y se usa el valor por defecto `max_chunk_tokens` del método, ignorando el ajuste del usuario.\n\nAdemás, el FACTS FROM THE PROJECT BANK ya señala este problema: `max_chunks_tokens` aparece solo en la línea 93 de `backend/job_exporter.py`, mientras que `max_chunk_tokens` (sin 's') aparece en 26 lugares en el proyecto.\n\n**Respuesta:** Sí, tiene un error de programación en la **línea 93** de `backend/job_exporter.py`.\n\n**Qué hace mal:** Busca la clave `\"max_chunks_tokens\"` (con 's') dentro del diccionario `ajustes`, pero el nombre correcto del parámetro del método es `max_chunk_tokens` (sin 's'). Esta inconsistencia significa que si alguien pasa un ajuste con la clave `max_chunk_tokens` (sin 's'), el valor se ignora y se usa siempre el valor por defecto del método.\n\n**Caso concreto en el que falla:** Si llamas a `preparar(rutas=[\"libro.pdf\"], destino=\"/tmp/job\", max_chunk_tokens=500, progreso=None)` y además pasas `rutas=[{\"path\": \"libro.pdf\", \"ajustes\": {\"max_chunk_tokens\": 300}}]`, el código ignorará el valor 300 y usará 500, porque busca la clave `\"max_chunks_tokens\"` (con 's') en el diccionario `ajustes`, que no existe. El fragmento se creará con 500 tokens en lugar de los 300 solicitados.",
+   "agotada": false,
+   "corte": null,
+   "unidad": ".: job_exporter, __init__, pdf_parser, semantic_chunker +3",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 493,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"JobExporter.preparar\"}",
+     "resultado_caracteres": 143
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Leer las líneas restantes de JobExporter.preparar\\nlines = P.lineas(\\\"backend/job_exporter.py\\\")\\nfor i in range(139, 207):\\n    print(f\\\"{i+1:3d}: {lines[i]}\\\")\"}",
+     "resultado_caracteres": 2000
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 59.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B2·z3",
+   "prueba": "off-by-one: se pierde una línea al partir",
+   "objetivo": "B2",
+   "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B2",
+   "modo": "unidad",
+   "respuesta": "Voy a revisar `piezas_de_archivo` con detalle.\n\nSí, **tiene un error de programación**. Está en la **línea 84** de `backend/particion_proyecto.py`.\n\n### Qué hace mal\n\nCuando un símbolo de primer nivel (p. ej., una clase o función) no cabe en el `tope` de tokens, la función lo subdivide por sus hijos (línea 76). Recorre los hijos y, tras el último hijo (o entre hijos), si queda código residual (`cur <= fin`), lo agrega con:\n\n```python\nfinos.append((cur, fin, nombres if not hijos else []))\n```\n\nSi `hijos` no está vacío, el código residual se agrega con `[]` (lista vacía), **perdiendo la asociación con el nombre del símbolo padre**. Ese código residual pertenece al padre, pero se registra como si fuera código suelto sin nombre.\n\n### Caso concreto que falla\n\nImagina un archivo con una clase `ClaseGigante` de 100 líneas, que tiene tres métodos: `m1` (líneas 10-30), `m2` (40-60) y `m3` (70-90). Hay código residual dentro de la clase entre métodos: líneas 31-39 y 61-69. La clase entera no cabe en el `tope`, pero cada método sí cabe.\n\nAl procesar:\n1. Se crean tramos con `m1`, `m2`, `m3`.\n2. Tras `m3`, `cur = 91` y `fin = 100`, así que `cur <= fin` es verdadero.\n3. Se ejecuta la línea 84: como `hijos` no está vacío, se agrega `(91, 100, [])` en lugar de `(91, 100, [\"ClaseGigante\"])`.\n\nEl resultado es que las líneas 91-100 (que son parte de `ClaseGigante`) se pierden su asociación con el símbolo padre, lo que puede causar que el contexto que se le pase al modelo no incluya correctamente a qué símbolo pertenecen esos tokens.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: agent_flows, particion_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 472,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Obtener el código completo de piezas_de_archivo\\ncodigo = P.codigo(\\\"piezas_de_archivo\\\")\\nprint(codigo)\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Analizo el bug: cuando un símbolo de primer nivel no cabe, se subdivide por métodos (línea 76).\\n# Pero los hijos se agregan a \\\"finos\\\" con nombres=[h[\\\"nombre\\\"]], y luego en la línea 84, si hay \\n# código entre métodos (cur <= fin), se agrega con nombres if not hijos else [].\\n# El problema está en la línea 84: si el tramo original (s) tiene hijos y hay código residual \\n# despu",
+     "resultado_caracteres": 113
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Voy a verificar el bug con un caso concreto. El problema está en la línea 84.\\n# Cuando un símbolo de primer nivel (s) no cabe, se subdivide por sus hijos (métodos).\\n# Si hay código residual (entre métodos o después del último método), se agrega con nombres=[]\\n# cuando debería llevar el nombre del padre.\\n\\n# Caso de prueba:\\n# - Una clase ClaseGigante con 3 métodos: metodo1 (lín",
+     "resultado_caracteres": 475
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Confirmo el bug. La línea 84 dice:\\n#   finos.append((cur, fin, nombres if not hijos else []))\\n# \\n# Cuando s no es None (es un símbolo de primer nivel que no cabe) y hay hijos (métodos), \\n# y hay código residual después del último método (cur <= fin), se agrega con [] en lugar \\n# de [s[\\\"nombre\\\"]] (que es lo que nombres contiene).\\n#\\n# El código residual (líneas entre métodos",
+     "resultado_caracteres": 131
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 136.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "E8a_B7·z",
+   "prueba": "conexión SQLite que nunca se cierra",
+   "objetivo": "B7",
+   "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+   "base": "E8a_B7",
+   "modo": "unidad",
+   "respuesta": "El método `BancoProyecto.conectar` (líneas 708-713) **tiene un error de programación**:\n\n**Línea 713:** `c.commit()` se ejecuta de forma no segura. El contextmanager no envuelve `commit()` en un bloque `try/finally`, por lo que si se produce una excepción dentro del bloque `with`, el flujo salta directamente a la propagación de la excepción sin ejecutar `c.commit()` (lo cual es correcto, pues se haría rollback implícito) **pero tampoco cierra la conexión** (`c.close()` nunca se llama).\n\n**Qué hace mal:** Si dentro del `with self.conectar() as c:` se produce una excepción (por ejemplo, un `sqlite3.OperationalError`, un error de disco, o cualquier excepción del código del llamador), el control salta fuera del contextmanager sin pasar por `c.commit()`. En ese caso:\n1. La transacción se descarta (rollback implícito de sqlite3) — esto es aceptable.\n2. **Pero la conexión `c` queda abierta y sin cerrar**, provocando una pérdida de recursos (fichero de base de datos abierto, posible agotamiento de conexiones si se repite muchas veces).\n\n**Caso concreto de fallo:** Si un método llama a `sincronizar()` y dentro de `_indexar_archivo()` se produce una excepción de escritura en SQLite (por ejemplo, disco lleno o base de datos corrupta), la conexión abierta por `conectar()` nunca se cierra. En un servidor que ejecuta sincronizaciones frecuentes (el vigilante llama a `sincronizar()` cada pocos segundos), esto provocaría acumulación progresiva de conexiones SQLite abiertas sin cerrar, hasta agotar los descriptores de archivo del proceso.\n\nLa corrección sería envolver `commit()` y añadir `c.close()` en un `finally`:\n\n```python\n@contextmanager\ndef conectar(self):\n    c = sqlite3.connect(self.ruta_db, timeout=30, check_same_thread=False)\n    c.row_factory = sqlite3.Row\n    try:\n        yield c\n        c.commit()\n    except:\n        c.rollback()\n        raise\n    finally:\n        c.close()\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: banco_proyecto",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 487,
+   "consultas": [
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"BancoProyecto.conectar\"}",
+     "resultado_caracteres": 884
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Revisar si hay algún caso donde conectar() se usa dentro de un bloque try/except\\n# y la transacción no se commitea si hay excepción.\\n# En un contextmanager, si hay excepción en el bloque 'with', el código tras yield NO se ejecuta.\\n# Esto significa que c.commit() NO se llamaría en caso de excepción, y los cambios se perderían.\\n# Veamos cómo se usa conectar() en el código.\\n\\nimpor",
+     "resultado_caracteres": 30
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Buscar usos de \\\"with self.conectar()\\\" en el proyecto\\nmatches = P.grep(r\\\"with self\\\\.conectar\\\\(\\\\)\\\", rutas=[\\\"backend/banco_proyecto.py\\\"])\\nmatches[:30]\\n\"}",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar: en un contextmanager, si hay excepción entre yield y return,\\n# el código tras yield NO se ejecuta. Esto significa que commit() no se llama.\\n# Veamos si hay try/except alrededor de los \\\"with self.conectar()\\\" que capturen excepciones\\n# y luego hagan rollback o algo.\\n\\n# Buscar bloques try alrededor de \\\"with self.conectar()\\\"\\nlines = P.lineas(\\\"backend/banco_proyecto.",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# El error: en un contextmanager, si el bloque 'with' genera una excepción,\\n# el código tras yield (c.commit()) NO se ejecuta. Esto significa que si hay\\n# una excepción dentro del bloque 'with self.conectar()', los cambios NO se\\n# guardan y la transacción se descarta (rollback implícito de sqlite3).\\n# \\n# Pero el problema real es el OPUESTO: si NO hay excepción, commit() se llama.\\",
+     "resultado_caracteres": 650
+    }
+   ],
+   "modo_pedido": "auto",
+   "segundos": 121.1,
+   "memoria_del_modelo": null
+  }
+ ]
+}

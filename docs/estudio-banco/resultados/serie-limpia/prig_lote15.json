@@ -1,0 +1,320 @@
+{
+ "lote": 15,
+ "repeticion": false,
+ "ok": true,
+ "problemas": [],
+ "preguntas": 12,
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "version_banco": "15",
+  "huella_codigo": "5da3b8899ca477fd",
+  "huella_sistema": "f0b8982330805ddf",
+  "vectores": 0,
+  "unidades_vigentes": 96,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 46
+  },
+  "repeticion": false,
+  "ollama_escuchando": false,
+  "motor": {
+   "contexto": 65536,
+   "calientes_por_capa": 16,
+   "mtp": true,
+   "modo": "equilibrado"
+  },
+  "gpu_despues": {
+   "vram_mb": 5285,
+   "temp_c": 60
+  }
+ },
+ "media": 0.917,
+ "segundos": 527,
+ "modos": {
+  "general": 4,
+  "unidad": 8
+ },
+ "por_tipo": {
+  "entorno": 1.0,
+  "llamadores": 1.0,
+  "ubicacion": 1.0,
+  "frontend": 1.0,
+  "endpoint": 1.0,
+  "impacto": 0.0,
+  "recorrido": 1.0,
+  "config": 1.0,
+  "constante": 1.0
+ },
+ "distintos_a_la_corrida_final": [],
+ "limite_s": 600,
+ "agotadas": [],
+ "memoria_del_modelo": [],
+ "resultados": [
+  {
+   "id": "a60ed7033a43",
+   "tipo": "config",
+   "puntaje": 1.0,
+   "segundos": 28.2,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "4df51f5cc32e",
+   "tipo": "constante",
+   "puntaje": 1.0,
+   "segundos": 25.9,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "c889b1fb148a",
+   "tipo": "endpoint",
+   "puntaje": 1.0,
+   "segundos": 10.4,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "10365a620f7a",
+   "tipo": "entorno",
+   "puntaje": 1.0,
+   "segundos": 22.2,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "d9002a638337",
+   "tipo": "frontend",
+   "puntaje": 1.0,
+   "segundos": 12.7,
+   "modo": "general",
+   "herramientas": 0
+  },
+  {
+   "id": "f29f377d7d2f",
+   "tipo": "impacto",
+   "puntaje": 0.0,
+   "segundos": 322.7,
+   "modo": "unidad",
+   "herramientas": 16
+  },
+  {
+   "id": "3bd4a1786164",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 30.2,
+   "modo": "general",
+   "herramientas": 6
+  },
+  {
+   "id": "cb15eeff9d97",
+   "tipo": "llamadores",
+   "puntaje": 1.0,
+   "segundos": 15.6,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "574e475f5f2e",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 18.0,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "c35ee51e709d",
+   "tipo": "recorrido",
+   "puntaje": 1.0,
+   "segundos": 21.5,
+   "modo": "unidad",
+   "herramientas": 1
+  },
+  {
+   "id": "05f30dde391c",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 7.1,
+   "modo": "unidad",
+   "herramientas": 0
+  },
+  {
+   "id": "c02d46b5a17d",
+   "tipo": "ubicacion",
+   "puntaje": 1.0,
+   "segundos": 12.0,
+   "modo": "unidad",
+   "herramientas": 1
+  }
+ ],
+ "consultas": {
+  "a60ed7033a43": [],
+  "4df51f5cc32e": [],
+  "c889b1fb148a": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.api(\\\"POST /api/desafios/*/rendirse\\\")\"}",
+    "resultado_caracteres": 283
+   }
+  ],
+  "10365a620f7a": [],
+  "d9002a638337": [],
+  "f29f377d7d2f": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"credenciales\\\"))\"}",
+    "resultado_caracteres": 686
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"descargar\\\"))\\n</print(P.llamadores(\\\"descargar\\\"))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"descargar\\\"))\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/descargar\\\"))\\n</print(P.api(\\\"/api/kaggle/descargar\\\"))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/descargar\\\"))\"}",
+    "resultado_caracteres": 350
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/*\\\"))\\n</print(P.api(\\\"/api/kaggle/*\\\"))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/*\\\"))\"}",
+    "resultado_caracteres": 227
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Buscar qué endpoints de app.py usan funciones de kaggle_lector\\nimport re\\nwith open(\\\"backend/app.py\\\") as f:\\n    texto = f.read()\\n# Buscar import de kaggle_lector\\nprint(\\\"kaggle_lector\\\" in texto)\\n# Buscar llamadas a funciones de kaggle_lector\\nfor m in re.finditer(r'\\\\b(kaggle_\\\\w+)\\\\.', texto):\\n    print(m.group(0))\"}",
+    "resultado_caracteres": 30
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.grep(r\\\"kaggle_lector\\\\.\\\", maximo=50))\"}",
+    "resultado_caracteres": 2000
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver qué endpoints usan estado, guardar_credenciales, borrar_credenciales\\nprint(P.api(\\\"/api/kaggle/estado\\\"))\\n</print(P.api(\\\"/api/kaggle/estado\\\"))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/estado\\\"))\"}",
+    "resultado_caracteres": 225
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/credenciales\\\"))\\n</print(P.api(\\\"/api/kaggle/credenciales\\\"))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.api(\\\"/api/kaggle/credenciales\\\"))\"}",
+    "resultado_caracteres": 363
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver el recorrido desde kaggle_lector.credenciales hasta los endpoints\\nprint(P.recorrido(\\\"kaggle_lector.credenciales\\\", 4))\\n</print(P.recorrido(\\\"kaggle_lector.credenciales\\\", 4))\"}",
+    "resultado_caracteres": 50
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"kaggle_lector.credenciales\\\", 4))\"}",
+    "resultado_caracteres": 224
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"# Ver qué endpoints usan _pedir (que llama a credenciales)\\nprint(P.api(\\\"/api/kaggle/buscar\\\"))\\n</print(P.api(\\\"/api/kaggle/buscar\\\"))\"}",
+    "resultado_caracteres": 50
+   }
+  ],
+  "3bd4a1786164": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app._instalados_tags\\\")\"}",
+    "resultado_caracteres": 117
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app._nombres_instalados\\\")\"}",
+    "resultado_caracteres": 236
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app._marcar_modelos\\\")\"}",
+    "resultado_caracteres": 228
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app.buscador_buscar\\\")\"}",
+    "resultado_caracteres": 2
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app.buscador_localizar\\\")\"}",
+    "resultado_caracteres": 2
+   },
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"app.buscador_variantes\\\")\"}",
+    "resultado_caracteres": 2
+   }
+  ],
+  "cb15eeff9d97": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.llamadores(\\\"estadoLista\\\")\"}",
+    "resultado_caracteres": 352
+   }
+  ],
+  "574e475f5f2e": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.ficha(\\\"kaggle_descargar\\\")\"}",
+    "resultado_caracteres": 445
+   }
+  ],
+  "c35ee51e709d": [
+   {
+    "nombre": "consola",
+    "argumentos": "{\"codigo\": \"P.camino(\\\"github_descargar\\\", \\\"_flujo_cancelable\\\")\"}",
+    "resultado_caracteres": 131
+   }
+  ],
+  "05f30dde391c": [],
+  "c02d46b5a17d": [
+   {
+    "nombre": "ver_simbolo",
+    "argumentos": "{\"nombre\": \"ExerciseEngine.generate\"}",
+    "resultado_caracteres": 1108
+   }
+  ]
+ },
+ "respuestas": {
+  "a60ed7033a43": "1. **`_exec_timeout`** en `backend/app.py` (línea 2926): es la función que lee directamente la configuración `exec_timeout` de `ai_engine.config`, con un valor por defecto de 25 segundos.\n2. **`run_code`** en `backend/app.py` (línea 2930): utiliza `_exec_timeout()` para obtener el tiempo de ejecución al llamar a `runner.run_file`.\n3. **`run_cell`** en `backend/app.py` (línea 2940): utiliza `_exec_timeout()` para obtener el tiempo de ejecución al llamar a `runner.run_cell_code`.\n\nAdemás, `ai_engine.config` es un diccionario gestionado por `ai_engine.update_config` (que se expone en `/api/ai/config`), por lo que cualquier cambio en esa clave afecta a estas tres funciones.",
+  "4df51f5cc32e": "En `backend/ai_engine/motor_moe.py` (línea 47), la constante `RESERVA_CUDA_MB` vale **370**.\n\n```python\nRESERVA_CUDA_MB = 370         # medido: CUDA deja usar ~5.770 de los 6.141 MB (nvidia-smi da ~6.126 libres)\n```\n\nSe utiliza para reservar memoria de la GPU que no está disponible para el modelo, asegurando que el motor no intente asignar más VRAM de la físicamente usable.",
+  "c889b1fb148a": "P.api(\"POST /api/desafios/*/rendirse\")El endpoint `POST /api/desafios/*/rendirse` está implementado por la función `desafios_rendirse` en el archivo `backend/app.py` (línea 6700).",
+  "10365a620f7a": "Las funciones que leen la variable de entorno `PRIG_SUAVE_CONTROL` son:\n\n*   `ruta_control` en `backend/recursos/motor_suave.py` (línea 36)\n*   `rutas` en `backend/recursos/nativo/prig_suave.c` (línea 70)",
+  "d9002a638337": "La función es `launchTerminalUpdate` dentro de la clase `GlobalConfigManager` en `frontend/js/global_config.js:288`.",
+  "f29f377d7d2f": "P.llamadores(\"credenciales\")\n\nAhora reviso la cadena completa: `credenciales` → `_pedir` → todas las búsquedas/aperturas de notebooks, y `credenciales` → `estado` → endpoint de estado.\n\nEso es solo el recorrido interno. Necesito ver los llamadores de nivel superior que usan `credenciales` y llegan a endpoints.\n\n",
+  "3bd4a1786164": "La cadena de llamadas es:\n\n1. **`_instalados_tags()`** (línea 5940) → consultada por:\n2. **`_nombres_instalados()`** (línea 5947) → consultada por:\n3. **`_marcar_modelos()`** (línea 5992) y **`buscador_variantes()`** (línea 6010) → ambas consultadas por:\n4. **`buscador_buscar()`** (línea 5985) y **`buscador_localizar()`** (línea 6003)\n\nLas dos funciones finales (`buscador_buscar` y `buscador_localizar`) no aparecen llamadas desde ningún otro símbolo del proyecto, lo que sugiere que son **endpoints de API** expuestos directamente por FastAPI (el enrutador de `app.py` las registra como rutas HTTP, probablemente `/api/buscador/buscar` y `/api/buscador/localizar`).\n\nEn resumen: `_instalados_tags()` se invoca de forma transitiva desde los endpoints del buscador de modelos, que a su vez llaman a `_nombres_instalados()` para obtener el set de nombres descargados y marcarlos en los resultados.",
+  "cb15eeff9d97": "Las funciones que llaman a `estadoLista` en `frontend/js/kaggle_lector.js` son:\n\n1. **`vistaLista`** (línea 560)\n2. **`buscarLista`** (línea 612)\n3. **`pintarLista`** (línea 626)",
+  "574e475f5f2e": "P.ficha(\"kaggle_descargar\")La función `kaggle_descargar` llama directamente a `_ndjson_en_hilo`, y esta a su vez llama a `_flujo_cancelable`. El orden es:\n\n1. `kaggle_descargar`\n2. `_ndjson_en_hilo`\n3. `_flujo_cancelable`",
+  "c35ee51e709d": "La ejecución pasa por estas funciones en orden:\n\n1. **`github_descargar`** (endpoint `@app.post(\"/api/github/descargar\")` en `backend/app.py:2597`)\n2. **`_ndjson_en_hilo`** (en `backend/app.py:5107`)\n3. **`_flujo_cancelable`** (en `backend/app.py:5054`)\n\n`github_descargar` crea un `threading.Event` para cancelación, define una función `trabajo` que llama a `github_lector.descargar`, y luego devuelve `return _ndjson_en_hilo(trabajo)`. `_ndjson_en_hilo` ejecuta `trabajo` en un hilo y lo envuelve con `_flujo_cancelable` para gestionar la cancelación y la emisión en formato NDJSON.",
+  "05f30dde391c": "`IndiceSemantico.embeber` está definida en **`backend/indice_semantico.py`**, en la línea 114.",
+  "c02d46b5a17d": "`ExerciseEngine.generate` está definida en **`backend/exercise_engine.py`** (líneas 61-81)."
+ }
+}

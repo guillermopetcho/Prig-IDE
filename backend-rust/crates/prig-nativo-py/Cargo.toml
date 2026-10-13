@@ -1,0 +1,15 @@
+[package]
+name = "prig-nativo-py"
+version = "0.1.0"
+edition = "2021"
+
+# El módulo de Python `prig_nativo`: los subsistemas de Prig ya portados a Rust, para el backend de Python mientras
+# su anfitrión (el chat, las rutas) siga allí (docs/plan-prig-rust.md, 4.1).
+
+[lib]
+name = "prig_nativo"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["extension-module"] }
+prig-recursos = { path = "../prig-recursos" }

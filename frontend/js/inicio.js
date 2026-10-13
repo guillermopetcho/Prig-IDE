@@ -164,42 +164,50 @@
         }
         const d = estado.datos;
         const scroll = raiz.scrollTop;
-        raiz.innerHTML = `<div class="in-pagina">
-            ${heroe(d)}
-            <div style="display:flex; flex-direction:column; gap:18px; min-width:0;">
-              ${continuar(d)}
-              ${actividad(d)}
-            </div>
-            <div style="display:flex; flex-direction:column; gap:18px; min-width:0;">
-              ${avance(d)}
-              ${notas(d)}
-              ${modelos(d)}
-              ${proyectos(d)}
-              ${kaggle(d)}
-            </div>
-            ${herramientas(d)}
-          </div>`;
-        raiz.scrollTop = scroll;
-        conectar(raiz, d);
+        try {
+            raiz.innerHTML = `<div class="in-pagina">
+                ${heroe(d)}
+                <div style="display:flex; flex-direction:column; gap:18px; min-width:0;">
+                  ${continuar(d)}
+                  ${actividad(d)}
+                </div>
+                <div style="display:flex; flex-direction:column; gap:18px; min-width:0;">
+                  ${avance(d)}
+                  ${notas(d)}
+                  ${modelos(d)}
+                  ${proyectos(d)}
+                  ${kaggle(d)}
+                </div>
+                ${herramientas(d)}
+              </div>`;
+            raiz.scrollTop = scroll;
+            conectar(raiz, d);
+        } catch (err) {
+            console.error('Error al pintar inicio:', err);
+            raiz.innerHTML = `<div class="in-pagina"><div class="in-tarjeta in-ancho"><div class="in-error">Error al mostrar el inicio: ${esc(err.message)}</div><button class="in-btn" data-recargar style="margin-top:10px;">Reintentar</button></div></div>`;
+            const r = raiz.querySelector('[data-recargar]');
+            if (r) r.onclick = cargar;
+        }
     }
 
     // ------------------------------------------------------------------ perfil y semana
     function heroe(d) {
-        const p = d.perfil;
+        const p = d.perfil || {};
         const prog = d.progreso || {};
         const racha = prog.racha || {};
         const des = prog.desafios || {};
         const resueltos = (des.por_estado || {}).resuelto || 0;
-        const leidas = ((d.kaggle || {}).lecturas || []).reduce((s, l) => s + (l.leidas || 0), 0);
-        const max = Math.max(1, ...d.semana.map(x => x.n));
-        const inicial = (p.nombre || '?').trim()[0] || '?';
+        const leidas = ((d.kaggle || {}).lecturas || []).reduce((s, l) => s + ((l && l.leidas) || 0), 0);
+        const semana = Array.isArray(d.semana) ? d.semana : [];
+        const max = Math.max(1, ...semana.map(x => (x && x.n) || 0));
+        const inicial = ((p.nombre || '?').trim()[0] || '?');
         if (estado.editando) {
             return `<div class="in-tarjeta in-heroe in-ancho" style="flex-wrap:wrap;">
                 <div class="in-avatar">${esc(inicial.toUpperCase())}</div>
                 <div style="flex:1; min-width:260px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                  <label class="in-sub">Tu nombre<input class="in-campo" id="in-nombre" maxlength="60" value="${esc(p.nombre)}" placeholder="¿Cómo te llamo?"></label>
+                  <label class="in-sub">Tu nombre<input class="in-campo" id="in-nombre" maxlength="60" value="${esc(p.nombre || '')}" placeholder="¿Cómo te llamo?"></label>
                   <label class="in-sub">Nivel<select class="in-campo" id="in-nivel">${['principiante', 'intermedio', 'avanzado'].map(n => `<option ${n === p.nivel ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-                  <label class="in-sub" style="grid-column:1 / -1;">Tu objetivo<input class="in-campo" id="in-objetivo" maxlength="300" value="${esc(p.objetivo)}" placeholder="Por ejemplo: entrar en machine learning y ganar una competición de Kaggle"></label>
+                  <label class="in-sub" style="grid-column:1 / -1;">Tu objetivo<input class="in-campo" id="in-objetivo" maxlength="300" value="${esc(p.objetivo || '')}" placeholder="Por ejemplo: entrar en machine learning y ganar una competición de Kaggle"></label>
                   <label class="in-sub" style="grid-column:1 / -1; display:flex; gap:8px; align-items:center;"><input type="checkbox" id="in-mostrar" ${p.mostrar_al_abrir ? 'checked' : ''}> Abrir esta pantalla al iniciar Prig</label>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px;"><button class="in-btn primario" data-guardar-perfil><i class="fa-solid fa-check"></i> Guardar</button>
@@ -209,12 +217,12 @@
         return `<div class="in-tarjeta in-heroe in-ancho">
             <div class="in-avatar" title="Editar perfil" data-editar-perfil style="cursor:pointer;">${esc(inicial.toUpperCase())}</div>
             <div style="min-width:0;">
-              <h1 class="in-saludo">${SALUDO(d.hora)}${p.nombre ? `, ${esc(p.nombre)}` : ''}</h1>
-              <div class="in-sub">${p.objetivo ? `<i class="fa-solid fa-flag-checkered"></i> ${esc(p.objetivo)} · ` : ''}nivel ${esc(p.nivel)}
+              <h1 class="in-saludo">${SALUDO(d.hora || 12)}${p.nombre ? `, ${esc(p.nombre)}` : ''}</h1>
+              <div class="in-sub">${p.objetivo ? `<i class="fa-solid fa-flag-checkered"></i> ${esc(p.objetivo)} · ` : ''}nivel ${esc(p.nivel || 'principiante')}
                 · <a href="#" data-editar-perfil style="color:var(--accent-blue);">${p.nombre ? 'editar perfil' : 'cuéntame quién eres'}</a>
                 · <a href="#" data-abrir-gh-widget style="color:#cba6f7; display:inline-flex; align-items:center; gap:4px;"><i class="fa-brands fa-github"></i> tarjeta GitHub Profile</a></div>
-              <div class="in-semana" title="Tu actividad de los últimos 7 días">${d.semana.map((x, i) => `<div class="in-dia ${x.n ? 'activo' : ''} ${i === d.semana.length - 1 ? 'hoy' : ''}" title="${x.fecha}: ${x.n} acciones">
-                  <div style="height:${x.n ? 8 + Math.round(30 * x.n / max) : 5}px;"></div>${x.dia}</div>`).join('')}</div>
+              <div class="in-semana" title="Tu actividad de los últimos 7 días">${semana.map((x, i) => `<div class="in-dia ${x && x.n ? 'activo' : ''} ${i === semana.length - 1 ? 'hoy' : ''}" title="${esc(x && x.fecha)}: ${(x && x.n) || 0} acciones">
+                  <div style="height:${x && x.n ? 8 + Math.round(30 * (x.n || 0) / max) : 5}px;"></div>${esc((x && x.dia) || '')}</div>`).join('')}</div>
             </div>
             <div class="in-cifras">
               <div class="in-cifra"><b>${racha.actual || 0}<i class="fa-solid fa-fire" style="color:#fab387; font-size:14px; margin-left:4px;"></i></b><span>días de racha</span></div>
@@ -276,8 +284,8 @@
 
     // ------------------------------------------------------------------ modelos y máquina
     function modelos(d) {
-        const lista = (d.modelos || []).filter(m => !(m.capacidades || []).includes('embedding'));
-        const cargados = new Set((d.cargados || []).map(m => m.nombre));
+        const lista = (d.modelos || []).filter(m => !((m && m.capacidades) || []).includes('embedding'));
+        const cargados = new Set((d.cargados || []).map(m => (m && (m.nombre || m.name)) || ''));
         const t = d.temperaturas || {};
         const s = d.sistema || {};
         const g = (s.gpu || {});
@@ -292,12 +300,18 @@
               <div><span>CPU</span><b>${t.cpu != null ? Math.round(t.cpu) + ' °C' : (s.cpu_pct != null ? s.cpu_pct + '%' : '—')}</b></div>
             </div>
             ${errorModelos ? `<div class="in-error" style="margin-bottom:8px;">Ollama no responde: ${esc(errorModelos)}</div>` : ''}
-            <div style="max-height:250px; overflow-y:auto;">${lista.map(m => `<div class="in-fila clic" data-modelo="${esc(m.nombre)}" title="Abrir en Modelos">
+            <div style="max-height:250px; overflow-y:auto;">${lista.map(m => {
+                const nom = (m && (m.nombre || m.name)) || '';
+                const params = (m && (m.parametros || (m.details && m.details.parameter_size))) || '';
+                const bytes = m ? (m.bytes ?? m.size) : null;
+                const caps = (m && m.capacidades) || [];
+                return `<div class="in-fila clic" data-modelo="${esc(nom)}" title="Abrir en Modelos">
                 <div class="in-icono" style="width:28px; height:28px;"><i class="fa-solid fa-cube"></i></div>
-                <div class="in-texto" style="font-size:12px;"><span style="font-family:'Fira Code',monospace;">${esc(m.nombre.replace(/^hf\.co\//, ''))}</span>
-                  <small>${esc(m.parametros || '')} · ${gb(m.bytes)} ${(m.capacidades || []).filter(c => c !== 'completion').map(c => `<span class="in-modelo-cap">${esc(c)}</span>`).join(' ')}</small></div>
-                ${m.nombre === d.modelo_tutor ? '<span class="in-badge azul" title="Modelo del tutor">tutor</span>' : ''}
-                ${cargados.has(m.nombre) ? '<span class="in-badge verde" title="Cargado en memoria">en memoria</span>' : ''}</div>`).join('')
+                <div class="in-texto" style="font-size:12px;"><span style="font-family:'Fira Code',monospace;">${esc(nom.replace(/^hf\.co\//, ''))}</span>
+                  <small>${esc(params)} · ${gb(bytes)} ${caps.filter(c => c !== 'completion').map(c => `<span class="in-modelo-cap">${esc(c)}</span>`).join(' ')}</small></div>
+                ${nom && nom === d.modelo_tutor ? '<span class="in-badge azul" title="Modelo del tutor">tutor</span>' : ''}
+                ${nom && cargados.has(nom) ? '<span class="in-badge verde" title="Cargado en memoria">en memoria</span>' : ''}</div>`;
+            }).join('')
               || (errorModelos ? '' : '<div class="in-vacio">No tienes modelos locales. Busca uno pequeño para empezar (p. ej. qwen2.5-coder:1.5b).</div>')}</div>
             <div class="in-fila" style="margin-top:4px;">
               <div class="in-icono" style="width:28px; height:28px; background:rgba(66,133,244,.14); color:#8ab4f8;"><i class="fa-brands fa-google"></i></div>
@@ -493,19 +507,23 @@
 
     // ------------------------------------------------------------------ herramientas
     function herramientas(d) {
-        const favoritas = d.perfil.favoritas || [];
-        const disponibles = HERRAMIENTAS.filter(([id]) => comando(id));
+        const favoritas = (d.perfil && d.perfil.favoritas) || [];
+        const disponibles = HERRAMIENTAS.filter(([id]) => {
+            const c = comando(id);
+            return c && c.label;
+        });
         const orden = [...disponibles.filter(([id]) => favoritas.includes(id)), ...disponibles.filter(([id]) => !favoritas.includes(id))];
         const visibles = estado.todasHerramientas ? orden : orden.slice(0, Math.max(8, favoritas.length));
         return `<div class="in-tarjeta in-ancho"><h2><i class="fa-solid fa-layer-group"></i> Secciones
               <span class="in-sub" style="margin:0; font-weight:400;">· marca tus favoritas con <i class="fa-solid fa-star" style="color:#f9e2af;"></i> para tenerlas primero</span>
               <button class="in-btn in-accion" data-todas>${estado.todasHerramientas ? 'Ver menos' : `Ver todas (${orden.length})`}</button></h2>
             <div class="in-herramientas">${visibles.map(([id, icono, color, texto]) => {
-                const c = comando(id);
+                const c = comando(id) || {};
                 const tecla = atajo(id);
+                const cLabel = c.label ? c.label.replace(/…$/, '') : id;
                 return `<div class="in-herramienta" data-cmd="${id}" style="--c:${color};">
                     <div class="in-icono"><i class="${icono}"></i></div>
-                    <div style="min-width:0; padding-right:14px;"><b>${esc(c.label.replace(/…$/, ''))}</b>${tecla ? `<span class="in-tecla">${esc(tecla)}</span>` : ''}<p>${esc(texto)}</p></div>
+                    <div style="min-width:0; padding-right:14px;"><b>${esc(cLabel)}</b>${tecla ? `<span class="in-tecla">${esc(tecla)}</span>` : ''}<p>${esc(texto)}</p></div>
                     <button class="in-estrella ${favoritas.includes(id) ? 'activa' : ''}" data-favorita="${id}" title="${favoritas.includes(id) ? 'Quitar de favoritas' : 'Marcar como favorita'}"><i class="fa-solid fa-star"></i></button>
                   </div>`;
             }).join('')}</div>
@@ -541,8 +559,9 @@
         raiz.querySelectorAll('[data-favorita]').forEach(b => b.onclick = async (e) => {
             e.stopPropagation();
             const id = b.dataset.favorita;
-            const favs = new Set(d.perfil.favoritas || []);
+            const favs = new Set((d.perfil && d.perfil.favoritas) || []);
             if (favs.has(id)) favs.delete(id); else favs.add(id);
+            if (!d.perfil) d.perfil = {};
             d.perfil.favoritas = [...favs];
             pintar();
             try { d.perfil = await enviar('/api/inicio/perfil', { favoritas: d.perfil.favoritas }, 'PATCH'); } catch (err) { /* se queda en pantalla */ }
@@ -550,15 +569,16 @@
         const todas = raiz.querySelector('[data-todas]');
         if (todas) todas.onclick = () => { estado.todasHerramientas = !estado.todasHerramientas; pintar(); };
         raiz.querySelectorAll('[data-siguiente]').forEach(el => el.onclick = () => {
-            const s = d.progreso.siguientes[+el.dataset.siguiente];
+            const s = (d.progreso && d.progreso.siguientes && d.progreso.siguientes[+el.dataset.siguiente]);
+            if (!s) return;
             if (!window.Desafios && s.tipo !== 'kaggle') return;
-            if (s.desafio_id) window.Desafios.abrir({ id: s.desafio_id });
+            if (s.desafio_id && window.Desafios) window.Desafios.abrir({ id: s.desafio_id });
             else if (s.tipo === 'kaggle' && window.KaggleLector) window.KaggleLector.abrir({ ref: s.ref, celda: s.celda });
-            else if (s.ruta_id) window.Desafios.abrir({ rutaId: s.ruta_id, bloqueId: s.bloque_id });
-            else window.Desafios.abrir({ tema: s.tema });
+            else if (s.ruta_id && window.Desafios) window.Desafios.abrir({ rutaId: s.ruta_id, bloqueId: s.bloque_id });
+            else if (window.Desafios) window.Desafios.abrir({ tema: s.tema });
         });
         raiz.querySelectorAll('[data-evento]').forEach(el => el.onclick = () => {
-            const ev = d.actividad[+el.dataset.evento];
+            const ev = (d.actividad && d.actividad[+el.dataset.evento]);
             const a = ev && ev.abrir;
             if (!a) return;
             if (a.desafio && window.Desafios) window.Desafios.abrir({ id: a.desafio });
@@ -604,13 +624,26 @@
 
     // ================================================================== entrada
     function abrir() {
-        if (window.workArea) window.workArea.abrirHerramienta('modal-inicio', 'Inicio', 'fa-house');
+        if (window.workArea) {
+            window.workArea.abrirHerramienta('modal-inicio', 'Inicio', 'fa-house');
+        } else {
+            setTimeout(() => {
+                if (window.workArea) window.workArea.abrirHerramienta('modal-inicio', 'Inicio', 'fa-house');
+            }, 60);
+        }
+        if (estado.datos) {
+            setTimeout(pintar, 10);
+        } else {
+            cargar();
+        }
     }
 
     document.addEventListener('prig:herramienta-abierta', (e) => {
         if (e.detail && e.detail.modalId === 'modal-inicio') {
             pintar();
-            cargar();
+            if (!estado.datos || estado.cargando === false) {
+                cargar();
+            }
         }
     });
 

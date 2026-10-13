@@ -310,11 +310,16 @@
           <nav class="kg-nav" id="kg-nav">
             <div class="kg-logo">kaggle</div>
             ${SECCIONES.map(([id, icono, texto]) => `<button class="kg-nav-item" data-seccion="${id}" title="${texto}"><i class="fa-solid ${icono}"></i>${texto}</button>`).join('')}
+            <button class="kg-nav-item" id="kg-nav-grafo" title="Ver en Grafo de Aprendizaje" style="color:#cba6f7;"><i class="fa-solid fa-diagram-project" style="color:#cba6f7;"></i>Grafo DAG</button>
             <span style="flex:1"></span>
             <div id="kg-cuenta" style="padding:6px 4px;"></div>
           </nav>
           <main class="kg-hoja" id="kg-hoja"></main>`;
         $('kg-nav').onclick = (e) => {
+            if (e.target.closest('#kg-nav-grafo')) {
+                if (window.MotorAprendizajeGrafo) window.MotorAprendizajeGrafo.abrir();
+                return;
+            }
             const b = e.target.closest('[data-seccion]');
             if (b) ir({ tipo: b.dataset.seccion });
         };

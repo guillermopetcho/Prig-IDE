@@ -1,0 +1,712 @@
+/* ============================================================================
+   PANEL DE RAZONAMIENTO Y NOTAS DEL MODELO (25% ANCHO, 100% ALTURA)
+   Estética profesional de modelos grandes (CoT, AST, Grafos de ejecución y notas)
+   ============================================================================ */
+
+/* Contenedor divisor del editor y panel lateral */
+.editor-area-wrapper {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-editor, #1e1e1e);
+}
+
+/* Divisor interactivo para redimensionar */
+.editor-razonamiento-resizer {
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background 0.2s ease, border-color 0.2s ease;
+    z-index: 12;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.editor-razonamiento-resizer:hover,
+.editor-razonamiento-resizer.arrastrando {
+    background: rgba(137, 180, 250, 0.35);
+    border-color: var(--accent-blue, #89b4fa);
+}
+
+/* Panel lateral derecho del editor (25% de ancho, 100% de altura) */
+.editor-panel-razonamiento {
+    width: 25%;
+    min-width: 280px;
+    max-width: 540px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: rgba(17, 17, 27, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-left: 1px solid rgba(137, 180, 250, 0.18);
+    box-shadow: -6px 0 24px rgba(0, 0, 0, 0.45);
+    z-index: 11;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--text-main, #cdd6f4);
+    transition: width 0.15s ease, opacity 0.2s ease;
+}
+
+.editor-panel-razonamiento.oculto {
+    display: none !important;
+}
+
+/* Cabecera del panel */
+.razonamiento-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    background: rgba(24, 24, 37, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.razonamiento-header-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 2px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.razonamiento-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+    color: var(--text-muted, #a6adc8);
+    background: transparent;
+    transition: all 0.18s ease;
+}
+
+.razonamiento-tab-btn:hover {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.razonamiento-tab-btn.activo {
+    background: rgba(137, 180, 250, 0.18);
+    color: var(--accent-blue, #89b4fa);
+    border-color: rgba(137, 180, 250, 0.45);
+    box-shadow: 0 2px 8px rgba(137, 180, 250, 0.15);
+}
+
+.razonamiento-tab-btn.tab-notas.activo {
+    background: rgba(166, 227, 161, 0.18);
+    color: var(--accent-green, #a6e3a1);
+    border-color: rgba(166, 227, 161, 0.45);
+    box-shadow: 0 2px 8px rgba(166, 227, 161, 0.15);
+}
+
+.razonamiento-header-acciones {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.razonamiento-btn-icon {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted, #a6adc8);
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s ease;
+}
+
+.razonamiento-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Barra de Telemetría del Modelo */
+.razonamiento-telemetria-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: rgba(17, 24, 39, 0.65);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 10.5px;
+    color: var(--text-muted, #a6adc8);
+    flex-shrink: 0;
+}
+
+.razonamiento-modelo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: #89b4fa;
+}
+
+.razonamiento-dot-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #a6e3a1;
+    box-shadow: 0 0 6px #a6e3a1;
+    display: inline-block;
+    animation: pulsoVerde 2s infinite ease-in-out;
+}
+
+.razonamiento-dot-pulse.pensando {
+    background: #cba6f7;
+    box-shadow: 0 0 8px #cba6f7;
+    animation: pulsoPensando 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes pulsoVerde {
+    0%, 100% { opacity: 0.6; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes pulsoPensando {
+    0% { transform: scale(0.85); opacity: 0.5; }
+    100% { transform: scale(1.3); opacity: 1; }
+}
+
+/* Contenido de vistas con scroll */
+.razonamiento-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.razonamiento-body::-webkit-scrollbar {
+    width: 5px;
+}
+.razonamiento-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+.razonamiento-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(137, 180, 250, 0.35);
+}
+
+/* Acordeón de Proceso de Pensamiento (Chain-of-Thought) */
+.razonamiento-cot-box {
+    background: rgba(24, 24, 37, 0.7);
+    border: 1px solid rgba(203, 166, 247, 0.28);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+}
+
+.razonamiento-cot-box:hover {
+    border-color: rgba(203, 166, 247, 0.5);
+}
+
+.razonamiento-cot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: rgba(203, 166, 247, 0.08);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    color: #cba6f7;
+    user-select: none;
+}
+
+.razonamiento-cot-header .cot-titulo {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.razonamiento-cot-content {
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.55;
+    color: #cdd6f4;
+    background: rgba(10, 12, 20, 0.5);
+    border-top: 1px solid rgba(203, 166, 247, 0.15);
+}
+
+.razonamiento-cot-step {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 7px;
+    align-items: flex-start;
+}
+
+.razonamiento-step-num {
+    background: rgba(203, 166, 247, 0.2);
+    color: #cba6f7;
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Tarjeta estructurada de hallazgo o diagnóstico */
+.razonamiento-card {
+    background: rgba(24, 24, 37, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.razonamiento-card:hover {
+    border-color: rgba(137, 180, 250, 0.35);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.razonamiento-card.activa {
+    border-color: var(--accent-blue, #89b4fa);
+    background: rgba(137, 180, 250, 0.07);
+}
+
+.razonamiento-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.razonamiento-badge-categoria {
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(166, 227, 161, 0.15);
+    color: #a6e3a1;
+    border: 1px solid rgba(166, 227, 161, 0.3);
+}
+
+.razonamiento-badge-categoria.opt {
+    background: rgba(249, 226, 175, 0.15);
+    color: #f9e2af;
+    border-color: rgba(249, 226, 175, 0.3);
+}
+
+.razonamiento-badge-categoria.seg {
+    background: rgba(243, 139, 168, 0.15);
+    color: #f38ba8;
+    border-color: rgba(243, 139, 168, 0.3);
+}
+
+.razonamiento-badge-categoria.arq {
+    background: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+    border-color: rgba(137, 180, 250, 0.3);
+}
+
+.razonamiento-badge-linea {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--text-muted, #a6adc8);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.15s ease;
+}
+
+.razonamiento-badge-linea:hover {
+    color: #ffffff;
+    border-color: var(--accent-blue, #89b4fa);
+    background: rgba(137, 180, 250, 0.18);
+}
+
+.razonamiento-card-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.35;
+}
+
+.razonamiento-card-detalle {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #bac2de;
+}
+
+.razonamiento-codigo-snippet {
+    background: rgba(10, 12, 20, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: #a6e3a1;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.razonamiento-card-acciones {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.razonamiento-btn-conectar {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 5px;
+    background: rgba(137, 180, 250, 0.12);
+    border: 1px solid rgba(137, 180, 250, 0.35);
+    color: #89b4fa;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.razonamiento-btn-conectar:hover {
+    background: rgba(137, 180, 250, 0.25);
+    border-color: #89b4fa;
+    color: #ffffff;
+}
+
+.razonamiento-btn-aplicar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 5px;
+    background: rgba(166, 227, 161, 0.15);
+    border: 1px solid rgba(166, 227, 161, 0.4);
+    color: #a6e3a1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.razonamiento-btn-aplicar:hover {
+    background: rgba(166, 227, 161, 0.3);
+    color: #ffffff;
+}
+
+/* Grafo de Lógica de Ejecución (Nodos Verticales) */
+.razonamiento-flujo-grafo {
+    background: rgba(20, 22, 34, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.razonamiento-grafo-titulo {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #cba6f7;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.razonamiento-grafo-nodo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: rgba(10, 12, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.razonamiento-grafo-nodo:hover {
+    border-color: #89b4fa;
+    background: rgba(137, 180, 250, 0.12);
+}
+
+.razonamiento-grafo-nodo.activo {
+    border-color: #a6e3a1;
+    background: rgba(166, 227, 161, 0.14);
+    box-shadow: 0 0 10px rgba(166, 227, 161, 0.15);
+}
+
+.razonamiento-grafo-flecha {
+    text-align: center;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1;
+}
+
+/* Vista de Notas Técnicas */
+.notas-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.notas-btn-nueva {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 6px;
+    background: rgba(166, 227, 161, 0.16);
+    border: 1px solid rgba(166, 227, 161, 0.4);
+    color: #a6e3a1;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.notas-btn-nueva:hover {
+    background: rgba(166, 227, 161, 0.28);
+    color: #ffffff;
+}
+
+.notas-form-crear {
+    background: rgba(24, 24, 37, 0.85);
+    border: 1px solid rgba(166, 227, 161, 0.35);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.notas-input-fila {
+    display: flex;
+    gap: 6px;
+}
+
+.notas-input {
+    width: 100%;
+    background: rgba(10, 12, 20, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    color: #f8fafc;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.notas-input:focus {
+    outline: none;
+    border-color: #89b4fa;
+}
+
+.notas-textarea {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    background: rgba(10, 12, 20, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    color: #f8fafc;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.notas-item-card {
+    background: rgba(24, 24, 37, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.notas-item-card:hover {
+    border-color: rgba(166, 227, 161, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.notas-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.notas-item-texto {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #cdd6f4;
+}
+
+/* ============================================================================
+   ILUMINACIÓN BRILLANTE DE NÚMEROS DE LÍNEA EN EL EDITOR (EN VEZ DE CORCHETES)
+   ============================================================================ */
+
+/* Iluminación Neon Cyan de Números de Línea Activos */
+.monaco-editor .margin .prig-line-number-bright,
+.monaco-editor .margin-view-overlays .prig-line-number-bright,
+.monaco-editor .margin-view-overlays .prig-line-number-bright .line-numbers,
+.monaco-editor .prig-line-number-bright,
+.monaco-editor .prig-line-number-bright .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright {
+    color: #00f0ff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #00f0ff, 0 0 16px rgba(0, 240, 255, 0.8) !important;
+    transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+
+/* Indicador de barra vertical neón elegante en el margen izquierdo */
+.monaco-editor .prig-gutter-neon-bar {
+    background: #00f0ff !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #00f0ff, 0 0 14px rgba(0, 240, 255, 0.75) !important;
+}
+
+/* Tinte sutil en las líneas de código activas (limpio, sin tapar la sintaxis) */
+.monaco-editor .prig-code-active-tint {
+    background: rgba(0, 240, 255, 0.04) !important;
+    border-left: 2px solid rgba(0, 240, 255, 0.6) !important;
+}
+
+/* Variantes de color por tipo de diagnóstico o nota */
+.monaco-editor .margin .prig-line-number-bright-green,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-green,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-green .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright-green {
+    color: #a6e3a1 !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #a6e3a1, 0 0 16px rgba(166, 227, 161, 0.8) !important;
+}
+
+.monaco-editor .prig-gutter-neon-bar-green {
+    background: #a6e3a1 !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #a6e3a1, 0 0 14px rgba(166, 227, 161, 0.75) !important;
+}
+
+.monaco-editor .prig-code-active-tint-green {
+    background: rgba(166, 227, 161, 0.04) !important;
+    border-left: 2px solid rgba(166, 227, 161, 0.6) !important;
+}
+
+.monaco-editor .margin .prig-line-number-bright-purple,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-purple,
+.monaco-editor .margin-view-overlays .prig-line-number-bright-purple .line-numbers,
+.monaco-editor .line-numbers.prig-line-number-bright-purple {
+    color: #cba6f7 !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 8px #cba6f7, 0 0 16px rgba(203, 166, 247, 0.8) !important;
+}
+
+.monaco-editor .prig-gutter-neon-bar-purple {
+    background: #cba6f7 !important;
+    width: 3.5px !important;
+    margin-left: 2px !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 8px #cba6f7, 0 0 14px rgba(203, 166, 247, 0.75) !important;
+}
+
+/* ============================================================================
+   ÁMBITO ACTIVO (SCOPE HEADER) Y VISTA LIMPIA PROFESIONAL
+   ============================================================================ */
+
+.razonamiento-scope-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    background: rgba(14, 16, 26, 0.88);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 10.5px;
+    flex-shrink: 0;
+}
+
+.razonamiento-scope-path {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Fira Code', monospace;
+    color: #cdd6f4;
+}
+
+.razonamiento-scope-lineas {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.razonamiento-scope-lineas:hover {
+    background: rgba(0, 240, 255, 0.22);
+    border-color: #00f0ff;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+

@@ -1,0 +1,19 @@
+{
+  "name": "prig-render-wasm",
+  "type": "module",
+  "collaborators": [
+    "Prig Team"
+  ],
+  "description": "Módulo WebAssembly para renderizado de alta performance en Prig",
+  "version": "0.1.0",
+  "files": [
+    "prig_render_wasm_bg.wasm",
+    "prig_render_wasm.js",
+    "prig_render_wasm.d.ts"
+  ],
+  "main": "prig_render_wasm.js",
+  "types": "prig_render_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

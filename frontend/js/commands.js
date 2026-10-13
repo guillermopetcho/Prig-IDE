@@ -360,8 +360,10 @@
         { id: 'herr.agentes', menu: 'Secciones', label: 'Agenticos', accel: 'Ctrl+6',
           run: () => window.workArea.abrirHerramienta('modal-agent-workflow', 'Agenticos', 'fa-diagram-project') },
 
-        // Grupo 2: Kaggle, GitHub, YouTube
-        { id: 'herr.kaggle', menu: 'Secciones', label: 'Kaggle', accel: 'Ctrl+5', separadorAntes: true,
+        // Grupo 2: Grafo de Aprendizaje, Kaggle, GitHub, YouTube, Prig Hub
+        { id: 'herr.aprendizajeGrafo', menu: 'Secciones', label: 'Grafo de Aprendizaje (DAG)', accel: 'Ctrl+Shift+K', separadorAntes: true,
+          run: () => window.MotorAprendizajeGrafo && window.MotorAprendizajeGrafo.abrir() },
+        { id: 'herr.kaggle', menu: 'Secciones', label: 'Kaggle', accel: 'Ctrl+5',
           run: () => window.KaggleLector ? window.KaggleLector.abrir() : (window.workArea && window.workArea.abrirHerramienta('modal-kaggle-hub', 'Kaggle', 'fa-brands fa-kaggle')) },
         { id: 'herr.github', menu: 'Secciones', label: 'GitHub', accel: 'Ctrl+Shift+G',
           run: () => window.GitHubLector && window.GitHubLector.abrir() },
@@ -395,7 +397,7 @@
           run: () => window.openGlobalConfigModal('accesibilidad') },
         { id: 'config.general', menu: 'Configuración', label: 'Configuración global…', accel: 'Ctrl+,',
           run: () => window.openGlobalConfigModal('ai') },
-        { id: 'config.apariencia', menu: 'Configuración', label: 'Apariencia y transparencia…', accel: 'Ctrl+Shift+A',
+        { id: 'config.apariencia', menu: 'Configuración', label: 'Personalización, colores y fondos…', accel: 'Ctrl+Shift+A',
           run: () => window.openGlobalConfigModal('apariencia') },
         { id: 'config.modelos', menu: 'Configuración', label: 'Modelos: ajustes, prueba y servidor…', accel: 'Ctrl+9', separadorAntes: true,
           run: () => window.Modelos && window.Modelos.abrir() },

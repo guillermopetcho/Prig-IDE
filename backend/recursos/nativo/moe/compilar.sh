@@ -61,12 +61,15 @@ cmake -S . -B build -G Ninja -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$arch" \
     -DCMAKE_CUDA_COMPILER="$TRABAJO/cudaenv/bin/nvcc" -DCUDAToolkit_ROOT="$TRABAJO/cudaenv" \
     -DCMAKE_CUDA_HOST_COMPILER="$(command -v g++)" -DGGML_NATIVE=ON -DLLAMA_CURL=OFF \
     -DLLAMA_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release >/dev/null
-NUCLEOS_E="$(python3 -c "
+# El Python de Prig: el pausador del termostato está en su módulo nativo (prig_nativo, backend-rust)
+PY="$PRIG/.venv/bin/python"
+[ -x "$PY" ] || PY=python3
+NUCLEOS_E="$("$PY" -c "
 import sys; sys.path.insert(0, '$PRIG/backend')
 from recursos import frio; print(','.join(map(str, frio.nucleos_eficientes())) or '')")"
 TASKSET=()
 [ -n "$NUCLEOS_E" ] && TASKSET=(taskset -c "$NUCLEOS_E")
-OBJETIVO=72 python3 "$AQUI/termostato.py" "${TASKSET[@]}" nice -n 19 \
+OBJETIVO=72 "$PY" "$AQUI/termostato.py" "${TASKSET[@]}" nice -n 19 \
     cmake --build build -j4 --target llama-server
 
 echo "== 4/4 Instalación en $DESTINO"

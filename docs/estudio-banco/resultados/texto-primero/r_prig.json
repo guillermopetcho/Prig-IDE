@@ -1,0 +1,651 @@
+{
+ "condiciones": {
+  "raiz": "/home/ama-gi/.cache/prig-estudio/repos/Prig",
+  "banco": "/home/ama-gi/.cache/prig-estudio/bancos/Prig-56d7f2b1b1/banco.db",
+  "memoria": false,
+  "limite_s": 600,
+  "gpu_antes": {
+   "vram_mb": 15,
+   "temp_c": 34
+  },
+  "sincronizacion": {
+   "nuevos": 0,
+   "modificados": 0,
+   "borrados": 0
+  },
+  "unidades": 96,
+  "vencidas": [],
+  "resoluciones": 0,
+  "conocimiento": 0,
+  "cambios": 0,
+  "modo": "general",
+  "cache_gb": 60.0,
+  "gpu_despues": {
+   "vram_mb": 5263,
+   "temp_c": 58
+  },
+  "segundos": 785,
+  "vectores_despues": 0,
+  "memoria_despues": {
+   "resoluciones": 0,
+   "conocimiento": 0
+  }
+ },
+ "resultados": [
+  {
+   "id": "ind_15·g1",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "general",
+   "respuesta": "Voy a buscar quién llama explícitamente a `BookService.delete_item` fuera de los tests.\n\n## Respuesta\n\nFuera de los tests, hay **una sola llamada directa** a `BookService.delete_item`:\n\n**`backend/app.py:450`** — dentro del endpoint `DELETE /api/books/delete`:\n\n```python\n@app.post(\"/api/books/delete\")\ndef delete_book(req: BookDeleteRequest):\n    \"\"\" Elimina un elemento de la biblioteca y lo retira del catálogo de conocimiento \"\"\"\n    target = book_service._resolve_item(req.id)\n    \n    res = book_service.delete_item(req.id)  # ← aquí\n```\n\nLa otra coincidencia (`app.py:3090`) es `file_mgr.delete_item(path)`, que es `FileManager.delete_item` (archivo diferente), no `BookService`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 465,
+   "tokens": 157,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Buscar llamadas a book_service.delete_item en el código fuente (excluyendo tests)\\nllamadas = P.grep(r\\\"\\\\.delete_item\\\\(\\\", maximo=50)\\nfuera_tests = [l for l in llamadas if '/tests/' not in l['ruta']]\\nfor l in fuera_tests:\\n    print(f\\\"{l['ruta']}:{l['linea']}: {l['texto'].strip()}\\\")\\n\"}",
+     "resultado_caracteres": 150
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver el contexto de app.py:450 para confirmar que es book_service\\nprint(P.leer('backend/app.py', desde_linea=445, hasta_linea=455))\"}",
+     "resultado_caracteres": 115
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.leer('backend/app.py', desde=445, hasta=455))\"}",
+     "resultado_caracteres": 570
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 60.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_15·u1",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "unidad",
+   "respuesta": "P.llamadores(\"BookService.delete_item\")La única función o método fuera de los tests que llama a `BookService.delete_item` es **`delete_book`** en `backend/app.py` (línea 450).\n\nEl resto de llamadas (`TestBiblioteca...`, `TestConfinamiento...`) provienen de archivos de pruebas (`test_datos_usuario.py`, `test_file_manager.py`), por lo que no se consideran según tu pregunta.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: book_service",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 98,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"P.llamadores(\\\"BookService.delete_item\\\")\"}",
+     "resultado_caracteres": 1804
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 15.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_15·g2",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "general",
+   "respuesta": "Voy a buscar los llamadores de `BookService.delete_item` en el código del proyecto, excluyendo los tests.\n\n## Llamadores de `BookService.delete_item` (fuera de tests)\n\nHay **un solo llamador directo** en la capa de aplicación:\n\n### `backend/app.py:450` — función `delete_book`\n\n```python\n@app.post(\"/api/books/delete\")\ndef delete_book(req: BookDeleteRequest):\n    \"\"\" Elimina un elemento de la biblioteca y lo retira del catálogo de conocimiento \"\"\"\n    target = book_service._resolve_item(req.id)\n    \n    res = book_service.delete_item(req.id)  # <-- aquí\n    if \"error\" in res:\n        raise HTTPException(status_code=404, detail=res[\"error\"])\n    \n    # Si no se retira también del catálogo, el tutor seguiría citando un libro\n    # que ya no existe en disco.\n    try:\n        res[\"removed_from_index\"] = knowledge_service.remove_by_path(target) if target else False\n    except Exception as err:\n        res[\"removed_from_index\"] = False\n        res[\"index_error\"] = str(err)\n    \n    return res\n```\n\nEste endpoint (`POST /api/books/delete`) es el único que invoca `book_service.delete_item()`. La segunda aparición de `.delete_item(` en `app.py:3090` corresponde a `file_mgr.delete_item()`, que es el método de `FileManager` en `backend/file_manager.py`, no de `BookService`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 465,
+   "tokens": 305,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Buscar quién llama a book_service.delete_item o BookService().delete_item en el backend (excluyendo tests)\\nimport P\\n\\n# Buscar referencias literales a delete_item en archivos del backend (no tests)\\nresultados = P.grep(r'\\\\.delete_item\\\\(', maximo=200)\\n\\n# Filtrar solo backend/app.py y otros archivos que no sean tests\\nllamadores = []\\nfor r in resultados:\\n    if '/tests/' not ",
+     "resultado_caracteres": 182
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"\\n# Usar el objeto P directamente\\nresultados = P.grep(r'\\\\.delete_item\\\\(', maximo=200)\\n\\n# Filtrar solo backend/app.py y otros archivos que no sean tests\\nllamadores = []\\nfor r in resultados:\\n    if '/tests/' not in r['ruta'] and 'test_' not in r['ruta']:\\n        llamadores.append(r)\\n\\nprint(\\\"=== Llamadores por texto ===\\\")\\nfor l in llamadores:\\n    print(f\\\"{l['ruta']}:{l['li",
+     "resultado_caracteres": 224
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"delete_book\"}",
+     "resultado_caracteres": 1669
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 47.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_15·u2",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+   "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+   "base": "ind_15",
+   "modo": "unidad",
+   "respuesta": "La única función o método fuera de los tests que llama a `BookService.delete_item` es:\n\n- **`delete_book`** en `backend/app.py` (línea 450), que hace `book_service.delete_item(req.id)`.\n\nLos demás llamadores son todos de tests (`test_datos_usuario.py` y `test_file_manager.py`).",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: book_service",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 76,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"BookService.delete_item\\\"))\"}",
+     "resultado_caracteres": 1795
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 14.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_16·g1",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+   "prueba": "hueco del grafo: llamada por fábrica",
+   "base": "ind_16",
+   "modo": "general",
+   "respuesta": "Basado en el banco del proyecto y el grafo de hechos, aquí están las llamadas a `Gestor.radiografia` fuera de los tests:\n\n1. **`Gestor.maquina`** (`backend/recursos/gestor.py:55`)\n   Es el llamador directo principal. `maquina()` llama a `self.radiografia(fresca)` para obtener los datos de hardware y construir un objeto `Maquina`.\n\n2. **`Gestor.estado_vivo`** (`backend/recursos/gestor.py:150`)\n   También es un llamador directo. `estado_vivo()` llama a `self.radiografia()` (sin parámetro, usa la caché) para obtener la temperatura, VRAM y otros datos en tiempo real.\n\nAdemás, hay un **llamador indirecto vía texto** no resuelto en el grafo:\n\n3. **`recursos_servidor_aplicar`** (`backend/app.py:5387`)\n   El código literal muestra: `recursos_gestor().radiografia(fresca=True)`. Esta función del servidor expone el endpoint para aplicar configuración, y fuerza una lectura fresca de la radiografía.\n\nEn resumen: `Gestor.maquina` y `Gestor.estado_vivo` son los métodos internos del mismo `Gestor` que la usan. `recursos_servidor_aplicar` es la única llamada externa (desde la API) que se ha detectado.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1201,
+   "tokens": 318,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 28.6,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_16·u1",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+   "prueba": "hueco del grafo: llamada por fábrica",
+   "base": "ind_16",
+   "modo": "unidad",
+   "respuesta": "Las funciones o métodos que llaman a `Gestor.radiografia` (fuera de los tests) son:\n\n1. **`Gestor.maquina`** (en `backend/recursos/gestor.py`, línea 55) — llamada interna directa.\n2. **`Gestor.estado_vivo`** (en `backend/recursos/gestor.py`, línea 150) — llamada interna directa.\n3. **`recursos_servidor_aplicar`** (en `backend/app.py`, línea 5387) — llamada vía `recursos_gestor().radiografia(fresca=True)`.\n4. **`_num_gpus`** (en `backend/app.py`, línea 5631) — llamada vía `recursos_gestor().radiografia().get(\"gpus\")`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/recursos: almacen, detector, gestor, servidor",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 184,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"Gestor.radiografia\\\"))\"}",
+     "resultado_caracteres": 754
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 39.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_16·g2",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+   "prueba": "hueco del grafo: llamada por fábrica",
+   "base": "ind_16",
+   "modo": "general",
+   "respuesta": "Voy a verificar el grafo de llamadas y el código para confirmar quiénes llaman a `Gestor.radiografia`.\n\nDe `backend/recursos/gestor.py`, fuera de los tests, **dos métodos** llaman a `Gestor.radiografia`:\n\n1. **`Gestor.maquina`** (línea 55):\n   ```python\n   def maquina(self, fresca: bool = False) -> Maquina:\n       rad = self.radiografia(fresca)\n       return Maquina(rad, almacen().calibracion(rad[\"huella\"]))\n   ```\n\n2. **`Gestor.estado_vivo`** (línea 150):\n   ```python\n   def estado_vivo(self) -> Dict[str, Any]:\n       rad = self.radiografia()\n       # ... usa rad para obtener GPU, temperatura, etc.\n   ```\n\nAdemás, hay **dos llamadas desde `backend/app.py`** que no resuelven al símbolo exacto en el grafo (llamadas dinámicas vía `recursos_gestor()`):\n\n- **`recursos_servidor_aplicar`** (app.py:5387): `recursos_gestor().radiografia(fresca=True)`\n- **`_num_gpus`** (app.py:5631): `recursos_gestor().radiografia().get(\"gpus\")`\n\nPero estas son externas al archivo `gestor.py`. Dentro de `gestor.py`, solo `maquina` y `estado_vivo` llaman a `self.radiografia()`.\n\nNota: La línea 43 (`detector.radiografia(...)`) llama a la función `detector.radiografia`, no al método `Gestor.radiografia`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1201,
+   "tokens": 359,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Llamar a Gestor.radiografia\\nllamadores = P.llamadores(\\\"Gestor.radiografia\\\")\\nprint(\\\"Llamadores directos (grafo):\\\", [l['nombre'] for l in llamadores])\\n\\n# Buscar llamadas literales por si hay alguna fuera del grafo\\nllamadas = P.grep(r\\\"\\\\.radiografia\\\\(\\\", rutas=[\\\"backend/recursos/gestor.py\\\"])\\nprint(\\\"\\\\nLlamadas literales en gestor.py:\\\")\\nfor l in llamadas:\\n    print(f\\\" ",
+     "resultado_caracteres": 49
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Revisar estructura de llamadores\\nllamadores = P.llamadores(\\\"Gestor.radiografia\\\")\\nprint(\\\"Estructura:\\\", llamadores)\\nprint(\\\"\\\\nClaves:\\\", llamadores[0].keys() if llamadores else \\\"vacio\\\")\\n\\n# Buscar llamadas literales\\nllamadas = P.grep(r\\\"self\\\\.radiografia\\\", rutas=[\\\"backend/recursos/gestor.py\\\"])\\nprint(\\\"\\\\nLlamadas self.radiografia:\\\")\\nfor l in llamadas:\\n    print(f\\\" ",
+     "resultado_caracteres": 1170
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 47.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "ind_16·u2",
+   "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+   "prueba": "hueco del grafo: llamada por fábrica",
+   "base": "ind_16",
+   "modo": "unidad",
+   "respuesta": "Las funciones o métodos que llaman a `Gestor.radiografia` (fuera de los tests) son:\n\n1. **`Gestor.maquina`** (en `backend/recursos/gestor.py:55`) — dentro del propio módulo Gestor.\n2. **`Gestor.estado_vivo`** (en `backend/recursos/gestor.py:150`) — también dentro de Gestor.\n3. **`recursos_servidor_aplicar`** (en `backend/app.py:5387`) — llamada vía `recursos_gestor().radiografia(fresca=True)`.\n4. **`_num_gpus`** (en `backend/app.py:5631`) — llamada vía `recursos_gestor().radiografia().get(\"gpus\") or []`.\n\nLos dos últimos son llamadas a través de la instancia global del gestor (`recursos_gestor()`), por lo que el grafo de hechos no los resolvió como exactos, pero el código literal confirma que llaman a `radiografia` en `Gestor`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend/recursos: almacen, detector, gestor, servidor",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 240,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.llamadores(\\\"Gestor.radiografia\\\"))\"}",
+     "resultado_caracteres": 754
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 24.2,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "12bb842411c5·g1",
+   "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto: ruta HTTP inventada",
+   "base": "12bb842411c5",
+   "modo": "general",
+   "respuesta": "Voy a verificar el grafo de llamadas y los endpoints expuestos para determinar el impacto exacto.\n\n## Impacto de modificar `cleanup_all_processes`\n\n### Endpoints HTTP afectados\n\n**1. `POST /api/app/shutdown`** — `backend/app.py:3122`\n- **Impacto directo:** Este endpoint llama a `api_shutdown` (`backend/app.py:3124`), que a su vez llama a `cleanup_all_processes`.\n- Si cambias el comportamiento de `cleanup_all_processes`, este endpoint verá los efectos inmediatamente.\n- **Consumidores:** Ningún frontend lo invoca actualmente (consumidores vacíos en el grafo), pero está expuesto y disponible para uso futuro.\n\n### No es un endpoint HTTP, pero también llama a `cleanup_all_processes`\n\n**2. `lifespan`** — `backend/app.py:83` (decorador `@asynccontextmanager`)\n- Se ejecuta **automáticamente** cuando FastAPI cierra el servidor (al apagar la aplicación).\n- No es un endpoint HTTP, pero es un punto crítico: si `cleanup_all_processes` falla aquí, el cierre del servidor se vuelve sucio.\n\n**3. `shutdown_prig`** — `main.py:171`\n- Función de limpieza al recibir señales del sistema (Ctrl+C, SIGTERM, etc.).\n- Tampoco es un endpoint HTTP, pero es el otro camino crítico para el apagado ordenado.\n\n### Resumen\n\n| Llamador | Tipo | Impacto |\n|----------|------|---------|\n| `POST /api/app/shutdown` | Endpoint HTTP | Directo — única vía HTTP |\n| `lifespan` | Decorador FastAPI | Indirecto — cierre automático del servidor |\n| `shutdown_prig` | Señal del sistema | Indirecto — apagado por señal |\n| `test_app_cleanup_all_processes` | Prueba | Indirecto — `backend/tests/test_shutdown_cleanup.py:115` |\n\n**Conclusión:** Solo **un endpoint HTTP** (`POST /api/app/shutdown`) se ve afectado directamente. Los otros dos caminos (`lifespan` y `shutdown_prig`) son mecanismos de cierre del servidor, no endpoints. Si modificas `cleanup_all_processes`, asegúrate de que la prueba `test_shutdown_cleanup.py` siga pasando.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 517,
+   "tokens": 484,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ver los llamadores directos e indirectos de cleanup_all_processes\\nllamadores = P.llamadores(\\\"cleanup_all_processes\\\")\\nprint(\\\"Llamadores directos:\\\")\\nfor l in llamadores:\\n    print(f\\\"  - {l['nombre']} en {l['ruta']}:{l['linea']}\\\")\\n\\n# Ver los endpoints que tocan cleanup_all_processes transitivamente\\ndef endpoints_alcanzados(nombre, visitados=None):\\n    if visitados is None:",
+     "resultado_caracteres": 73
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Revisar la estructura de llamadores\\nllamadores = P.llamadores(\\\"cleanup_all_processes\\\")\\nprint(\\\"Estructura de un llamador:\\\")\\nif llamadores:\\n    print(llamadores[0])\\n    print(\\\"\\\\nClaves:\\\", llamadores[0].keys())\\nelse:\\n    print(\\\"No hay llamadores\\\")\\n\\n# Ver hechos directos\\nhechos = P.hechos(s=\\\"cleanup_all_processes\\\", r=\\\"llama\\\")\\nprint(\\\"\\\\nHechos directos (quién llam",
+     "resultado_caracteres": 532
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Ahora, quién llama a cleanup_all_processes\\nllamadores = P.hechos(s=\\\"cleanup_all_processes\\\", r=\\\"define\\\")\\nprint(\\\"Hechos de definición:\\\")\\nfor h in llamadores:\\n    print(h)\\n\\n# Buscar llamadas a cleanup_all_processes\\nllamadas = P.hechos(o=\\\"cleanup_all_processes\\\", r=\\\"llama\\\")\\nprint(\\\"\\\\nLlamadas a cleanup_all_processes:\\\")\\nfor l in llamadas:\\n    print(f\\\"  {l['s']} en {l",
+     "resultado_caracteres": 588
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar si hay otros endpoints que llamen a api_shutdown o lifespan indirectamente\\n# lifespan se ejecuta al iniciar el servidor, no es un endpoint\\n\\n# Ver qué endpoints existen en app.py\\nendpoints_app = P.simbolos(ruta=\\\"backend/app.py\\\", tipo=\\\"endpoint\\\")\\nprint(\\\"Endpoints en app.py:\\\")\\nfor e in endpoints_app:\\n    print(f\\\"  {e['nombre']} ({e['firma']})\\\")\\n\\n# Verificar P.",
+     "resultado_caracteres": 2000
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar el endpoint /api/app/shutdown con P.api\\ninfo = P.api(\\\"/api/app/shutdown\\\")\\nprint(\\\"Endpoint /api/app/shutdown:\\\")\\nprint(f\\\"  Expositor: {info['expone']}\\\")\\nprint(f\\\"  Consumidores: {info['consume']}\\\")\\n\\n# Verificar si hay otros endpoints que puedan llamar a api_shutdown\\n# Buscar llamadas a api_shutdown\\nllamadas_api_shutdown = P.hechos(o=\\\"api_shutdown\\\", r=\\\"llama\\",
+     "resultado_caracteres": 481
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 77.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "12bb842411c5·u1",
+   "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto: ruta HTTP inventada",
+   "base": "12bb842411c5",
+   "modo": "unidad",
+   "respuesta": "Cambiar `cleanup_all_processes` afecta directamente al endpoint:\n\n- **POST `/api/app/shutdown`** (expuesto por `api_shutdown` en `backend/app.py:3124`)\n\nIndirectamente, también se ve afectado el ciclo de vida de la aplicación FastAPI a través de:\n\n- **`lifespan`** (el `@asynccontextmanager` en `backend/app.py:93`), que llama a `cleanup_all_processes` al cerrar la aplicación (cuando el servidor se apaga limpiamente).\n\nPor tanto, cualquier cambio en `cleanup_all_processes` impacta:\n1. El apagado explícito vía la API (`POST /api/app/shutdown`)\n2. El apagado automático del servidor (lifespan al cerrar)",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: app",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 168,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.impacto(\\\"cleanup_all_processes\\\"))\"}",
+     "resultado_caracteres": 289
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 22.6,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "12bb842411c5·g2",
+   "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto: ruta HTTP inventada",
+   "base": "12bb842411c5",
+   "modo": "general",
+   "respuesta": "Para determinar los endpoints afectados, consulto el grafo de hechos y los llamadores de `cleanup_all_processes`.\n\nCambiar `cleanup_all_processes` afecta directamente a:\n\n## Endpoint HTTP afectado\n\n### `POST /api/app/shutdown`\n- **Ubicación**: `backend/app.py:3121-3125`\n- **Función**: `api_shutdown()`\n- **Relación**: Llama directamente a `cleanup_all_processes()` en su cuerpo (línea 3124).\n- **Comportamiento**: El cliente frontend envía una petición POST a este endpoint para solicitar el apagado seguro de la aplicación. El backend ejecuta `cleanup_all_processes()` y devuelve `{\"status\": \"ok\", ...}`.\n\n## Contextos no-HTTP afectados\n\nAunque no son endpoints HTTP, estos dos contextos también ejecutan `cleanup_all_processes` y se verían afectados:\n\n1. **Lifespan de FastAPI** (`backend/app.py:93`)\n   - Se ejecuta automáticamente cuando el servidor se apaga (por Ctrl+C, señal SIGTERM, etc.).\n   - No es un endpoint invocable por el cliente, pero es el mecanismo de limpieza al cerrar el proceso.\n\n2. **`shutdown_prig` en `main.py:171`**\n   - Manejador de señales (SIGINT/SIGTERM) que detiene el servidor de forma ordenada.\n   - Tampoco es un endpoint HTTP, pero es la vía de apagado cuando el proceso se termina desde la terminal.\n\n## Resumen\n\nSolo **un endpoint HTTP** (`POST /api/app/shutdown`) expone directamente `cleanup_all_processes` al cliente. Sin embargo, cualquier cambio en esta función impacta también el apagado silencioso del servidor (lifespan y señales), que son críticos para la integridad del estado y la liberación de recursos (VRAM, sockets, procesos hijos).",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 517,
+   "tokens": 385,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# 1. Obtener todos los llamadores directos de cleanup_all_processes\\nllamadores = P.llamadores(\\\"cleanup_all_processes\\\")\\nprint(\\\"Llamadores directos:\\\", llamadores)\\n\\n# 2. Verificar si hay endpoints HTTP que llamen a estos llamadores o a cleanup_all_processes directamente\\nendpoints = []\\nfor llamador in llamadores:\\n    ruta = llamador.get('ruta', '')\\n    if '/api/' in ruta:\\n    ",
+     "resultado_caracteres": 1098
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar qué endpoint expone api_shutdown\\napi_info = P.api(\\\"/api/app/shutdown\\\")\\nprint(\\\"Endpoint /api/app/shutdown:\\\", api_info)\\n\\n# Verificar si lifespan está asociado a algún endpoint (no es un endpoint en sí, pero es el ciclo de vida de la app)\\nprint(\\\"\\\\nLifespan es el contexto de inicio/fin de la aplicación FastAPI, no un endpoint HTTP directo.\\\")\"}",
+     "resultado_caracteres": 339
+    },
+    {
+     "nombre": "ver_simbolo",
+     "argumentos": "{\"nombre\": \"api_shutdown\"}",
+     "resultado_caracteres": 355
+    }
+   ],
+   "modo_pedido": "general",
+   "segundos": 48.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "12bb842411c5·u2",
+   "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+   "prueba": "impacto: ruta HTTP inventada",
+   "base": "12bb842411c5",
+   "modo": "unidad",
+   "respuesta": "El único endpoint HTTP del backend que se ve afectado directa o indirectamente es:\n\n**`POST /api/app/shutdown`**\n\nEste endpoint (definido en `backend/app.py` línea 3122, función `api_shutdown`) llama directamente a `cleanup_all_processes`. Además, `cleanup_all_processes` también se ejecuta como parte del ciclo de vida de la aplicación (`lifespan`, línea 93) cuando el servidor FastAPI se cierra limpiamente, pero esto no corresponde a un endpoint HTTP específico sino al shutdown del proceso.\n\nSi cambias el comportamiento de `cleanup_all_processes`, el efecto directo será sobre `POST /api/app/shutdown`, que es el único endpoint expuesto que depende de esta función.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: app",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 156,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.api(\\\"POST /api/app/shutdown\\\"))\"}",
+     "resultado_caracteres": 122
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.recorrido(\\\"POST /api/app/shutdown\\\"))\"}",
+     "resultado_caracteres": 603
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# También la lifespan del FastAPI llama a cleanup_all_processes\\nprint(P.llamadores(\\\"cleanup_all_processes\\\"))\"}",
+     "resultado_caracteres": 516
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# Verificar si lifespan se dispara en algun endpoint en particular o en todos\\nprint(P.ficha(\\\"lifespan\\\"))\"}",
+     "resultado_caracteres": 335
+    },
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"# lifespan es el context manager del FastAPI: se ejecuta al cerrar la app, no en un endpoint concreto\\n# Pero api_shutdown es el unico endpoint que lo expone directamente\\nprint(P.api(\\\"POST /api/app/shutdown\\\"))\"}",
+     "resultado_caracteres": 122
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 81.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·g1",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "general",
+   "respuesta": "Las funciones que leen la clave de configuración `truncar` son:\n\n1. **`IndiceSemantico.embeber`** (`backend/indice_semantico.py:101`)\n2. **`IndiceSemantico.estado`** (`backend/indice_semantico.py:265`)\n\nAmbas obtienen el valor desde el diccionario de ajustes devuelto por `IndiceSemantico._ajustes` (`backend/indice_semantico.py:92`), que a su vez lo lee de `ConfigModelos.embeddings()` (`backend/ollama_opciones.py:371`).",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 940,
+   "tokens": 137,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 25.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·u1",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Basado en los FACTS FROM THE PROJECT BANK proporcionados en la pregunta, las funciones o métodos que leen la clave de configuración `truncar` son:\n\n1.  **`IndiceSemantico.embeber`** (en `backend/indice_semantico.py`, línea 101): Lee la clave para decidir si añadir el parámetro `truncate: False` a la petición al embebedor.\n2.  **`IndiceSemantico._ajustes`** (en `backend/indice_semantico.py`, línea 92): Lee la clave del diccionario de configuración de embeddings para devolver el valor actual (con un valor por defecto de `True`).\n3.  **`IndiceSemantico.estado`** (en `backend/indice_semantico.py`, línea 265): Lee la clave para informar en el estado del índice si la configuración de truncado está activada o no.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 203,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 12.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·g2",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "general",
+   "respuesta": "Basado en el banco del proyecto, las funciones que leen la clave de configuración `truncar` son:\n\n1.  **`IndiceSemantico.embeber`** (`backend/indice_semantico.py:101`)\n2.  **`IndiceSemantico.estado`** (`backend/indice_semantico.py:265`)\n\nEstas funciones obtienen el valor de `truncar` a través de `IndiceSemantico._ajustes`, que a su vez lo lee de `ConfigModelos.embeddings()`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 940,
+   "tokens": 123,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 25.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "a84a7fe1bad7·u2",
+   "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+   "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+   "base": "a84a7fe1bad7",
+   "modo": "unidad",
+   "respuesta": "Las funciones que leen la clave `truncar` son:\n\n1. `IndiceSemantico.embeber` (en `backend/indice_semantico.py`, línea 101)\n2. `IndiceSemantico.estado` (en `backend/indice_semantico.py`, línea 265)\n\nAmbas obtienen el valor a través de `IndiceSemantico._ajustes()`, que lee la configuración de embeddings desde `ollama_opciones.py`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": "backend: indice_semantico, knowledge_base, knowledge_context",
+   "motivo": "lectura guardada de la unidad",
+   "hechos_caracteres": 0,
+   "tokens": 108,
+   "consultas": [
+    {
+     "nombre": "consola",
+     "argumentos": "{\"codigo\": \"print(P.hechos(r=\\\"lee_config\\\", o=\\\"truncar\\\", limite=50))\"}",
+     "resultado_caracteres": 243
+    }
+   ],
+   "modo_pedido": "unidad",
+   "segundos": 18.1,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·g1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "La ruta de ejecución es una cadena directa de dependencias entre los módulos. Aquí están las funciones intermedias en orden:\n\n1.  **`modelos_borrar_parciales`** (`backend/app.py:5876`): El endpoint recibe la petición DELETE.\n2.  **`_carpeta_modelos_servidor`** (`backend/app.py:5863`): Llamada dentro del endpoint para determinar la ruta base.\n3.  **`estado`** (`backend/recursos/servidor.py:123`): Llamada desde `_carpeta_modelos_servidor` (o la función que lo invoca en el flujo de app.py) para obtener la configuración actual del servidor.\n4.  **`librerias_disponibles`** (`backend/recursos/servidor.py:72`): Llamada dentro de `estado` para construir la lista de motores disponibles que se incluye en la respuesta.\n\nEn resumen, el flujo es:\n`modelos_borrar_parciales` → `_carpeta_modelos_servidor` → `estado` → `librerias_disponibles`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1191,
+   "tokens": 247,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 29.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·u1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "No, esa ruta de ejecución **no existe**. `modelos_borrar_parciales` y `librerias_disponibles` son funciones independientes que no se llaman entre sí.\n\nEl mapa del proyecto indica una ruta imposible (`modelos_borrar_parciales` → `_carpeta_modelos_servidor` → `estado` → `librerias_disponibles`) que contradice el código literal:\n\n1.  **`modelos_borrar_parciales`** (`backend/app.py:5876`) es un endpoint DELETE que solo llama a `gestor_modelos.borrar_parciales()`. No llama a `_carpeta_modelos_servidor` ni a `estado`.\n2.  **`librerias_disponibles`** (`backend/recursos/servidor.py:72`) es una función pura que lee el sistema de archivos. Solo es llamada por `estado` (en `backend/recursos/servidor.py:141`) y `validar` (en `backend/recursos/servidor.py:114`).\n3.  **`estado`** (`backend/recursos/servidor.py:123`) es la única función que conecta con `librerias_disponibles`. `estado` es llamada por el endpoint `GET /api/recursos/servidor` (gestionada en `app.py`), no por `modelos_borrar_parciales`.\n\n### Funciones intermedias reales\n\nNo hay funciones intermedias porque **no hay conexión directa**. Son dos flujos separados:\n\n*   **Flujo A (Borrar parciales):**\n    `modelos_borrar_parciales` → `gestor_modelos.borrar_parciales`\n\n*   **Flujo B (Configuración del servidor):**\n    `GET /api/recursos/servidor` (app.py) → `recursos_srv.estado` → `librerias_disponibles`\n\nEl error en el mapa proviene de una confusión en el grafo de llamadas: `modelos_borrar_parciales` no llama a `_carpeta_modelos_servidor` ni a `estado`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "la pregunta reparte su peso entre unidades: repartida entre unidades (la mejor tiene 27%)",
+   "hechos_caracteres": 1191,
+   "tokens": 460,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 26.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·g2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "Ninguna. La ejecución **no pasa** de `modelos_borrar_parciales` a `librerias_disponibles`.\n\n`modelos_borrar_parciales` (backend/app.py:5876) llama a `_carpeta_modelos_servidor` (backend/app.py:5863), que devuelve una ruta de directorio para borrar archivos `.gguf` parciales. Es una operación de sistema de archivos independiente.\n\n`librerias_disponibles` (backend/recursos/servidor.py:72) se invoca desde `estado` (backend/recursos/servidor.py:141), que es llamada por el endpoint `GET /api/recursos/servidor` para mostrar al usuario qué motores de cálculo (CUDA, Vulkan, CPU) tiene instalados junto al binario de Ollama.\n\nSon dos flujos sin relación: uno borra archivos temporales de descargas, el otro lee un directorio para listar bibliotecas disponibles.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1191,
+   "tokens": 214,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 18.5,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "0b5f93c17f28·u2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe",
+   "base": "0b5f93c17f28",
+   "modo": "general",
+   "respuesta": "Revisando el código y el grafo de llamadas del proyecto:\n\n1. **`modelos_borrar_parciales`** (backend/app.py:5876) → llama a `_carpeta_modelos_servidor()`\n2. **`_carpeta_modelos_servidor`** (backend/app.py:5863) → devuelve la ruta, pero no llama a `librerias_disponibles`\n\nEl grafo indica que `librerias_disponibles` es llamada por `estado` (backend/recursos/servidor.py:123) y `validar` (backend/recursos/servidor.py:97), pero **no hay una ruta directa desde `modelos_borrar_parciales` hasta `librerias_disponibles`**.\n\n`modelos_borrar_parciales` solo llama a `_carpeta_modelos_servidor()` para obtener la carpeta y luego llama a `gestor_modelos.borrar_parciales()`. No pasa por `estado()` ni por ninguna función que invoque a `librerias_disponibles`.\n\n**Respuesta:** No hay funciones intermedias porque **`modelos_borrar_parciales` no llama a `librerias_disponibles`**. Son rutas independientes. La relación que muestra el grafo es que ambos terminales comparten el mismo endpoint raíz (`/api/modelos/`), pero `librerias_disponibles` se usa en el endpoint GET `/api/recursos/servidor` (vía `estado()`), no en el DELETE de borrado de parciales.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "la pregunta reparte su peso entre unidades: repartida entre unidades (la mejor tiene 27%)",
+   "hechos_caracteres": 1191,
+   "tokens": 340,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 22.8,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "d408dee5873f·g1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe (2)",
+   "base": "d408dee5873f",
+   "modo": "general",
+   "respuesta": "Aquí tienes el camino exacto, de arriba a abajo, pasando por las funciones/métodos intermedios que conectan el endpoint con el controlador:\n\n1.  `recursos_ritmo` (`backend/app.py:5420`)\n    *   Es el endpoint GET. Llama directamente a `gobernador()`.\n2.  `gobernador` (`backend/recursos/termico.py:711`)\n    *   Función de conveniencia que devuelve la instancia única del gobernador.\n3.  `Gobernador.__init__` (`backend/recursos/termico.py:341`)\n    *   Se ejecuta al crear la instancia del gobernador (una sola vez, en el arranque). Dentro de este inicializador se crea y asigna la instancia de `ControladorFrio`.\n\n**Nota importante:** La ejecución no \"pasa\" por `ControladorFrio` en cada llamada a `recursos_ritmo`. El endpoint simplemente lee el estado actual de ese controlador (que ya está corriendo en segundo plano). El vínculo es de **composición** (el Gobernador *tiene* un ControladorFrio), no de llamada directa en el flujo de la petición.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1321,
+   "tokens": 264,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 20.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "d408dee5873f·u1",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe (2)",
+   "base": "d408dee5873f",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por las siguientes funciones en orden:\n\n1. `recursos_ritmo` (backend/app.py:5420): El endpoint de la API que recibe la petición.\n2. `gobernador` (backend/recursos/termico.py:711): Función que se llama dentro de `recursos_ritmo` para obtener el gobernador térmico activo.\n3. `Gobernador.__init__` (backend/recursos/termico.py:341): El inicializador de la clase `Gobernador`, que es donde se crea la instancia de `ControladorFrio`.\n\nPor lo tanto, el orden es: `recursos_ritmo` → `gobernador` → `Gobernador.__init__` → `ControladorFrio`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "la pregunta reparte su peso entre unidades: repartida entre unidades (la mejor tiene 24%)",
+   "hechos_caracteres": 1321,
+   "tokens": 175,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 16.9,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "d408dee5873f·g2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe (2)",
+   "base": "d408dee5873f",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por las siguientes funciones en este orden:\n\n1. **`recursos_ritmo`** (`backend/app.py:5420`): El endpoint API que recibe la petición.\n2. **`gobernador`** (`backend/recursos/termico.py:711`): Función que devuelve la instancia única del gobernador térmico.\n3. **`Gobernador.__init__`** (`backend/recursos/termico.py:341`): El constructor del gobernador, que inicializa el controlador de enfriamiento.\n4. **`ControladorFrio`** (`backend/recursos/frio.py:257`): La clase que se instancia dentro del constructor del gobernador para gestionar las pausas del motor.\n\nEl flujo es: `recursos_ritmo` → `gobernador` → `Gobernador.__init__` → `ControladorFrio`.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 1321,
+   "tokens": 201,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 17.3,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "d408dee5873f·u2",
+   "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+   "prueba": "recorrido: negó un camino que existe (2)",
+   "base": "d408dee5873f",
+   "modo": "general",
+   "respuesta": "La ejecución pasa por estas funciones en orden:\n\n1. **`recursos_ritmo`** (`backend/app.py:5420`): El endpoint que recibe la petición GET `/api/recursos/ritmo`.\n2. **`gobernador`** (`backend/recursos/termico.py:711`): Función llamada dentro de `recursos_ritmo` que retorna el objeto `Gobernador` singleton.\n3. **`Gobernador.__init__`** (`backend/recursos/termico.py:341`): El constructor de `Gobernador` se encarga de inicializar el control térmico. Dentro de su lógica, crea la instancia de `ControladorFrio` (línea 365 según los facts del banco).\n\nPor lo tanto, el camino es:\n\n```\nrecursos_ritmo → gobernador → Gobernador.__init__ → ControladorFrio\n```",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "la pregunta reparte su peso entre unidades: repartida entre unidades (la mejor tiene 24%)",
+   "hechos_caracteres": 1321,
+   "tokens": 205,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 18.0,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "8caebf27e7ba·g1",
+   "pregunta": "¿Cuánto vale la constante `MESETA_S` en `backend/recursos/termico.py`?",
+   "prueba": "control: constante (correcta en E7)",
+   "base": "8caebf27e7ba",
+   "modo": "general",
+   "respuesta": "En `backend/recursos/termico.py:35`, la constante `MESETA_S` vale **20.0**.\n\nSe usa para detectar si la GPU ha dejado de enfriarse: si no baja 1 °C en 20 segundos, el gobernador asume que ha alcanzado su temperatura mínima de reposo y no espera más.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "forzado: modo general",
+   "hechos_caracteres": 0,
+   "tokens": 76,
+   "consultas": [],
+   "modo_pedido": "general",
+   "segundos": 14.4,
+   "memoria_del_modelo": null
+  },
+  {
+   "id": "8caebf27e7ba·u1",
+   "pregunta": "¿Cuánto vale la constante `MESETA_S` en `backend/recursos/termico.py`?",
+   "prueba": "control: constante (correcta en E7)",
+   "base": "8caebf27e7ba",
+   "modo": "general",
+   "respuesta": "En `backend/recursos/termico.py:20`, `MESETA_S` vale **20.0**.",
+   "agotada": false,
+   "corte": null,
+   "unidad": null,
+   "motivo": "la pregunta reparte su peso entre unidades: repartida entre unidades (la mejor tiene 57%)",
+   "hechos_caracteres": 0,
+   "tokens": 27,
+   "consultas": [],
+   "modo_pedido": "unidad",
+   "segundos": 12.4,
+   "memoria_del_modelo": null
+  }
+ ]
+}

@@ -230,9 +230,16 @@
           ${VISTAS.map(([id, icono, nombre]) => `<button class="ph-nav-item ${estado.vista === id ? 'activa' : ''}" data-vista="${id}" title="${nombre}">
               <i class="fa-solid ${icono}"></i> ${nombre}
               ${id === 'siguiendo' && pendientes ? '<span class="ph-punto" title="Hay novedades por revisar"></span>' : (cuentas[id] ? `<span class="ph-cuenta">${cuentas[id]}</span>` : '')}</button>`).join('')}
+          <button class="ph-nav-item" id="ph-nav-grafo" title="Ver en Grafo de Aprendizaje" style="color:#cba6f7;"><i class="fa-solid fa-diagram-project" style="color:#cba6f7;"></i> Grafo DAG</button>
           <span style="flex:1"></span>
           <div class="ph-sub" style="padding-bottom:0;"><a href="#" id="ph-formato"><i class="fa-solid fa-file-lines"></i> Formato de los archivos</a></div>`;
         nav.querySelectorAll('[data-vista]').forEach(b => b.onclick = () => ir(b.dataset.vista));
+        const btnGrafo = $('ph-nav-grafo');
+        if (btnGrafo) {
+            btnGrafo.onclick = () => {
+                if (window.MotorAprendizajeGrafo) window.MotorAprendizajeGrafo.abrir();
+            };
+        }
         $('ph-formato').onclick = (e) => { e.preventDefault(); verFormato(); };
     }
 

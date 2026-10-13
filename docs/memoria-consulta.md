@@ -148,6 +148,13 @@ Antes de cada paso consulta una guardia (`_guardia_analista`) y espera si:
 
 ## Próximos pasos
 
+- **Arquitectura unificada (referencia principal para seguir):** banco simbólico + pasada única con
+  captura múltiple + tronco y ramas de estados + fichas verificadas + enrutador en el idioma del
+  modelo. Ver [arquitectura-unificada.md](arquitectura-unificada.md).
+- **Plan de lectura única:** leer el repositorio una sola vez, guardando fichas verificadas y una
+  instantánea del motor por unidad, para acercarse a un modelo de contexto enorme. Ver
+  [plan-lectura-unica.md](plan-lectura-unica.md).
+
 - Afinar el análisis por archivo: título corto para las decisiones y descartar definiciones que son
   solo el nombre del módulo.
 - Correr el analista con un modelo chico en la CPU cuando la GPU está ocupada, o por lotes de

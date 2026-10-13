@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import queue
 import shutil
@@ -12,16 +13,16 @@ import subprocess
 import zipfile
 import requests as requests_lib
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple
+from audio_monitor import audio_monitor
 
 logger = logging.getLogger("prig")
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from file_manager import FileManager
 from runner import CodeRunner
 from ai_engine import AIEngine
@@ -50,6 +51,7 @@ from ollama_gestion import GestorModelos, ErrorGestion
 from herramientas_chat import Herramientas, ETIQUETAS as ETIQUETAS_HERRAMIENTAS
 import banco_proyecto
 import memoria_consulta
+import lectura_unidades
 import buscador_modelos
 from buscador_modelos import ErrorBuscador
 from descargas_modelos import Descargas
@@ -57,6 +59,7 @@ from recursos.gestor import gestor as _gestor_recursos
 from recursos import calculadora as recursos_calc, ficha as recursos_ficha
 from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
+import perfiles_config
 from recursos import termico as recursos_termico
 from recursos.perfiles import PERFILES as RECURSOS_PERFILES, TIRADORES as RECURSOS_TIRADORES
 from exercise_engine import ExerciseEngine
@@ -338,6 +341,11 @@ class AIChatRequest(BaseModel):
     solo_codigo: bool = False
     # Banco del proyecto (banco_proyecto.py): mapa, código relevante, cambios, memoria y herramientas
     banco: bool = False
+    # False: sin la memoria de respuestas anteriores (ni se inyectan ni se guarda esta). Para medir: si no,
+    # cada corrida del examen ve las respuestas de la anterior (docs/estudio-banco.md, E1)
+    memoria: bool = True
+    # auto | general | unidad (None: el de la configuración, banco_modo). docs/plan-texto-primero.md
+    banco_modo: Optional[str] = None
 
 class AIInlinePromptRequest(BaseModel):
     prompt: str
@@ -668,7 +676,7 @@ def ask_paper(req: PaperAskRequest):
     return StreamingResponse(_flujo_cancelable(
         papers_service.ask_paper_stream(
             paper_id=req.paper_id,
-            pregunta=req.pregunta,
+            pregunta=_con_referencias(f"{req.paper_id.replace('_', ' ')} {req.pregunta}", req.pregunta)[0],
             ai_engine=ai_engine,
             modelo=modelo,
             tipo=req.tipo or "analisis",
@@ -676,6 +684,128 @@ def ask_paper(req: PaperAskRequest):
         )),
         media_type="text/plain; charset=utf-8"
     )
+
+
+# ==========================================
+# ENDPOINTS: REFERENCIAS DE ML (libros, papers, formularios; backend/referencias_ml.py)
+# ==========================================
+import referencias_ml  # noqa: E402
+
+MAX_PDF_REFERENCIA = 80 * 1024 * 1024
+
+
+class ReferenciaAccionRequest(BaseModel):
+    id: str
+
+
+def _referencia_o_404(ref_id: str) -> Dict[str, Any]:
+    r = referencias_ml.referencia(ref_id)
+    if not r:
+        raise HTTPException(status_code=404, detail=f"No existe la referencia «{ref_id}»")
+    return r
+
+
+def _pdf_de_referencia(r: Dict[str, Any]) -> Optional[str]:
+    """ El PDF de una referencia: el enlace directo al PDF, o la página si ya es un PDF """
+    if r.get("url_pdf"):
+        return r["url_pdf"]
+    return r["url"] if r["url"].lower().split("?")[0].endswith(".pdf") else None
+
+
+def _descargar_pdf(url: str) -> bytes:
+    """ Solo URLs del catálogo verificado (nunca una URL que mande el cliente) """
+    import urllib.request
+    peticion = urllib.request.Request(url, headers={"User-Agent": referencias_ml.AGENTE, "Accept": "application/pdf,*/*"})
+    with urllib.request.urlopen(peticion, timeout=60) as resp:
+        datos = resp.read(MAX_PDF_REFERENCIA + 1)
+    if len(datos) > MAX_PDF_REFERENCIA:
+        raise HTTPException(status_code=413, detail="El PDF supera 80 MB: ábrelo en el navegador.")
+    if datos[:5] != b"%PDF-":
+        raise HTTPException(status_code=502, detail="El enlace no devolvió un PDF: ábrelo en el navegador.")
+    return datos
+
+
+@app.get("/api/referencias")
+def referencias_listar(q: str = "", categoria: str = "", tipo: str = ""):
+    """ El catálogo ordenado por familia de modelo; sin el resumen original (va en el detalle) """
+    datos = referencias_ml.cargar()
+    refs = referencias_ml.listar(q=q, categoria=categoria, tipo=tipo)
+    ligeras = [{k: v for k, v in r.items() if k not in ("resumen_original", "nota_verificacion")} | {
+        "tiene_pdf": bool(_pdf_de_referencia(r)), "cita": referencias_ml.cita_corta(r)} for r in refs]
+    return {"categorias": [{k: c[k] for k in ("id", "nombre", "icono")} for c in datos["categorias"]],
+            "tipos": datos["tipos"], "referencias": ligeras, "total": len(datos["referencias"])}
+
+
+@app.get("/api/referencias/detalle")
+def referencias_detalle(id: str):
+    r = _referencia_o_404(id)
+    return r | {"tiene_pdf": bool(_pdf_de_referencia(r)), "cita": referencias_ml.cita_corta(r),
+                "categorias_nombres": [referencias_ml.CATEGORIA_POR_ID[c]["nombre"] for c in r.get("categorias", [])
+                                       if c in referencias_ml.CATEGORIA_POR_ID]}
+
+
+@app.get("/api/referencias/relacionadas")
+def referencias_relacionadas(q: str, maximo: int = 5):
+    return {"referencias": [referencias_ml.resumen_publico(r) for r in referencias_ml.relacionadas(q, maximo)]}
+
+
+@app.get("/api/referencias/pdf")
+def referencias_pdf(id: str):
+    """ El PDF de la referencia, servido desde Prig para leerlo dentro de la Biblioteca (muchas páginas
+    no se dejan incrustar en un iframe ajeno) """
+    r = _referencia_o_404(id)
+    url = _pdf_de_referencia(r)
+    if not url:
+        raise HTTPException(status_code=404, detail="Esta referencia no tiene PDF directo: ábrela en el navegador.")
+    try:
+        datos = _descargar_pdf(url)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"No se pudo descargar el PDF: {e}")
+    return Response(content=datos, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{r["id"]}.pdf"', "Cache-Control": "max-age=86400"})
+
+
+@app.post("/api/referencias/abrir")
+def referencias_abrir(req: ReferenciaAccionRequest):
+    """ Abre la referencia en el navegador del sistema """
+    r = _referencia_o_404(req.id)
+    return {"ok": _lanzar_navegador_sistema(r["url"]), "url": r["url"]}
+
+
+@app.post("/api/referencias/guardar")
+def referencias_guardar(req: ReferenciaAccionRequest):
+    """ Descarga el PDF a la biblioteca local (libros o papers) y lo indexa, para que el tutor lo lea y
+    lo cite por página con «Mi biblioteca» """
+    r = _referencia_o_404(req.id)
+    url = _pdf_de_referencia(r)
+    if not url:
+        raise HTTPException(status_code=400, detail="Esta referencia no tiene PDF directo para guardar.")
+    datos = _descargar_pdf(url)
+    autores = r.get("autores") or []
+    quien = (autores[0].split()[-1] + (" et al" if len(autores) > 1 else "")) if autores else "Referencia"
+    nombre = re.sub(r"[^\w\s.,-]", "", f"{quien} {r.get('anio') or ''} - {r['titulo']}", flags=re.UNICODE).strip()[:150] + ".pdf"
+    import tempfile
+    carpeta = tempfile.mkdtemp(prefix="prig_ref_")
+    origen = os.path.join(carpeta, nombre)
+    try:
+        with open(origen, "wb") as f:
+            f.write(datos)
+        categoria = "books" if r.get("tipo") == "libro" else "papers"
+        res = book_service.import_file(origen, categoria)
+    finally:
+        shutil.rmtree(carpeta, ignore_errors=True)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    try:
+        ingest = knowledge_service.index_single(res["path"], res.get("category", "book").lower())
+        res["indexed"] = ingest.get("status") in ("INGESTED", "ALREADY_EXISTS")
+        res["chunks_count"] = ingest.get("chunks_count", 0)
+    except Exception as err:
+        res["indexed"] = False
+        res["index_error"] = str(err)
+    return res
 
 
 
@@ -1062,6 +1192,11 @@ def knowledge_ask(req: KnowledgeAskRequest):
                     + result["context_prompt"]) if result["found"] else destilado["texto"]
     else:
         contexto = result["context_prompt"]
+    # Lecturas del catálogo de referencias de ML: van después de los fragmentos (la fuente principal sigue
+    # siendo lo que el alumno tiene en su biblioteca) y el modelo puede recomendarlas con su enlace
+    bloque_refs, referencias = referencias_ml.bloque_para_prompt(req.query)
+    if bloque_refs:
+        contexto = f"{contexto}\n\n--- LECTURAS RECOMENDADAS (catálogo) ---\n{bloque_refs}"
 
     def event_stream():
         # Las fuentes van primero para que la interfaz pueda pintarlas mientras
@@ -1086,6 +1221,7 @@ def knowledge_ask(req: KnowledgeAskRequest):
                 for i, c in enumerate(result["chunks"])
             ],
             "stats": result["stats"],
+            "referencias": [referencias_ml.resumen_publico(r) for r in referencias],
         }, ensure_ascii=False) + "\n"
 
         for chunk in ai_engine.answer_from_library(
@@ -1900,6 +2036,162 @@ def flujos_ejecucion(eid: str):
 
 
 # ======================================================================
+# Perfiles de Configuración del Entorno (Apariencia, Movimiento, IA)
+# ======================================================================
+
+@app.get("/api/config/profiles")
+def obtener_perfiles_config():
+    """ Devuelve la lista persistente de perfiles de configuración y el perfil activo. """
+    return perfiles_config.cargar_perfiles()
+
+
+@app.post("/api/config/profiles")
+def guardar_perfiles_config(req: perfiles_config.PerfilGuardarRequest):
+    """ Guarda la lista de perfiles y el perfil activo en disco. """
+    exito = perfiles_config.guardar_perfiles(req.model_dump())
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de perfiles en disco.")
+    return {"exito": True, "perfil_activo": req.perfil_activo}
+
+
+@app.post("/api/config/profiles/reset")
+def restablecer_perfiles_config():
+    """ Restablece los perfiles a los predeterminados de fábrica. """
+    datos = {
+        "perfil_activo": "catppuccin_equilibrado",
+        "perfiles": perfiles_config.PERFILES_PREDETERMINADOS
+    }
+    perfiles_config.guardar_perfiles(datos)
+    return datos
+
+
+@app.get("/api/config/apariencia")
+def obtener_apariencia_config():
+    """ Devuelve la configuración de apariencia y temas guardada en disco. """
+    return perfiles_config.cargar_apariencia()
+
+
+@app.post("/api/config/apariencia")
+def guardar_apariencia_config(datos: Dict[str, Any]):
+    """ Guarda la configuración de apariencia y temas de forma persistente en disco. """
+    exito = perfiles_config.guardar_apariencia(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la apariencia en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/sintaxis")
+def obtener_sintaxis_config():
+    """ Devuelve la configuración de sintaxis, tokens y efectos guardada en disco. """
+    return perfiles_config.cargar_sintaxis()
+
+
+@app.post("/api/config/sintaxis")
+def guardar_sintaxis_config(datos: Dict[str, Any]):
+    """ Guarda la configuración de sintaxis y tokens de forma persistente en disco. """
+    exito = perfiles_config.guardar_sintaxis(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de sintaxis en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/motor_movimiento")
+def obtener_motor_movimiento_config():
+    """ Devuelve los parámetros del motor de movimiento guardados en disco. """
+    return perfiles_config.cargar_motor_movimiento()
+
+
+@app.post("/api/config/motor_movimiento")
+def guardar_motor_movimiento_config(datos: Dict[str, Any]):
+    """ Guarda los parámetros del motor de movimiento de forma persistente en disco. """
+    exito = perfiles_config.guardar_motor_movimiento(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración del motor de movimiento en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/audio_reactivo")
+def obtener_audio_reactivo_config():
+    """ Devuelve los parámetros del sistema de audio reactivo guardados en disco. """
+    return perfiles_config.cargar_audio_reactivo()
+
+
+@app.post("/api/config/audio_reactivo")
+def guardar_audio_reactivo_config(datos: Dict[str, Any]):
+    """ Guarda los parámetros del sistema de audio reactivo en disco. """
+    exito = perfiles_config.guardar_audio_reactivo(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de audio reactivo en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/audio/aplicaciones")
+def listar_aplicaciones_audio():
+    """ Devuelve la lista en tiempo real de aplicaciones y pestañas que reproducen audio en Linux. """
+    return {"aplicaciones": audio_monitor.listar_aplicaciones_audio()}
+
+
+@app.post("/api/audio/seleccionar_fuente")
+def seleccionar_fuente_audio(datos: Dict[str, Any]):
+    """ Cambia la fuente de captura de audio al stream o aplicación indicada. """
+    fuente_id = str(datos.get("fuente_id", "sistema_global"))
+    audio_monitor.seleccionar_fuente(fuente_id)
+    return {"ok": True, "fuente_actual": fuente_id}
+
+
+@app.get("/api/audio/datos_actuales")
+def obtener_datos_audio_actuales():
+    """ Devuelve el último paquete de análisis FFT y energía en tiempo real. """
+    return audio_monitor.datos_actuales
+
+
+@app.websocket("/ws/audio_reactivo")
+async def websocket_audio_reactivo(websocket: WebSocket):
+    """ Transmite paquetes de análisis de espectro FFT a 50-60 FPS en tiempo real. """
+    await websocket.accept()
+    audio_monitor.incrementar_suscriptor()
+    try:
+        while True:
+            await websocket.send_json(audio_monitor.datos_actuales)
+            await asyncio.sleep(0.02)  # ~50 FPS
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"Desconexión de websocket de audio: {e}")
+    finally:
+        audio_monitor.decrementar_suscriptor()
+
+
+@app.get("/api/config/accesibilidad")
+def obtener_accesibilidad_config():
+    """ Devuelve las opciones de accesibilidad guardadas en disco. """
+    return perfiles_config.cargar_accesibilidad()
+
+
+@app.post("/api/config/accesibilidad")
+def guardar_accesibilidad_config(datos: Dict[str, Any]):
+    """ Guarda las opciones de accesibilidad en disco. """
+    exito = perfiles_config.guardar_accesibilidad(datos)
+    if not exito:
+        raise HTTPException(status_code=500, detail="No se pudo guardar la accesibilidad en disco.")
+    return {"ok": True}
+
+
+@app.get("/api/config/estado_completo")
+def obtener_estado_completo():
+    """ Devuelve todo el estado unificado de configuración y apariencia. """
+    return perfiles_config.cargar_estado_completo()
+
+
+@app.post("/api/config/estado_completo")
+def guardar_estado_completo(datos: Dict[str, Any]):
+    """ Guarda todo el estado unificado de configuración en disco. """
+    res = perfiles_config.guardar_estado_completo(datos)
+    return {"ok": True, "detalle": res}
+
+
+
+# ======================================================================
 # Ficha de libro: analizar un libro entero con un flujo de agentes
 # ======================================================================
 
@@ -2443,7 +2735,7 @@ def github_preguntar(req: GithubRefRequest):
     motor, nombre = _motor_desafios(req.modelo, "explicar")
 
     def trabajo(avisar):
-        return {"texto": _consumir(github_lector.preguntar(motor, nombre, info, req.ruta, req.mensajes), avisar)}
+        return {"texto": _consumir(github_lector.preguntar(motor, nombre, info, req.ruta, _mensajes_con_referencias(req.mensajes)), avisar)}
     return _ndjson_en_hilo(trabajo)
 
 
@@ -2727,7 +3019,8 @@ def kaggle_preguntar(req: KagglePreguntarRequest):
     ctx_datos = _obtener_contexto_datos(nb, req)
 
     def trabajo(avisar):
-        return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, req.mensajes, contexto_datos=ctx_datos), avisar)}
+        return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, _mensajes_con_referencias(req.mensajes),
+                                                           contexto_datos=ctx_datos), avisar)}
     return _ndjson_en_hilo(trabajo)
 
 @app.get("/api/workspace")
@@ -2922,6 +3215,7 @@ def get_tree(path: Optional[str] = None):
     return file_mgr.get_file_tree(path)
 
 @app.get("/api/raw-file")
+@app.get("/api/file/raw")          # el nombre que usa el editor para las imágenes (antes solo existía en el servidor Rust)
 def get_raw_file(path: str):
     try:
         abs_path = file_mgr.resolve(path)
@@ -2943,6 +3237,17 @@ def write_file(req: FileWriteRequest):
     res = file_mgr.write_file(req.path, req.content)
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
+    try:
+        from llm_director import director_llm
+        ext = os.path.splitext(req.path)[1].lower()
+        lenguaje = "python" if ext == ".py" else ("javascript" if ext in (".js", ".jsx") else ("typescript" if ext in (".ts", ".tsx") else ("html" if ext == ".html" else ("css" if ext == ".css" else ("c_cpp" if ext in (".c", ".cpp", ".h") else ("rust" if ext == ".rs" else "text"))))))
+        director_llm.memoria.registrar_lectura_archivo(
+            archivo=req.path,
+            codigo=req.content,
+            lenguaje=lenguaje
+        )
+    except Exception as e:
+        logger.debug("Error registrando memoria AST al guardar archivo: %s", e)
     return res
 
 @app.post("/api/create")
@@ -3621,6 +3926,27 @@ def _formatear_gancho(hooked_files: Optional[List[Dict[str, str]]]) -> str:
         + "\n\n".join(bloques)
     )
 
+def _con_referencias(texto_para_buscar: str, prompt: str) -> Tuple[str, List[Dict[str, Any]]]:
+    """ (prompt con el bloque de referencias de ML relacionadas delante, referencias elegidas). Lo usan los
+    chats de todas las secciones: así un resumen o una explicación puede citar el libro o el paper del tema """
+    try:
+        bloque, refs = referencias_ml.bloque_para_prompt(texto_para_buscar)
+    except Exception as err:  # el catálogo nunca debe romper un chat
+        logger.warning(f"Referencias de ML no disponibles: {err}")
+        return prompt, []
+    return (f"{bloque}\n\n{prompt}" if bloque else prompt), refs
+
+
+def _mensajes_con_referencias(mensajes: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """ Copia de la conversación con las referencias relacionadas delante del último mensaje del alumno """
+    copia = [dict(m) for m in mensajes]
+    for m in reversed(copia):
+        if m.get("role") == "user" and m.get("content"):
+            m["content"] = _con_referencias(m["content"], m["content"])[0]
+            break
+    return copia
+
+
 def _formatear_citas(citas: Optional[List[Dict[str, Any]]] = None, citas_lib: Optional[List[Dict[str, Any]]] = None) -> str:
     todas = []
     if isinstance(citas, list):
@@ -3676,6 +4002,62 @@ INSTRUCCION_BANCO = (
     "5. Sé breve: lo esencial en 150-400 palabras, salvo que te pidan más detalle. Primero consulta lo que "
     "necesites y después responde una sola vez; no narres lo que vas a hacer."
 )
+# Con la memoria del chat desactivada no se le pide guardar nada (y anotar no escribe: herramientas_chat.py)
+_REGLA_ANOTAR = ("4. Si descubres algo que valga para futuras preguntas (una definición del dominio, una decisión de "
+                 "diseño, teoría que explica el código), guárdalo con anotar.\n")
+assert _REGLA_ANOTAR in INSTRUCCION_BANCO
+INSTRUCCION_BANCO_SIN_MEMORIA = INSTRUCCION_BANCO.replace(_REGLA_ANOTAR, "").replace("\n5. Sé breve", "\n4. Sé breve")
+
+# Tope de la respuesta en el chat con banco. Sin él, una respuesta en bucle (texto que se repite) seguía hasta
+# llenar el contexto, el motor lo agrandaba y la volvía a empezar desde cero: medido 31.937 tokens en 17 min y
+# 11.459 hasta llenar 32K (docs/estudio-banco.md). 4096 es lo que el motor ya reserva para la salida al elegir el
+# contexto (motor_moe.estimar_tokens), así que no cambia su elección; la respuesta correcta más larga medida
+# rondaba los 1.500. Cortada por el tope, se puede «Continuar».
+TOPE_RESPUESTA_BANCO = 4096
+# Con «Pensar», el razonamiento cuenta dentro del tope: con 4096, revisar una función gastaba todo en razonar y la
+# respuesta salía vacía (2 de 2; docs/estudio-banco.md, «Corrige los fallos»). Este tope deja lugar a razonar y responder;
+# el motor reserva ese espacio al elegir el contexto (motor_moe.estimar_tokens) y el bucle sigue acotado
+TOPE_RESPUESTA_BANCO_PENSANDO = 16384
+# Rondas de herramientas con el banco: en la última se le pide responder (ai_engine_class.chat_eventos), así que son 8
+# de consultas y una para responder. Medido: con 9 o más consultas, 1 de 5 respuestas correctas.
+RONDAS_BANCO = 9
+
+
+EMPUJONES_MAX = 2
+# Revisando una función que se puede ejecutar (memoria_consulta.sugiere_ejecutar), si respondió sin ejecutarla: una vez.
+# Con la pista sola, B2 de E8 (la línea perdida al cortar) lo encontraron las que la ejecutaron, y la ejecutó 1 de 3
+EJECUTALA = ("Antes de cerrar: ejecuta la función con P.cargar, como indican los hechos, con casos borde (vacío, un "
+             "elemento, justo en el límite, apenas por encima) y compara lo que devuelve con lo que debería devolver. "
+             "Después confirma o corrige tu conclusión, en pocas líneas.")
+# Con «Pensar», si el razonamiento llena el tope sin llegar a responder, se responde sin razonar (B2 de E8: 16.384
+# tokens de razonamiento y una respuesta vacía)
+SIN_RAZONAR = "El razonamiento llenó el tope sin llegar a responder: se responde ahora sin razonar."
+EMPUJON = ("Continúa: haz ahora con las herramientas la consulta que anunciaste y termina la respuesta. "
+           "No anuncies lo que vas a hacer: hazlo.")
+_ANUNCIO = re.compile(r"(?:^|[\n.:!?]\s*)(?:ahora|voy a|vamos a|veamos|veo si|busco|buscaré|reviso|revisaré|consulto|"
+                      r"consultaré|compruebo|comprobaré|déjame|a continuación|primero|luego)\b[^\n]{0,220}$", re.I)
+
+
+RESPONDE_CON_RESULTADO = "Responde la pregunta con este resultado, en palabras (sin escribir código de P)."
+_LINEA_P = re.compile(r"^\s*(?:[A-Za-z_]\w*\s*=\s*)?(?:P\.\w+\(.*\)|print\(.*\))\s*$")
+
+
+def codigo_de_consola_escrito(texto: str) -> Optional[str]:
+    """ Si la respuesta es SOLO código de la consola (una o más líneas P.…(…)), ese código """
+    limpio = re.sub(r"^```\w*\s*|\s*```$", "", (texto or "").strip())
+    lineas = [l for l in limpio.splitlines() if l.strip()]
+    if not lineas or len(lineas) > 8 or not any("P." in l for l in lineas):
+        return None
+    return "\n".join(lineas) if all(_LINEA_P.match(l) for l in lineas) else None
+
+
+def anuncia_sin_hacer(texto: str) -> bool:
+    """ ¿La respuesta termina anunciando una consulta en vez de concluir? (el último párrafo es un
+    «voy a…/ahora busco…» corto, sin código ni lista de resultados) """
+    ultimo = (texto or "").strip().rsplit("\n\n", 1)[-1].strip()
+    if not ultimo or len(ultimo) > 300 or "```" in ultimo or ultimo.startswith(("-", "*", "|", "#", "1.")):
+        return False
+    return bool(_ANUNCIO.search(ultimo))
 
 
 INSTRUCCION_CONSOLA = (
@@ -3700,6 +4082,49 @@ def _generador_subllamadas(modelo: str):
                                                    options={"num_predict": int(max_tokens), **MUESTREO_PRECISO},
                                                    uso="programador")).strip()
     return generar
+
+
+BANCO_MODOS = ("auto", "general", "unidad")
+
+
+def _unidad_para(req: "AIChatRequest", modelo: str, banco) -> Tuple[Optional[Dict[str, Any]], str]:
+    """ (unidad, motivo): la unidad cuya lectura usa esta pregunta (lectura_unidades.py), o None para el modo
+    general, y por qué. El modo sale de la petición o de la configuración (banco_modo; docs/plan-texto-primero.md):
+      auto     la unidad solo si su lectura está guardada; si no, modo general
+      general  siempre modo general: el contexto se arma con el texto del banco, sin estados del motor
+      unidad   la unidad aunque no tenga lectura guardada: se lee antes de responder (_chat_eventos)
+    El modo unidad pide el motor MoE, eventos y herramientas, y nada de archivos enganchados ni código del editor
+    (cambiarían el prefijo guardado). """
+    from ai_engine import motor_moe as motor_moe_mod
+    if banco is None:
+        return None, "sin banco"
+    modo = str(req.banco_modo or ai_engine.config.get("banco_modo") or "auto").strip().lower()
+    if modo not in BANCO_MODOS:
+        modo = "auto"
+    if modo == "general":
+        return None, "forzado: modo general"
+    for falla, razon in ((not req.eventos, "sin eventos"), (not motor_moe_mod.es_moe(modelo), "no es el motor MoE"),
+                         (req.solo_codigo, "solo código"), (req.hooked_files, "archivos enganchados"),
+                         (req.code_context, "código del editor"), (req.continuar, "continuación"),
+                         (req.think, "con razonamiento")):
+        if falla:
+            return None, f"modo unidad no disponible: {razon}"
+    try:
+        lector = lectura_unidades.LectorUnidades(banco, ai_engine, modelo=modelo, generar_sub=_generador_subllamadas(modelo))
+        if not lector._unidades:
+            return None, "el proyecto todavía no está partido en unidades"
+        eleccion = lector.elegir_unidad(req.prompt)
+        if eleccion.get("orden") is None:
+            return None, f"la pregunta reparte su peso entre unidades: {eleccion.get('motivo') or 'ninguna se destaca'}"
+        unidad = {**eleccion, "lector": lector, "datos": lector._unidades[eleccion["orden"]]}
+        nombre = eleccion.get("nombre") or f"unidad {eleccion['orden']}"
+        if not eleccion.get("vigente"):
+            if modo == "unidad":
+                return {**unidad, "leer_antes": True}, f"forzado: «{nombre}» no tiene lectura guardada; se lee ahora"
+            return None, f"«{nombre}» no tiene lectura guardada: modo general"
+        return unidad, "lectura guardada de la unidad"
+    except Exception as e:
+        return None, f"no se pudo elegir unidad: {type(e).__name__}"
 
 
 def _presupuesto_banco(modelo: str) -> Tuple[int, int]:
@@ -3729,7 +4154,7 @@ def _preparar_banco(req: "AIChatRequest", modelo: str):
         bancos.vigilar(raiz)
         presupuesto, presupuesto_mapa = _presupuesto_banco(modelo)
         enganchados = {str(f.get("path") or "").strip("./") for f in (req.hooked_files or [])}
-        paquete = banco.componer(req.prompt, presupuesto, excluir_rutas=enganchados)
+        paquete = banco.componer(req.prompt, presupuesto, excluir_rutas=enganchados, usar_resoluciones=req.memoria)
         mapa = banco.mapa(presupuesto_mapa)
     except Exception as e:
         return None, {"error": f"{type(e).__name__}: {e}"}, "", ""
@@ -3768,6 +4193,12 @@ def ai_chat(req: AIChatRequest):
     if citas_contexto:
         prompt = f"{citas_contexto}\n\n{prompt}"
 
+    # Referencias de ML del catálogo (libros, papers, formularios) que vienen al caso, para que el modelo
+    # las cite con su enlace. No en preguntas sobre el código del proyecto (banco) ni en «solo código»
+    referencias: List[Dict[str, Any]] = []
+    if not req.banco and not req.solo_codigo:
+        prompt, referencias = _con_referencias(req.prompt, prompt)
+
     modelo = req.model or _modelo_desafios(None, "tutor")
 
     gancho_contexto = _formatear_gancho(req.hooked_files)
@@ -3779,9 +4210,30 @@ def ai_chat(req: AIChatRequest):
     contexto_fijo = gancho_contexto if (gancho_contexto and req.eventos and motor_moe_mod.es_moe(modelo)) else ""
     if gancho_contexto and not contexto_fijo:
         prompt = f"{gancho_contexto}\n\n{prompt}"
-    banco, banco_info = None, None
+    banco, banco_info, unidad = None, None, None
     if req.banco:
         banco, banco_info, mapa, contexto_banco = _preparar_banco(req, modelo)
+        unidad, motivo_modo = _unidad_para(req, modelo, banco)
+        if banco is not None and banco_info is not None:
+            banco_info.update({"modo": "unidad" if unidad is not None else "general", "motivo": motivo_modo})
+        if unidad is not None and banco_info is not None:
+            banco_info.update({"unidad": unidad["nombre"], "unidad_orden": unidad["orden"],
+                               "unidad_cuota": unidad.get("cuota")})
+        if banco is not None and unidad is None:
+            # Modo general, el camino normal desde el plan «texto primero»: los mismos hechos del banco que recibe el
+            # modo unidad (definición, llamadores, rutas, configuración…). En el estudio, el general era el más fiable
+            # (97 % frente a 86 %; docs/plan-texto-primero.md)
+            try:
+                hechos = memoria_consulta.hechos_de_la_pregunta(banco, req.prompt)
+            except Exception:
+                hechos = ""
+            if hechos:
+                # Después del paquete, pegados a la pregunta (como en el modo unidad). Arriba de todo quedaban a ~21.000
+                # caracteres de la pregunta y el modelo los ignoraba o descartaba; pegados a ella, el general acertó 3 de
+                # 3 y verificó lo «sin resolver» (T7, docs/estudio-banco.md, «Texto primero: medición corta»)
+                contexto_banco = f"{contexto_banco}\n\n{hechos}" if contexto_banco else hechos
+            if banco_info is not None:
+                banco_info["hechos_caracteres"] = len(hechos)
         if banco is not None:
             if contexto_banco:
                 prompt = f"{contexto_banco}\n\n{prompt}"
@@ -3792,7 +4244,7 @@ def ai_chat(req: AIChatRequest):
                 else:
                     prompt = f"{mapa}\n\n{prompt}"
             if not (req.solo_codigo and solo_lo_pedido):
-                sys_prompt = f"{sys_prompt}\n\n{INSTRUCCION_BANCO}"
+                sys_prompt = f"{sys_prompt}\n\n{INSTRUCCION_BANCO if req.memoria else INSTRUCCION_BANCO_SIN_MEMORIA}"
     if req.code_context:
         prompt = f"```\n{req.code_context}\n```\n\n{prompt}"
 
@@ -3812,7 +4264,8 @@ def ai_chat(req: AIChatRequest):
     if req.eventos:
         return StreamingResponse(_flujo_cancelable(_chat_eventos(req, prompt, sys_prompt, modelo=modelo,
                                                                  contexto_fijo=contexto_fijo,
-                                                                 banco=banco, banco_info=banco_info)),
+                                                                 banco=banco, banco_info=banco_info,
+                                                                 unidad=unidad, referencias=referencias)),
                                  media_type="application/x-ndjson")
 
     def event_stream():
@@ -3827,11 +4280,40 @@ def ai_chat(req: AIChatRequest):
     return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 
+def _leer_unidad_antes(unidad: Dict[str, Any]):
+    """ Modo «unidad» forzado y la unidad sin lectura guardada (docs/plan-texto-primero.md, T5). Con caché, se lee antes
+    de responder (LectorUnidades.leer: el motor guarda su estado si cabe y queda registrada, así que las preguntas
+    siguientes la restauran en ~0,3 s). Con el caché apagado (moe_cache_gb = 0) no: leería el prefijo dos veces sin
+    poder guardarlo; se lee junto con la pregunta. Emite los avisos para el chat """
+    def aviso(texto: str) -> str:
+        return json.dumps({"t": "aviso", "v": texto}, ensure_ascii=False) + "\n"
+    try:
+        tope = ai_engine.config.get("moe_cache_gb")
+        tope = None if tope in (None, "") else float(tope)
+    except (TypeError, ValueError):
+        tope = None
+    nombre = unidad.get("nombre") or f"unidad {unidad.get('orden')}"
+    if tope == 0:
+        yield aviso(f"«{nombre}» no tiene lectura guardada y el caché está apagado: se lee junto con la pregunta "
+                    "(≈30 s más).")
+        return
+    yield aviso(f"Leyendo «{nombre}» antes de responder (≈30–40 s; queda guardada para las próximas preguntas)…")
+    try:
+        r = unidad["lector"].leer(unidad["orden"]) or {}
+        yield aviso(f"Unidad leída: {int(r.get('tokens') or 0):,} tokens en {r.get('segundos') or 0} s.".replace(",", "."))
+    except Exception as e:
+        yield aviso(f"No se pudo leer antes ({type(e).__name__}): se lee junto con la pregunta.")
+
+
 def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Optional[str] = None,
-                  contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None):
+                  contexto_fijo: str = "", banco=None, banco_info: Optional[Dict[str, Any]] = None,
+                  unidad: Optional[Dict[str, Any]] = None, referencias: Optional[List[Dict[str, Any]]] = None):
     mod = modelo or req.model or _modelo_desafios(None, "tutor")
     if banco_info:
         yield json.dumps({"t": "banco", "v": banco_info}, ensure_ascii=False, default=str) + "\n"
+    if referencias:
+        yield json.dumps({"t": "referencias", "v": [referencias_ml.resumen_publico(r) for r in referencias]},
+                         ensure_ascii=False) + "\n"
     fuentes = []
     from ai_engine import motor_moe as motor_moe_mod
     # Motor MoE: la web solo si el usuario la marca (ver ai_chat)
@@ -3856,11 +4338,22 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
     # memoria de consulta: una consola aislada donde el proyecto entero es el objeto P
     if (req.herramientas or banco is not None) and not solo_codigo:   # la gramática de solo código no admite llamadas
         if banco is not None and "tools" in ai_engine.capacidades(mod):
-            consola = memoria_consulta.Consola(banco, generar=_generador_subllamadas(mod))
+            consola = memoria_consulta.Consola(banco, generar=_generador_subllamadas(mod), escribir=req.memoria)
             mensajes[0]["content"] = f"{mensajes[0]['content']}\n\n{INSTRUCCION_CONSOLA}"
         herramientas = Herramientas(knowledge_base, file_mgr, ide, runner,
                                     permitir_codigo=req.permitir_codigo, timeout=_exec_timeout(), banco=banco,
-                                    consola=consola)
+                                    consola=consola, escribir=req.memoria)
+    if unidad is not None and consola is not None:
+        # Modo unidad: la conversación empieza exactamente con el prefijo de la lectura guardada de esa
+        # unidad (sistema del lector + tarjeta + contexto + código) y sus herramientas fijas; el motor la
+        # restaura en ~0,3 s con sus expertos, y la consola cubre el resto del proyecto. Con la pregunta van
+        # los hechos del banco sobre lo que nombra (lo que el modo general ya recibe)
+        mensajes = unidad["lector"].mensajes(unidad["datos"]) + [
+            {"role": "user", "content": unidad["lector"].pregunta_con_contexto(unidad["datos"], req.prompt, hechos=True)}]
+        herramientas = Herramientas(banco=banco, consola=consola, solo=list(lectura_unidades.HERRAMIENTAS_UNIDAD),
+                                    escribir=req.memoria)
+        if unidad.get("leer_antes"):
+            yield from _leer_unidad_antes(unidad)
     extra_moe = None
     if solo_codigo:
         extra_moe = {motor_moe_mod.SOLO_CODIGO: True}
@@ -3868,26 +4361,86 @@ def _chat_eventos(req: AIChatRequest, prompt: str, sys_prompt: str, modelo: Opti
         # Con el banco la respuesta debe ceñirse al código: muestreo «preciso» (ai_engine/motor_moe.py)
         extra_moe = {motor_moe_mod.PERFIL: "preciso"}
     respuesta = []
+    hubo_aviso = False
     with _chats_lock:
         _chats_usuario[0] += 1
     try:
-        for evento in ai_engine.chat_eventos(mensajes, mod, "tutor", think=False if solo_codigo else req.think,
-                                             logprobs=max(0, min(int(req.logprobs or 0), 5)),
-                                             herramientas=herramientas,
-                                             max_rondas=16 if banco is not None else 6,
-                                             gobernador=recursos_termico.gobernador(),
-                                             extra=extra_moe):
-            if evento.get("t") == "herramienta":
-                evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
-            elif evento.get("t") == "texto":
-                respuesta.append(str(evento.get("v") or ""))
-            yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+        conversacion = mensajes
+        pensar = bool(req.think) and not solo_codigo
+        try:
+            ejecutar = consola is not None and banco is not None and memoria_consulta.sugiere_ejecutar(banco, req.prompt)
+        except Exception:
+            ejecutar = False
+        cargo = False                       # ¿alguna consulta ejecutó código del proyecto (P.cargar)?
+        for intento in range(1 + (EMPUJONES_MAX if consola is not None else 0) + int(pensar) + int(ejecutar)):
+            inicio_ronda = len(respuesta)
+            pensado = False
+            for evento in ai_engine.chat_eventos(conversacion, mod, "tutor", think=pensar,
+                                                 logprobs=max(0, min(int(req.logprobs or 0), 5)),
+                                                 herramientas=herramientas,
+                                                 max_rondas=RONDAS_BANCO if banco is not None else 6,
+                                                 gobernador=recursos_termico.gobernador(),
+                                                 extra=extra_moe,
+                                                 max_tokens=None if banco is None else (
+                                                     TOPE_RESPUESTA_BANCO_PENSANDO if pensar else TOPE_RESPUESTA_BANCO)):
+                if evento.get("t") == "herramienta":
+                    evento["etiqueta"] = ETIQUETAS_HERRAMIENTAS.get(evento.get("nombre"), evento.get("nombre"))
+                    if "P.cargar(" in json.dumps(evento.get("argumentos") or {}, ensure_ascii=False):
+                        cargo = True
+                elif evento.get("t") == "pensando":
+                    pensado = True
+                elif evento.get("t") == "texto":
+                    respuesta.append(str(evento.get("v") or ""))
+                elif evento.get("t") in ("error", "aviso"):
+                    hubo_aviso = True
+                yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+            if pensar and pensado and not "".join(respuesta[inicio_ronda:]).strip():
+                pensar = False
+                yield json.dumps({"t": "aviso", "v": SIN_RAZONAR}, ensure_ascii=False) + "\n"
+                continue
+            # Con herramientas, el modelo a veces anuncia la próxima consulta («Ahora busco qué
+            # endpoints…») y cierra el turno sin hacerla (visto en el examen del proyecto). Se le pide
+            # que la haga, con lo que ya dijo delante.
+            if consola is None:
+                break
+            codigo = codigo_de_consola_escrito("".join(respuesta[inicio_ronda:]))
+            if codigo:
+                # Escribió la consulta como respuesta en vez de llamar a la herramienta (visto en modo
+                # unidad): se ejecuta aquí y se le pide que responda con el resultado
+                yield json.dumps({"t": "herramienta", "nombre": "consola", "argumentos": {"codigo": codigo},
+                                  "etiqueta": ETIQUETAS_HERRAMIENTAS.get("consola", "consola")}, ensure_ascii=False) + "\n"
+                resultado = memoria_consulta.formatear(consola.ejecutar(codigo))
+                yield json.dumps({"t": "resultado", "nombre": "consola", "v": resultado}, ensure_ascii=False) + "\n"
+                conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta[inicio_ronda:])},
+                                               {"role": "user", "content": f"Resultado de la consola:\n{resultado}\n\n{RESPONDE_CON_RESULTADO}"}]
+                del respuesta[inicio_ronda:]
+                continue
+            if not anuncia_sin_hacer("".join(respuesta)):
+                if ejecutar and not cargo and "".join(respuesta).strip():
+                    ejecutar = False
+                    yield json.dumps({"t": "aviso", "v": "Se le pide que ejecute la función con un caso antes de "
+                                                         "cerrar (P.cargar)."}, ensure_ascii=False) + "\n"
+                    conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
+                                                   {"role": "user", "content": EJECUTALA}]
+                    respuesta.append("\n\n")
+                    yield json.dumps({"t": "texto", "v": "\n\n"}, ensure_ascii=False) + "\n"
+                    continue
+                break
+            conversacion = conversacion + [{"role": "assistant", "content": "".join(respuesta)},
+                                           {"role": "user", "content": EMPUJON}]
+            respuesta.append("\n\n")
+            yield json.dumps({"t": "texto", "v": "\n\n"}, ensure_ascii=False) + "\n"
+        if not "".join(respuesta).strip() and not hubo_aviso:
+            # Ni texto ni aviso: el motor pudo detenerse a mitad (visto en el estudio del banco: respuestas
+            # vacías en 1 s mientras el vigía lo relanzaba). Mejor decirlo que devolver nada
+            yield json.dumps({"t": "error", "v": "El modelo no devolvió ninguna respuesta (el motor pudo haberse "
+                                                 "reiniciado). Vuelve a intentarlo."}, ensure_ascii=False) + "\n"
     finally:
         with _chats_lock:
             _chats_usuario[0] -= 1
         if consola is not None:
             consola.cerrar()
-    if banco is not None and respuesta:
+    if banco is not None and respuesta and req.memoria:
         # Historial de resoluciones: la próxima pregunta parecida parte de esta
         try:
             banco.registrar_resolucion(req.prompt, (req.continuar or "") + "".join(respuesta), mod,
@@ -3918,6 +4471,7 @@ class BancoAnalizarRequest(BaseModel):
 class BancoAjustesRequest(BaseModel):
     presupuesto: Optional[int] = None
     mapa: Optional[int] = None
+    modo: Optional[str] = None          # auto | general | unidad (docs/plan-texto-primero.md)
 
 
 def _banco_actual(crear: bool = True) -> "banco_proyecto.BancoProyecto":
@@ -3950,6 +4504,7 @@ def banco_estado():
                              "embebedor": {"modelo": embebedor_banco.modelo, "disponible": embebedor_banco.disponible()},
                              "presupuesto": int(ai_engine.config.get("banco_presupuesto") or 6000),
                              "mapa": int(ai_engine.config.get("banco_mapa") or 3000),
+                             "modo": ai_engine.config.get("banco_modo") or "auto",
                              "modelo_analisis": _modelo_analisis(None), "error": bancos.ultimo_error}
     if existe:
         datos["banco"] = bancos.para(raiz).estado()
@@ -3977,9 +4532,15 @@ def banco_ajustes(req: BancoAjustesRequest):
         cambios["banco_presupuesto"] = max(1000, min(int(req.presupuesto), 100000))
     if req.mapa is not None:
         cambios["banco_mapa"] = max(0, min(int(req.mapa), 30000))
+    if req.modo is not None:
+        modo = str(req.modo).strip().lower()
+        if modo not in BANCO_MODOS:
+            raise HTTPException(status_code=400, detail="modo: auto, general o unidad")
+        cambios["banco_modo"] = modo
     if cambios:
         ai_engine.update_config(cambios)
-    return {"presupuesto": ai_engine.config.get("banco_presupuesto"), "mapa": ai_engine.config.get("banco_mapa")}
+    return {"presupuesto": ai_engine.config.get("banco_presupuesto"), "mapa": ai_engine.config.get("banco_mapa"),
+            "modo": ai_engine.config.get("banco_modo") or "auto"}
 
 
 @app.get("/api/banco/buscar")
@@ -4434,7 +4995,9 @@ class SeguimientoExplainRequest(BaseModel):
 def explain_seguimiento_block(req: SeguimientoExplainRequest):
     def generator():
         try:
-            for chunk in ai_engine.explain_seguimiento_block(req.goal, req.block, model=req.model, use_web=req.use_web):
+            tema = f"{req.block.get('title', '')} {' '.join(req.block.get('topics', []))} {req.goal}"
+            for chunk in ai_engine.explain_seguimiento_block(req.goal, req.block, model=req.model, use_web=req.use_web,
+                                                             contexto_extra=_con_referencias(tema, "")[0]):
                 yield chunk
         except Exception as e:
             yield f"\n[Error: {str(e)}]"
@@ -4714,6 +5277,7 @@ ESTRUCTURA DE LA EXPLICACIÓN:
 Formatea la respuesta en Markdown limpio (títulos ##, ###, bloques de código ```). No agregues saludos ni intros informales."""
     
     prompt = f"Por favor, explica en detalle el siguiente tema en aproximadamente 500 palabras:\nTema: {req.topic}"
+    prompt = _con_referencias(req.topic, prompt)[0]
 
     def stream_explanation():
         for chunk in ai_engine.generate_response(prompt, model=req.model, system_prompt=sys_prompt):
@@ -5265,6 +5829,10 @@ class MoeRequest(BaseModel):
     nucleo: Optional[str] = None        # q8 (más calidad) | q4 (más rápido)
     detener: bool = False
     olvidar_proyectos: bool = False     # borra los proyectos guardados en disco
+    # Caché de estados en disco (docs/plan-texto-primero.md): tope en GB (0 = no se guarda ninguno) y disco libre
+    # que nunca toca
+    cache_gb: Optional[float] = None
+    cache_reserva_gb: Optional[float] = None
 
 
 def _moe_estado() -> Dict[str, Any]:
@@ -5273,7 +5841,8 @@ def _moe_estado() -> Dict[str, Any]:
     return {**ai_engine.motor_moe().estado(),
             "ajustes": {"contexto": cfg.get("moe_contexto"), "hilos": cfg.get("moe_hilos"),
                         "calientes": cfg.get("moe_calientes"), "modo": cfg.get("moe_modo"),
-                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo")},
+                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo"),
+                        "cache_gb": cfg.get("moe_cache_gb"), "cache_reserva_gb": cfg.get("moe_cache_reserva_gb")},
             "modos": list(motor_moe_mod.MODOS)}
 
 
@@ -5317,8 +5886,21 @@ def recursos_moe_ajustar(req: MoeRequest):
         if req.nucleo not in motor_moe_mod.NUCLEOS:
             raise HTTPException(status_code=400, detail="nucleo: q8 o q4")
         cambios["moe_nucleo"] = req.nucleo
+    if req.cache_gb is not None:
+        if not 0 <= float(req.cache_gb) <= 2000:
+            raise HTTPException(status_code=400, detail="cache_gb: entre 0 y 2000 GB (0 = no guardar)")
+        cambios["moe_cache_gb"] = float(req.cache_gb)
+    if req.cache_reserva_gb is not None:
+        if not 0 <= float(req.cache_reserva_gb) <= 1000:
+            raise HTTPException(status_code=400, detail="cache_reserva_gb: entre 0 y 1000 GB")
+        cambios["moe_cache_reserva_gb"] = float(req.cache_reserva_gb)
     if cambios:
         ai_engine.update_config(cambios)
+    if req.cache_gb is not None or req.cache_reserva_gb is not None:
+        try:
+            ai_engine.motor_moe().podar()            # el tope nuevo se aplica ya, no en el próximo guardado
+        except Exception:
+            pass
     if req.detener:
         ai_engine.motor_moe().detener()
     if req.olvidar_proyectos:
@@ -5712,7 +6294,8 @@ def _al_terminar_descarga(item):
 
 descargas = Descargas(lambda: ai_engine.base_url.rstrip("/"),
                       lambda: _carpeta_modelos_servidor() or gestor_modelos.carpeta_modelos(),
-                      al_terminar=_al_terminar_descarga)
+                      al_terminar=_al_terminar_descarga,
+                      workspace_dir_fn=lambda: file_mgr.base_dir)
 seguimiento = buscador_modelos.Seguimiento()
 
 
@@ -5814,11 +6397,27 @@ def buscador_visto(req: SeguirRequest):
 class DescargaModeloRequest(BaseModel):
     ref: str
     titulo: Optional[str] = None
+    tipo: Optional[str] = "ollama"
+    variante: Optional[str] = None
+    destino: Optional[str] = None
 
 
 @app.post("/api/descargas")
 def descargas_encolar(req: DescargaModeloRequest):
-    return _buscador(descargas.encolar, req.ref, req.titulo)
+    return _buscador(descargas.encolar, req.ref, req.titulo, tipo=req.tipo or "ollama",
+                     variante=req.variante, destino=req.destino)
+
+
+@app.get("/api/buscador/hf/inspeccionar_completo")
+def buscador_hf_inspeccionar_completo(repo: Optional[str] = None, repo_id: Optional[str] = None, variante: Optional[str] = None):
+    """Inspecciona los archivos de configuración y pesos de un repositorio de Hugging Face
+    para preparar una descarga y respaldo completo contra borrado."""
+    ident = repo or repo_id
+    if not ident:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Falta el identificador del repositorio ('repo' o 'repo_id').")
+    from descargas_hf_completo import inspeccionar_modelo_hf
+    return _buscador(inspeccionar_modelo_hf, ident, variante=variante)
 
 
 @app.get("/api/descargas")
@@ -6502,7 +7101,7 @@ def desafios_chat(req: DesafioChatRequest):
     motor, nombre_modelo = _motor_desafios(req.modelo)
 
     def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.chat(motor, nombre_modelo, req.mensajes, d, paginas,
+        return {"texto": _consumir(des_tutor.chat(motor, nombre_modelo, _mensajes_con_referencias(req.mensajes), d, paginas,
                                                   (d or {}).get("ultima_comprobacion")), avisar)}
     return _ndjson_en_hilo(trabajo)
 
@@ -6608,17 +7207,23 @@ def youtube_analizar(req: YouTubeAnalisisRequest):
         notas_usuario=req.notas_usuario or ""
     )
 
-    resultado = {}
-    if req.modo in ("resumen", "ambos"):
-        resultado["resumen"] = youtube_analisis.generar_resumen_estructurado(
-            motor, nombre_modelo, req.titulo, req.canal or "YouTube",
-            req.duracion or "", contexto, req.categoria or ""
-        )
-    if req.modo in ("objetivos", "ambos"):
-        resultado["objetivos"] = youtube_analisis.generar_objetivos_didacticos(
-            motor, nombre_modelo, req.titulo, req.canal or "YouTube",
-            req.duracion or "", contexto, req.nivel or "intermedio", req.categoria or ""
-        )
+    # fuente: "transcripcion", "texto_usuario" o "solo_metadatos" (la interfaz avisa que sin transcripción
+    # el análisis se basa solo en el título y la descripción)
+    resultado = {"fuente": contexto["fuente"], "transcripcion_completa": contexto["transcripcion_completa"]}
+    try:
+        if req.modo in ("resumen", "ambos"):
+            resultado["resumen"] = youtube_analisis.generar_resumen_estructurado(
+                motor, nombre_modelo, req.titulo, req.canal or "YouTube",
+                req.duracion or "", contexto["texto"], req.categoria or ""
+            )
+        if req.modo in ("objetivos", "ambos"):
+            resultado["objetivos"] = youtube_analisis.generar_objetivos_didacticos(
+                motor, nombre_modelo, req.titulo, req.canal or "YouTube",
+                req.duracion or "", contexto["texto"], req.nivel or "intermedio", req.categoria or "",
+                duracion_segundos=contexto["duracion_segundos"]
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     return resultado
 
@@ -6826,10 +7431,14 @@ def youtube_traducir_texto(req: YouTubeTraducirRequest):
     )
 
     try:
-        respuesta = motor.completar(nombre_modelo, [{"role": "user", "content": prompt}])
-        traduccion = respuesta.get("texto", "").strip() if isinstance(respuesta, dict) else str(respuesta).strip()
+        # generate_response es la interfaz común de los dos motores (Ollama y Gemini); «completar» no existía
+        traduccion = "".join(motor.generate_response(prompt, model=nombre_modelo, think=False,
+                                                     options={"temperature": 0.2}, uso="tutor")).strip()
         # Limpiar tags <think> si el modelo es razonador
         traduccion = re.sub(r"<think>[\s\S]*?</think>", "", traduccion, flags=re.I).strip()
+        import youtube_analisis
+        if youtube_analisis.error_del_motor(traduccion) or not traduccion:
+            return {"ok": False, "error": traduccion or "El modelo no devolvió texto.", "original": req.texto}
         return {"ok": True, "traduccion": traduccion, "original": req.texto}
     except Exception as e:
         logger.error(f"Error traduciendo fragmento de YouTube: {e}")
@@ -6840,7 +7449,6 @@ def youtube_traducir_texto(req: YouTubeTraducirRequest):
 
 # ============================================================================
 # Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
-
 # ============================================================================
 from hub.api import crear_router as _hub_router  # noqa: E402
 
@@ -6849,8 +7457,199 @@ app.include_router(_hub_router(
     telemetria=_registrar_telemetria, publico=AlmacenDesafios.publico, validar_desafio=des_ejec.validar_desafio,
     autor=lambda: inicio.perfil().get("nombre") or ""))
 
+# ============================================================================
+# API DIRECTOR NARRATIVO Y DE AGENTES ASCII (Modelos 7B / Ollama / Local)
+# ============================================================================
+from llm_director import director_llm
+
+class LLMDirectorRequest(BaseModel):
+    tema_id: str = "tema_mecha_patrol"
+    contexto: Dict[str, Any] = {}
+    modelo: Optional[str] = None
+    endpoint: Optional[str] = None
+
+@app.post("/api/llm/director_decision")
+def obtener_decision_director(req: LLMDirectorRequest):
+    """
+    Retorna directivas de movimiento, animaciones y diálogos de fondo
+    generados por un modelo 7B o motor procedural.
+    """
+    try:
+        decision = director_llm.consultar_director(
+            tema_id=req.tema_id,
+            contexto_editor=req.contexto,
+            modelo_personalizado=req.modelo,
+            endpoint_personalizado=req.endpoint
+        )
+        return {"ok": True, "data": decision}
+    except Exception as e:
+        logger.error(f"Error en director LLM: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/director_stream")
+def obtener_decision_director_stream(req: LLMDirectorRequest):
+    """
+    Emite tokens progresivos en streaming (Server-Sent Events) con latencia < 150ms
+    y entrega la decisión completa estructurada al finalizar.
+    """
+    try:
+        gen = director_llm.consultar_director_stream(
+            tema_id=req.tema_id,
+            contexto_editor=req.contexto,
+            modelo_personalizado=req.modelo,
+            endpoint_personalizado=req.endpoint
+        )
+        return StreamingResponse(gen, media_type="text/event-stream")
+    except Exception as e:
+        logger.error(f"Error en streaming del director LLM: {e}")
+        return {"ok": False, "error": str(e)}
+
+class PreguntaCerebroRequest(BaseModel):
+    pregunta: str
+    modelo: Optional[str] = None
+    endpoint: Optional[str] = None
+
+@app.get("/api/llm/memoria_archivos")
+def obtener_memoria_archivos():
+    """
+    Retorna la lista de archivos leídos y comprimidos semánticamente (TC-AST)
+    junto con las estadísticas de ahorro de tokens.
+    """
+    try:
+        archivos = director_llm.memoria.obtener_resumen_memoria()
+        stats = director_llm.memoria.obtener_estadisticas_tokens()
+        return {
+            "ok": True,
+            "archivos": archivos,
+            "stats": stats,
+            "historial_preguntas": director_llm.memoria.historial_preguntas
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo memoria de archivos: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/preguntar_cerebro")
+def preguntar_cerebro_memoria(req: PreguntaCerebroRequest):
+    """
+    Responde preguntas sobre los archivos leídos utilizando únicamente
+    la memoria semántica comprimida (ahorrando ~90% tokens).
+    """
+    try:
+        res = director_llm.memoria.preguntar_al_cerebro(
+            pregunta=req.pregunta,
+            director_instancia=director_llm,
+            modelo=req.modelo,
+            endpoint=req.endpoint
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error consultando al cerebro: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/llm/limpiar_memoria_cerebro")
+def limpiar_memoria_cerebro():
+    """Limpia el almacén de memoria comprimida"""
+    try:
+        director_llm.memoria.archivos_memorizados.clear()
+        director_llm.memoria.historial_preguntas.clear()
+        director_llm.memoria._guardar_memoria()
+        return {"ok": True, "mensaje": "Memoria del cerebro reiniciada"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ============================================================================
+# API MOTOR DE APRENDIZAJE POR GRAFO DE NODOS (YouTube, GitHub, Kaggle, Prig Hub)
+# ============================================================================
+from motor_aprendizaje_nodos import motor_aprendizaje
+
+class EjecutarTareaAprendizajeRequest(BaseModel):
+    codigo: Optional[str] = ""
+    usar_solucion: bool = False
+
+class ProgresoNodoAprendizajeRequest(BaseModel):
+    completado: bool = True
+
+@app.get("/api/aprendizaje/grafo")
+def obtener_grafo_aprendizaje(nivel: Optional[str] = None):
+    """Retorna el árbol de conocimiento estructurado en DAG con dependencias y estado."""
+    try:
+        return motor_aprendizaje.obtener_grafo(filtro_nivel=nivel)
+    except Exception as e:
+        logger.error(f"Error obteniendo grafo de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/nodo/{nodo_id}")
+def obtener_nodo_aprendizaje(nodo_id: str):
+    """Retorna el detalle conceptual, recursos de 4 herramientas y tarea pre-respondida."""
+    try:
+        nodo = motor_aprendizaje.obtener_nodo(nodo_id)
+        if not nodo:
+            raise HTTPException(status_code=404, detail=f"Nodo '{nodo_id}' no encontrado")
+        return {"ok": True, "nodo": nodo}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo nodo de aprendizaje {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/buscar")
+def buscar_aprendizaje(q: str = "", limite: int = 15):
+    """Búsqueda semántica ultra-rápida (<5ms) a través de nodos, teoría, videos y datasets."""
+    try:
+        resultados = motor_aprendizaje.buscar(query=q, limite=limite)
+        return {"ok": True, "total": len(resultados), "resultados": resultados}
+    except Exception as e:
+        logger.error(f"Error en búsqueda de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/ejecutar")
+def ejecutar_tarea_nodo(nodo_id: str, req: EjecutarTareaAprendizajeRequest):
+    """Ejecuta de manera segura la solución y verifica contra tests unitarios en <50ms."""
+    try:
+        return motor_aprendizaje.ejecutar_tarea(
+            nodo_id=nodo_id,
+            codigo_usuario=req.codigo or "",
+            usar_solucion=req.usar_solucion
+        )
+    except Exception as e:
+        logger.error(f"Error ejecutando tarea del nodo {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/abrir_en_editor")
+def abrir_nodo_en_editor(nodo_id: str):
+    """Genera los archivos locales en el workspace y los abre en el Editor Prig."""
+    try:
+        return motor_aprendizaje.abrir_en_editor(nodo_id=nodo_id)
+    except Exception as e:
+        logger.error(f"Error abriendo nodo {nodo_id} en editor: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/aprendizaje/nodo/{nodo_id}/progreso")
+def actualizar_progreso_nodo(nodo_id: str, req: ProgresoNodoAprendizajeRequest):
+    """Marca manualmente un nodo como completado o pendiente."""
+    try:
+        motor_aprendizaje.marcar_progreso(nodo_id=nodo_id, completado=req.completado)
+        return {"ok": True, "nodo_id": nodo_id, "completado": req.completado}
+    except Exception as e:
+        logger.error(f"Error actualizando progreso del nodo {nodo_id}: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/aprendizaje/estadisticas")
+def obtener_estadisticas_aprendizaje():
+    """Retorna métricas globales de avance pedagógico por nivel (Junior a Senior)."""
+    try:
+        stats = motor_aprendizaje.obtener_estadisticas_progreso()
+        return {"ok": True, "estadisticas": stats}
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de aprendizaje: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+
 
 # Serve frontend static assets
+
 
 if os.path.exists(frontend_dir):
 

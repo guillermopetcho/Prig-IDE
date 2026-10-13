@@ -1,0 +1,20 @@
+[
+ {
+  "id": "E8a_B2·t5",
+  "prueba": "off-by-one: se pierde una línea al partir",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto",
+  "think": true
+ },
+ {
+  "id": "E8a_B2·t6",
+  "prueba": "off-by-one: se pierde una línea al partir",
+  "objetivo": "B2",
+  "pregunta": "Revisa `piezas_de_archivo` en `backend/particion_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B2",
+  "modo": "auto",
+  "think": true
+ }
+]

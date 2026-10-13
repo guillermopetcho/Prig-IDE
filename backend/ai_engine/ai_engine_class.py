@@ -79,6 +79,28 @@ def explicar_error_motor(texto: str) -> Optional[str]:
     if "llama-server binary not found" in (texto or ""):
         return MENSAJE_RUNTIME_INCOMPLETO
     return None
+
+# Chat con herramientas (chat_eventos): una consulta idéntica no se repite, y la última ronda responde
+CONSULTA_REPETIDA = ("Ya hiciste exactamente esta consulta y su resultado está más arriba: no la repitas. Usa ese "
+                     "resultado, prueba una consulta DISTINTA o responde.")
+SIN_MAS_CONSULTAS = ("No hay más consultas: responde ahora la pregunta con lo que ya obtuviste. Si algo no lo pudiste "
+                     "confirmar, dilo en lugar de suponerlo.")
+SALIR_DEL_BUCLE = ("Te estás repitiendo. Detente y da ahora tu conclusión final en pocas líneas, sin repetir lo anterior.")
+
+
+def corte_de_bucle(texto: str, largo: int = 240, veces: int = 3) -> Optional[int]:
+    """ Si el final del texto ya apareció literal `veces - 1` veces antes, el modelo está en un bucle: devuelve dónde
+    termina la primera aparición (lo de antes del bucle). Revisando una función, una respuesta repitió el mismo párrafo
+    («Espera, creo que el error está en la línea 96…») hasta el tope; en 132 respuestas medidas, solo esa dispara esto
+    (docs/estudio-banco.md, «Corrige los fallos») """
+    if len(texto) < largo * veces:
+        return None
+    cola = texto[-largo:]
+    previo = texto[:-largo]
+    if previo.count(cola) < veces - 1:
+        return None
+    return previo.index(cola) + largo
+
 CONFIG_PATH = os.path.expanduser("~/.prig_ai_config.json")
 
 
@@ -309,10 +331,17 @@ class AIEngine:
             "moe_modo": motor_moe.MODO,  # exacto | equilibrado | rapido (omite expertos fríos de poco peso)
             "moe_mtp": True,             # decodificación especulativa con la cabeza MTP del modelo
             "moe_nucleo": motor_moe.NUCLEO,  # q8: núcleo en Q8 (más calidad) · q4: el de Ollama (más rápido)
+            # Caché de estados del motor en disco (docs/plan-texto-primero.md): tope en GB (0 = no se guarda ninguno) y
+            # disco libre que el caché nunca toca. 32 = el tope fijo que había: el valor final se decide al medir
+            "moe_cache_gb": 32,
+            "moe_cache_reserva_gb": 20,
             # Banco del proyecto: tokens de contexto por pregunta y del mapa; modelo del análisis ("" = automático)
             "banco_presupuesto": 6000,
             "banco_mapa": 3000,
             "banco_modelo": "",
+            # Cómo responde el chat con el banco: auto (lectura guardada de la unidad si la hay) | general (siempre desde
+            # el texto del banco) | unidad (leerla si hace falta). docs/plan-texto-primero.md
+            "banco_modo": "auto",
         }
         self._load_config()
 
@@ -863,7 +892,9 @@ class AIEngine:
             liberar_gpu=self._descargar_ollama,
             ajustes=lambda: {"contexto": self.config.get("moe_contexto"), "hilos": self.config.get("moe_hilos"),
                              "calientes": self.config.get("moe_calientes"), "modo": self.config.get("moe_modo"),
-                             "mtp": self.config.get("moe_mtp", True), "nucleo": self.config.get("moe_nucleo")})
+                             "mtp": self.config.get("moe_mtp", True), "nucleo": self.config.get("moe_nucleo"),
+                             "cache_gb": self.config.get("moe_cache_gb"),
+                             "cache_reserva_gb": self.config.get("moe_cache_reserva_gb")})
 
     def _post_con_recuperacion(self, url: str, payload: Dict[str, Any], intentos: int = 3):
         """ POST a Ollama que sobrevive a una falta de memoria al cargar.
@@ -1038,11 +1069,21 @@ class AIEngine:
         cancelar: Optional[threading.Event] = None,
         gobernador=None,
         extra: Optional[Dict[str, Any]] = None,
+        max_tokens: Optional[int] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """ Chat por eventos: texto, razonamiento, herramientas, confianza y métricas.
 
         `extra`: campos que se añaden tal cual a la petición (p. ej. el modo «solo código» del
-        motor MoE).
+        motor MoE). `max_tokens`: tope de la respuesta si la configuración no fija otro (num_predict); con `think`, también
+        si la configuración fija uno menor: el razonamiento cuenta dentro del tope, y con el num_predict de 4096 de la
+        configuración, revisar una función con «Pensar» gastaba todo en razonar y la respuesta salía vacía (2 de 2;
+        docs/estudio-banco.md, «Corrige los fallos»).
+
+        Con herramientas: una consulta idéntica a otra ya hecha no se vuelve a ejecutar (se le recuerda
+        que el resultado está arriba) y, si insiste o se llega a la última ronda, esa ronda va SIN
+        herramientas para que responda con lo que tiene. Medido en el estudio del banco
+        (docs/estudio-banco.md): de las respuestas con 9 o más consultas solo 1 de 5 fue correcta; una
+        repitió 4 veces el mismo código fallido y otra agotó 16 rondas sin llegar a responder.
 
           {"t": "texto", "v": "…"}            parte de la respuesta
           {"t": "pensando", "v": "…"}         parte del razonamiento
@@ -1062,6 +1103,9 @@ class AIEngine:
         """
         url = f"{self.base_url}/api/chat"
         opciones = self._build_options(None, model, uso)
+        configurado = int(opciones.get("num_predict") or 0)
+        if max_tokens and (configurado <= 0 or (think and configurado < int(max_tokens))):
+            opciones["num_predict"] = int(max_tokens)
         base: Dict[str, Any] = {}
         extra = self._completar_payload(base, model, uso, think, "")["sistema"]
         msgs = [dict(m) for m in mensajes]
@@ -1107,8 +1151,22 @@ class AIEngine:
             if gobernador is not None:
                 tramo = None
                 yield from enfriar("antes_de_paso")
-            for ronda in range(max_rondas):
+            hechas: Dict[str, str] = {}          # consultas ya ejecutadas en esta respuesta
+            repetidas = 0
+            # Cuando se le pide responder (última ronda o consultas repetidas), las herramientas SIGUEN en la petición:
+            # quitarlas cambia el prefijo que el motor MoE guardó (las definiciones van en él) y lo relee entero
+            # (T7: 26 s y un estado nuevo de 246 MB; docs/estudio-banco.md). Una consulta que pida igual no se
+            # ejecuta, y recién entonces hay una ronda más, esa sí sin herramientas.
+            forzada = False
+            salio_de_bucle = False          # el corte por texto repetido, una sola vez por respuesta
+            ronda, limite = 0, max_rondas
+            while ronda < limite:
+                if definiciones and not forzada and ronda > 0 and ronda == max_rondas - 1:
+                    forzada = True
+                    msgs.append({"role": "user", "content": SIN_MAS_CONSULTAS})
+                    yield {"t": "aviso", "v": "Última ronda: se le pide al modelo que responda con lo que ya consultó."}
                 contenido, pensamiento, llamadas, probabilidades = "", "", [], []
+                revisado, bucle = 0, None
                 estadisticas = None
                 while True:
                     previo = []
@@ -1147,6 +1205,11 @@ class AIEngine:
                             if msg.get("content"):
                                 contenido += msg["content"]
                                 yield {"t": "texto", "v": msg["content"]}
+                                if len(contenido) - revisado >= 200 and not salio_de_bucle:
+                                    revisado = len(contenido)
+                                    bucle = corte_de_bucle(contenido)
+                                    if bucle is not None:
+                                        break
                             if msg.get("tool_calls"):
                                 llamadas.extend(msg["tool_calls"])
                             if datos.get("logprobs"):
@@ -1198,10 +1261,28 @@ class AIEngine:
                          "alternativas": [{"token": a.get("token"), "logprob": a.get("logprob")}
                                           for a in (p.get("top_logprobs") or [])]}
                         for p in probabilidades[:4000]]}
+                if bucle is not None:
+                    # Cortado por repetirse: lo de antes del bucle queda como su mensaje, y se le pide la conclusión. Las
+                    # herramientas siguen en la petición (como al pedirle responder: no cambia el prefijo guardado)
+                    salio_de_bucle = True
+                    msgs.append({"role": "assistant", "content": contenido[:bucle]})
+                    msgs.append({"role": "user", "content": SALIR_DEL_BUCLE})
+                    yield {"t": "aviso", "v": "El modelo repetía el mismo texto: se cortó y se le pide la conclusión."}
+                    forzada = forzada or bool(definiciones)
+                    limite = max(limite, ronda + 2)
+                    ronda += 1
+                    continue
                 if not llamadas or herramientas is None:
                     if estadisticas:
                         yield {"t": "stats", "v": {**estadisticas, "rondas": ronda + 1}}
                     return
+                if forzada and definiciones:
+                    definiciones = None
+                    limite = ronda + 2
+                    ronda += 1
+                    yield {"t": "aviso", "v": "El modelo pidió otra consulta en vez de responder: no se ejecuta; "
+                                              "se le vuelve a pedir que responda, ya sin herramientas."}
+                    continue
 
                 asistente: Dict[str, Any] = {"role": "assistant", "content": contenido, "tool_calls": llamadas}
                 if pensamiento:
@@ -1212,9 +1293,20 @@ class AIEngine:
                     nombre = funcion.get("name", "")
                     argumentos = funcion.get("arguments") or {}
                     yield {"t": "herramienta", "nombre": nombre, "argumentos": argumentos}
-                    resultado = herramientas.ejecutar(nombre, argumentos)
+                    clave = f"{nombre}:{json.dumps(argumentos, sort_keys=True, ensure_ascii=False, default=str)}"
+                    if clave in hechas:
+                        repetidas += 1
+                        resultado = CONSULTA_REPETIDA
+                    else:
+                        resultado = herramientas.ejecutar(nombre, argumentos)
+                        hechas[clave] = resultado
                     yield {"t": "resultado", "nombre": nombre, "v": resultado[:2000]}
                     msgs.append({"role": "tool", "tool_name": nombre, "content": resultado})
+                if repetidas >= 2 and definiciones and not forzada:
+                    forzada = True
+                    msgs.append({"role": "user", "content": SIN_MAS_CONSULTAS})
+                    yield {"t": "aviso", "v": "El modelo repetía consultas: se le pide que responda con lo que ya tiene."}
+                ronda += 1
             yield {"t": "aviso", "v": f"Se alcanzó el máximo de {max_rondas} rondas de herramientas."}
         finally:
             with self._streams_lock:
@@ -1922,7 +2014,8 @@ Debes devolver ÚNICAMENTE un objeto JSON válido con este formato:
             for s in sources:
                 yield f"- [{s['title']}]({s['url']}) (`{s['domain']}`)\n"
 
-    def explain_seguimiento_block(self, goal: str, block: dict, model: str = "qwen2.5-coder:7b", use_web: bool = True):
+    def explain_seguimiento_block(self, goal: str, block: dict, model: str = "qwen2.5-coder:7b", use_web: bool = True,
+                                  contexto_extra: str = ""):
         web_context = ""
         sources = []
         if use_web:
@@ -1941,7 +2034,7 @@ REGLAS PEDAGÓGICAS PARA TU RESPUESTA:
 4. Si el contexto incluye enlaces o recursos oficiales, cítalos explícitamente.
 5. Tu respuesta debe estar formateada en Markdown (títulos ##, ###, bloques de código ```).
 """
-        prompt = f"Meta del Alumno: {goal}\n\nBloque a Explicar:\n- Título: {block.get('title')}\n- Temas: {', '.join(block.get('topics', []))}\n- Objetivo: {block.get('learning_objective')}\n- Validación: {block.get('validation_check')}\n\n{web_context}\n¡Por favor, dame la clase!"
+        prompt = f"Meta del Alumno: {goal}\n\nBloque a Explicar:\n- Título: {block.get('title')}\n- Temas: {', '.join(block.get('topics', []))}\n- Objetivo: {block.get('learning_objective')}\n- Validación: {block.get('validation_check')}\n\n{web_context}\n{contexto_extra}\n¡Por favor, dame la clase!"
         
         for chunk in self.generate_response(prompt, model=model, system_prompt=sys_prompt):
             yield chunk

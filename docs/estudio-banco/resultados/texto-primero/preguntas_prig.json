@@ -1,0 +1,62 @@
+[
+ {
+  "id": "ind_15",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)"
+ },
+ {
+  "id": "ind_16",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "prueba": "hueco del grafo: llamada por fábrica"
+ },
+ {
+  "id": "f46b5c0819d3",
+  "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto con función pasada como argumento y lambda"
+ },
+ {
+  "id": "a84a7fe1bad7",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)"
+ },
+ {
+  "id": "29b468d8a2cb",
+  "pregunta": "Si cambio el comportamiento de `rebind_workspace` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: nombró la función, no la ruta HTTP"
+ },
+ {
+  "id": "12bb842411c5",
+  "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: ruta HTTP inventada"
+ },
+ {
+  "id": "0b5f93c17f28",
+  "pregunta": "¿Por qué funciones pasa la ejecución desde `modelos_borrar_parciales` (endpoint en `backend/app.py`) hasta llegar a `librerias_disponibles` (en `backend/recursos/servidor.py`)? Nombra las intermedias en orden.",
+  "prueba": "recorrido: negó un camino que existe"
+ },
+ {
+  "id": "d408dee5873f",
+  "pregunta": "¿Por qué funciones pasa la ejecución desde `recursos_ritmo` (endpoint en `backend/app.py`) hasta llegar a `ControladorFrio` (en `backend/recursos/frio.py`)? Nombra las intermedias en orden.",
+  "prueba": "recorrido: negó un camino que existe (2)"
+ },
+ {
+  "id": "ind_27",
+  "pregunta": "¿Cómo decide el motor MoE cuántos expertos calientes cargar, y qué hace si al arrancar no caben en la GPU?",
+  "prueba": "diseño: bucle de 28 consultas sin responder"
+ },
+ {
+  "id": "1f14bd2a14dd",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la variable de entorno `KAGGLE_API_TOKEN`?",
+  "prueba": "entorno: bucle de texto, agotada vacía"
+ },
+ {
+  "id": "02bd1db0d170",
+  "pregunta": "¿Qué funciones o métodos llaman a `escribir_manifiesto` (definida en `backend/hub/formato.py`)?",
+  "prueba": "llamadores: salida degenerada («...»)"
+ },
+ {
+  "id": "8caebf27e7ba",
+  "pregunta": "¿Cuánto vale la constante `MESETA_S` en `backend/recursos/termico.py`?",
+  "prueba": "control: constante (correcta en E7)"
+ }
+]

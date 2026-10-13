@@ -38,6 +38,15 @@
     const estado = {
         panel: 'armar', modelo: null, modelos: [],
         lenguaje: leerLocal('prig_desafios_lenguaje') || 'python',
+        disposicion: leerLocal('prig_desafios_disposicion') || 'paralelo',
+        ocultarDesafio: leerLocal('prig_desafios_ocultar_desafio') === '1',
+        ocultarSidebar: leerLocal('prig_desafios_ocultar_sidebar') === '1',
+        seccionesColapsadas: new Set(JSON.parse(leerLocal('prig_desafios_colapsadas') || '[]')),
+        favoritos: new Set(JSON.parse(leerLocal('prig_desafios_favoritos') || '[]')),
+        grupos: JSON.parse(leerLocal('prig_desafios_grupos') || '{}'),
+        misOrden: leerLocal('prig_desafios_mis_orden') || 'recientes',
+        misFiltroGrupo: leerLocal('prig_desafios_mis_filtro_grupo') || 'todos',
+        misBusqueda: '',
         propuesta: '',
         propuestaNivel: 'intermedio',
         propuestaAnalisis: null,
@@ -129,7 +138,9 @@
         const css = document.createElement('style');
         css.id = 'des-estilos';
         css.textContent = `
-          #desafios-raiz { display:grid; grid-template-columns: 340px 1fr; height:100%; min-height:0; background:var(--bg-dark); }
+          #desafios-raiz { display:grid; grid-template-columns: 340px 1fr; height:100%; min-height:0; background:var(--bg-dark); transition:grid-template-columns .2s ease; }
+          #desafios-raiz.sidebar-oculta { grid-template-columns: 0px 1fr !important; }
+          #desafios-raiz.sidebar-oculta .des-lado { display:none !important; }
           .des-lado { border-right:1px solid var(--border-color); display:flex; flex-direction:column; min-height:0; background:var(--bg-panel); }
           .des-pestanas { display:flex; border-bottom:1px solid var(--border-color); }
           .des-pestanas button { flex:1; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); padding:9px 4px; cursor:pointer; font-size:11px; }
@@ -154,14 +165,46 @@
           .des-msg { padding:7px 10px; border-radius:8px; font-size:12px; line-height:1.5; max-width:92%; }
           .des-msg.usuario { align-self:flex-end; background:rgba(137,180,250,.14); }
           .des-msg.tutor { align-self:flex-start; background:rgba(255,255,255,.05); }
-          .des-msg p { margin:0 0 6px; } .des-msg p:last-child { margin:0; }
-          .des-item { border:1px solid rgba(255,255,255,.07); border-radius:7px; padding:8px; background:rgba(0,0,0,.15); cursor:pointer; }
+          .des-item { border:1px solid rgba(255,255,255,.07); border-radius:7px; padding:8px; background:rgba(0,0,0,.15); cursor:pointer; transition:all .15s ease; }
           .des-item:hover { border-color:rgba(137,180,250,.35); }
           .des-item.destacado { border-color:var(--accent-purple); box-shadow:0 0 0 1px var(--accent-purple) inset; }
+          .des-item.resuelto { border-color:var(--accent-green) !important; background:rgba(166,227,161,.08) !important; box-shadow:0 0 0 1px rgba(166,227,161,.25) inset; }
           .des-item-titulo { font-weight:600; color:#fff; font-size:12px; }
-          .des-hoja { overflow-y:auto; min-height:0; padding:18px 26px 60px; }
-          .des-hoja-interior { max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
-          .des-seccion { background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; padding:14px 16px; }
+          .des-fav-btn { background:transparent; border:none; cursor:pointer; font-size:13px; padding:2px 5px; color:var(--text-muted); transition:color .15s ease, transform .15s ease; border-radius:4px; }
+          .des-fav-btn:hover { transform:scale(1.15); color:var(--accent-yellow); }
+          .des-fav-btn.activo { color:var(--accent-yellow) !important; }
+          .des-grupo-badge { font-size:10px; padding:1px 7px; border-radius:9px; background:rgba(203,166,247,.12); color:var(--accent-purple); border:1px solid rgba(203,166,247,.3); cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+          .des-grupo-badge:hover { background:rgba(203,166,247,.22); border-color:var(--accent-purple); }
+          .des-mis-controles { display:flex; flex-direction:column; gap:6px; padding-bottom:6px; border-bottom:1px solid var(--border-color); }
+          .des-seccion.resuelto { border-color:rgba(166,227,161,.45); box-shadow:0 0 12px rgba(166,227,161,.06); }
+          .des-hoja { overflow-y:auto; min-height:0; padding:14px 20px 60px; }
+          .des-hoja-interior { width:100%; max-width:100%; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+
+          /* Barra superior de herramientas y controles de disposición */
+          .des-toolbar-hoja { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; flex-wrap:wrap; }
+          .des-toolbar-grupo { display:inline-flex; align-items:center; gap:3px; background:rgba(0,0,0,.25); border:1px solid var(--border-color); border-radius:6px; padding:2px 4px; }
+          .des-toolbar-btn { background:transparent; border:none; color:var(--text-muted); padding:3px 8px; font-size:11px; border-radius:4px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all .15s ease; }
+          .des-toolbar-btn:hover { color:var(--text-main); background:rgba(255,255,255,.06); }
+          .des-toolbar-btn.activo { background:rgba(137,180,250,.18); color:var(--accent-blue); font-weight:600; }
+
+          /* Contenedor lado a lado (paralelo: desafío izquierda, código derecha) */
+          .des-contenedor-paralelo { display:grid; grid-template-columns:minmax(340px, 1fr) minmax(420px, 1.25fr); gap:16px; align-items:start; width:100%; }
+          .des-contenedor-paralelo.desafio-oculto { grid-template-columns:1fr !important; }
+          .des-contenedor-paralelo.desafio-oculto .des-col-desafio { display:none !important; }
+          .des-col-desafio { display:flex; flex-direction:column; gap:12px; min-width:0; }
+          .des-col-codigo { display:flex; flex-direction:column; gap:12px; min-width:0; }
+
+          /* Contenedor apilado (vertical: 1 columna centrada) */
+          .des-contenedor-apilado { display:flex; flex-direction:column; gap:14px; max-width:1050px; margin:0 auto; width:100%; }
+          .des-contenedor-apilado.desafio-oculto .des-col-desafio { display:none !important; }
+
+          /* Secciones */
+          .des-seccion { background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; padding:14px 16px; transition:all .2s ease; }
+          .des-seccion.colapsada .des-seccion-cuerpo { display:none !important; }
+          .des-seccion.colapsada { padding-bottom:8px; }
+          .des-sec-toggle-btn { background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding:2px 6px; border-radius:4px; font-size:11px; }
+          .des-sec-toggle-btn:hover { color:var(--text-main); background:rgba(255,255,255,.06); }
+
           .des-seccion-titulo { display:flex; gap:8px; align-items:center; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
           .des-seccion-titulo .des-mini, .des-seccion-titulo .des-btn, .des-seccion-titulo .des-ayuda { text-transform:none; letter-spacing:0; }
           .des-seccion-titulo .num { background:rgba(137,180,250,.18); color:var(--accent-blue); border-radius:50%; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; }
@@ -204,6 +247,10 @@
           .des-eval-score-pill.error { background:rgba(243,139,168,.2); color:var(--accent-red, #f38ba8); border:1px solid var(--accent-red, #f38ba8); }
           .des-eval-tarjeta { background:rgba(0,0,0,.25); border:1px solid var(--border-color, #313244); border-radius:8px; padding:12px 14px; }
           .des-eval-tarjeta-titulo { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent-purple, #cba6f7); font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+
+          @media (max-width: 960px) {
+            .des-contenedor-paralelo { grid-template-columns: 1fr !important; }
+          }
         `;
         document.head.appendChild(css);
     }
@@ -211,15 +258,60 @@
     // ================================================================== estructura
     function raiz() { return $('desafios-raiz'); }
 
+    function ajustarEditores() {
+        setTimeout(() => {
+            estado.editores.forEach((ed, nombre) => {
+                try {
+                    const el = [...document.querySelectorAll('#des-paginas .des-pagina')].find(x => estado.paginas[+x.dataset.i] && estado.paginas[+x.dataset.i].nombre === nombre);
+                    if (el) {
+                        const cont = el.querySelector('.des-pagina-editor');
+                        if (cont) {
+                            const alto = Math.max(120, Math.min(560, ed.getContentHeight()));
+                            cont.style.height = `${alto}px`;
+                            ed.layout({ width: cont.clientWidth, height: alto });
+                        }
+                    } else {
+                        ed.layout();
+                    }
+                } catch (e) {}
+            });
+        }, 50);
+    }
+
+    function toggleSidebar(forzar) {
+        if (typeof forzar === 'boolean') estado.ocultarSidebar = forzar;
+        else estado.ocultarSidebar = !estado.ocultarSidebar;
+        guardarLocal('prig_desafios_ocultar_sidebar', estado.ocultarSidebar ? '1' : '0');
+        const r = raiz();
+        if (r) r.classList.toggle('sidebar-oculta', estado.ocultarSidebar);
+        const b = $('des-btn-toggle-sidebar');
+        if (b) {
+            b.innerHTML = `<i class="fa-solid ${estado.ocultarSidebar ? 'fa-bars' : 'fa-bars-staggered'}"></i> <span>${estado.ocultarSidebar ? 'Menú' : 'Ocultar menú'}</span>`;
+            b.title = estado.ocultarSidebar ? 'Mostrar menú de desafíos (Armar, Buscar, Plan, Mis desafíos)' : 'Ocultar menú de desafíos (Armar, Buscar, Plan, Mis desafíos)';
+            b.classList.toggle('amarillo', estado.ocultarSidebar);
+        }
+        const floatBtn = $('des-float-toggle-sidebar');
+        if (floatBtn) {
+            floatBtn.style.display = estado.ocultarSidebar ? 'inline-flex' : 'none';
+        }
+        ajustarEditores();
+    }
+
     function montar() {
         estilos();
         const r = raiz();
         if (!r || $('des-lado')) return;
+        if (estado.ocultarSidebar) r.classList.add('sidebar-oculta');
         r.innerHTML = `
           <aside class="des-lado" id="des-lado">
-            <div class="des-pestanas" id="des-pestanas">
-              ${[['armar', 'fa-wand-magic-sparkles', 'Armar'], ['internet', 'fa-globe', 'Buscar'], ['plan', 'fa-route', 'Plan'], ['mis', 'fa-list-check', 'Mis desafíos']]
-                .map(([id, ic, t]) => `<button data-panel="${id}"><i class="fa-solid ${ic}"></i><br>${t}</button>`).join('')}
+            <div style="display:flex; border-bottom:1px solid var(--border-color); align-items:stretch; background:rgba(0,0,0,0.1);">
+              <div class="des-pestanas" id="des-pestanas" style="flex:1; border-bottom:none;">
+                ${[['armar', 'fa-wand-magic-sparkles', 'Armar'], ['internet', 'fa-globe', 'Buscar'], ['plan', 'fa-route', 'Plan'], ['mis', 'fa-list-check', 'Mis desafíos']]
+                  .map(([id, ic, t]) => `<button data-panel="${id}"><i class="fa-solid ${ic}"></i><br>${t}</button>`).join('')}
+              </div>
+              <button id="des-sidebar-colapsar" class="des-btn" title="Ocultar sección (Armar, Buscar, Plan, Mis desafíos)" style="border:none; border-left:1px solid var(--border-color); border-radius:0; padding:0 10px; color:var(--text-muted); cursor:pointer; background:transparent;">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
             </div>
             <div class="des-modelo"><i class="fa-solid fa-microchip"></i> Modelo <select id="des-modelo" class="des-campo"></select>
               <span class="des-mini" id="des-modelo-nube" hidden title="Este modelo funciona en los servidores de Google" style="color:var(--accent-yellow);"><i class="fa-solid fa-cloud"></i> nube</span></div>
@@ -231,8 +323,17 @@
             </div>
             <div class="des-lado-cuerpo" id="des-lado-cuerpo"></div>
           </aside>
-          <main class="des-hoja" id="des-hoja"><div class="des-hoja-interior" id="des-hoja-interior"></div></main>`;
+          <main class="des-hoja" id="des-hoja" style="position:relative;">
+            <button id="des-float-toggle-sidebar" class="des-btn azul" title="Mostrar menú lateral (Armar, Buscar, Plan, Mis desafíos)" style="position:absolute; top:12px; left:12px; z-index:90; display:${estado.ocultarSidebar ? 'inline-flex' : 'none'}; gap:6px; box-shadow:0 4px 12px rgba(0,0,0,.45);">
+              <i class="fa-solid fa-bars"></i> <span>Menú de desafíos</span>
+            </button>
+            <div class="des-hoja-interior" id="des-hoja-interior"></div>
+          </main>`;
         $('des-pestanas').onclick = (e) => { const b = e.target.closest('button'); if (b) cambiarPanel(b.dataset.panel); };
+        const btnColapsar = $('des-sidebar-colapsar');
+        if (btnColapsar) btnColapsar.onclick = () => toggleSidebar(true);
+        const floatBtn = $('des-float-toggle-sidebar');
+        if (floatBtn) floatBtn.onclick = () => toggleSidebar(false);
         $('des-modelo').onchange = (e) => {
             if (e.target.value === '__gemini__') { e.target.value = estado.modelo; return dialogoGemini(); }
             estado.modelo = e.target.value;
@@ -709,17 +810,23 @@
               </div>
               <div class="des-ayuda" style="margin-bottom:6px;">Archivos de ejercicios en <b>${esc(ep.ref)}</b>:</div>
               ${!ep.archivos || !ep.archivos.length ? '<div class="des-ayuda">No se detectaron archivos de ejercicios automáticos en este repositorio. Ábrelo en GitHub Lector para explorar todas sus carpetas.</div>' : ''}
-              ${(ep.archivos || []).map((a, idx) => `
+              ${(ep.archivos || []).map((a, idx) => {
+                const favKey = 'gh:' + ep.ref + ':' + a.ruta;
+                const esFav = estado.favoritos.has(favKey);
+                return `
                 <div class="des-item" style="margin-top:6px;">
                   <div class="des-fila">
                     <span class="des-mini" style="color:${a.lenguaje === 'cpp' ? 'var(--accent-blue)' : 'var(--accent-yellow)'};"><i class="fa-solid fa-file-code"></i> ${a.lenguaje.toUpperCase()}</span>
                     <span class="des-ayuda">${a.bytes ? Math.round(a.bytes / 1024) + ' KB' : ''}</span>
                     <span style="flex:1"></span>
+                    <button class="des-fav-btn ${esFav ? 'activo' : ''}" data-fav-repo="${idx}" title="${esFav ? 'Quitar de favoritos' : 'Guardar como favorito'}">
+                      <i class="fa-${esFav ? 'solid' : 'regular'} fa-star"></i>
+                    </button>
                     <button class="des-btn verde" data-rep-idx="${idx}" style="padding:2px 8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Replicar</button>
                   </div>
                   <div class="des-item-titulo" style="margin-top:3px; word-break:break-all;">${esc(a.ruta)}</div>
                 </div>
-              `).join('')}
+              `;}).join('')}
             `;
             const cerr = $('des-cat-err-close');
             if (cerr) cerr.onclick = () => { i.catalogoError = null; pintarCatalogoGitHub(); };
@@ -727,6 +834,14 @@
             if (volver) volver.onclick = () => { i.ejerciciosRepo = null; i.catalogoError = null; pintarCatalogoGitHub(); };
             const exp = $('des-cat-explorar-actual');
             if (exp && window.GitHubLector) exp.onclick = () => window.GitHubLector.abrirRepo(ep.ref);
+            c.querySelectorAll('[data-fav-repo]').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const a = ep.archivos[+btn.dataset.favRepo];
+                    const key = 'gh:' + ep.ref + ':' + a.ruta;
+                    toggleFavorito(key);
+                };
+            });
             c.querySelectorAll('[data-rep-idx]').forEach(btn => {
                 const a = ep.archivos[+btn.dataset.repIdx];
                 btn.onclick = () => replicarDesdeGitHub(ep.ref, a.ruta, a.lenguaje, a.nombre);
@@ -809,6 +924,11 @@
                 }
             }, senal);
             if (pedido !== estado.pedido) return;
+            const favKey = 'gh:' + ref + ':' + ruta;
+            if (estado.favoritos.has(favKey) && d && d.id) {
+                estado.favoritos.add(d.id);
+                guardarLocal('prig_desafios_favoritos', JSON.stringify([...estado.favoritos]));
+            }
             abrirDesafio(d);
             if (estado.panel === 'mis') panelMis();
         } catch (e) {
@@ -897,7 +1017,97 @@
         }
     }
 
-    // ================================================================== panel: mis desafíos
+    // ================================================================== panel: mis desafíos (grupos, favoritos, orden)
+    function obtenerGruposExistentes() {
+        const set = new Set();
+        if (estado.grupos) {
+            Object.values(estado.grupos).forEach(g => {
+                if (g && typeof g === 'string' && g.trim()) set.add(g.trim());
+            });
+        }
+        return Array.from(set).sort();
+    }
+
+    function cambiarGrupoDesafio(id, grupoActual = '') {
+        const grupos = obtenerGruposExistentes();
+        const listaSugs = grupos.length ? `\nGrupos existentes: ${grupos.join(', ')}` : '';
+        const nuevo = prompt(`Asignar grupo o carpeta a este desafío.${listaSugs}\n\nEscribe el nombre del grupo (o déjalo vacío para quitar):`, grupoActual || '');
+        if (nuevo === null) return;
+        const val = nuevo.trim();
+        if (val) {
+            estado.grupos[id] = val;
+        } else {
+            delete estado.grupos[id];
+        }
+        guardarLocal('prig_desafios_grupos', JSON.stringify(estado.grupos));
+        pintarMis();
+        actualizarCabeceraGrupo(id);
+    }
+
+    function toggleFavorito(id) {
+        if (estado.favoritos.has(id)) {
+            estado.favoritos.delete(id);
+        } else {
+            estado.favoritos.add(id);
+        }
+        guardarLocal('prig_desafios_favoritos', JSON.stringify([...estado.favoritos]));
+        if (estado.panel === 'mis') pintarMis();
+        if (estado.panel === 'internet' && estado.internet && estado.internet.ejerciciosRepo) {
+            pintarCatalogoGitHub();
+        }
+        actualizarCabeceraFav(id);
+    }
+
+    function actualizarCabeceraFav(id) {
+        if (!estado.d || estado.d.id !== id) return;
+        const btnFav = $('des-cab-fav');
+        if (btnFav) {
+            const esFav = estado.favoritos.has(id);
+            btnFav.classList.toggle('activo', esFav);
+            btnFav.classList.toggle('amarillo', esFav);
+            btnFav.innerHTML = `<i class="fa-${esFav ? 'solid' : 'regular'} fa-star"></i> <span>${esFav ? 'Favorito' : 'Marcar favorito'}</span>`;
+        }
+    }
+
+    function actualizarCabeceraGrupo(id) {
+        if (!estado.d || estado.d.id !== id) return;
+        const btnGrupo = $('des-cab-grupo');
+        const grupo = estado.grupos[id] || '';
+        if (btnGrupo) {
+            btnGrupo.innerHTML = grupo ? `<i class="fa-solid fa-folder-open"></i> ${esc(grupo)}` : '<i class="fa-solid fa-folder-plus"></i> Grupo';
+            btnGrupo.title = grupo ? `Grupo: ${grupo} (clic para cambiar)` : 'Asignar a un grupo';
+            btnGrupo.classList.toggle('morado', !!grupo);
+        }
+    }
+
+    function ordenarListaMis(lista) {
+        const orden = estado.misOrden || 'recientes';
+        const nivelPeso = { principiante: 1, intermedio: 2, avanzado: 3, senior: 4 };
+
+        return [...lista].sort((a, b) => {
+            if (orden === 'favoritos') {
+                const fa = estado.favoritos.has(a.id) ? 1 : 0;
+                const fb = estado.favoritos.has(b.id) ? 1 : 0;
+                if (fa !== fb) return fb - fa;
+            } else if (orden === 'resueltos') {
+                const ra = (a.progreso && a.progreso.estado === 'resuelto') ? 1 : 0;
+                const rb = (b.progreso && b.progreso.estado === 'resuelto') ? 1 : 0;
+                if (ra !== rb) return rb - ra;
+            } else if (orden === 'alfabetico') {
+                return (a.titulo || '').localeCompare(b.titulo || '');
+            } else if (orden === 'dificultad') {
+                const pa = nivelPeso[a.nivel] || 2;
+                const pb = nivelPeso[b.nivel] || 2;
+                if (pa !== pb) return pa - pb;
+            } else if (orden === 'grupo') {
+                const ga = estado.grupos[a.id] || 'zzz';
+                const gb = estado.grupos[b.id] || 'zzz';
+                if (ga !== gb) return ga.localeCompare(gb);
+            }
+            return 0; // 'recientes' (orden por defecto)
+        });
+    }
+
     async function panelMis() {
         const c = $('des-lado-cuerpo');
         c.innerHTML = '<div class="des-ayuda"><i class="fa-solid fa-spinner fa-spin"></i> Cargando…</div>';
@@ -910,29 +1120,137 @@
     function pintarMis() {
         const c = $('des-lado-cuerpo');
         if (!c || !estado.mis) return;
-        const lista = estado.mis.desafios || [];
-        if (!lista.length) { c.innerHTML = '<div class="des-ayuda">Todavía no has abierto ningún desafío. Define una propuesta, busca en el catálogo o parte de tu plan.</div>'; return; }
-        c.innerHTML = lista.map((d, n) => {
-            const p = d.progreso || {};
-            const [estNom, estIc, estCol] = ESTADOS[p.estado] || ESTADOS.nuevo;
-            const [fNom, fIc, fCol] = FUENTES[d.origen?.tipo] || FUENTES.modelo;
-            const activo = estado.d && estado.d.id === d.id;
-            return `<div class="des-item ${activo ? 'destacado' : ''}" data-id="${d.id}" style="margin-top:6px;">
-              <div class="des-fila"><span class="des-mini" style="color:${estCol};"><i class="fa-solid ${estIc}"></i> ${estNom}</span>
-                <span class="des-mini" style="color:${fCol};"><i class="fa-solid ${fIc}"></i> ${fNom}</span>
-                ${d.nivel ? `<span class="des-mini">${esc(d.nivel)}</span>` : ''}
-                <span style="flex:1"></span>
-                <button class="des-btn rojo" data-borrar="${d.id}" style="padding:1px 5px;" title="Borrar de la lista"><i class="fa-solid fa-trash"></i></button></div>
-              <div class="des-item-titulo" style="margin-top:4px;">${esc(d.titulo)}</div>
-              <div class="des-ayuda">${p.intentos ? `${p.intentos} intentos` : 'sin empezar'}${p.mejor && p.mejor.total ? ` · mejor ${p.mejor.pasados}/${p.mejor.total}` : ''}</div>
-            </div>`;
-        }).join('');
+        const totalLista = estado.mis.desafios || [];
+        if (!totalLista.length) {
+            c.innerHTML = '<div class="des-ayuda">Todavía no has abierto ningún desafío. Define una propuesta, busca en el catálogo o parte de tu plan.</div>';
+            return;
+        }
+
+        const gruposExistentes = obtenerGruposExistentes();
+        const busqueda = (estado.misBusqueda || '').toLowerCase().trim();
+        const filtroGrupo = estado.misFiltroGrupo || 'todos';
+
+        // Filtrado por búsqueda y grupo
+        let listaFiltrada = totalLista.filter(d => {
+            const grupo = estado.grupos[d.id] || '';
+            if (filtroGrupo === 'sin_grupo' && grupo) return false;
+            if (filtroGrupo !== 'todos' && filtroGrupo !== 'sin_grupo' && grupo !== filtroGrupo) return false;
+            if (busqueda) {
+                const txt = `${d.titulo || ''} ${d.nivel || ''} ${d.origen?.tipo || ''} ${grupo}`.toLowerCase();
+                if (!txt.includes(busqueda)) return false;
+            }
+            return true;
+        });
+
+        // Ordenación
+        const lista = ordenarListaMis(listaFiltrada);
+
+        c.innerHTML = `
+          <div class="des-mis-controles">
+            <input id="des-mis-buscar" class="des-campo" placeholder="Buscar desafío o concepto…" value="${esc(estado.misBusqueda || '')}" style="padding:4px 8px; font-size:11.5px;">
+            <div class="des-fila" style="gap:4px;">
+              <select id="des-mis-orden" class="des-campo" style="flex:1; min-width:0; padding:4px 6px; font-size:11px;" title="Criterio de ordenación">
+                <option value="recientes" ${estado.misOrden === 'recientes' ? 'selected' : ''}>🕒 Más recientes</option>
+                <option value="favoritos" ${estado.misOrden === 'favoritos' ? 'selected' : ''}>★ Favoritos primero</option>
+                <option value="resueltos" ${estado.misOrden === 'resueltos' ? 'selected' : ''}>✓ Resueltos primero</option>
+                <option value="alfabetico" ${estado.misOrden === 'alfabetico' ? 'selected' : ''}>🔤 Título A-Z</option>
+                <option value="dificultad" ${estado.misOrden === 'dificultad' ? 'selected' : ''}>📊 Dificultad</option>
+                <option value="grupo" ${estado.misOrden === 'grupo' ? 'selected' : ''}>📁 Por grupo</option>
+              </select>
+              <select id="des-mis-filtro-grupo" class="des-campo" style="flex:1; min-width:0; padding:4px 6px; font-size:11px;" title="Filtrar por grupo">
+                <option value="todos" ${filtroGrupo === 'todos' ? 'selected' : ''}>Todos (${totalLista.length})</option>
+                <option value="sin_grupo" ${filtroGrupo === 'sin_grupo' ? 'selected' : ''}>Sin grupo</option>
+                ${gruposExistentes.map(g => `<option value="${esc(g)}" ${filtroGrupo === g ? 'selected' : ''}>📁 ${esc(g)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="des-fila" style="justify-content:space-between; font-size:10.5px; color:var(--text-muted);">
+              <span>${lista.length === totalLista.length ? `${totalLista.length} desafíos` : `${lista.length} de ${totalLista.length} desafíos`}</span>
+              ${estado.favoritos.size ? `<span style="color:var(--accent-yellow);"><i class="fa-solid fa-star"></i> ${estado.favoritos.size} favoritos</span>` : ''}
+            </div>
+          </div>
+          <div id="des-mis-lista" style="display:flex; flex-direction:column; gap:6px;">
+            ${!lista.length ? '<div class="des-ayuda" style="margin-top:10px; text-align:center;">No hay desafíos que coincidan con el filtro.</div>' : ''}
+            ${lista.map((d) => {
+                const p = d.progreso || {};
+                const esResuelto = p.estado === 'resuelto';
+                const esFav = estado.favoritos.has(d.id);
+                const grupo = estado.grupos[d.id] || '';
+                const [estNom, estIc, estCol] = ESTADOS[p.estado] || ESTADOS.nuevo;
+                const [fNom, fIc, fCol] = FUENTES[d.origen?.tipo] || FUENTES.modelo;
+                const activo = estado.d && estado.d.id === d.id;
+                return `<div class="des-item ${activo ? 'destacado' : ''} ${esResuelto ? 'resuelto' : ''}" data-id="${d.id}" style="margin-top:2px;">
+                  <div class="des-fila">
+                    <button class="des-fav-btn ${esFav ? 'activo' : ''}" data-fav="${d.id}" title="${esFav ? 'Quitar de favoritos' : 'Marcar como favorito'}">
+                      <i class="fa-${esFav ? 'solid' : 'regular'} fa-star"></i>
+                    </button>
+                    <span class="des-mini" style="color:${estCol};"><i class="fa-solid ${estIc}"></i> ${estNom}</span>
+                    <span class="des-mini" style="color:${fCol};"><i class="fa-solid ${fIc}"></i> ${fNom}</span>
+                    ${d.nivel ? `<span class="des-mini">${esc(d.nivel)}</span>` : ''}
+                    <span style="flex:1"></span>
+                    <button class="des-btn rojo" data-borrar="${d.id}" style="padding:1px 5px;" title="Borrar de la lista"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                  <div class="des-item-titulo" style="margin-top:4px;">${esc(d.titulo)}</div>
+                  <div class="des-fila" style="margin-top:4px; justify-content:space-between;">
+                    <div class="des-ayuda">${p.intentos ? `${p.intentos} intentos` : 'sin empezar'}${p.mejor && p.mejor.total ? ` · ${p.mejor.pasados}/${p.mejor.total}` : ''}</div>
+                    <span class="des-grupo-badge" data-grupo="${d.id}" data-grupo-val="${esc(grupo)}" title="Asignar o cambiar grupo">
+                      <i class="fa-solid ${grupo ? 'fa-folder-open' : 'fa-folder-plus'}"></i> ${esc(grupo || 'Grupo')}
+                    </span>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>`;
+
+        // Eventos de controles de filtrado y orden
+        const inpBuscar = $('des-mis-buscar');
+        if (inpBuscar) {
+            inpBuscar.oninput = () => {
+                estado.misBusqueda = inpBuscar.value;
+                pintarMis();
+                const reInp = $('des-mis-buscar');
+                if (reInp) { reInp.focus(); reInp.selectionStart = reInp.selectionEnd = reInp.value.length; }
+            };
+        }
+
+        const selOrden = $('des-mis-orden');
+        if (selOrden) {
+            selOrden.onchange = () => {
+                estado.misOrden = selOrden.value;
+                guardarLocal('prig_desafios_mis_orden', estado.misOrden);
+                pintarMis();
+            };
+        }
+
+        const selFiltro = $('des-mis-filtro-grupo');
+        if (selFiltro) {
+            selFiltro.onchange = () => {
+                estado.misFiltroGrupo = selFiltro.value;
+                guardarLocal('prig_desafios_mis_filtro_grupo', estado.misFiltroGrupo);
+                pintarMis();
+            };
+        }
+
+        // Eventos en tarjetas
         c.querySelectorAll('.des-item').forEach(el => {
             el.onclick = (e) => {
-                if (e.target.closest('[data-borrar]')) return;
+                if (e.target.closest('[data-borrar]') || e.target.closest('[data-fav]') || e.target.closest('[data-grupo]')) return;
                 abrirPorId(el.dataset.id);
             };
         });
+
+        c.querySelectorAll('[data-fav]').forEach(b => {
+            b.onclick = (e) => {
+                e.stopPropagation();
+                toggleFavorito(b.dataset.fav);
+            };
+        });
+
+        c.querySelectorAll('[data-grupo]').forEach(b => {
+            b.onclick = (e) => {
+                e.stopPropagation();
+                cambiarGrupoDesafio(b.dataset.grupo, b.dataset.grupoVal);
+            };
+        });
+
         c.querySelectorAll('[data-borrar]').forEach(b => {
             b.onclick = async (e) => {
                 e.stopPropagation();
@@ -1024,75 +1342,153 @@
         destruirEditores();
         const d = estado.d;
         const p = d.progreso || {};
+        const esResuelto = p.estado === 'resuelto';
+        const esFav = estado.favoritos.has(d.id);
+        const grupo = estado.grupos[d.id] || '';
         const [fn, fi, fc] = FUENTES[(d.origen || {}).tipo] || FUENTES.modelo;
         const [en, ie, ce] = ESTADOS[p.estado] || ESTADOS.nuevo;
         const original = d.idioma && d.idioma !== 'es';
         c.innerHTML = `
-          <section class="des-seccion" id="des-sec-desafio">
-            <div class="des-seccion-titulo"><span class="num">1</span> Desafío <span style="flex:1"></span>
-              <span class="des-mini" style="color:${ce};"><i class="fa-solid ${ie}"></i> ${en}</span></div>
-            <div class="des-fila">
-              <span class="des-mini" style="color:${fc};"><i class="fa-solid ${fi}"></i> ${esc((d.origen || {}).nombre || fn)}</span>
-              <span class="des-mini">${esc(d.nivel || '')}</span>
-              ${(d.conceptos || []).slice(0, 5).map(x => `<span class="des-mini">${esc(x)}</span>`).join('')}
-              <span style="flex:1"></span>
-              <button class="des-btn primario" id="des-cab-abrir-editor" title="Crear archivo en el espacio de trabajo y resolver en el editor"><i class="fa-solid fa-code"></i> Resolver en el Editor</button>
-              <button class="des-btn morado" id="des-cab-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar con IA</button>
-              ${original ? `<button class="des-btn" id="des-traducir">${d.enunciado_es && estado.idioma === 'es' ? '<i class="fa-solid fa-language"></i> Ver original' : '<i class="fa-solid fa-language"></i> Traducir al español'}</button>` : ''}
-              ${(d.origen || {}).otras_funciones && d.origen.otras_funciones.length ? `<select id="des-otra-funcion" class="des-campo" style="width:auto;" title="Otra función del mismo archivo"><option value="">Otra función…</option>${d.origen.otras_funciones.map(f => `<option>${esc(f)}</option>`).join('')}</select>` : ''}
+          <!-- BARRA SUPERIOR DE HERRAMIENTAS Y DISPOSICIÓN -->
+          <div class="des-toolbar-hoja">
+            <button class="des-btn" id="des-btn-toggle-sidebar" title="${estado.ocultarSidebar ? 'Mostrar panel lateral de desafíos' : 'Ocultar panel lateral de desafíos'}">
+              <i class="fa-solid ${estado.ocultarSidebar ? 'fa-bars' : 'fa-bars-staggered'}"></i>
+              <span>${estado.ocultarSidebar ? 'Panel' : 'Ocultar panel'}</span>
+            </button>
+
+            <div class="des-toolbar-grupo" title="Disposición visual: lado a lado o apilado vertical">
+              <button class="des-toolbar-btn ${estado.disposicion === 'paralelo' ? 'activo' : ''}" id="des-disposicion-paralelo" title="Desafío a la izquierda y código a la derecha">
+                <i class="fa-solid fa-table-columns"></i> Lado a lado
+              </button>
+              <button class="des-toolbar-btn ${estado.disposicion === 'apilado' ? 'activo' : ''}" id="des-disposicion-apilado" title="Desafío arriba y código abajo">
+                <i class="fa-solid fa-grip-lines"></i> Apilado
+              </button>
             </div>
-            <div class="des-titulo">${esc(d.titulo)}</div>
-            ${(d.origen || {}).bloque ? `<div class="des-ayuda"><i class="fa-solid fa-route"></i> Bloque «${esc(d.origen.bloque)}» de tu plan</div>` : ''}
-            ${d.teoria ? `<details style="margin:8px 0;"><summary class="des-ayuda" style="cursor:pointer;"><i class="fa-solid fa-book-open"></i> Teoría del concepto</summary><div class="des-md" id="des-teoria"></div></details>` : ''}
-            <div class="des-md" id="des-enunciado"></div>
-            ${d.origen && d.origen.atribucion ? `<div class="des-ayuda" style="margin-top:10px; border-top:1px dashed var(--border-color); padding-top:6px;">
-              <i class="fa-solid fa-scale-balanced"></i> ${esc(d.origen.atribucion)} ${d.origen.url ? `<a href="${esc(d.origen.url)}" target="_blank" rel="noopener noreferrer">Ver original</a>` : ''}
-              ${d.origen.nota ? `<div style="margin-top:4px; color:var(--accent-yellow);"><i class="fa-solid fa-circle-info"></i> ${esc(d.origen.nota)}</div>` : ''}</div>` : ''}
-          </section>
 
-          <section class="des-seccion" id="des-sec-razonamiento">
-            <div class="des-seccion-titulo"><span class="num">2</span> Razonar antes de programar</div>
-            <div id="des-razonamiento"></div>
-          </section>
+            <button class="des-btn ${estado.ocultarDesafio ? 'amarillo' : ''}" id="des-btn-toggle-desafio" title="${estado.ocultarDesafio ? 'Mostrar el texto del desafío y razonamiento' : 'Ocultar el texto del desafío para tener todo el espacio para el código'}">
+              <i class="fa-solid ${estado.ocultarDesafio ? 'fa-eye' : 'fa-eye-slash'}"></i>
+              <span>${estado.ocultarDesafio ? 'Mostrar desafío' : 'Ocultar desafío'}</span>
+            </button>
 
-          <section class="des-seccion" id="des-sec-plan">
-            <details ${p.plan ? 'open' : ''}><summary class="des-seccion-titulo" style="cursor:pointer; margin:0;"><span class="num">3</span> Tu plan <span class="des-ayuda" style="text-transform:none; letter-spacing:0;">(opcional) escribe con tus palabras cómo lo resolverías</span></summary>
-              <textarea id="des-plan" class="des-campo" rows="4" style="margin-top:8px;" placeholder="1. Recorro la lista…&#10;2. Si encuentro…&#10;3. Al final devuelvo…">${esc(p.plan || '')}</textarea>
-              <div class="des-fila" style="margin-top:6px;"><button class="des-btn morado" id="des-plan-revisar"><i class="fa-solid fa-user-graduate"></i> Revisar mi plan con el tutor</button></div>
-              <div class="des-md" id="des-plan-respuesta" style="margin-top:8px;"></div>
-            </details>
-          </section>
+            <button class="des-btn ${esFav ? 'activo amarillo' : ''}" id="des-cab-fav" title="${esFav ? 'Quitar de favoritos' : 'Marcar como favorito'}">
+              <i class="fa-${esFav ? 'solid' : 'regular'} fa-star"></i>
+              <span>${esFav ? 'Favorito' : 'Marcar favorito'}</span>
+            </button>
 
-          <section class="des-seccion" id="des-sec-paginas">
-            <div class="des-seccion-titulo"><span class="num">4</span> Páginas de código <span style="flex:1"></span>
-              <button class="des-btn primario" id="des-abrir-editor" title="Abrir y programar este archivo en el editor de Prig"><i class="fa-solid fa-code"></i> Resolver en el Editor</button>
-              <button class="des-btn" id="des-pagina-nueva"><i class="fa-solid fa-file-circle-plus"></i> Nueva página</button>
-              <button class="des-btn" id="des-pagina-importar"><i class="fa-solid fa-file-import"></i> Importar archivo</button>
-              <input type="file" id="des-pagina-archivo" accept=".py,.cpp,.hpp,.h,.cc,.cxx,.c,text/x-python,text/x-c,text/x-c++" multiple hidden></div>
-            <div class="des-ayuda">${((estado.d && estado.d.lenguaje) || estado.lenguaje) === 'cpp'
-              ? 'Cada página es un archivo de C++ o cabecera (.h/.hpp). Puedes usar unas desde otras con <code>#include "archivo.h"</code>.'
-              : `Cada página es un archivo de Python. Desde una página se usa otra con <code>import</code>: ${estado.paginas.length > 1 ? `por ejemplo <code>from ${esc(estado.paginas[0].nombre.replace(/\.py$/, ''))} import …</code>` : 'si creas <code>utiles.py</code>, en otra página escribe <code>from utiles import …</code>'}.`}
-              <b>Mayús+Enter</b> ejecuta la página · <b>Ctrl+Enter</b> comprueba · se guarda solo <span id="des-guardado"></span></div>
-            <div id="des-paginas"></div>
-          </section>
+            <button class="des-btn ${grupo ? 'morado' : ''}" id="des-cab-grupo" title="${grupo ? `Grupo: ${esc(grupo)} (clic para cambiar)` : 'Asignar a un grupo'}">
+              <i class="fa-solid ${grupo ? 'fa-folder-open' : 'fa-folder-plus'}"></i>
+              <span>${esc(grupo || 'Grupo')}</span>
+            </button>
 
-          <section class="des-seccion" id="des-sec-comprobar">
-            <div class="des-seccion-titulo"><span class="num">5</span> Comprobar</div>
-            <div class="des-fila">
-              ${d.comprobacion && d.comprobacion.tipo !== 'ninguna'
-                ? `<button class="des-btn primario" id="des-comprobar"><i class="fa-solid fa-circle-check"></i> Comprobar con ${d.comprobacion.pruebas || ''} pruebas</button>`
-                : '<span class="des-ayuda"><i class="fa-solid fa-circle-info"></i> Este desafío no tiene pruebas automáticas: ejecuta tu página y compara el resultado.</span>'}
-              <button class="des-btn morado" id="des-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar salida con IA</button>
-              <button class="des-btn amarillo" id="des-pista" ${(p.pistas || 0) >= 3 ? 'disabled' : ''}><i class="fa-solid fa-lightbulb"></i> Pista ${(p.pistas || 0) ? `(${Math.min(p.pistas, 3)}/3)` : ''}</button>
-              ${d.pistas_fuente ? '<button class="des-btn amarillo" id="des-pista-autor"><i class="fa-solid fa-book"></i> Pistas del autor</button>' : ''}
-              ${d.comprobacion && d.comprobacion.tipo !== 'ninguna' ? `<button class="des-btn rojo" id="des-solucion"><i class="fa-solid fa-flag"></i> ${d.solucion_disponible ? 'Ver solución' : 'Rendirme y ver solución'}</button>` : ''}
-              <span style="flex:1"></span>
-              <span class="des-ayuda" id="des-contadores"></span>
+            <span style="flex:1"></span>
+
+            <button class="des-btn primario" id="des-cab-abrir-editor" title="Crear archivo en el espacio de trabajo y resolver en el editor de Prig"><i class="fa-solid fa-code"></i> Resolver en el Editor</button>
+            <button class="des-btn morado" id="des-cab-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar con IA</button>
+            ${original ? `<button class="des-btn" id="des-traducir">${d.enunciado_es && estado.idioma === 'es' ? '<i class="fa-solid fa-language"></i> Ver original' : '<i class="fa-solid fa-language"></i> Traducir al español'}</button>` : ''}
+            ${(d.origen || {}).otras_funciones && d.origen.otras_funciones.length ? `<select id="des-otra-funcion" class="des-campo" style="width:auto;" title="Otra función del mismo archivo"><option value="">Otra función…</option>${d.origen.otras_funciones.map(f => `<option>${esc(f)}</option>`).join('')}</select>` : ''}
+          </div>
+
+          <!-- CONTENEDOR PRINCIPAL: LADO A LADO O APILADO -->
+          <div id="des-contenedor-principal" class="${estado.disposicion === 'paralelo' ? 'des-contenedor-paralelo' : 'des-contenedor-apilado'} ${estado.ocultarDesafio ? 'desafio-oculto' : ''}">
+
+            <!-- COLUMNA IZQUIERDA: TEXTO DEL DESAFÍO Y RAZONAMIENTO -->
+            <div class="des-col-desafio">
+              <section class="des-seccion ${esResuelto ? 'resuelto' : ''} ${estado.seccionesColapsadas.has('desafio') ? 'colapsada' : ''}" id="des-sec-desafio">
+                <div class="des-seccion-titulo">
+                  <span class="num">1</span> Desafío <span style="flex:1"></span>
+                  <span class="des-mini" style="color:${ce};"><i class="fa-solid ${ie}"></i> ${en}</span>
+                  <button class="des-sec-toggle-btn" data-sec="desafio" title="Minimizar / Expandir sección"><i class="fa-solid ${estado.seccionesColapsadas.has('desafio') ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                </div>
+                <div class="des-seccion-cuerpo">
+                  <div class="des-fila" style="margin-bottom:6px;">
+                    <span class="des-mini" style="color:${fc};"><i class="fa-solid ${fi}"></i> ${esc((d.origen || {}).nombre || fn)}</span>
+                    <span class="des-mini">${esc(d.nivel || '')}</span>
+                    ${(d.conceptos || []).slice(0, 5).map(x => `<span class="des-mini">${esc(x)}</span>`).join('')}
+                  </div>
+                  <div class="des-titulo">${esc(d.titulo)}</div>
+                  ${(d.origen || {}).bloque ? `<div class="des-ayuda"><i class="fa-solid fa-route"></i> Bloque «${esc(d.origen.bloque)}» de tu plan</div>` : ''}
+                  ${d.teoria ? `<details style="margin:8px 0;"><summary class="des-ayuda" style="cursor:pointer;"><i class="fa-solid fa-book-open"></i> Teoría del concepto</summary><div class="des-md" id="des-teoria"></div></details>` : ''}
+                  <div class="des-md" id="des-enunciado"></div>
+                  ${d.origen && d.origen.atribucion ? `<div class="des-ayuda" style="margin-top:10px; border-top:1px dashed var(--border-color); padding-top:6px;">
+                    <i class="fa-solid fa-scale-balanced"></i> ${esc(d.origen.atribucion)} ${d.origen.url ? `<a href="${esc(d.origen.url)}" target="_blank" rel="noopener noreferrer">Ver original</a>` : ''}
+                    ${d.origen.nota ? `<div style="margin-top:4px; color:var(--accent-yellow);"><i class="fa-solid fa-circle-info"></i> ${esc(d.origen.nota)}</div>` : ''}</div>` : ''}
+                </div>
+              </section>
+
+              <section class="des-seccion ${estado.seccionesColapsadas.has('razonamiento') ? 'colapsada' : ''}" id="des-sec-razonamiento">
+                <div class="des-seccion-titulo">
+                  <span class="num">2</span> Razonar antes de programar
+                  <span style="flex:1"></span>
+                  <button class="des-sec-toggle-btn" data-sec="razonamiento" title="Minimizar / Expandir sección"><i class="fa-solid ${estado.seccionesColapsadas.has('razonamiento') ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                </div>
+                <div class="des-seccion-cuerpo">
+                  <div id="des-razonamiento"></div>
+                </div>
+              </section>
+
+              <section class="des-seccion ${estado.seccionesColapsadas.has('plan') ? 'colapsada' : ''}" id="des-sec-plan">
+                <div class="des-seccion-titulo">
+                  <span class="num">3</span> Tu plan
+                  <span class="des-ayuda" style="text-transform:none; letter-spacing:0; margin-left:6px;">(opcional)</span>
+                  <span style="flex:1"></span>
+                  <button class="des-sec-toggle-btn" data-sec="plan" title="Minimizar / Expandir sección"><i class="fa-solid ${estado.seccionesColapsadas.has('plan') ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                </div>
+                <div class="des-seccion-cuerpo">
+                  <details ${p.plan ? 'open' : ''}>
+                    <summary class="des-ayuda" style="cursor:pointer; margin-bottom:4px;">Escribe con tus palabras cómo lo resolverías</summary>
+                    <textarea id="des-plan" class="des-campo" rows="4" style="margin-top:6px;" placeholder="1. Recorro la lista…&#10;2. Si encuentro…&#10;3. Al final devuelvo…">${esc(p.plan || '')}</textarea>
+                    <div class="des-fila" style="margin-top:6px;"><button class="des-btn morado" id="des-plan-revisar"><i class="fa-solid fa-user-graduate"></i> Revisar mi plan con el tutor</button></div>
+                    <div class="des-md" id="des-plan-respuesta" style="margin-top:8px;"></div>
+                  </details>
+                </div>
+              </section>
             </div>
-            <div id="des-resultado" style="margin-top:10px;"></div>
-            <div id="des-pistas" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
-            <div id="des-solucion-caja" style="margin-top:8px;"></div>
-          </section>`;
+
+            <!-- COLUMNA DERECHA: PÁGINAS DE CÓDIGO Y COMPROBACIÓN -->
+            <div class="des-col-codigo">
+              <section class="des-seccion ${estado.seccionesColapsadas.has('paginas') ? 'colapsada' : ''}" id="des-sec-paginas">
+                <div class="des-seccion-titulo">
+                  <span class="num">4</span> Páginas de código <span style="flex:1"></span>
+                  <button class="des-btn primario" id="des-abrir-editor" title="Abrir y programar este archivo en el editor de Prig"><i class="fa-solid fa-code"></i> Editor externo</button>
+                  <button class="des-btn" id="des-pagina-nueva"><i class="fa-solid fa-file-circle-plus"></i> Nueva</button>
+                  <button class="des-btn" id="des-pagina-importar"><i class="fa-solid fa-file-import"></i> Importar</button>
+                  <input type="file" id="des-pagina-archivo" accept=".py,.cpp,.hpp,.h,.cc,.cxx,.c,text/x-python,text/x-c,text/x-c++" multiple hidden>
+                  <button class="des-sec-toggle-btn" data-sec="paginas" title="Minimizar / Expandir sección"><i class="fa-solid ${estado.seccionesColapsadas.has('paginas') ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                </div>
+                <div class="des-seccion-cuerpo">
+                  <div class="des-ayuda">${((estado.d && estado.d.lenguaje) || estado.lenguaje) === 'cpp'
+                    ? 'Cada página es un archivo de C++ o cabecera (.h/.hpp). Úsalas con <code>#include "archivo.h"</code>.'
+                    : `Cada página es un archivo de Python. Úsalas con <code>import</code>: ${estado.paginas.length > 1 ? `por ejemplo <code>from ${esc(estado.paginas[0].nombre.replace(/\.py$/, ''))} import …</code>` : 'si creas <code>utiles.py</code>, escribe <code>from utiles import …</code>'}.`}
+                    <b>Mayús+Enter</b> ejecuta · <b>Ctrl+Enter</b> comprueba <span id="des-guardado"></span></div>
+                  <div id="des-paginas"></div>
+                </div>
+              </section>
+
+              <section class="des-seccion ${estado.seccionesColapsadas.has('comprobar') ? 'colapsada' : ''}" id="des-sec-comprobar">
+                <div class="des-seccion-titulo">
+                  <span class="num">5</span> Comprobar y Pruebas
+                  <span style="flex:1"></span>
+                  <button class="des-sec-toggle-btn" data-sec="comprobar" title="Minimizar / Expandir sección"><i class="fa-solid ${estado.seccionesColapsadas.has('comprobar') ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                </div>
+                <div class="des-seccion-cuerpo">
+                  <div class="des-fila">
+                    ${d.comprobacion && d.comprobacion.tipo !== 'ninguna'
+                      ? `<button class="des-btn primario" id="des-comprobar"><i class="fa-solid fa-circle-check"></i> Comprobar con ${d.comprobacion.pruebas || ''} pruebas</button>`
+                      : '<span class="des-ayuda"><i class="fa-solid fa-circle-info"></i> Este desafío no tiene pruebas automáticas: ejecuta tu página y compara el resultado.</span>'}
+                    <button class="des-btn morado" id="des-evaluar-ia" title="Evaluar código y salida con el modelo IA"><i class="fa-solid fa-wand-magic-sparkles"></i> Evaluar con IA</button>
+                    <button class="des-btn amarillo" id="des-pista" ${(p.pistas || 0) >= 3 ? 'disabled' : ''}><i class="fa-solid fa-lightbulb"></i> Pista ${(p.pistas || 0) ? `(${Math.min(p.pistas, 3)}/3)` : ''}</button>
+                    ${d.pistas_fuente ? '<button class="des-btn amarillo" id="des-pista-autor"><i class="fa-solid fa-book"></i> Pistas del autor</button>' : ''}
+                    ${d.comprobacion && d.comprobacion.tipo !== 'ninguna' ? `<button class="des-btn rojo" id="des-solucion"><i class="fa-solid fa-flag"></i> ${d.solucion_disponible ? 'Ver solución' : 'Rendirme y ver solución'}</button>` : ''}
+                    <span style="flex:1"></span>
+                    <span class="des-ayuda" id="des-contadores"></span>
+                  </div>
+                  <div id="des-resultado" style="margin-top:10px;"></div>
+                  <div id="des-pistas" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                  <div id="des-solucion-caja" style="margin-top:8px;"></div>
+                </div>
+              </section>
+            </div>
+          </div>`;
 
         pintarEnunciado();
         pintarRazonamiento();
@@ -1101,6 +1497,7 @@
         pintarResultado();
         conectarHoja();
         if (estado.solucion) pintarSolucion(estado.solucion);
+        ajustarEditores();
     }
 
     function pintarVacio(c) {
@@ -1711,6 +2108,8 @@
         on('des-pista', () => pedirPista(false));
         on('des-pista-autor', () => pedirPista(true));
         on('des-solucion', verSolucion);
+        on('des-cab-fav', () => toggleFavorito(d.id));
+        on('des-cab-grupo', () => cambiarGrupoDesafio(d.id, estado.grupos[d.id] || ''));
         on('des-cab-abrir-editor', () => abrirEnEditor(d));
         on('des-abrir-editor', () => abrirEnEditor(d));
         on('des-cab-evaluar-ia', () => {
@@ -1718,6 +2117,61 @@
         });
         on('des-evaluar-ia', () => {
             if (window.desafiosEvaluador) window.desafiosEvaluador.evaluarDesafio(d);
+        });
+
+        // Controles de barra de herramientas y disposición
+        on('des-btn-toggle-sidebar', () => toggleSidebar());
+
+        on('des-disposicion-paralelo', () => {
+            estado.disposicion = 'paralelo';
+            guardarLocal('prig_desafios_disposicion', 'paralelo');
+            const cont = $('des-contenedor-principal');
+            if (cont) cont.className = `des-contenedor-paralelo ${estado.ocultarDesafio ? 'desafio-oculto' : ''}`;
+            const bp = $('des-disposicion-paralelo'), ba = $('des-disposicion-apilado');
+            if (bp) bp.classList.add('activo');
+            if (ba) ba.classList.remove('activo');
+            ajustarEditores();
+        });
+
+        on('des-disposicion-apilado', () => {
+            estado.disposicion = 'apilado';
+            guardarLocal('prig_desafios_disposicion', 'apilado');
+            const cont = $('des-contenedor-principal');
+            if (cont) cont.className = `des-contenedor-apilado ${estado.ocultarDesafio ? 'desafio-oculto' : ''}`;
+            const bp = $('des-disposicion-paralelo'), ba = $('des-disposicion-apilado');
+            if (bp) bp.classList.remove('activo');
+            if (ba) ba.classList.add('activo');
+            ajustarEditores();
+        });
+
+        on('des-btn-toggle-desafio', () => {
+            estado.ocultarDesafio = !estado.ocultarDesafio;
+            guardarLocal('prig_desafios_ocultar_desafio', estado.ocultarDesafio ? '1' : '0');
+            const cont = $('des-contenedor-principal');
+            if (cont) cont.classList.toggle('desafio-oculto', estado.ocultarDesafio);
+            const b = $('des-btn-toggle-desafio');
+            if (b) {
+                b.className = `des-btn ${estado.ocultarDesafio ? 'amarillo' : ''}`;
+                b.innerHTML = `<i class="fa-solid ${estado.ocultarDesafio ? 'fa-eye' : 'fa-eye-slash'}"></i> <span>${estado.ocultarDesafio ? 'Mostrar desafío' : 'Ocultar desafío'}</span>`;
+                b.title = estado.ocultarDesafio ? 'Mostrar el texto del desafío y razonamiento' : 'Ocultar el texto del desafío para tener todo el espacio para el código';
+            }
+            ajustarEditores();
+        });
+
+        document.querySelectorAll('.des-sec-toggle-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const secId = btn.dataset.sec;
+                const sec = $(`des-sec-${secId}`);
+                if (!sec) return;
+                const colapsada = sec.classList.toggle('colapsada');
+                if (colapsada) estado.seccionesColapsadas.add(secId);
+                else estado.seccionesColapsadas.delete(secId);
+                guardarLocal('prig_desafios_colapsadas', JSON.stringify([...estado.seccionesColapsadas]));
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = `fa-solid ${colapsada ? 'fa-chevron-down' : 'fa-chevron-up'}`;
+                ajustarEditores();
+            };
         });
     }
 

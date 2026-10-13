@@ -226,49 +226,66 @@ class TestGenerateResponse(unittest.TestCase):
             self.assertEqual(p.call_count, 1)
 
 
+class SistemaFalso:
+    """ Procesos y núcleos de mentira para el fijador: apunta a qué núcleos se fija cada pid o hilo """
+
+    def __init__(self, procesos, hilos=None, todos=range(12)):
+        self._procesos, self._hilos, self._todos = procesos, hilos or {}, list(todos)
+        self.fijados = {}
+
+    def procesos(self):
+        return self._procesos
+
+    def hilos(self, pid):
+        return self._hilos.get(pid, [])
+
+    def fijar(self, pid, cpus):
+        self.fijados[pid] = list(cpus)
+
+    def afinidad_propia(self):
+        return self._todos
+
+    def uid(self):
+        return os.getuid()
+
+    def pids(self):
+        return [p[0] for p in self._procesos]
+
+
 class TestFijadorCPU(unittest.TestCase):
     def test_solo_si_el_modelo_esta_entero_en_gpu(self):
         entero, partido = "a" * 64, "b" * 64
-
-        class Proc:
-            def __init__(self, pid, digest):
-                self.pid = pid
-                self.info = {"pid": pid, "cmdline": ["/x/llama-server", "--model", f"/m/blobs/sha256-{digest}"],
-                             "uids": mock.Mock(real=os.getuid())}
-
-            def threads(self):
-                return [mock.Mock(id=self.pid * 10)]
-        procesos = [Proc(101, entero), Proc(202, partido)]
-        f = rt.FijadorCPU()
-        fijados = {}
+        sistema = SistemaFalso([(101, ["/x/llama-server", "--model", f"/m/blobs/sha256-{entero}"], os.getuid()),
+                                (202, ["/x/llama-server", "--model", f"/m/blobs/sha256-{partido}"], os.getuid())],
+                               hilos={101: [1010], 202: [2020]})
+        f = rt.FijadorCPU(sistema=sistema)
         with mock.patch.object(rt, "nucleos_eficientes", return_value=[8, 9, 10, 11]), \
-                mock.patch.object(f, "_modelos_en_gpu", return_value={entero: True, partido: False}), \
-                mock.patch("psutil.process_iter", return_value=procesos), \
-                mock.patch("psutil.pids", return_value=[101, 202]), \
-                mock.patch.object(rt.os, "sched_getaffinity", return_value=set(range(12))), \
-                mock.patch.object(rt.os, "sched_setaffinity", side_effect=lambda pid, cpus: fijados.__setitem__(pid, list(cpus))):
+                mock.patch.object(f, "_modelos_en_gpu", return_value={entero: True, partido: False}):
             r = f.aplicar(forzar=True)
         self.assertTrue(r["aplicado"])
-        self.assertEqual(fijados[101], [8, 9, 10, 11])
-        self.assertEqual(fijados[1010], [8, 9, 10, 11])          # también sus hilos
-        self.assertEqual(fijados[202], list(range(12)))          # el que no cabe en la GPU, todos los núcleos
+        self.assertEqual(sistema.fijados[101], [8, 9, 10, 11])
+        self.assertEqual(sistema.fijados[1010], [8, 9, 10, 11])          # también sus hilos
+        self.assertEqual(sistema.fijados[202], list(range(12)))          # el que no cabe en la GPU, todos los núcleos
 
     def test_no_toca_el_motor_moe(self):
         """ El motor MoE usa el mismo GGUF que un modelo de Ollama y fija él sus núcleos P: antes se le
         ponían todos los núcleos y rendía la mitad """
         blob = "c" * 64
-        proc = mock.Mock(pid=303, info={"pid": 303, "uids": mock.Mock(real=os.getuid()),
-                                        "cmdline": ["/home/u/Prig/lib/moe/llama-server", "-m", f"/m/blobs/sha256-{blob}"]})
-        f = rt.FijadorCPU()
-        fijados = {}
+        sistema = SistemaFalso([(303, ["/home/u/Prig/lib/moe/llama-server", "-m", f"/m/blobs/sha256-{blob}"], os.getuid())])
+        f = rt.FijadorCPU(sistema=sistema)
         with mock.patch.object(rt, "nucleos_eficientes", return_value=[8, 9, 10, 11]), \
-                mock.patch.object(f, "_modelos_en_gpu", return_value={}), \
-                mock.patch("psutil.process_iter", return_value=[proc]), \
-                mock.patch("psutil.pids", return_value=[303]), \
-                mock.patch.object(rt.os, "sched_getaffinity", return_value=set(range(12))), \
-                mock.patch.object(rt.os, "sched_setaffinity", side_effect=lambda pid, cpus: fijados.__setitem__(pid, list(cpus))):
+                mock.patch.object(f, "_modelos_en_gpu", return_value={}):
             f.aplicar(forzar=True)
-        self.assertEqual(fijados, {})
+        self.assertEqual(sistema.fijados, {})
+
+    def test_procesos_de_otro_usuario_no_se_tocan(self):
+        blob = "d" * 64
+        sistema = SistemaFalso([(404, ["/x/llama-server", "--model", f"/m/blobs/sha256-{blob}"], os.getuid() + 1)])
+        f = rt.FijadorCPU(sistema=sistema)
+        with mock.patch.object(rt, "nucleos_eficientes", return_value=[8, 9, 10, 11]), \
+                mock.patch.object(f, "_modelos_en_gpu", return_value={blob: True}):
+            f.aplicar(forzar=True)
+        self.assertEqual(sistema.fijados, {})
 
     def test_sin_nucleos_de_eficiencia_no_hace_nada(self):
         with mock.patch.object(rt, "nucleos_eficientes", return_value=[]):

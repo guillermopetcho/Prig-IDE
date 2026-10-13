@@ -1,0 +1,44 @@
+[
+ {
+  "id": "ind_15·v",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `delete_item` definida en `backend/book_service.py`?",
+  "prueba": "hueco del grafo: llamada por instancia global (falló 3 de 3)",
+  "base": "ind_15",
+  "modo": "auto"
+ },
+ {
+  "id": "ind_16·v",
+  "pregunta": "¿Qué funciones o métodos (fuera de los tests) llaman a `radiografia` definida en `backend/recursos/gestor.py`?",
+  "prueba": "hueco del grafo: llamada por fábrica",
+  "base": "ind_16",
+  "modo": "auto"
+ },
+ {
+  "id": "f46b5c0819d3·v",
+  "pregunta": "Si cambio el comportamiento de `historial` (en `backend/progreso.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto con función pasada como argumento y lambda",
+  "base": "f46b5c0819d3",
+  "modo": "auto"
+ },
+ {
+  "id": "02bd1db0d170·v",
+  "pregunta": "¿Qué funciones o métodos llaman a `escribir_manifiesto` (definida en `backend/hub/formato.py`)?",
+  "prueba": "llamadores: salida degenerada («...»)",
+  "base": "02bd1db0d170",
+  "modo": "auto"
+ },
+ {
+  "id": "12bb842411c5·v",
+  "pregunta": "Si cambio el comportamiento de `cleanup_all_processes` (en `backend/app.py`), ¿qué endpoints HTTP del backend se ven afectados directa o indirectamente?",
+  "prueba": "impacto: ruta HTTP inventada",
+  "base": "12bb842411c5",
+  "modo": "auto"
+ },
+ {
+  "id": "a84a7fe1bad7·v",
+  "pregunta": "¿Qué funciones o métodos del proyecto leen la clave de configuración `truncar`?",
+  "prueba": "config: la lectora real no está en el grafo (_ajustes)",
+  "base": "a84a7fe1bad7",
+  "modo": "auto"
+ }
+]

@@ -1052,12 +1052,15 @@ class AIChatManager {
     /** Tarjetas de fuente: título del libro, página y acceso al lector */
     renderFuentes(ev) {
         const esc = (t) => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        // Lecturas del catálogo de referencias de ML, además de los fragmentos de la biblioteca propia
+        const lecturas = (window.ReferenciasML && ev.referencias && ev.referencias.length)
+            ? window.ReferenciasML.chipsHtml(ev.referencias) : '';
 
         if (!ev.found || !ev.chunks || ev.chunks.length === 0) {
             return `<div style="background: rgba(249,226,175,0.10); border:1px solid rgba(249,226,175,0.3); border-radius:6px; padding:8px 10px; font-size:11px; color: var(--accent-yellow); margin-bottom:10px;">
                 <i class="fa-solid fa-circle-info"></i> No encontré nada sobre esto en tu biblioteca.
                 Comprueba que el material esté indexado en <strong>Biblioteca</strong>.
-            </div>`;
+            </div>${lecturas}`;
         }
 
         const tarjetas = ev.chunks.map(ch => `
@@ -1075,6 +1078,7 @@ class AIChatManager {
                 FUENTES DE TU BIBLIOTECA · ${t.estimated_tokens || 0}/${t.token_budget || 0} tokens
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:5px;">${tarjetas}</div>
+            ${lecturas}
         </div>`;
     }
 
@@ -1379,6 +1383,11 @@ class AIChatManager {
                         const el = asegurar('msg-banco', '<div style="font-size:11px; color:var(--accent-green); margin:2px 0 6px;"><i class="fa-solid fa-database"></i> <span></span></div>');
                         if (b.error) {
                             el.querySelector('span').textContent = `Banco del proyecto no disponible: ${b.error}`;
+                        } else if (b.modo === 'unidad') {
+                            // Modo unidad: se restauró la lectura guardada de la parte del proyecto que toca
+                            el.querySelector('span').textContent = `Banco «${b.proyecto}»: lectura de «${b.unidad}» restaurada; el resto del proyecto, con la consola`;
+                            el.title = `El modelo tiene esa unidad leída completa (estado guardado del motor) y consulta lo demás con herramientas.` +
+                                (b.motivo ? `\nModo: ${b.motivo}` : '');
                         } else {
                             const partes = [`${b.fragmentos} fragmentos de ${(b.archivos || []).length} archivos`,
                                             `${(b.tokens || 0).toLocaleString('es')} tokens`];
@@ -1386,9 +1395,18 @@ class AIChatManager {
                             if (b.conocimiento) partes.push(`${b.conocimiento} nota(s) de memoria`);
                             if (b.resoluciones) partes.push(`${b.resoluciones} resolución(es) parecida(s)`);
                             if (b.inicial) partes.push('proyecto indexado ahora');
+                            if (b.hechos_caracteres) partes.push('hechos del banco');
                             el.querySelector('span').textContent = `Banco «${b.proyecto}»: ${partes.join(' · ')}`;
                             el.title = `Archivos: ${(b.archivos || []).join(', ')}\nMapa: ${b.mapa_tokens} tokens · búsqueda ${b.segundos} s` +
-                                (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)');
+                                (b.vectores ? ' · con búsqueda semántica' : ' · solo por palabras (índice semántico pendiente)') +
+                                (b.motivo ? `\nModo general: ${b.motivo}` : '');
+                        }
+                    }
+                    else if (ev.t === 'referencias') {
+                        // Libros, papers y formularios del catálogo relacionados con la pregunta (Biblioteca →
+                        // Referencias ML): van debajo de la respuesta, como bibliografía, y abren la ficha
+                        if (window.ReferenciasML && !msgEl.querySelector('.msg-referencias')) {
+                            contentEl.insertAdjacentHTML('afterend', window.ReferenciasML.chipsHtml(ev.v || []));
                         }
                     }
                     else if (ev.t === 'aviso') { avisos.push(ev.v); }

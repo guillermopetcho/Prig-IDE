@@ -1,0 +1,66 @@
+[
+ {
+  "id": "E8a_B3·d1",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B7·d1",
+  "prueba": "E8a",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B7",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·d2",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B7·d2",
+  "prueba": "E8a",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B7",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B3·d3",
+  "prueba": "E8a",
+  "objetivo": "B3",
+  "pregunta": "Revisa `FileManager.is_path_allowed` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B3",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_B7·d3",
+  "prueba": "E8a",
+  "objetivo": "B7",
+  "pregunta": "Revisa `BancoProyecto.conectar` en `backend/banco_proyecto.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_B7",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C2·d1",
+  "prueba": "E8a",
+  "objetivo": "C2",
+  "pregunta": "Revisa `FileManager.resolve` en `backend/file_manager.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C2",
+  "modo": "auto"
+ },
+ {
+  "id": "E8a_C3·d1",
+  "prueba": "E8a",
+  "objetivo": "C3",
+  "pregunta": "Revisa `perfil` en `backend/inicio.py`. ¿Tiene algún error de programación? Si lo tiene, di en qué línea, qué hace mal y un caso concreto en el que falla. Si no lo tiene, dilo.",
+  "base": "E8a_C3",
+  "modo": "auto"
+ }
+]

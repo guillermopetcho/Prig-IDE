@@ -15,8 +15,6 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
-import uvicorn
-
 
 def obtener_navegador_ejecutable() -> Optional[str]:
     """ Encuentra un binario de navegador web real y ejecutable en el sistema. """
@@ -92,8 +90,13 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 # El hilo del backend guarda aquí su excepción: si muere en silencio, la ventana
 # nunca aparece y el usuario se queda sin ninguna pista de por qué.
 _backend_error = {"exc": None}
-_server: "Optional[uvicorn.Server]" = None
+_server = None
 _backend_thread: "Optional[threading.Thread]" = None
+# Modo con el servidor nativo en Rust: main.py es el dueño de los dos procesos (los arranca, los vigila y los cierra)
+RUST_SERVER = os.path.join(ROOT, "backend-rust", "target", "release", "prig-server")
+_rust_proc = None
+_python_proc = None
+_puertos_duales = (None, None)        # (puerto de Rust, puerto de Python)
 _shutting_down = False
 _shutdown_lock = threading.Lock()
 _is_server_owner = False
@@ -137,9 +140,184 @@ def choose_port(host: str) -> tuple:
     )
 
 
+# ===========================================================================
+# Servidor nativo en Rust + backend de Python
+# ===========================================================================
+
+def _morir_con_prig():
+    """ Para los procesos hijos: si main.py muere de golpe, el kernel les manda SIGTERM (PR_SET_PDEATHSIG) y no
+    quedan servidores sueltos ocupando el puerto o la VRAM """
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, signal.SIGTERM)  # 1 = PR_SET_PDEATHSIG
+    except Exception:
+        pass
+
+
+def usar_rust() -> bool:
+    if os.environ.get("PRIG_SIN_RUST", "").strip().lower() in ("1", "true", "si", "sí", "yes"):
+        return False
+    return os.path.isfile(RUST_SERVER) and os.access(RUST_SERVER, os.X_OK)
+
+
+def _primer_puerto_libre(host: str, desde: int, excluir: int) -> Optional[int]:
+    for p in range(desde, desde + PORT_RANGE):
+        if p != excluir and port_is_free(host, p):
+            return p
+    return None
+
+
+def limpiar_huerfanos_de_sesiones_viejas():
+    """ Servidores de Prig que quedaron sueltos de una sesión anterior (su padre ya es init/systemd): el de Rust
+    (antes run.sh lo lanzaba con `&` y nadie lo cerraba; servía la interfaz sin Python detrás, con un binario viejo) y
+    el de Python de respaldo. Uno arrancado a mano desde una terminal no se toca. """
+    try:
+        import psutil
+    except ImportError:
+        return
+    rust = os.path.realpath(RUST_SERVER)
+    for proc in psutil.process_iter(["pid", "ppid", "exe", "cmdline"]):
+        try:
+            cmd = proc.info["cmdline"] or []
+            exe = (proc.info["exe"] or "").replace(" (deleted)", "")
+            es_rust = bool(exe) and os.path.realpath(exe) == rust or (cmd[:1] and os.path.realpath(cmd[0]) == rust)
+            es_python = "uvicorn" in " ".join(cmd) and "backend.app:app" in cmd and proc.cwd() == ROOT
+            if not (es_rust or es_python):
+                continue
+            padre = psutil.Process(proc.info["ppid"]) if proc.info["ppid"] else None
+            if padre is not None and padre.pid != 1 and padre.name() not in ("systemd", "init"):
+                continue
+            print(f"🧹 Cerrando un servidor de Prig que quedó suelto de una sesión anterior (pid {proc.pid}).")
+            proc.terminate()
+            try:
+                proc.wait(timeout=8)
+            except psutil.TimeoutExpired:
+                proc.kill()
+        except (psutil.Error, OSError, IndexError):
+            continue
+
+
+def _lanzar_python(puerto: int):
+    import subprocess
+    env = os.environ.copy()
+    backend_dir = os.path.join(ROOT, "backend")
+    env["PYTHONPATH"] = backend_dir + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    return subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", HOST, "--port", str(puerto), "--log-level", "error"],
+        cwd=ROOT, env=env, stdin=subprocess.DEVNULL, preexec_fn=_morir_con_prig,
+    )
+
+
+def _lanzar_rust(puerto: int, puerto_python: int):
+    import subprocess
+    registro = open(os.path.join(os.path.expanduser("~"), ".prig_rust_server.log"), "ab")
+    env = os.environ.copy()
+    env.setdefault("RUST_LOG", "info")
+    return subprocess.Popen(
+        [RUST_SERVER, "--port", str(puerto), "--fallback-port", str(puerto_python)],
+        cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=registro, stderr=registro, preexec_fn=_morir_con_prig,
+    )
+
+
+def _responde(url: str, timeout: float = 1.0) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout):
+            return True
+    except urllib.error.HTTPError:
+        return True
+    except Exception:
+        return False
+
+
+def _esperar_proceso(url: str, proc, timeout: float) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return False
+        if _responde(url):
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def _vigilar_servidores():
+    """ Si el backend de Python o el servidor de Rust se caen con Prig abierto, se vuelven a arrancar (mientras
+    tanto, el proxy de Rust hace esperar a las peticiones hasta un minuto en lugar de fallar) """
+    global _rust_proc, _python_proc
+    reinicios = []
+    puerto_rust, puerto_python = _puertos_duales
+    while not _shutting_down:
+        time.sleep(1.0)
+        if _shutting_down:
+            break
+        for nombre in ("python", "rust"):
+            proc = _python_proc if nombre == "python" else _rust_proc
+            if proc is None or proc.poll() is None:
+                continue
+            ahora = time.time()
+            reinicios = [t for t in reinicios if ahora - t < 60]
+            if len(reinicios) >= 5:
+                print(f"❌ El servidor de {nombre} se cayó 5 veces en un minuto: no se reinicia más.", file=sys.stderr)
+                continue
+            reinicios.append(ahora)
+            print(f"⚠️ El servidor de {nombre} terminó (código {proc.returncode}): se vuelve a arrancar.", file=sys.stderr)
+            try:
+                if nombre == "python":
+                    _python_proc = _lanzar_python(puerto_python)
+                else:
+                    _rust_proc = _lanzar_rust(puerto_rust, puerto_python)
+            except Exception as e:
+                print(f"⚠️ No se pudo volver a arrancar el servidor de {nombre}: {e}", file=sys.stderr)
+
+
+def _terminar(proc, espera: float):
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=espera)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def arrancar_dual(puerto: int) -> bool:
+    """ Rust en `puerto` (la interfaz y lo que atiende rápido) y Python en un puerto libre desde 8001 (todo lo demás,
+    por el proxy de Rust). Devuelve True cuando los dos responden. """
+    global _rust_proc, _python_proc, _puertos_duales
+    puerto_python = _primer_puerto_libre(HOST, puerto + 1, puerto)
+    if puerto_python is None:
+        print("⚠️ No hay puerto libre para el backend de Python: se arranca solo Python.", file=sys.stderr)
+        return False
+    _puertos_duales = (puerto, puerto_python)
+    _python_proc = _lanzar_python(puerto_python)
+    _rust_proc = _lanzar_rust(puerto, puerto_python)
+    if not _esperar_proceso(f"http://{HOST}:{puerto}/api/health", _rust_proc, 15.0):
+        print("⚠️ El servidor nativo en Rust no arrancó (detalle en ~/.prig_rust_server.log): se usa solo Python.",
+              file=sys.stderr)
+        _terminar(_rust_proc, 3.0)
+        _rust_proc = None
+        _terminar(_python_proc, 15.0)
+        _python_proc = None
+        return False
+    print("⚡ Servidor nativo en Rust activo; esperando al backend de Python…")
+    # La ventana se abre cuando Python responde: si no, la interfaz cargaba con medio programa dando 502
+    if not _esperar_proceso(f"http://{HOST}:{puerto_python}/api/workspace", _python_proc, 120.0):
+        print("❌ El backend de Python no arrancó.", file=sys.stderr)
+        _terminar(_rust_proc, 3.0)
+        _terminar(_python_proc, 15.0)
+        _rust_proc = _python_proc = None
+        return False
+    threading.Thread(target=_vigilar_servidores, daemon=True).start()
+    return True
+
+
 def start_backend(port: int):
     global _server
     try:
+        import uvicorn
         sys.path.append(os.path.join(ROOT, "backend"))
         from backend.app import app
         config = uvicorn.Config(app, host=HOST, port=port, log_level="error")
@@ -152,13 +330,22 @@ def start_backend(port: int):
 
 def shutdown_prig(signum=None, frame=None):
     """ Detiene de forma ordenada el servidor, cancela análisis y apaga todos los procesos """
-    global _shutting_down
+    global _shutting_down, _rust_proc, _python_proc
     with _shutdown_lock:
         if _shutting_down:
             return
         _shutting_down = True
 
-    if _is_server_owner:
+    if _rust_proc is not None or _python_proc is not None:
+        print("\n🛑 Cerrando Prig IDE: apagando análisis y procesos en ejecución...")
+        # Primero Rust (deja de recibir peticiones) y después Python, con tiempo para su limpieza: soltar los
+        # modelos de la GPU, parar el motor MoE y las ejecuciones en curso (cleanup_all_processes)
+        _terminar(_rust_proc, 3.0)
+        _rust_proc = None
+        _terminar(_python_proc, 20.0)
+        _python_proc = None
+        print("✅ Procesos y análisis apagados correctamente.")
+    elif _is_server_owner:
         print("\n🛑 Cerrando Prig IDE: apagando análisis y procesos en ejecución...")
         if _server is not None:
             _server.should_exit = True
@@ -369,6 +556,8 @@ def main():
         pass
     atexit.register(shutdown_prig)
 
+    limpiar_huerfanos_de_sesiones_viejas()
+
     try:
         port, ya_en_marcha = choose_port(HOST)
     except RuntimeError as e:
@@ -377,7 +566,9 @@ def main():
 
     target_url = f"http://{HOST}:{port}"
 
-    if not ya_en_marcha:
+    if not ya_en_marcha and usar_rust() and arrancar_dual(port):
+        _is_server_owner = True
+    elif not ya_en_marcha:
         _is_server_owner = True
         _backend_thread = threading.Thread(target=start_backend, args=(port,), daemon=True)
         _backend_thread.start()

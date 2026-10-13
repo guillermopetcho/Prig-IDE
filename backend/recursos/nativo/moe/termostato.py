@@ -4,7 +4,7 @@ Sirve para compilar el motor MoE sin calentar el equipo (sin control, compilar C
 a 90–97 °C). Se agrupan los procesos por sesión, no por grupo: ninja lanza cada compilación en
 su propio grupo de procesos.
 
-    OBJETIVO=72 python3 termostato.py comando args...
+    OBJETIVO=72 <Prig>/.venv/bin/python termostato.py comando args...
 """
 import glob
 import os

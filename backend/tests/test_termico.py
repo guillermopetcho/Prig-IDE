@@ -416,8 +416,8 @@ class PruebaSensores(unittest.TestCase):
         fans = {"acpi_fan": [Fan("", 2204)], "hp": [Fan("", 2204), Fan("", 2000)]}
         with mock.patch.object(termico, "_nvidia", return_value=[
                 {"id": "gpu0", "tipo": "gpu", "nombre": "RTX", "temp": 58.0}]), \
-                mock.patch.object(termico, "_psutil_temps", return_value=temps), \
-                mock.patch.object(termico, "_psutil_fans", return_value=fans):
+                mock.patch.object(termico, "_temperaturas", return_value=temps), \
+                mock.patch.object(termico, "_ventiladores", return_value=fans):
             l = termico.leer_sensores()
         por_tipo = {c["tipo"]: c for c in l["componentes"]}
         self.assertEqual(por_tipo["cpu"]["temp"], 76.0)
@@ -432,8 +432,8 @@ class PruebaSensores(unittest.TestCase):
         temps = {"k10temp": [Sensor("Tctl", 66.5, None, None)],
                  "amdgpu": [Sensor("edge", 55.0, 100.0, 105.0)]}
         with mock.patch.object(termico, "_nvidia", return_value=[]), \
-                mock.patch.object(termico, "_psutil_temps", return_value=temps), \
-                mock.patch.object(termico, "_psutil_fans", return_value={}):
+                mock.patch.object(termico, "_temperaturas", return_value=temps), \
+                mock.patch.object(termico, "_ventiladores", return_value={}):
             l = termico.leer_sensores()
         self.assertEqual(termico.temp_cpu(l), 66.5)
         self.assertEqual(termico.temp_gpu(l), 55.0)
