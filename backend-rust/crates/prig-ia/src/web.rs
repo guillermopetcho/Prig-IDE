@@ -294,3 +294,67 @@ pub fn cache_guardar(dir: &str, consulta: &str, contexto: &str, fuentes: &Valor,
         avisos.push(format!("⚠️ Error guardando en caché de búsqueda: {e}"));
     }
 }
+// ---------------------------------------------------------------------------------------------- buscar
+
+
+/// Resultados de DuckDuckGo (su página «lite»): {title, href, snippet}
+pub fn buscar_ddg(consulta: &str, maximo: usize) -> Vec<Mapa> {
+    let url = std::env::var("PRIG_DDG_URL").ok().filter(|u| !u.is_empty()).unwrap_or_else(|| "https://lite.duckduckgo.com/lite/".into());
+    let r = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()
+        .and_then(|c| c.post(&url).header("User-Agent", AGENTE).form(&[("q", consulta)]).send().ok())
+        .filter(|r| r.status().as_u16() == 200)
+        .and_then(|r| r.text().ok());
+    let Some(html) = r else { return Vec::new() };
+    let doc = scraper::Html::parse_document(&html);
+    let (Ok(sel_a), Ok(sel_td)) = (scraper::Selector::parse("a.result-link"), scraper::Selector::parse("td.result-snippet")) else {
+        return Vec::new();
+    };
+    let enlaces: Vec<_> = doc.select(&sel_a).collect();
+    let resumenes: Vec<_> = doc.select(&sel_td).collect();
+    let texto = |e: &scraper::ElementRef| e.text().map(str::trim).filter(|t| !t.is_empty()).collect::<Vec<_>>().join("");
+    enlaces
+        .iter()
+        .take(maximo)
+        .enumerate()
+        .map(|(i, a)| {
+            let mut href = a.value().attr("href").unwrap_or("").to_string();
+            if href.starts_with("//") {
+                href = format!("https:{href}");
+            }
+            Mapa::new()
+                .con("title", texto(a))
+                .con("href", href)
+                .con("snippet", resumenes.get(i).map(texto).unwrap_or_default())
+        })
+        .collect()
+}
+
+/// `get_web_context(consulta)`: con caché de 24 h, reordenado (documentación oficial primero) y leído
+pub fn contexto_web(consulta: &str) -> (String, Valor) {
+    const MAX: usize = 4;
+    let cache = std::env::current_dir().unwrap_or_default().join(".prig_web_cache").to_string_lossy().into_owned();
+    let _ = std::fs::create_dir_all(&cache);
+    let mut avisos = Vec::new();
+    if let Some((c, f)) = cache_leer(&cache, consulta, 86400.0, &mut avisos) {
+        return (c.texto_py(), f);
+    }
+    let minus = consulta.to_lowercase();
+    let busqueda = if minus.contains("site:") || minus.contains("http") { consulta.to_string() } else { format!("{consulta} official docs documentation") };
+    let mut crudos = buscar_ddg(&busqueda, MAX * 2);
+    if ["ejemplo", "código", "codigo", "implementación", "github"].iter().any(|w| minus.contains(w)) {
+        crudos.extend(buscar_ddg(&format!("{consulta} site:github.com"), MAX * 2));
+    }
+    let resultados = reordenar(consulta, &crudos, MAX);
+    if resultados.is_empty() {
+        return (String::new(), Valor::Lista(vec![]));
+    }
+    let (contexto, fuentes) = contexto(&resultados, 5.0, 2500);
+    let fuentes = Valor::Lista(fuentes);
+    cache_guardar(&cache, consulta, &contexto, &fuentes, &mut avisos);
+    (contexto, fuentes)
+}
+
+

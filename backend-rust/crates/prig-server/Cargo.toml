@@ -24,10 +24,15 @@ uuid = { version = "1", features = ["v4"] }
 prig-aprendizaje = { path = "../prig-aprendizaje" }
 prig-ia = { path = "../prig-ia" }
 prig-recursos = { path = "../prig-recursos" }
+prig-modelos = { path = "../prig-modelos" }
 prig-integrations = { path = "../prig-integrations" }
 prig-biblioteca = { path = "../prig-biblioteca" }
 prig-hardware = { path = "../prig-hardware" }
 banco-core = { path = "../banco-core" }
 regex = "1"
+prig-documentos = { path = "../prig-documentos" }
+# El resaltado de la vista previa de exportación (las mismas versiones que ya trae Typst)
+syntect = { version = "5.3", default-features = false, features = ["default-fancy"] }
+two-face = { version = "0.4.5", default-features = false, features = ["syntect-fancy"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 

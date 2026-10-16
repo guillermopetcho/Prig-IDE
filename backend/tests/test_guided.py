@@ -138,16 +138,6 @@ class TestAprendizajeGuiado(unittest.TestCase):
         self.assertEqual(done_event["path"]["goal"], "Meta Streaming")
 
 
-    def test_endpoint_cancel_guided(self):
-        from fastapi.testclient import TestClient
-        from app import app
-        client = TestClient(app)
-        res = client.post("/api/guided/cancel")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertEqual(data["status"], "cancelled")
-        self.assertIn("active_requests_cancelled", data)
-
     def test_endpoint_generate_stream_empty_topics(self):
         from fastapi.testclient import TestClient
         from app import app

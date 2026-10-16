@@ -202,6 +202,7 @@ where
         }
     }
     let guarda = AlSoltar(cancelar.clone());
+    crate::routes::asistente::apuntar(&cancelar);
     std::thread::spawn(move || {
         let mut emitir = |e: Mapa| {
             let linea = prig_plataforma::json::escribir_compacto(&Valor::Mapa(e)) + "\n";
@@ -352,4 +353,56 @@ pub async fn ia_descargar(State(state): State<AppState>) -> Response {
         Mapa::new().con("ok", true)
     })
     .await
+}
+
+// =========================================================================== Gemini
+
+use prig_ia::gemini;
+
+fn de_gemini(r: Result<Mapa, gemini::ErrorGemini>) -> Response {
+    match r {
+        Ok(m) => json_py(StatusCode::OK, &Valor::Mapa(m)),
+        Err(e) => crate::routes::detalle(StatusCode::BAD_REQUEST, e.0),
+    }
+}
+
+/// `GET /api/gemini/estado`: nunca devuelve la clave, solo si hay una y sus 4 primeros y últimos caracteres
+pub async fn gemini_estado() -> Response {
+    bloque(gemini::estado).await
+}
+
+/// `POST /api/gemini/clave` (`clave`, `acepto_aviso`): se comprueba contra Google antes de guardarla
+pub async fn gemini_guardar(b: Bytes) -> Response {
+    let m = match cuerpo::modelo(&b) {
+        Ok(m) => m,
+        Err(r) => return r,
+    };
+    let c = match cuerpo::tipados(&m, &[("clave", &Tipo::Texto, true), ("acepto_aviso", &Tipo::Booleano, false)]) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let (clave, acepto) = (texto_de(&c, "clave"), c.verdad("acepto_aviso"));
+    tokio::task::spawn_blocking(move || de_gemini(gemini::guardar_clave(&clave, acepto))).await.unwrap_or_else(|_| error_500())
+}
+
+/// `DELETE /api/gemini/clave`
+pub async fn gemini_borrar() -> Response {
+    bloque(gemini::borrar_clave).await
+}
+
+/// `GET /api/gemini/modelos`
+pub async fn gemini_modelos() -> Response {
+    tokio::task::spawn_blocking(|| de_gemini(gemini::listar_modelos(None, true).map(|l| Mapa::new().con("modelos", Valor::Lista(l)))))
+        .await
+        .unwrap_or_else(|_| error_500())
+}
+
+/// `POST /api/ia/gemini`: generar con Gemini por eventos (como `/api/ia/generar`)
+pub async fn ia_gemini(b: Bytes) -> Response {
+    let m = match cuerpo_mapa(&b) {
+        Ok(m) => m,
+        Err(r) => return r,
+    };
+    let (prompt, modelo, sistema, opciones) = (texto_de(&m, "prompt"), texto_de(&m, "model"), texto_de(&m, "system_prompt"), m.mapa("options").cloned());
+    flujo_de_eventos(move |c, emitir| gemini::generar(&prompt, &modelo, &sistema, opciones.as_ref(), c, emitir))
 }

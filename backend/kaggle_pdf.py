@@ -15,7 +15,7 @@ fuentes que trae Typst. Antes era ReportLab con Pygments.
     actual (si el autor cambió la celda, la explicación vieja no se imprime).
 
 Un PDF puede llevar un notebook o todos los de una colección. Lo usan también la
-exportación de repositorios de GitHub (github_lector) y la de carpetas (pdf_exporter).
+exportación de repositorios de GitHub (github_lector) y la de carpetas (prig-server, routes/exportar.rs).
 """
 
 import json

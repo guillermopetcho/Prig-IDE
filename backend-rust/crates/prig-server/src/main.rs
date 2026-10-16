@@ -70,6 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = AppState::new(project_root.clone(), frontend_dir.clone(), assets_dir, fallback_url);
     state.puerto = port;
 
+    // lo que Python preparaba al arrancar (las citas de muestra de las librerías)
+    prig_server::routes::librerias::preparar();
     let app = create_app(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));

@@ -167,16 +167,7 @@ class TestShutdownCleanup(unittest.TestCase):
         self.assertEqual(m14.get("vram_gb"), 9.3)
         self.assertEqual(m14.get("familia"), "Qwen3")
 
-        # Verificar endpoint /api/ai/catalog
-        from fastapi.testclient import TestClient
-        from app import app
-        client = TestClient(app)
-        res = client.get("/api/ai/catalog")
-        self.assertEqual(res.status_code, 200)
-        catalog = res.json().get("catalog", [])
-        names = [m["name"] for m in catalog]
-        self.assertIn("qwen3:14b", names)
-        self.assertTrue(len(catalog) >= 20)
+        # El endpoint /api/ai/catalog es del servidor de Rust (comparador de rutas)
 
     def test_ollama_version_and_update_endpoints(self):
         """ Verifica que /api/ai/ollama/version-info y /api/ai/ollama/update funcionen correctamente """

@@ -2,6 +2,7 @@
 //! (`gestion`) y `buscador_modelos.py` (`buscador`).
 
 pub mod buscador;
+pub mod explorar;
 pub mod gestion;
 pub mod opciones;
 pub mod red;

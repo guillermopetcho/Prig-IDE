@@ -1632,3 +1632,27 @@ body.editor-transparente .editor-panel-razonamiento {
     color: #fff !important;
 }
 
+/* ============================================================
+   LÍNEA ACTIVA MONACO: Forzar transparencia total (respaldo estático)
+   Los estilos dinámicos de sintaxis_personalizada.js amplían estos.
+   Necesario porque Monaco ignora alpha=0 en su API de colores de tema.
+   ============================================================ */
+.monaco-editor .current-line,
+.monaco-editor .view-overlays .current-line,
+.monaco-editor .view-overlays .current-line-both,
+.monaco-editor .lines-content .current-line {
+    background: rgba(0, 0, 0, 0) !important;
+    background-color: rgba(0, 0, 0, 0) !important;
+}
+
+.monaco-editor .margin-view-overlays .current-line-margin,
+.monaco-editor .margin-view-overlays .current-line-margin-both {
+    background: rgba(0, 0, 0, 0) !important;
+    background-color: rgba(0, 0, 0, 0) !important;
+}
+
+/* Atrapar cualquier div interno de overlay con clase que contenga "current" */
+.monaco-editor .view-overlays > div[class*="current"] {
+    background: rgba(0, 0, 0, 0) !important;
+    background-color: rgba(0, 0, 0, 0) !important;
+}

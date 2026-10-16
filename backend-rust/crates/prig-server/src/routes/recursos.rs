@@ -918,3 +918,8 @@ fn aplicar_servidor(raiz: &Path, cambios: &Mapa, reiniciar: bool, forzar: bool) 
         .con("faltan", faltan)
         .con("version", nuevo.get("version").cloned().unwrap_or(Valor::Nulo)))
 }
+
+/// El estado del servidor de Ollama (lo que Prig quiere, lo que tiene y lo que falta), para otras rutas
+pub fn estado_servidor_publico(raiz: &Path) -> Mapa {
+    estado_servidor(raiz, None)
+}

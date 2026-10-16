@@ -104,7 +104,9 @@ class EditorManager {
             colors: {
                 'editor.background': '#00000000',
                 'editorGutter.background': '#00000000',
-                'editor.lineHighlightBackground': 'rgba(255,255,255,0.04)',
+                // Monaco no soporta hex-8 con alpha=0; #00000001 es casi invisible y sí respetado
+                'editor.lineHighlightBackground': '#00000001',
+                'editor.lineHighlightBorder': '#00000001',
                 'editorLineNumber.foreground': '#7f849c',
                 'editorLineNumber.activeForeground': '#00f0ff',
                 'editorIndentGuide.background': 'rgba(255,255,255,0.06)'
@@ -121,7 +123,9 @@ class EditorManager {
                 colors: {
                     'editor.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
                     'editorGutter.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
-                    'editor.lineHighlightBackground': '#2a2d2e',
+                    // Monaco no soporta hex-8 con alpha=0; #00000001 es casi invisible y sí respetado
+                    'editor.lineHighlightBackground': '#00000001',
+                    'editor.lineHighlightBorder': '#00000001',
                     'editorLineNumber.foreground': '#858585',
                     'editorLineNumber.activeForeground': '#cccccc',
                     'editorIndentGuide.background': '#333333'
@@ -212,6 +216,9 @@ class EditorManager {
         if (monaco.languages.registerInlineCompletionsProvider) {
             monaco.languages.registerInlineCompletionsProvider('python', {
                 provideInlineCompletions: async (model, position, context, token) => {
+                    if (typeof window !== 'undefined' && window.isQwenEditorActivo && !window.isQwenEditorActivo()) {
+                        return { items: [] };
+                    }
                     const lineContent = model.getLineContent(position.lineNumber);
                     if (!lineContent.trim() || lineContent.trim().length < 3) {
                         return { items: [] };
@@ -2202,3 +2209,70 @@ window.addEventListener('beforeunload', (e) => {
         return '';
     }
 });
+
+// ============================================================================
+// Control Global: Modelo Qwen en Editor (Activación / Desactivación de análisis)
+// ============================================================================
+window.isQwenEditorActivo = function () {
+    return localStorage.getItem('prig_qwen_editor_activo') !== 'false';
+};
+
+window.alternarQwenEditor = function (activo) {
+    if (typeof activo !== 'boolean') {
+        activo = window.isQwenEditorActivo() ? false : true;
+    }
+    localStorage.setItem('prig_qwen_editor_activo', activo ? 'true' : 'false');
+
+    // 1. Actualizar interruptor cuadradito en la barra superior del editor
+    const chk = document.getElementById('chk-qwen-editor-activo');
+    const badge = document.getElementById('badge-qwen-editor-estado');
+    const lbl = document.getElementById('btn-toggle-qwen-editor');
+    const icono = document.getElementById('icono-qwen-editor');
+
+    if (chk) chk.checked = activo;
+    if (badge) {
+        badge.textContent = activo ? 'ON' : 'OFF';
+        badge.style.background = activo ? 'rgba(166, 227, 161, 0.25)' : 'rgba(243, 139, 168, 0.2)';
+        badge.style.color = activo ? '#a6e3a1' : '#f38ba8';
+    }
+    if (lbl) {
+        lbl.classList.toggle('inactivo', !activo);
+        lbl.title = activo
+            ? 'Qwen está activo: leyendo y analizando el código del editor'
+            : 'Qwen está desactivado: NO analiza el archivo en el editor';
+    }
+    if (icono) {
+        icono.style.color = activo ? '#cba6f7' : 'var(--text-muted, #a6adc8)';
+    }
+
+    // 2. Notificar a EditorRazonamiento
+    if (window.EditorRazonamiento && typeof window.EditorRazonamiento.fijarQwenActivo === 'function') {
+        window.EditorRazonamiento.fijarQwenActivo(activo);
+    }
+
+    // 3. Notificar a DirectorAscii
+    if (window.DIRECTOR_ASCII && typeof window.DIRECTOR_ASCII.fijarQwenActivo === 'function') {
+        window.DIRECTOR_ASCII.fijarQwenActivo(activo);
+    }
+
+    // 4. Sincronizar checkbox secundario en el panel de telemetría si está abierto
+    const chkTele = document.getElementById('chk-qwen-telemetria');
+    if (chkTele) chkTele.checked = activo;
+
+    if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+        window.layoutMgr.mensajeEstado(
+            activo ? '🤖 Qwen: Análisis de código ACTIVADO' : '⏸️ Qwen: Análisis de código DESACTIVADO',
+            2000
+        );
+    }
+};
+
+// Sincronizar estado inicial al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (typeof window.alternarQwenEditor === 'function') {
+            window.alternarQwenEditor(window.isQwenEditorActivo());
+        }
+    }, 150);
+});
+

@@ -13,13 +13,12 @@ import subprocess
 import zipfile
 import requests as requests_lib
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple
-from audio_monitor import audio_monitor
 
 logger = logging.getLogger("prig")
 
@@ -28,8 +27,7 @@ from runner import CodeRunner
 from ai_engine import AIEngine
 from ai_engine.ai_engine_class import explicar_error_motor, fijar_cancelacion
 from book_service import BookService
-from librerias_service import LibreriasService
-from papers_service import PapersService
+import librerias_service
 from knowledge_service import KnowledgeService
 from knowledge_base import KnowledgeBase
 from pack_importer import PackImporter, PackImportError
@@ -66,7 +64,6 @@ from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
 from exercise_store import ExerciseStore
 from guided_learning import GuidedLearningService
-from pdf_exporter import PDFExporter
 from study_plan_engine import (
     StudyPlanEngine, NotebookSafetyLayer, PlanValidator, KnowledgeMap, PracticalCurriculum,
     ExecutableLearningPlan, ChangeRequest, ActionEnum, PlanStatusEnum, DecisionTrace, TraceStep,
@@ -117,8 +114,6 @@ ai_engine = AIEngine()
 # local, no solo a los flujos y al chat: Desafíos, Kaggle, GitHub y el profesor también
 ai_engine.gobernador = recursos_termico.gobernador()
 book_service = BookService()
-librerias_service = LibreriasService(book_service.books_dir)
-papers_service = PapersService()
 # Único punto de indexación y consulta del conocimiento. Comparte carpeta con
 # book_service: los mismos archivos, pero fragmentados y buscables.
 knowledge_service = KnowledgeService(book_service.books_dir)
@@ -380,46 +375,12 @@ class WorkflowRequest(BaseModel):
     nodos: Optional[List[Dict[str, Any]]] = None
     grafo: Optional[Dict[str, Any]] = None
 
-class BookSnippetRequest(BaseModel):
-    book_id: str
-    page: int = 1
-    box: Optional[Dict[str, Any]] = None
-    text: Optional[str] = ""
-    label: Optional[str] = ""
-
-class BookAnalyzeRequest(BaseModel):
-    book_id: str
-    path: Optional[str] = None
-    model: str = "qwen2.5-coder:7b"
-
 class BookImportRequest(BaseModel):
     path: str
     category: Optional[str] = None
 
-@app.get("/api/books/list")
-def list_books(category: Optional[str] = Query(default=None)):
-    items = book_service.list_books(category)
-
-    # Marcar qué elementos están realmente indexados: sin esto el usuario no
-    # distingue entre "está en la carpeta" y "el tutor puede consultarlo".
-    try:
-        indexed_paths = knowledge_service.get_indexed_paths()
-        for item in items:
-            item["indexed"] = os.path.abspath(item.get("path", "")) in indexed_paths
-    except Exception:
-        for item in items:
-            item["indexed"] = None
-
-    return items
-
-@app.get("/api/books/read")
-def read_book(id: str = Query(...)):
-    return book_service.get_book_content(id)
-
-@app.post("/api/books/analyze")
-def analyze_book(req: BookAnalyzeRequest):
-    target = req.path or req.book_id
-    return book_service.analyze_document(target, ai_engine, req.model)
+# La lista, leer, la ficha de IA, los recortes, el lector de PDF y las citas de los libros: servidor de Rust
+# (routes/estante.rs y routes/libros.rs). Importar sigue aquí, con la indexación del conocimiento.
 
 @app.post("/api/books/import")
 def import_book(req: BookImportRequest):
@@ -440,247 +401,18 @@ def import_book(req: BookImportRequest):
     return res
 
 
-class BookDeleteRequest(BaseModel):
-    id: str
-
-@app.post("/api/books/delete")
-def delete_book(req: BookDeleteRequest):
-    """ Elimina un elemento de la biblioteca y lo retira del catálogo de conocimiento """
-    target = book_service._resolve_item(req.id)
-
-    res = book_service.delete_item(req.id)
-    if "error" in res:
-        raise HTTPException(status_code=404, detail=res["error"])
-
-    # Si no se retira también del catálogo, el tutor seguiría citando un libro
-    # que ya no existe en disco.
-    try:
-        res["removed_from_index"] = knowledge_service.remove_by_path(target) if target else False
-    except Exception as err:
-        res["removed_from_index"] = False
-        res["index_error"] = str(err)
-
-    return res
-
-
-@app.get("/api/books/metadata")
-def get_book_metadata_by_query(id: str = Query(...)):
-    """ Variante con parámetro de consulta: admite rutas relativas con '/', que como
-    parámetro de ruta no encajarían en el enrutador. """
-    meta = book_service.get_metadata(id)
-    if not meta:
-        raise HTTPException(status_code=404, detail="Metadatos de IA no encontrados")
-    return meta
-
-@app.get("/api/books/metadata/{book_id}")
-def get_book_metadata(book_id: str):
-    meta = book_service.get_metadata(book_id)
-    if not meta:
-        raise HTTPException(status_code=404, detail="Metadatos de IA no encontrados")
-    return meta
-
-@app.post("/api/books/snippet")
-def save_book_snippet(req: BookSnippetRequest):
-    return book_service.save_snippet(req.book_id, req.page, req.box or {}, req.text or "", req.label or "")
-
-@app.get("/api/books/snippets")
-def list_snippets():
-    return book_service.load_snippets()
-
-@app.get("/api/books/snippet/{snippet_id}")
-def get_snippet(snippet_id: str):
-    return book_service.get_snippet(snippet_id)
-
-# =========================================================================
-# LECTOR DE TEXTO PDF Y CITAS (nombre_libro.json)
-# =========================================================================
-
-class BookPageEditRequest(BaseModel):
-    book_id: str
-    page: int
-    text: str
-
-class BookCitationSaveRequest(BaseModel):
-    book_id: str
-    citation: Dict[str, Any]
-
-class BookCitationDeleteRequest(BaseModel):
-    book_id: str
-    citation_id: str
-
-class BookCitationExportRequest(BaseModel):
-    book_id: str
-    workspace_path: Optional[str] = None
-
-@app.get("/api/books/pdf-pages")
-def get_book_pdf_pages(id: str = Query(...), page: int = Query(default=1), search: Optional[str] = Query(default=None)):
-    res = book_service.get_pdf_pages(id, page=page, search_query=search)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/books/pdf-page-save")
-def save_book_pdf_page_edit(req: BookPageEditRequest):
-    res = book_service.save_pdf_page_edit(req.book_id, req.page, req.text)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.get("/api/books/citations")
-def get_book_citations(id: str = Query(...)):
-    return book_service.get_book_citations(id)
-
-@app.post("/api/books/citations/save")
-def save_book_citation(req: BookCitationSaveRequest):
-    res = book_service.save_book_citation(req.book_id, req.citation)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/books/citations/delete")
-def delete_book_citation(req: BookCitationDeleteRequest):
-    res = book_service.delete_book_citation(req.book_id, req.citation_id)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/books/citations/export")
-def export_book_citations(req: BookCitationExportRequest):
-    ws_path = req.workspace_path or file_mgr.base_dir
-    res = book_service.export_citations_to_workspace(req.book_id, ws_path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.get("/api/books/all-citations")
-def get_all_book_citations(query: Optional[str] = Query(default=None)):
-    return book_service.get_all_citations_for_ai(query=query)
-
 # =========================================================================
 # ANALISTA DE LIBRERÍAS Y CITAS TÉCNICAS (libreria.json)
 # =========================================================================
 
-class LibraryAddRequest(BaseModel):
-    repo: str
-    name: Optional[str] = None
-    desc: Optional[str] = None
-
-class LibraryCitationSaveRequest(BaseModel):
-    lib_id: str
-    citation: Dict[str, Any]
-
-class LibraryCitationDeleteRequest(BaseModel):
-    lib_id: str
-    citation_id: str
-
-class LibraryCitationExportRequest(BaseModel):
-    lib_id: str
-    workspace_path: Optional[str] = None
-
-class LibraryAnalyzeRequest(BaseModel):
-    lib_id: str
-    topic: str
-    model: Optional[str] = "qwen2.5-coder:7b"
-
-@app.get("/api/librerias/list")
-def list_libraries():
-    return librerias_service.list_libraries()
-
-@app.post("/api/librerias/add")
-def add_library(req: LibraryAddRequest):
-    res = librerias_service.add_library(req.repo, req.name, req.desc)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.get("/api/librerias/citations")
-def get_library_citations(id: str = Query(...)):
-    return librerias_service.get_library_citations(id)
-
-@app.post("/api/librerias/citations/save")
-def save_library_citation(req: LibraryCitationSaveRequest):
-    res = librerias_service.save_library_citation(req.lib_id, req.citation)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/librerias/citations/delete")
-def delete_library_citation(req: LibraryCitationDeleteRequest):
-    res = librerias_service.delete_library_citation(req.lib_id, req.citation_id)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/librerias/citations/export")
-def export_library_citations(req: LibraryCitationExportRequest):
-    ws_path = req.workspace_path or file_mgr.base_dir
-    res = librerias_service.export_library_citations(req.lib_id, ws_path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/librerias/analyze")
-def analyze_library(req: LibraryAnalyzeRequest):
-    model = req.model or "qwen2.5-coder:7b"
-    res = librerias_service.analyze_library_topic(req.lib_id, req.topic, ai_engine, model=model)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.get("/api/librerias/all-citations")
-def get_all_library_citations(query: Optional[str] = Query(default=None)):
-    return librerias_service.get_all_library_citations_for_ai(query=query)
+# Las librerías y sus citas: servidor de Rust (routes/librerias.rs)
 
 
 # ==========================================
 # ENDPOINTS: PAPERS Y ALGORITMOS SEMINALES ML
 # ==========================================
 
-class PaperDownloadRequest(BaseModel):
-    paper_id: str
-    tipo: Optional[str] = "analisis"
-    workspace_path: Optional[str] = None
-
-class PaperAskRequest(BaseModel):
-    paper_id: str
-    pregunta: str
-    modelo: Optional[str] = None
-    tipo: Optional[str] = "analisis"
-    historial: Optional[List[Dict[str, Any]]] = None
-
-@app.get("/api/papers/list")
-def list_papers(q: Optional[str] = Query(default=None), categoria: Optional[str] = Query(default=None)):
-    return {"papers": papers_service.list_papers(q=q, categoria=categoria), "total": len(papers_service.catalogo)}
-
-@app.get("/api/papers/detail")
-def get_paper_detail(id: str = Query(...), tipo: str = Query(default="analisis")):
-    res = papers_service.get_paper(id, tipo=tipo)
-    if "error" in res:
-        raise HTTPException(status_code=404, detail=res["error"])
-    return res
-
-@app.post("/api/papers/download")
-def download_paper(req: PaperDownloadRequest):
-    ws_path = req.workspace_path or file_mgr.base_dir
-    res = papers_service.download_paper(req.paper_id, ws_path, tipo=req.tipo or "analisis")
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/papers/ask")
-def ask_paper(req: PaperAskRequest):
-    modelo = req.modelo or ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-    return StreamingResponse(_flujo_cancelable(
-        papers_service.ask_paper_stream(
-            paper_id=req.paper_id,
-            pregunta=_con_referencias(f"{req.paper_id.replace('_', ' ')} {req.pregunta}", req.pregunta)[0],
-            ai_engine=ai_engine,
-            modelo=modelo,
-            tipo=req.tipo or "analisis",
-            historial=req.historial
-        )),
-        media_type="text/plain; charset=utf-8"
-    )
+# Listar, leer, guardar en el proyecto y preguntarle a una monografía: servidor de Rust (routes/biblioteca.rs)
 
 
 # ==========================================
@@ -691,6 +423,8 @@ import referencias_ml  # noqa: E402
 MAX_PDF_REFERENCIA = 80 * 1024 * 1024
 
 
+# Las referencias (listar, detalle, relacionadas, pdf, abrir) son del servidor de Rust (routes/referencias.rs);
+# guardar el PDF en la biblioteca sigue aquí, con la indexación de libros.
 class ReferenciaAccionRequest(BaseModel):
     id: str
 
@@ -720,55 +454,6 @@ def _descargar_pdf(url: str) -> bytes:
     if datos[:5] != b"%PDF-":
         raise HTTPException(status_code=502, detail="El enlace no devolvió un PDF: ábrelo en el navegador.")
     return datos
-
-
-@app.get("/api/referencias")
-def referencias_listar(q: str = "", categoria: str = "", tipo: str = ""):
-    """ El catálogo ordenado por familia de modelo; sin el resumen original (va en el detalle) """
-    datos = referencias_ml.cargar()
-    refs = referencias_ml.listar(q=q, categoria=categoria, tipo=tipo)
-    ligeras = [{k: v for k, v in r.items() if k not in ("resumen_original", "nota_verificacion")} | {
-        "tiene_pdf": bool(_pdf_de_referencia(r)), "cita": referencias_ml.cita_corta(r)} for r in refs]
-    return {"categorias": [{k: c[k] for k in ("id", "nombre", "icono")} for c in datos["categorias"]],
-            "tipos": datos["tipos"], "referencias": ligeras, "total": len(datos["referencias"])}
-
-
-@app.get("/api/referencias/detalle")
-def referencias_detalle(id: str):
-    r = _referencia_o_404(id)
-    return r | {"tiene_pdf": bool(_pdf_de_referencia(r)), "cita": referencias_ml.cita_corta(r),
-                "categorias_nombres": [referencias_ml.CATEGORIA_POR_ID[c]["nombre"] for c in r.get("categorias", [])
-                                       if c in referencias_ml.CATEGORIA_POR_ID]}
-
-
-@app.get("/api/referencias/relacionadas")
-def referencias_relacionadas(q: str, maximo: int = 5):
-    return {"referencias": [referencias_ml.resumen_publico(r) for r in referencias_ml.relacionadas(q, maximo)]}
-
-
-@app.get("/api/referencias/pdf")
-def referencias_pdf(id: str):
-    """ El PDF de la referencia, servido desde Prig para leerlo dentro de la Biblioteca (muchas páginas
-    no se dejan incrustar en un iframe ajeno) """
-    r = _referencia_o_404(id)
-    url = _pdf_de_referencia(r)
-    if not url:
-        raise HTTPException(status_code=404, detail="Esta referencia no tiene PDF directo: ábrela en el navegador.")
-    try:
-        datos = _descargar_pdf(url)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"No se pudo descargar el PDF: {e}")
-    return Response(content=datos, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{r["id"]}.pdf"', "Cache-Control": "max-age=86400"})
-
-
-@app.post("/api/referencias/abrir")
-def referencias_abrir(req: ReferenciaAccionRequest):
-    """ Abre la referencia en el navegador del sistema """
-    r = _referencia_o_404(req.id)
-    return {"ok": _lanzar_navegador_sistema(r["url"]), "url": r["url"]}
 
 
 @app.post("/api/referencias/guardar")
@@ -865,13 +550,7 @@ def guided_generate_stream(req: GuidedGenerateRequest):
 
     return StreamingResponse(_flujo_cancelable(emit()), media_type="application/x-ndjson")
 
-@app.post("/api/guided/cancel")
-@app.post("/api/ai/cancel")
-def cancel_guided_generation():
-    """ Detiene de inmediato la generación activa en Ollama liberando sockets y cómputo GPU/CPU """
-    count = ai_engine.cancel_active_requests() + gemini_motor.cancelar_todo()
-    return {"status": "cancelled", "active_requests_cancelled": count}
-
+# Detener (/api/guided/cancel, como /api/ai/cancel): servidor de Rust (routes/asistente.rs)
 @app.post("/api/guided/migrate")
 def guided_migrate():
     """ Trae los planes de estudio antiguos al sistema unificado. Idempotente. """
@@ -933,56 +612,6 @@ def set_flag(req: FlagUpdateRequest):
 def learning_metrics(days: int = Query(default=30, ge=1, le=365)):
     """ Métricas de competencia real, derivadas de ejecutar el código del alumno """
     return telemetry.metrics(days=days)
-
-@app.get("/api/system/health")
-def system_health():
-    """ ¿Puede este equipo con el modelo elegido? Hoy el usuario lo descubre
-    esperando cinco minutos a que algo no responda. """
-    stats = get_system_stats()
-    gpu = stats.get("gpu", {})
-    vram_total = gpu.get("vram_total_mb", 0)
-    vram_free = max(0, vram_total - gpu.get("vram_used_mb", 0))
-
-    detail = ai_engine.get_detailed_models()
-    models = detail.get("models", []) if detail.get("online") else []
-
-    active = ai_engine.config.get("agent1_model")
-    evaluados = []
-    for m in models:
-        # Regla práctica: un modelo necesita algo más de VRAM que su tamaño en disco
-        needed_mb = int(m.get("size_gb", 0) * 1024 * 1.2)
-        evaluados.append({
-            "name": m.get("name"),
-            "size_gb": m.get("size_gb"),
-            "estimated_vram_mb": needed_mb,
-            "fits_in_gpu": bool(vram_total) and needed_mb <= vram_total,
-            "fits_now": bool(vram_free) and needed_mb <= vram_free,
-            "is_active": m.get("name") == active,
-        })
-
-    warnings: List[str] = []
-    if not detail.get("online"):
-        warnings.append("Ollama no responde: el tutor y los ejercicios no funcionarán.")
-    if not gpu.get("has_gpu"):
-        warnings.append("Sin GPU detectada: la inferencia irá por CPU y será notablemente más lenta.")
-    activo = next((m for m in evaluados if m["is_active"]), None)
-    if activo and not activo["fits_in_gpu"]:
-        warnings.append(
-            f"El modelo activo ({activo['name']}) necesita ~{activo['estimated_vram_mb']} MB "
-            f"y la GPU tiene {vram_total} MB: se descargará parcialmente a RAM."
-        )
-
-    return {
-        "ollama_online": detail.get("online", False),
-        "cpu_pct": stats.get("cpu_pct"),
-        "ram_total_gb": stats.get("ram_total_gb"),
-        "gpu": gpu,
-        "vram_free_mb": vram_free,
-        "active_model": active,
-        "models": sorted(evaluados, key=lambda m: not m["fits_now"]),
-        "warnings": warnings,
-    }
-
 
 # ==========================================
 # ENDPOINTS: EJERCICIOS VERIFICABLES POR EJECUCIÓN
@@ -2122,41 +1751,7 @@ def guardar_audio_reactivo_config(datos: Dict[str, Any]):
     return {"ok": True}
 
 
-@app.get("/api/audio/aplicaciones")
-def listar_aplicaciones_audio():
-    """ Devuelve la lista en tiempo real de aplicaciones y pestañas que reproducen audio en Linux. """
-    return {"aplicaciones": audio_monitor.listar_aplicaciones_audio()}
-
-
-@app.post("/api/audio/seleccionar_fuente")
-def seleccionar_fuente_audio(datos: Dict[str, Any]):
-    """ Cambia la fuente de captura de audio al stream o aplicación indicada. """
-    fuente_id = str(datos.get("fuente_id", "sistema_global"))
-    audio_monitor.seleccionar_fuente(fuente_id)
-    return {"ok": True, "fuente_actual": fuente_id}
-
-
-@app.get("/api/audio/datos_actuales")
-def obtener_datos_audio_actuales():
-    """ Devuelve el último paquete de análisis FFT y energía en tiempo real. """
-    return audio_monitor.datos_actuales
-
-
-@app.websocket("/ws/audio_reactivo")
-async def websocket_audio_reactivo(websocket: WebSocket):
-    """ Transmite paquetes de análisis de espectro FFT a 50-60 FPS en tiempo real. """
-    await websocket.accept()
-    audio_monitor.incrementar_suscriptor()
-    try:
-        while True:
-            await websocket.send_json(audio_monitor.datos_actuales)
-            await asyncio.sleep(0.02)  # ~50 FPS
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        logger.debug(f"Desconexión de websocket de audio: {e}")
-    finally:
-        audio_monitor.decrementar_suscriptor()
+# Las aplicaciones con audio, la fuente, el análisis y /ws/audio_reactivo: servidor de Rust (routes/escritorio.rs)
 
 
 @app.get("/api/config/accesibilidad")
@@ -2601,23 +2196,7 @@ def kaggle_archivo(ruta: str):
     return FileResponse(real)
 
 
-@app.post("/api/kaggle/explicar_datos")
-def kaggle_explicar_datos(req: KaggleDatosRequest):
-    ficha = _kaggle_ficha(req.tipo, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    modelo = _modelo_desafios(req.modelo, "explicar")
-    huella = kaggle_explorar.huella(ficha)
-    guardada = None if req.regenerar else kaggle_explorar.explicacion_datos(req.tipo, ficha["ref"], modelo, huella)
-    if guardada:
-        return _ndjson_en_hilo(lambda avisar: {"texto": guardada, "guardada": True})
-
-    def trabajo(avisar):
-        texto = _consumir(kaggle_explorar.explicar_datos(motor, nombre, ficha, file_mgr.base_dir), avisar)
-        if not texto.strip():
-            raise kaggle_lector.ErrorKaggle("El modelo no devolvió nada. Prueba otra vez u otro modelo.")
-        kaggle_explorar.guardar_explicacion_datos(req.tipo, ficha["ref"], modelo, huella, texto)
-        return {"texto": texto, "guardada": False}
-    return _ndjson_en_hilo(trabajo)
+# Explicar los datos de un dataset o una competición: servidor de Rust (routes/profesor.rs)
 
 
 # ==========================================
@@ -2694,46 +2273,7 @@ def github_archivo(ref: str, ruta: str):
     return _github(github_lector.leer_archivo, ref, ruta)
 
 
-def _github_con_cache(info, ruta, nivel, modelo, regenerar, generador):
-    guardada = None if regenerar else github_lector.explicacion_guardada(info, ruta, nivel, modelo)
-    if guardada:
-        return _ndjson_en_hilo(lambda avisar: {"texto": guardada, "guardada": True})
-
-    def trabajo(avisar):
-        texto = _consumir(generador(), avisar)
-        if not texto.strip():
-            raise github_lector.ErrorGitHub("El modelo no devolvió nada. Prueba otra vez u otro modelo.")
-        github_lector.guardar_explicacion(info, ruta, nivel, modelo, texto)
-        return {"texto": texto, "guardada": False}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/github/explicar")
-def github_explicar(req: GithubRefRequest):
-    """ Sin «ruta», el repositorio en conjunto; con ella, ese archivo """
-    info = _github(github_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    modelo = _modelo_desafios(req.modelo, "explicar")
-    nivel = req.nivel if req.nivel in github_lector.NIVELES else "intermedio"
-    if req.ruta:
-        if not any(a["ruta"] == req.ruta for a in info["archivos"]):
-            raise HTTPException(status_code=400, detail="Ese archivo no está en el repositorio.")
-        return _github_con_cache(info, req.ruta, nivel, modelo, req.regenerar,
-                                 lambda: github_lector.explicar_archivo(motor, nombre, info, req.ruta, nivel))
-    return _github_con_cache(info, None, "", modelo, req.regenerar,
-                             lambda: github_lector.explicar_repo(motor, nombre, info))
-
-
-@app.post("/api/github/preguntar")
-def github_preguntar(req: GithubRefRequest):
-    if not req.mensajes:
-        raise HTTPException(status_code=400, detail="Escribe una pregunta.")
-    info = _github(github_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-
-    def trabajo(avisar):
-        return {"texto": _consumir(github_lector.preguntar(motor, nombre, info, req.ruta, _mensajes_con_referencias(req.mensajes)), avisar)}
-    return _ndjson_en_hilo(trabajo)
+# Explicar un repositorio o un archivo y las preguntas: servidor de Rust (routes/profesor.rs)
 
 
 @app.get("/api/github/guardados")
@@ -2951,78 +2491,8 @@ def kaggle_lecturas():
     return {"lecturas": kaggle_lector.resumen_lecturas()}
 
 
-def _kaggle_con_cache(nb, indice, nivel, modelo, regenerar, generador):
-    """ Explicación guardada si ya existe; si no, se pide al modelo y se guarda """
-    guardada = None if regenerar else kaggle_lector.explicacion_guardada(nb, indice, nivel, modelo)
-    if guardada:
-        if indice is not None:
-            kaggle_lector.marcar_leida(nb, indice)
-        return _ndjson_en_hilo(lambda avisar: {"texto": guardada, "guardada": True})
+# Explicar un notebook (celda, guía, ruta de estudio, preguntas): servidor de Rust (routes/profesor.rs)
 
-    def trabajo(avisar):
-        texto = _consumir(generador(), avisar)
-        if not texto.strip():
-            raise kaggle_lector.ErrorKaggle("El modelo no devolvió nada. Prueba otra vez u otro modelo.")
-        kaggle_lector.guardar_explicacion(nb, indice, nivel, modelo, texto)
-        return {"texto": texto, "guardada": False}
-    return _ndjson_en_hilo(trabajo)
-
-
-def _obtener_contexto_datos(nb, req: KaggleRefRequest) -> Optional[str]:
-    if not getattr(req, "incluir_datos", True):
-        return None
-    try:
-        resumen = kaggle_explorar.obtener_contexto_datasets_notebook(nb, file_mgr.base_dir)
-        return resumen.get("contexto_texto")
-    except Exception as e:
-        logger.warning(f"Error obteniendo contexto de datos: {e}")
-        return None
-
-
-@app.post("/api/kaggle/explicar")
-def kaggle_explicar(req: KaggleExplicarRequest):
-    nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    modelo = _modelo_desafios(req.modelo, "explicar")
-    nivel = req.nivel if req.nivel in kaggle_lector.NIVELES else "intermedio"
-    if not 0 <= req.indice < len(nb["celdas"]):
-        raise HTTPException(status_code=400, detail="Esa celda no existe.")
-    ctx_datos = _obtener_contexto_datos(nb, req)
-    return _kaggle_con_cache(nb, req.indice, nivel, modelo, req.regenerar,
-                             lambda: kaggle_lector.explicar(motor, nombre, nb, req.indice, nivel, contexto_datos=ctx_datos))
-
-
-@app.post("/api/kaggle/guia")
-def kaggle_guia(req: KaggleRefRequest):
-    nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    ctx_datos = _obtener_contexto_datos(nb, req)
-    return _kaggle_con_cache(nb, None, "", _modelo_desafios(req.modelo, "explicar"), req.regenerar,
-                             lambda: kaggle_lector.guia(motor, nombre, nb, contexto_datos=ctx_datos))
-
-
-@app.post("/api/kaggle/notebook/estudio_optimo")
-def kaggle_estudio_optimo(req: KaggleRefRequest):
-    nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    modelo = _modelo_desafios(req.modelo, "explicar")
-    ctx_datos = _obtener_contexto_datos(nb, req)
-    return _kaggle_con_cache(nb, None, "estudio", modelo, req.regenerar,
-                             lambda: kaggle_lector.estudio_optimo(motor, nombre, nb, contexto_datos=ctx_datos))
-
-
-@app.post("/api/kaggle/preguntar")
-def kaggle_preguntar(req: KagglePreguntarRequest):
-    if not req.mensajes:
-        raise HTTPException(status_code=400, detail="Escribe una pregunta.")
-    nb = _kaggle(kaggle_lector.abrir, req.ref)
-    motor, nombre = _motor_desafios(req.modelo, "explicar")
-    ctx_datos = _obtener_contexto_datos(nb, req)
-
-    def trabajo(avisar):
-        return {"texto": _consumir(kaggle_lector.preguntar(motor, nombre, nb, req.indice, _mensajes_con_referencias(req.mensajes),
-                                                           contexto_datos=ctx_datos), avisar)}
-    return _ndjson_en_hilo(trabajo)
 
 @app.get("/api/workspace")
 def get_workspace():
@@ -3031,15 +2501,6 @@ def get_workspace():
         "name": os.path.basename(file_mgr.base_dir) or file_mgr.base_dir
     }
 
-@app.post("/api/workspace/open")
-def open_workspace(req: OpenFolderRequest):
-    res = file_mgr.set_base_dir(req.path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    rebind_workspace(file_mgr.base_dir)
-    ide.anotar_reciente(file_mgr.base_dir)
-    return res
-
 class SegundaCarpetaRequest(BaseModel):
     path: Optional[str] = None
 
@@ -3047,30 +2508,6 @@ class SegundaCarpetaRequest(BaseModel):
 def get_segunda_carpeta():
     ruta = file_mgr.segunda_dir
     return {"path": ruta, "name": (os.path.basename(ruta) or ruta) if ruta else None}
-
-@app.post("/api/workspace/segunda")
-def set_segunda_carpeta(req: SegundaCarpetaRequest):
-    res = file_mgr.set_segunda_dir(req.path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/workspace/segunda/browse")
-def browse_segunda_carpeta():
-    elegida = file_mgr.elegir_carpeta_nativa("Seleccionar segunda carpeta - Prig IDE")
-    if not elegida:
-        raise HTTPException(status_code=400, detail="No se eligió ninguna carpeta")
-    return file_mgr.set_segunda_dir(elegida)
-
-@app.post("/api/workspace/browse")
-def browse_workspace():
-    res = file_mgr.browse_folder_native()
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    rebind_workspace(file_mgr.base_dir)
-    ide.anotar_reciente(file_mgr.base_dir)
-    return res
-
 
 # ===========================================================================
 # Opciones de IDE: ir a archivo, buscar en archivos, renombrar, problemas…
@@ -3112,36 +2549,13 @@ def ide_buscar(req: IdeBuscarRequest):
                 req.incluir, req.excluir)
 
 
-@app.post("/api/ide/reemplazar")
-def ide_reemplazar(req: IdeBuscarRequest):
-    if req.reemplazo is None:
-        raise HTTPException(status_code=400, detail="Falta el texto de reemplazo.")
-    return _ide(ide.reemplazar, req.consulta, req.reemplazo, req.regex, req.mayusculas,
-                req.palabra, req.incluir, req.excluir, req.solo)
-
-
 class IdeRenombrarRequest(BaseModel):
     path: str
     destino: str
 
 
-@app.post("/api/ide/renombrar")
-def ide_renombrar(req: IdeRenombrarRequest):
-    return _ide(ide.renombrar, req.path, req.destino)
-
-
 class IdeRutaRequest(BaseModel):
     path: str
-
-
-@app.post("/api/ide/duplicar")
-def ide_duplicar(req: IdeRutaRequest):
-    return _ide(ide.duplicar, req.path)
-
-
-@app.post("/api/ide/mostrar-en-sistema")
-def ide_mostrar(req: IdeRutaRequest):
-    return _ide(ide.mostrar_en_sistema, req.path)
 
 
 class IdeProblemasRequest(BaseModel):
@@ -3149,20 +2563,9 @@ class IdeProblemasRequest(BaseModel):
     codigo: str
 
 
-@app.post("/api/ide/problemas")
-def ide_problemas(req: IdeProblemasRequest):
-    return {"problemas": ide.problemas(req.lenguaje, req.codigo)}
-
-
 @app.get("/api/ide/recientes")
 def ide_recientes():
     return {"carpetas": ide.recientes()}
-
-
-@app.delete("/api/ide/recientes")
-def ide_olvidar_recientes():
-    ide.olvidar_recientes()
-    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -3191,101 +2594,17 @@ def workspace_projects():
     }
 
 
-@app.post("/api/workspace/projects/save")
-def workspace_save_project(req: SaveProjectRequest):
-    return _ide(ide.guardar_proyecto, req.path, req.name, req.source)
-
-
-@app.post("/api/workspace/projects/remove")
-def workspace_remove_project(req: RemoveProjectRequest):
-    return _ide(ide.eliminar_proyecto_guardado, req.path)
-
-
 @app.get("/api/workspace/directories")
 def workspace_directories(ruta: Optional[str] = Query(default=None)):
     return _ide(ide.listar_directorios, ruta)
 
 
-@app.post("/api/ide/pantalla-completa")
-def ide_pantalla_completa():
-    """ La ventana nativa (pywebview) no deja al JavaScript ponerse a pantalla
-    completa: se hace desde aquí, que corre en el mismo proceso que la ventana. """
-    try:
-        import webview
-        ventanas = list(getattr(webview, "windows", []) or [])
-    except Exception:
-        ventanas = []
-    if not ventanas:
-        raise HTTPException(status_code=409, detail="No hay ventana nativa (¿abierto en el navegador?)")
-    ventanas[0].toggle_fullscreen()
-    return {"ok": True}
+# La pantalla completa la alterna la ventana de Rust (routes/escritorio.rs)
 
-
-@app.get("/api/ide/acerca")
-def ide_acerca():
-    import platform
-    return {
-        "prig": "Prig IDE",
-        "python": platform.python_version(),
-        "sistema": f"{platform.system()} {platform.release()}",
-        "ollama": _version_ollama(),
-        "workspace": file_mgr.base_dir,
-        "backend": os.path.dirname(os.path.abspath(__file__)),
-    }
 
 @app.get("/api/tree")
 def get_tree(path: Optional[str] = None):
     return file_mgr.get_file_tree(path)
-
-@app.get("/api/raw-file")
-@app.get("/api/file/raw")          # el nombre que usa el editor para las imágenes (antes solo existía en el servidor Rust)
-def get_raw_file(path: str):
-    try:
-        abs_path = file_mgr.resolve(path)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    if os.path.isfile(abs_path):
-        return FileResponse(abs_path)
-    raise HTTPException(status_code=404, detail="Archivo no encontrado")
-
-@app.get("/api/file")
-def read_file(path: str):
-    res = file_mgr.read_file(path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.post("/api/file")
-def write_file(req: FileWriteRequest):
-    res = file_mgr.write_file(req.path, req.content)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    try:
-        from llm_director import director_llm
-        ext = os.path.splitext(req.path)[1].lower()
-        lenguaje = "python" if ext == ".py" else ("javascript" if ext in (".js", ".jsx") else ("typescript" if ext in (".ts", ".tsx") else ("html" if ext == ".html" else ("css" if ext == ".css" else ("c_cpp" if ext in (".c", ".cpp", ".h") else ("rust" if ext == ".rs" else "text"))))))
-        director_llm.memoria.registrar_lectura_archivo(
-            archivo=req.path,
-            codigo=req.content,
-            lenguaje=lenguaje
-        )
-    except Exception as e:
-        logger.debug("Error registrando memoria AST al guardar archivo: %s", e)
-    return res
-
-@app.post("/api/create")
-def create_item(req: FileCreateRequest):
-    res = file_mgr.create_item(req.path, req.is_dir)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@app.delete("/api/file")
-def delete_item(path: str):
-    res = file_mgr.delete_item(path)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
 
 def _exec_timeout() -> int:
     try:
@@ -3574,91 +2893,6 @@ def update_ai_config(req: AIConfigUpdateRequest):
     data = req.model_dump(exclude_unset=True)
     return ai_engine.update_config(data)
 
-@app.get("/api/ai/catalog")
-def get_ai_catalog():
-    """ Devuelve el catálogo completo de modelos soportados de Prig (incluyendo qwen3:14b),
-    cruzado con la disponibilidad local en Ollama """
-    try:
-        detalle = ai_engine.get_detailed_models().get("models", [])
-    except Exception:
-        detalle = []
-    tamanos = {m["name"]: m.get("size_gb") or 0 for m in detalle}
-    instalados = set(tamanos)
-
-    lista = []
-    for nombre, info in agent_flows.MODELOS.items():
-        instalado = nombre in instalados or f"{nombre}:latest" in instalados
-        lista.append({
-            "name": nombre,
-            "familia": info.get("familia", ""),
-            "vram_gb": info.get("vram_gb", 0),
-            "razona": info.get("razona", 0),
-            "piensa": info.get("piensa", "no"),
-            "fuerte_en": info.get("fuerte_en", []),
-            "nota": info.get("nota", ""),
-            "instalado": instalado,
-            "size_gb": tamanos.get(nombre) or tamanos.get(f"{nombre}:latest") or info.get("vram_gb", 0)
-        })
-    return {"catalog": lista}
-
-
-@app.get("/api/system/stats")
-def get_system_stats():
-    import subprocess
-    
-    cpu_pct = 0
-    ram_pct = 0
-    ram_used_gb = 0.0
-    ram_total_gb = 0.0
-
-    try:
-        import psutil
-        cpu_pct = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory()
-        ram_pct = mem.percent
-        ram_used_gb = round(mem.used / (1024**3), 1)
-        ram_total_gb = round(mem.total / (1024**3), 1)
-    except Exception:
-        pass
-
-    gpu_info = {"has_gpu": False, "gpu_pct": 0, "vram_used_mb": 0, "vram_total_mb": 0}
-
-    # NVML primero: la barra de estado pregunta cada 3 s y un nvidia-smi por vez calentaba la CPU
-    try:
-        from recursos import nvml
-        por_nvml = nvml.lectura()
-    except Exception:
-        por_nvml = None
-    if por_nvml:
-        g = por_nvml[0]
-        return {"cpu_pct": cpu_pct, "ram_pct": ram_pct, "ram_used_gb": ram_used_gb, "ram_total_gb": ram_total_gb,
-                "gpu": {"has_gpu": True, "gpu_pct": g["uso_pct"] or 0, "vram_used_mb": g["vram_usada_mb"] or 0,
-                        "vram_total_mb": g["vram_total_mb"] or 0}}
-
-    try:
-        res = subprocess.run(
-            ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
-            capture_output=True, text=True, timeout=1
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            parts = [p.strip() for p in res.stdout.strip().split(',')]
-            gpu_info = {
-                "has_gpu": True,
-                "gpu_pct": int(parts[0]),
-                "vram_used_mb": int(parts[1]),
-                "vram_total_mb": int(parts[2])
-            }
-    except Exception:
-        pass
-
-    return {
-        "cpu_pct": cpu_pct,
-        "ram_pct": ram_pct,
-        "ram_used_gb": ram_used_gb,
-        "ram_total_gb": ram_total_gb,
-        "gpu": gpu_info
-    }
-
 class ModelDeleteRequest(BaseModel):
     model: str
 
@@ -3748,191 +2982,6 @@ class AIInlineCompleteRequest(BaseModel):
     code_prefix: str
     code_suffix: str = ""
     model: Optional[str] = None
-
-@app.post("/api/ai/search")
-def search_web(req: AISearchRequest):
-    context, sources = ai_engine.web_search.get_web_context(req.query)
-    return {"context": context, "sources": sources}
-
-def _modelo_autocompletado(pedido: Optional[str]) -> Optional[str]:
-    """ Un modelo con la capacidad `insert` (rellenar al medio): el pedido si la tiene,
-    si no el más pequeño instalado que la tenga, para que responda rápido. """
-    if pedido and "insert" in ai_engine.capacidades(pedido):
-        return pedido
-    try:
-        candidatos = []
-        for m in requests_lib.get(f"{ai_engine.base_url}/api/tags", timeout=5).json().get("models", []):
-            if "insert" in ai_engine.capacidades(m["name"]):
-                candidatos.append((m.get("size", 0), m["name"]))
-        return min(candidatos)[1] if candidatos else None
-    except Exception:
-        return None
-
-
-@app.post("/api/ai/inline-complete")
-def inline_complete(req: AIInlineCompleteRequest):
-    # Con lo que hay DESPUÉS del cursor el modelo rellena el medio (verificado con
-    # qwen2.5-coder: completó el cuerpo de una función que ya tenía su return)
-    elegido = ai_engine.modelo_para("autocompletar", req.model)
-    if elegido and "insert" not in ai_engine.capacidades(elegido):
-        # El elegido no sabe rellenar al medio: se respeta la elección y completa la línea
-        modelo_fim = None
-    else:
-        modelo_fim = _modelo_autocompletado(elegido)
-    if modelo_fim:
-        payload = {"model": modelo_fim, "prompt": req.code_prefix[-4000:], "suffix": req.code_suffix[:2000],
-                   "stream": False,
-                   "options": ai_engine._build_options({"num_predict": 64, "temperature": 0.2, "stop": ["\n\n"]},
-                                                       modelo_fim, "autocompletado")}
-        ai_engine._completar_payload(payload, modelo_fim, "autocompletado", False, "")
-        try:
-            r = requests_lib.post(f"{ai_engine.base_url}/api/generate", json=payload, timeout=30)
-            texto = (r.json().get("response") or "") if r.status_code == 200 else ""
-            return {"completion": texto.rstrip(), "modelo": modelo_fim, "relleno_al_medio": True}
-        except Exception:
-            return {"completion": ""}
-    prefix = req.code_prefix[-600:]
-    prompt = f"Completa la siguiente línea de código de forma exacta y concisa:\n```python\n{prefix}"
-    sys_prompt = "Eres un motor de autocompletado de código en tiempo real. Devuelve ÚNICAMENTE la sintaxis faltante de la siguiente línea de código sin explicaciones, formato markdown ni intros."
-    
-    completion_parts = []
-    try:
-        for chunk in ai_engine.generate_response(prompt, model=elegido or "qwen2.5-coder:7b", system_prompt=sys_prompt,
-                                                 uso="autocompletado"):
-            completion_parts.append(chunk)
-            if len("".join(completion_parts)) > 100:
-                break
-        raw = "".join(completion_parts).strip().replace("```python", "").replace("```", "")
-        completion = raw.split("\n")[0] if raw else ""
-        return {"completion": completion}
-    except Exception:
-        return {"completion": ""}
-
-@app.post("/api/ai/inline-prompt")
-def ai_inline_prompt(req: AIInlinePromptRequest):
-    """
-    Ejecuta una instrucción 'Prig//: <prompt>' directamente dentro del archivo de código.
-    Devuelve el código generado listo para insertarse en esa posición exacta.
-    """
-    if not req.prompt or not req.prompt.strip():
-        raise HTTPException(status_code=400, detail="Debes escribir una instrucción después de 'Prig//: '")
-
-    # 1. Intentar autoiniciar Ollama si está apagado
-    try:
-        if not ai_engine.is_online():
-            ai_engine.try_autostart_ollama()
-    except Exception:
-        pass
-
-    # 2. Reconstruir contexto de código
-    indent = ""
-    if req.file_content:
-        lines = req.file_content.splitlines()
-        line_num = req.line_number or 1
-        line_idx = max(0, min(line_num - 1, len(lines) - 1)) if lines else 0
-        current_line = lines[line_idx] if lines else ""
-        indent_match = re.match(r"^(\s*)", current_line)
-        indent = indent_match.group(1) if indent_match else ""
-        start_line = max(0, line_idx - 40)
-        end_line = min(len(lines), line_idx + 40)
-        context_before = "\n".join(lines[start_line:line_idx])
-        context_after = "\n".join(lines[line_idx + 1:end_line])
-    else:
-        context_before = req.prefix_code or ""
-        context_after = req.suffix_code or ""
-        if context_before:
-            for l in reversed(context_before.splitlines()):
-                if l.strip():
-                    m = re.match(r"^(\s*)", l)
-                    if m:
-                        indent = m.group(1)
-                    break
-
-    lang = req.language or "python"
-    filename = req.file_path or f"archivo.{lang}"
-
-    system_prompt = (
-        f"Eres Prig AI, un asistente experto de programación integrado directamente en el editor de código.\n"
-        f"El usuario ha escrito una instrucción en un comentario 'Prig//: ' en el archivo '{filename}'.\n"
-        f"Tu tarea es generar ÚNICAMENTE el código en {lang} que cumple la instrucción para insertarse en esa posición.\n"
-        f"REGLAS CRÍTICAS:\n"
-        f"1. Devuelve SOLAMENTE el código fuente válido en {lang}.\n"
-        f"2. NO devuelvas explicaciones, texto introductorio ni conclusiones en prosa.\n"
-        f"3. Si usas bloques markdown de código (```), asegúrate de que solo contengan el código solicitado.\n"
-        f"4. Mantén la coherencia con las variables, funciones e importaciones del código circundante.\n"
-        f"5. Ajusta la indentación para que encaje de forma natural en el archivo."
-    )
-
-    user_prompt = (
-        f"Archivo: {filename} (Lenguaje: {lang})\n\n"
-        f"--- Código previo a la instrucción ---\n{context_before}\n\n"
-        f"--- INSTRUCCIÓN DEL USUARIO ---\n{req.prompt}\n\n"
-        f"--- Código posterior a la instrucción ---\n{context_after}\n\n"
-        f"Genera el código correspondiente para cumplir la instrucción en esa posición:"
-    )
-
-    # 3. Determinar el modelo local o fallback seguro
-    raw_model = ai_engine.modelo_para("codigo", req.model) or ai_engine.config.get("agent1_model") or "qwen2.5-coder:7b"
-    clean_model = (raw_model or "qwen2.5-coder:7b").split(" (")[0].strip()
-
-    # Comprobar modelos instalados en Ollama para no lanzar 404
-    try:
-        r = requests_lib.get(f"{ai_engine.base_url}/api/tags", timeout=2)
-        if r.status_code == 200:
-            installed = [m.get("name") for m in r.json().get("models", [])]
-            if installed:
-                matched = any(clean_model in m or m in clean_model for m in installed)
-                if not matched:
-                    coders = [m for m in installed if "coder" in m or "code" in m or "qwen" in m]
-                    clean_model = coders[0] if coders else installed[0]
-    except Exception:
-        pass
-
-    try:
-        chunks = []
-        for chunk in ai_engine.generate_response(user_prompt, model=clean_model, system_prompt=system_prompt, uso="programador"):
-            chunks.append(chunk)
-        raw_code = "".join(chunks).strip()
-
-        if raw_code.startswith("[Error Ollama:") or raw_code.startswith("[Error:"):
-            raise RuntimeError(raw_code)
-
-        # Limpiar posibles bloques markdown ```lang ... ```
-        if "```" in raw_code:
-            match = re.search(r"```(?:\w+)?\n?(.*?)\n?```", raw_code, re.DOTALL)
-            if match:
-                raw_code = match.group(1).strip()
-            else:
-                raw_code = raw_code.replace("```", "").strip()
-
-        # Ajustar indentación
-        code_lines = raw_code.splitlines()
-        adjusted_lines = []
-        for l in code_lines:
-            if l.strip():
-                if not l.startswith(indent):
-                    adjusted_lines.append(indent + l)
-                else:
-                    adjusted_lines.append(l)
-            else:
-                adjusted_lines.append("")
-        final_code = "\n".join(adjusted_lines)
-
-        return {
-            "status": "ok",
-            "code": final_code,
-            "prompt": req.prompt,
-            "line_number": req.line_number or 1,
-            "model_used": clean_model
-        }
-    except Exception as e:
-        err_str = str(e)
-        if "Connection refused" in err_str or "Failed to establish a new connection" in err_str:
-            raise HTTPException(
-                status_code=503,
-                detail="Ollama no está en marcha o no responde en el puerto 11434. Inicia Ollama ('ollama serve') para usar el autocompletado con IA."
-            )
-        raise HTTPException(status_code=500, detail=f"Error al generar código: {err_str}")
 
 def _formatear_gancho(hooked_files: Optional[List[Dict[str, str]]]) -> str:
     if not hooked_files:
@@ -5269,77 +4318,13 @@ def export_dataset_file():
 # LANZADOR DE VENTANA NATIVA INDEPENDIENTE PARA NOTE
 # ==========================================
 
-@app.post("/api/note/open-standalone")
-def open_note_standalone():
-    try:
-        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        script_path = os.path.join(root_dir, "launch_note.py")
-        python_exec = sys.executable
-        p = subprocess.Popen([python_exec, script_path], close_fds=True, start_new_session=True)
-        with _tracked_lock:
-            _tracked_child_processes.append(p)
-        return {"status": "success", "message": "Ventana nativa Note lanzada como aplicación independiente."}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-class NoteExplainRequest(BaseModel):
-    topic: str
-    model: str = "qwen2.5-coder:7b"
-
-@app.post("/api/note/explain")
-def note_explain(req: NoteExplainRequest):
-    sys_prompt = """Eres un TUTOR PEDAGÓGICO DE IA EXPERTO EN TECNOLOGÍA Y PROGRAMACIÓN.
-Tu tarea es explicar el tema solicitado de forma profunda, pedagógica y clara en APROXIMADAMENTE 500 PALABRAS.
-
-ESTRUCTURA DE LA EXPLICACIÓN:
-1. Concepto Fundamental e Importancia.
-2. Principios y Funcionamiento Clave (usando viñetas explicativas).
-3. Ejemplo de Código Práctico o Caso de Uso.
-4. Conclusión / Resumen Técnico.
-
-Formatea la respuesta en Markdown limpio (títulos ##, ###, bloques de código ```). No agregues saludos ni intros informales."""
-    
-    prompt = f"Por favor, explica en detalle el siguiente tema en aproximadamente 500 palabras:\nTema: {req.topic}"
-    prompt = _con_referencias(req.topic, prompt)[0]
-
-    def stream_explanation():
-        for chunk in ai_engine.generate_response(prompt, model=req.model, system_prompt=sys_prompt):
-            yield chunk
-
-    return StreamingResponse(_flujo_cancelable(stream_explanation()), media_type="text/plain")
+# El bloc de notas suelto (`prig --nota`) y explicar un tema: servidor de Rust (routes/escritorio.rs)
 
 # ==========================================
 # ENDPOINTS EXPORTADOR PDF CARPETAS & NOTEBOOKS
 # ==========================================
 
-class PDFExportRequest(BaseModel):
-    folder_path: str
-    file_paths: List[str]
-    theme: str = "light"
-    options: Optional[Dict[str, Any]] = None
-
-@app.get("/api/folder/code-files")
-def get_folder_code_files(path: str = Query(...)):
-    pdf_exp = PDFExporter()
-    return pdf_exp.list_folder_code_files(path)
-
-@app.post("/api/export/pdf-preview")
-def pdf_preview(req: PDFExportRequest):
-    pdf_exp = PDFExporter()
-    html_content = pdf_exp.generate_styled_html(req.folder_path, req.file_paths, req.theme, req.options)
-    return {"html": html_content}
-
-@app.post("/api/export/pdf-download")
-def pdf_download(req: PDFExportRequest):
-    pdf_exp = PDFExporter()
-    pdf_bytes = pdf_exp.generate_pdf_bytes(req.folder_path, req.file_paths, req.theme, req.options)
-    folder_name = os.path.basename(os.path.abspath(req.folder_path)) or "export"
-    filename = f"{folder_name}_code_notebooks.pdf"
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+# La lista de archivos, la vista previa y el PDF los atiende el servidor de Rust (prig-server/src/routes/exportar.rs)
 
 
 # ===========================================================================
@@ -5461,6 +4446,65 @@ def _gpu_ocupada() -> bool:
         return bool(ai_engine._active_streams)
 
 
+class ArchivoGuardadoRequest(BaseModel):
+    path: str
+    content: str
+
+
+@app.post("/api/interno/archivo-guardado")
+def interno_archivo_guardado(req: ArchivoGuardadoRequest):
+    """ El servidor de Rust guarda los archivos del editor y avisa aquí: la memoria del director (llm_director, en
+    desarrollo) anota lo leído """
+    try:
+        from llm_director import director_llm
+        ext = os.path.splitext(req.path)[1].lower()
+        lenguaje = "python" if ext == ".py" else ("javascript" if ext in (".js", ".jsx") else ("typescript" if ext in (".ts", ".tsx") else ("html" if ext == ".html" else ("css" if ext == ".css" else ("c_cpp" if ext in (".c", ".cpp", ".h") else ("rust" if ext == ".rs" else "text"))))))
+        director_llm.memoria.registrar_lectura_archivo(archivo=req.path, codigo=req.content, lenguaje=lenguaje)
+    except Exception as e:
+        logger.debug("Error registrando memoria AST al guardar archivo: %s", e)
+    return {"ok": True}
+
+
+def _firma_config():
+    try:
+        st = os.stat(file_mgr.config_path)
+        return (st.st_mtime_ns, st.st_size, st.st_ino)
+    except OSError:
+        return None
+
+
+_config_visto: Dict[str, Any] = {"firma": _firma_config()}     # lo que había al arrancar ya se leyó
+
+
+@app.middleware("http")
+async def _seguir_espacio_de_trabajo(request, call_next):
+    """ El espacio de trabajo y la segunda carpeta los abre el servidor de Rust y los guarda en ~/.prig_config.json:
+    cuando el archivo cambia, se toman aquí y se reapuntan los servicios (rebind_workspace). Solo con una carpeta
+    guardada que exista; nunca se cae al directorio actual. """
+    firma = _firma_config()
+    if firma != _config_visto["firma"]:
+        _config_visto["firma"] = firma
+        if firma is not None:
+            try:
+                cfg = file_mgr._leer_config()
+                guardado = cfg.get("last_workspace")
+                if isinstance(guardado, str) and os.path.isdir(guardado) and \
+                        os.path.abspath(guardado) != os.path.abspath(file_mgr.base_dir):
+                    file_mgr.base_dir = os.path.abspath(guardado)
+                    rebind_workspace(file_mgr.base_dir)
+                segunda = cfg.get("segunda_carpeta")
+                file_mgr.segunda_dir = segunda if isinstance(segunda, str) and os.path.isdir(segunda) else None
+            except Exception as e:
+                logger.debug("No se pudo seguir el espacio de trabajo: %s", e)
+    return await call_next(request)
+
+
+@app.post("/api/interno/cancelar")
+def interno_cancelar():
+    """ «Detener» lo atiende el servidor de Rust; aquí se corta lo que siga generando este backend """
+    return {"active_requests_cancelled": ai_engine.cancel_active_requests() + gemini_motor.cancelar_todo()}
+
+
 class HerramientaInternaRequest(BaseModel):
     sesion: str
     nombre: str
@@ -5512,249 +4556,9 @@ def _modelos(fn, *args, **kwargs):
         raise HTTPException(status_code=503, detail=f"Ollama no responde: {e}")
 
 
-def _ndjson(generador):
-    def emitir():
-        try:
-            for evento in generador:
-                yield json.dumps(evento, ensure_ascii=False, default=str) + "\n"
-            yield json.dumps({"fase": "fin"}) + "\n"
-        except (ErrorConfig, ErrorGestion, requests_lib.RequestException) as e:
-            yield json.dumps({"fase": "error", "mensaje": str(e)}, ensure_ascii=False) + "\n"
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
-
-
-def _num_gpus() -> int:
-    try:
-        return max(1, len(recursos_gestor().radiografia().get("gpus") or []))
-    except Exception:
-        return 1
-
-
-@app.get("/api/modelos/catalogo")
-def modelos_catalogo():
-    return ollama_opciones.catalogo(_num_gpus())
-
-
-@app.get("/api/modelos")
-def modelos_lista():
-    # «propios»: los que sirve Prig sin Ollama (motor MoE), con sus capacidades para que el chat
-    # muestre sus opciones (Pensar, Herramientas). Van aparte: no admiten borrar, copiar ni actualizar.
-    from ai_engine import motor_moe as motor_moe_mod
-    propios = [{"nombre": m["name"], "capacidades": list(motor_moe_mod.CAPACIDADES), "motor": m.get("motor")}
-               for m in ai_engine._modelos_propios()]
-    return {"modelos": _modelos(gestor_modelos.instalados), "disco": _modelos(gestor_modelos.uso_disco),
-            "propios": propios}
-
-
-@app.get("/api/modelos/ficha")
-def modelos_ficha(modelo: str):
-    return _modelos(gestor_modelos.ficha, modelo)
-
-
-@app.get("/api/modelos/config")
-def modelos_config(modelo: Optional[str] = None, uso: Optional[str] = None):
-    cfg = ollama_opciones.config()
-    capas = {"global": cfg.capa("global")}
-    if modelo:
-        capas["modelo"] = _modelos(cfg.capa, "modelo", modelo)
-    if uso:
-        capas["uso"] = _modelos(cfg.capa, "uso", None, uso)
-        if modelo:
-            capas["modelo_uso"] = _modelos(cfg.capa, "modelo_uso", modelo, uso)
-    del_modelo = {}
-    if modelo:
-        try:
-            del_modelo = gestor_modelos.ficha(modelo)["parametros"]
-        except Exception:
-            del_modelo = {}
-    # Lo que la configuración global de IA sigue enviando (contexto, tope, hilos…)
-    globales = ai_engine._build_options(None)
-    for k in list(cfg.resolver(None, None)["opciones"]):
-        globales.pop(k, None)
-    return {"capas": capas, "efectivo": cfg.resolver(modelo, uso), "del_modelo": del_modelo,
-            "configuracion_ia": globales}
-
-
-class ModelosConfigRequest(BaseModel):
-    capa: str
-    modelo: Optional[str] = None
-    uso: Optional[str] = None
-    valores: Dict[str, Any] = {}
-    reemplazar: bool = False
-
-
-@app.post("/api/modelos/config")
-def modelos_config_fijar(req: ModelosConfigRequest):
-    return {"capa": _modelos(ollama_opciones.config().fijar, req.capa, req.valores, req.modelo, req.uso, req.reemplazar)}
-
-
-class ModelosPlantillaRequest(BaseModel):
-    capa: str
-    plantilla: str
-    modelo: Optional[str] = None
-    uso: Optional[str] = None
-
-
-@app.post("/api/modelos/plantilla")
-def modelos_plantilla(req: ModelosPlantillaRequest):
-    plantilla = ollama_opciones.PLANTILLAS.get(req.plantilla)
-    if not plantilla:
-        raise HTTPException(status_code=400, detail="Plantilla desconocida")
-    cfg = ollama_opciones.config()
-    actual = _modelos(cfg.capa, req.capa, req.modelo, req.uso)
-    muestreo = {"temperature", "top_k", "top_p", "min_p", "seed", "repeat_penalty", "repeat_last_n",
-                "presence_penalty", "frequency_penalty"}
-    nuevo = {k: v for k, v in actual.items() if k not in muestreo}
-    nuevo.update(plantilla["valores"])
-    return {"capa": _modelos(cfg.fijar, req.capa, nuevo, req.modelo, req.uso, True)}
-
-
-class ModelosProbarRequest(BaseModel):
-    modelo: str
-    prompt: str = ""
-    uso: Optional[str] = None
-    system: Optional[str] = None
-    opciones: Dict[str, Any] = {}
-    think: Optional[bool] = None
-    format: Optional[Any] = None          # "json" o un esquema JSON
-    logprobs: int = 0
-    raw: bool = False
-    template: Optional[str] = None
-    suffix: Optional[str] = None
-
-
-@app.post("/api/modelos/probar")
-def modelos_probar(req: ModelosProbarRequest):
-    opciones = _modelos(ollama_opciones.validar, req.opciones)
-    op_motor, campos = ollama_opciones.separar(opciones)
-    payload = {"model": req.modelo, "prompt": req.prompt,
-               "options": ai_engine._build_options(op_motor, req.modelo, req.uso)}
-    sistema = ai_engine._completar_payload(payload, req.modelo, req.uso,
-                                           req.think if req.think is not None else campos.get("think"),
-                                           req.system or "")["sistema"]
-    for clave in ("keep_alive", "truncate", "shift"):
-        if clave in campos:
-            payload[clave] = campos[clave]
-    if sistema:
-        payload["system"] = sistema
-    if req.format is not None and req.format != "":
-        if isinstance(req.format, str) and req.format != "json":
-            try:
-                payload["format"] = json.loads(req.format)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="El esquema JSON no es válido")
-        else:
-            payload["format"] = req.format
-    if req.logprobs:
-        payload["logprobs"] = True
-        payload["top_logprobs"] = max(1, min(int(req.logprobs), 5))
-    if req.raw:
-        payload["raw"] = True
-    if req.template:
-        payload["template"] = req.template
-    if req.suffix:
-        if "insert" not in ai_engine.capacidades(req.modelo):
-            raise HTTPException(status_code=400, detail=f"{req.modelo} no admite rellenar al medio (suffix)")
-        payload["suffix"] = req.suffix
-    datos = _modelos(gestor_modelos.probar, payload)
-    return {
-        "respuesta": datos.get("response", ""),
-        "pensamiento": datos.get("thinking", ""),
-        "metricas": ai_engine.metricas(datos, payload["options"].get("num_ctx")),
-        "logprobs": [{"token": p.get("token"), "logprob": p.get("logprob"),
-                      "alternativas": [{"token": a.get("token"), "logprob": a.get("logprob")} for a in (p.get("top_logprobs") or [])]}
-                     for p in (datos.get("logprobs") or [])[:4000]],
-        "peticion": {k: v for k, v in payload.items() if k != "prompt"},
-    }
-
-
-class ModelosCrearRequest(BaseModel):
-    nombre: str
-    desde: str
-    system: str = ""
-    parametros: Dict[str, Any] = {}
-    mensajes: List[Dict[str, str]] = []
-    licencia: str = ""
-
-
-# Los que se comprobó que Ollama guarda al crear una variante (show → parameters)
-PARAMETROS_VARIANTE = {"temperature", "top_k", "top_p", "min_p", "seed", "repeat_penalty", "repeat_last_n",
-                       "presence_penalty", "frequency_penalty", "num_predict", "stop", "num_ctx", "num_keep"}
-
-
-@app.post("/api/modelos/crear")
-def modelos_crear(req: ModelosCrearRequest):
-    fuera = set(req.parametros) - PARAMETROS_VARIANTE
-    if fuera:
-        raise HTTPException(status_code=400, detail=f"No se pueden guardar en una variante: {', '.join(sorted(fuera))}")
-    gestor_modelos.base = ai_engine.base_url.rstrip("/")
-    return _ndjson(gestor_modelos.crear_variante(req.nombre, req.desde, req.system, req.parametros,
-                                                 req.mensajes, req.licencia))
-
-
-class ModelosCopiarRequest(BaseModel):
-    origen: str
-    destino: str
-    copiar_config: bool = True
-
-
-@app.post("/api/modelos/copiar")
-def modelos_copiar(req: ModelosCopiarRequest):
-    r = _modelos(gestor_modelos.copiar, req.origen, req.destino)
-    if req.copiar_config:
-        ollama_opciones.config().renombrar_modelo(req.origen, r["modelo"])
-    return r
-
-
-class ModelosNombreRequest(BaseModel):
-    modelo: str
-    uso: Optional[str] = None
-
-
-@app.post("/api/modelos/borrar")
-def modelos_borrar(req: ModelosNombreRequest):
-    return _modelos(gestor_modelos.borrar, req.modelo)
-
-
-class ModelosImportarRequest(BaseModel):
-    ruta: str
-    nombre: str
-
-
-@app.post("/api/modelos/importar")
-def modelos_importar(req: ModelosImportarRequest):
-    ruta = os.path.realpath(os.path.expanduser(req.ruta))
-    casa = os.path.realpath(os.path.expanduser("~"))
-    if not (ruta + os.sep).startswith(casa + os.sep):
-        raise HTTPException(status_code=403, detail="Solo se importan archivos de tu carpeta personal")
-    if not ruta.lower().endswith(".gguf"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser .gguf")
-    gestor_modelos.base = ai_engine.base_url.rstrip("/")
-    return _ndjson(gestor_modelos.importar_gguf(ruta, req.nombre))
-
-
-@app.get("/api/modelos/actualizaciones")
-def modelos_actualizaciones():
-    return {"modelos": _modelos(gestor_modelos.actualizaciones)}
-
-
-@app.get("/api/modelos/cargados")
-def modelos_cargados():
-    return {"modelos": _modelos(gestor_modelos.cargados)}
-
-
-@app.post("/api/modelos/precargar")
-def modelos_precargar(req: ModelosNombreRequest):
-    campos = ai_engine._campos_peticion(req.modelo, req.uso)
-    opciones = {k: v for k, v in ai_engine._build_options(None, req.modelo, req.uso).items()
-                if k in ("num_ctx", "num_gpu", "num_batch", "num_thread", "use_mmap", "main_gpu")}
-    return _modelos(gestor_modelos.precargar, req.modelo, opciones,
-                    campos.get("keep_alive", ai_engine.config.get("keep_alive")))
-
-
-@app.post("/api/modelos/descargar")
-def modelos_descargar(req: ModelosNombreRequest):
-    return _modelos(gestor_modelos.descargar, req.modelo)
+# Las rutas de modelos (/api/modelos, catalogo, ficha, config, plantilla, probar, crear, copiar, borrar, importar,
+# actualizaciones, cargados, precargar, descargar, parciales, registro) son del servidor de Rust (routes/modelos.rs).
+# Aquí quedan los embeddings, con el índice semántico.
 
 
 def _carpeta_modelos_servidor() -> Optional[str]:
@@ -5763,25 +4567,6 @@ def _carpeta_modelos_servidor() -> Optional[str]:
         return entorno.get("OLLAMA_MODELS")
     except Exception:
         return None
-
-
-@app.get("/api/modelos/parciales")
-def modelos_parciales():
-    return gestor_modelos.parciales(_carpeta_modelos_servidor())
-
-
-@app.delete("/api/modelos/parciales")
-def modelos_borrar_parciales():
-    return gestor_modelos.borrar_parciales(_carpeta_modelos_servidor())
-
-
-@app.get("/api/modelos/registro")
-def modelos_registro(lineas: int = 400):
-    try:
-        dueno = recursos_srv.estado().get("dueno")
-    except Exception:
-        dueno = None
-    return recursos_srv.leer_registro(lineas, dueno)
 
 
 @app.get("/api/modelos/embeddings")
@@ -5834,22 +4619,6 @@ def _buscador(fn, *args, **kwargs):
         raise HTTPException(status_code=503, detail=f"Sin conexión con la plataforma: {e}")
 
 
-def _instalados_tags() -> List[Dict[str, Any]]:
-    try:
-        return requests_lib.get(f"{ai_engine.base_url}/api/tags", timeout=10).json().get("models", [])
-    except Exception:
-        return []
-
-
-def _nombres_instalados() -> set:
-    nombres = set()
-    for m in _instalados_tags():
-        nombres.add(m["name"])
-        if m["name"].endswith(":latest"):
-            nombres.add(m["name"][:-7])
-    return nombres
-
-
 def _al_terminar_descarga(item):
     try:
         recursos_gestor().olvidar_fichas()
@@ -5868,99 +4637,8 @@ descargas = Descargas(lambda: ai_engine.base_url.rstrip("/"),
 seguimiento = buscador_modelos.Seguimiento()
 
 
-@app.get("/api/buscador/fuentes")
-def buscador_fuentes():
-    return {"fuentes": buscador_modelos.FUENTES, "ordenes": buscador_modelos.ORDENES,
-            "capacidades_ollama": buscador_modelos.CAPACIDADES_OLLAMA}
-
-
-@app.get("/api/buscador/buscar")
-def buscador_buscar(q: str = "", fuentes: str = "ollama,huggingface,modelscope", orden: str = "relevancia",
-                    capacidad: Optional[str] = None, pagina_ollama: Optional[int] = None,
-                    pagina_huggingface: Optional[str] = None, pagina_modelscope: Optional[int] = None):
-    r = buscador_modelos.buscar(q.strip(), [f.strip() for f in fuentes.split(",") if f.strip()], orden, capacidad,
-                                {"ollama": pagina_ollama, "huggingface": pagina_huggingface, "modelscope": pagina_modelscope})
-    _marcar_modelos([m for datos in r["fuentes"].values() for m in datos["modelos"]])
-    return r
-
-
-def _marcar_modelos(modelos):
-    """ Añade a cada resultado si el usuario lo sigue y si ya tiene alguna variante instalada """
-    seguidos = {f"{x['fuente']}:{x['id']}" for x in seguimiento.lista()}
-    instalados = {n.lower() for n in _nombres_instalados()}
-    for m in modelos:
-        m["seguido"] = f"{m['fuente']}:{m['id']}" in seguidos
-        prefijo = {"ollama": m["id"], "huggingface": f"hf.co/{m['id']}", "modelscope": f"modelscope.cn/{m['id']}"}[m["fuente"]].lower()
-        m["instalado"] = any(n == prefijo or n.startswith(prefijo + ":") for n in instalados)
-
-
-@app.get("/api/buscador/localizar")
-def buscador_localizar(texto: str):
-    """ Un modelo concreto por nombre, «propietario/repo», orden de Ollama o enlace de cualquier plataforma """
-    r = _buscador(buscador_modelos.localizar, texto)
-    _marcar_modelos(r["exactos"] + r["parecidos"])
-    return r
-
-
-@app.get("/api/buscador/variantes")
-def buscador_variantes(fuente: str, id: str):
-    datos = _buscador(buscador_modelos.variantes, fuente, id)
-    instalados = _nombres_instalados()
-    for v in datos["variantes"]:
-        v["instalado"] = v["ref"] in instalados or v["ref"].lower() in {n.lower() for n in instalados}
-    return datos
-
-
-@app.get("/api/buscador/comprobar")
-def buscador_comprobar(ref: str):
-    return _buscador(buscador_modelos.comprobar, ref)
-
-
-@app.get("/api/buscador/analizar")
-def buscador_analizar(ref: str):
-    try:
-        return buscador_modelos.analizar_variante(ref)
-    except ErrorBuscador as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"No se pudo leer la cabecera del modelo: {e}")
-
-
-@app.get("/api/buscador/novedades")
-def buscador_novedades():
-    return buscador_modelos.novedades()
-
-
-@app.get("/api/buscador/actualizaciones")
-def buscador_actualizaciones(max_edad: int = 86400, forzar: bool = False):
-    return _buscador(seguimiento.actualizaciones, _instalados_tags, max_edad, forzar)
-
-
-class SeguirRequest(BaseModel):
-    fuente: str
-    id: str
-    titulo: Optional[str] = None
-
-
-@app.get("/api/buscador/seguidos")
-def buscador_seguidos(revisar: bool = False):
-    return {"seguidos": _buscador(seguimiento.revisar) if revisar else seguimiento.lista()}
-
-
-@app.post("/api/buscador/seguidos")
-def buscador_seguir(req: SeguirRequest):
-    return _buscador(seguimiento.seguir, req.fuente, req.id, req.titulo)
-
-
-@app.post("/api/buscador/seguidos/dejar")
-def buscador_dejar(req: SeguirRequest):
-    seguimiento.dejar(req.fuente, req.id)
-    return {"ok": True}
-
-
-@app.post("/api/buscador/seguidos/visto")
-def buscador_visto(req: SeguirRequest):
-    return _buscador(seguimiento.marcar_visto, req.fuente, req.id)
+# El buscador de modelos (/api/buscador/*) lo atiende el servidor de Rust (prig_modelos::explorar); aquí queda el
+# seguimiento para que una descarga terminada lo marque al día
 
 
 class DescargaModeloRequest(BaseModel):
@@ -6208,37 +4886,7 @@ def _registrar_telemetria(d: Dict[str, Any], evento: str, **extra):
         print(f"⚠️ Telemetría de desafíos: {e}")
 
 
-class GeminiClaveRequest(BaseModel):
-    clave: str
-    acepto_aviso: bool = False
-
-
-def _gemini(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except gemini_motor.ErrorGemini as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/api/gemini/estado")
-def gemini_estado():
-    """ Nunca devuelve la clave: solo si hay una y sus 4 primeros y últimos caracteres """
-    return gemini_motor.estado()
-
-
-@app.post("/api/gemini/clave")
-def gemini_guardar_clave(req: GeminiClaveRequest):
-    return _gemini(gemini_motor.guardar_clave, req.clave, req.acepto_aviso)
-
-
-@app.delete("/api/gemini/clave")
-def gemini_borrar_clave():
-    return gemini_motor.borrar_clave()
-
-
-@app.get("/api/gemini/modelos")
-def gemini_modelos():
-    return {"modelos": _gemini(gemini_motor.listar_modelos)}
+# Gemini (estado, clave, modelos): los sirve el servidor de Rust (routes/ia.rs; prig_ia::gemini)
 
 
 class ProgresoAnalisisRequest(BaseModel):
@@ -6252,53 +4900,14 @@ def progreso_resumen(dias: int = Query(default=120, ge=7, le=365)):
     return _desafio(progreso.resumen, desafios_almacen, guided, telemetry, dataset_mgr, dias, kaggle_lector)
 
 
+# Inicio, su perfil y el estado de la máquina (/api/system/stats, /api/system/health): servidor de Rust
+# (routes/inicio.rs)
 class InicioPerfilRequest(BaseModel):
     nombre: Optional[str] = None
     objetivo: Optional[str] = None
     nivel: Optional[str] = None
     mostrar_al_abrir: Optional[bool] = None
     favoritas: Optional[List[str]] = None
-
-
-@app.get("/api/inicio")
-def inicio_resumen():
-    """ Todo lo de la pantalla de Inicio en una petición; cada bloque falla por separado """
-    def temperaturas():
-        lectura = recursos_termico.monitor().lectura()
-        gob = recursos_termico.gobernador()
-        gpu = next((c for c in lectura.get("componentes", []) if c.get("tipo") == "gpu"), None)
-        cpu = next((c for c in lectura.get("componentes", []) if c.get("tipo") == "cpu"), None)
-        return {"gpu": gpu and gpu.get("temp"), "cpu": cpu and cpu.get("temp"), "limite": gob.limite,
-                "pausa": bool(gob.pausa)}
-    fuentes = {
-        "progreso": lambda: progreso.resumen(desafios_almacen, guided, telemetry, dataset_mgr, 120, kaggle_lector),
-        "historial": lambda: progreso.historial(desafios_almacen, limite=30),
-        "lecturas": kaggle_lector.resumen_lecturas,
-        "colecciones_recientes": lambda: kaggle_colecciones.recientes(12),
-        "colecciones": kaggle_colecciones.listar,
-        "descargas": lambda: kaggle_explorar.mis_datos(file_mgr.base_dir),
-        "ejercicios": lambda: telemetry.recientes(12),
-        "modelos": lambda: gestor_modelos.instalados(),
-        "cargados": lambda: gestor_modelos.cargados(),
-        "modelo_tutor": lambda: ai_engine.config.get("agent1_model"),
-        "gemini": gemini_motor.estado,
-        "sistema": get_system_stats,
-        "temperaturas": temperaturas,
-        "proyecto": lambda: {"path": file_mgr.base_dir, "name": os.path.basename(file_mgr.base_dir) or file_mgr.base_dir},
-        "recientes": ide.recientes,
-        "kaggle_cuenta": kaggle_lector.estado,
-    }
-    return inicio.resumen(fuentes)
-
-
-@app.get("/api/inicio/perfil")
-def inicio_perfil():
-    return inicio.perfil()
-
-
-@app.patch("/api/inicio/perfil")
-def inicio_perfil_guardar(req: InicioPerfilRequest):
-    return inicio.guardar_perfil({k: v for k, v in req.model_dump().items() if v is not None})
 
 
 @app.get("/api/progreso/historial")
@@ -6760,41 +5369,7 @@ def desafios_evaluar_salida(req: DesafioEvaluarSalidaRequest):
     }
 
 
-@app.post("/api/youtube/analizar")
-def youtube_analizar(req: YouTubeAnalisisRequest):
-    """ Analiza el texto del video para generar resumen estructurado o dividirlo en objetivos didácticos """
-    motor, nombre_modelo = _motor_desafios(req.modelo, "tutor")
-    import youtube_analisis
-
-    contexto = youtube_analisis.preparar_contexto_video(
-        video_id=req.video_id,
-        titulo=req.titulo,
-        canal=req.canal or "YouTube",
-        duracion=req.duracion or "",
-        descripcion=req.descripcion or "",
-        texto_usuario=req.texto_usuario or "",
-        notas_usuario=req.notas_usuario or ""
-    )
-
-    # fuente: "transcripcion", "texto_usuario" o "solo_metadatos" (la interfaz avisa que sin transcripción
-    # el análisis se basa solo en el título y la descripción)
-    resultado = {"fuente": contexto["fuente"], "transcripcion_completa": contexto["transcripcion_completa"]}
-    try:
-        if req.modo in ("resumen", "ambos"):
-            resultado["resumen"] = youtube_analisis.generar_resumen_estructurado(
-                motor, nombre_modelo, req.titulo, req.canal or "YouTube",
-                req.duracion or "", contexto["texto"], req.categoria or ""
-            )
-        if req.modo in ("objetivos", "ambos"):
-            resultado["objetivos"] = youtube_analisis.generar_objetivos_didacticos(
-                motor, nombre_modelo, req.titulo, req.canal or "YouTube",
-                req.duracion or "", contexto["texto"], req.nivel or "intermedio", req.categoria or "",
-                duracion_segundos=contexto["duracion_segundos"]
-            )
-    except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-    return resultado
+# Analizar un video y traducir un fragmento: servidor de Rust (routes/profesor.rs)
 
 
 @app.post("/api/youtube/crear-desafio")
@@ -6980,40 +5555,6 @@ def youtube_transcripcion(video_id: str, idioma: str = "es", forzar: bool = Fals
         raise HTTPException(status_code=400, detail="Falta el parámetro 'video_id'")
     import youtube_analisis
     return youtube_analisis.extraer_transcripcion_estructurada(video_id, idioma_destino=idioma, forzar_refresco=forzar)
-
-
-@app.post("/api/youtube/traducir_texto")
-def youtube_traducir_texto(req: YouTubeTraducirRequest):
-    """ Traduce o explica un fragmento de texto del video con el modelo pedagógico """
-    if not req.texto or not req.texto.strip():
-        raise HTTPException(status_code=400, detail="El texto a traducir está vacío")
-
-    modelo = _modelo_desafios(req.modelo, "tutor")
-    motor, nombre_modelo = _motor_desafios(modelo)
-
-    prompt = (
-        f"Traduce y explica de forma clara, didáctica y rigurosa el siguiente fragmento técnico "
-        f"de una clase de programación al español. Mantén intactos nombres de funciones, librerías, "
-        f"términos en código y palabras reservadas.\n\n"
-        f"TEXTO ORIGINAL:\n«{req.texto.strip()}»\n\n"
-        f"Responde directamente con la traducción explicada, fluida y precisa:"
-    )
-
-    try:
-        # generate_response es la interfaz común de los dos motores (Ollama y Gemini); «completar» no existía
-        traduccion = "".join(motor.generate_response(prompt, model=nombre_modelo, think=False,
-                                                     options={"temperature": 0.2}, uso="tutor")).strip()
-        # Limpiar tags <think> si el modelo es razonador
-        traduccion = re.sub(r"<think>[\s\S]*?</think>", "", traduccion, flags=re.I).strip()
-        import youtube_analisis
-        if youtube_analisis.error_del_motor(traduccion) or not traduccion:
-            return {"ok": False, "error": traduccion or "El modelo no devolvió texto.", "original": req.texto}
-        return {"ok": True, "traduccion": traduccion, "original": req.texto}
-    except Exception as e:
-        logger.error(f"Error traduciendo fragmento de YouTube: {e}")
-        return {"ok": False, "error": str(e), "original": req.texto}
-
-
 
 
 # ============================================================================

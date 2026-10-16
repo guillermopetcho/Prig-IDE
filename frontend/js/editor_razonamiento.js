@@ -23,11 +23,14 @@
             this.anchoPorcentaje = 25; // 25% de ancho por defecto
             this.archivoActivo = 'main.py';
             this.lineaCursor = 1;
+            this.qwenActivo = (typeof window !== 'undefined' && window.isQwenEditorActivo)
+                ? window.isQwenEditorActivo()
+                : (localStorage.getItem('prig_qwen_editor_activo') !== 'false');
 
             // Datos de Razonamiento del Modelo
             this.razonamiento = {
                 modelo: 'qwen2.5-coder:7b',
-                estado: 'listo', // 'listo' | 'pensando' | 'pausado'
+                estado: this.qwenActivo ? 'listo' : 'pausado', // 'listo' | 'pensando' | 'pausado'
                 tiempoCoT: '1.4s',
                 tokSeg: '44 tok/s',
                 cotExpandido: true,
@@ -393,8 +396,28 @@
             }
         }
 
+        fijarQwenActivo(activo) {
+            this.qwenActivo = !!activo;
+            if (this.qwenActivo) {
+                this.razonamiento.estado = 'listo';
+                const ed = window.editorMgr ? window.editorMgr.editor : null;
+                if (ed && ed.getModel()) {
+                    this.analizarCodigoBuffer(ed.getModel().getValue(), this.archivoActivo);
+                }
+            } else {
+                this.razonamiento.estado = 'pausado';
+                if (this._timerParseo) {
+                    clearTimeout(this._timerParseo);
+                    this._timerParseo = null;
+                }
+            }
+            this.renderizar();
+            this.actualizarOverlay();
+        }
+
         /** Analiza el búfer de código y extrae la jerarquía completa de clases, funciones y métodos */
         analizarCodigoBuffer(codigo, ruta = '') {
+            if (!this.qwenActivo) return;
             if (typeof codigo !== 'string' || !codigo.trim()) return;
             const rutaNormalizada = (ruta || this.archivoActivo || '').toLowerCase();
             const esJsTs = rutaNormalizada.endsWith('.js') || rutaNormalizada.endsWith('.ts') || rutaNormalizada.endsWith('.jsx') || rutaNormalizada.endsWith('.tsx');
@@ -763,7 +786,7 @@
             this._actualizarContadorNotas();
 
             const ed = window.editorMgr ? window.editorMgr.editor : null;
-            if (ed && ed.getModel()) {
+            if (ed && ed.getModel() && this.qwenActivo) {
                 this.analizarCodigoBuffer(ed.getModel().getValue(), this.archivoActivo);
             }
 
@@ -801,12 +824,18 @@
                 </div>
 
                 <!-- Barra de Telemetría Profesional -->
-                <div class="razonamiento-telemetria-bar">
-                    <span class="razonamiento-modelo-pill">
-                        <span class="razonamiento-dot-pulse ${this.razonamiento.estado === 'pensando' ? 'pensando' : ''}"></span>
-                        ${this.razonamiento.modelo}
-                    </span>
-                    <span>${this.razonamiento.tokSeg} · CoT ${this.razonamiento.tiempoCoT}</span>
+                <div class="razonamiento-telemetria-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="razonamiento-modelo-pill ${!this.qwenActivo ? 'pausado' : ''}">
+                            <span class="razonamiento-dot-pulse ${this.qwenActivo && this.razonamiento.estado === 'pensando' ? 'pensando' : ''}"></span>
+                            ${this.qwenActivo ? this.razonamiento.modelo : 'Qwen: Desactivado'}
+                        </span>
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; color: var(--text-muted); font-weight: 600;" title="Activar/desactivar análisis de Qwen sobre este archivo">
+                            <input type="checkbox" id="chk-qwen-telemetria" ${this.qwenActivo ? 'checked' : ''} onchange="window.alternarQwenEditor && window.alternarQwenEditor(this.checked);" style="accent-color: #cba6f7; cursor: pointer; width: 13px; height: 13px; margin: 0;">
+                            <span>Analizar</span>
+                        </label>
+                    </div>
+                    <span>${this.qwenActivo ? `${this.razonamiento.tokSeg} · CoT ${this.razonamiento.tiempoCoT}` : 'Pausado'}</span>
                 </div>
 
                 <!-- Ámbito Activo / Scope Header -->

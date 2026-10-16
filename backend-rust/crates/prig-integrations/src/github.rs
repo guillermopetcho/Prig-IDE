@@ -451,7 +451,8 @@ pub fn leer_archivo(texto: &str, ruta: &str) -> Result<Mapa, Fallo> {
     };
     let cache = carpeta().join("archivos").join(r.replace('/', "__")).join(format!("{sha}.txt"));
     let contenido = match std::fs::read(&cache) {
-        Ok(b) => String::from_utf8(b).map_err(|_| Fallo::Interno)?,
+        // `open(cache).read()` de Python, en modo texto: los saltos «\r\n» y «\r» se leen como «\n»
+        Ok(b) => String::from_utf8(b).map_err(|_| Fallo::Interno)?.replace("\r\n", "\n").replace('\r', "\n"),
         Err(_) => {
             let c = crudo(&r, &s(info.valor("rama")), ruta)?;
             std::fs::create_dir_all(cache.parent().ok_or(Fallo::Interno)?).map_err(|_| Fallo::Interno)?;
@@ -847,4 +848,271 @@ pub fn exportado(ruta: &str, espacio: &Path) -> Option<PathBuf> {
     let raiz = std::fs::canonicalize(espacio.join(CARPETA_EXPORT)).ok()?;
     let real = std::fs::canonicalize(ruta).ok()?;
     (real.starts_with(&raiz) && real != raiz && real.is_file()).then_some(real)
+}
+
+// ---------------------------------------------------------------------------------------------- el profesor
+
+pub const NIVELES: [(&str, &str); 3] = [
+    ("principiante", "El alumno está empezando: explica cada término técnico la primera vez y usa analogías sencillas."),
+    ("intermedio", "El alumno programa con soltura: céntrate en el diseño, las decisiones y lo que no es obvio."),
+    ("avanzado", "El alumno es avanzado: ve directo a la arquitectura, los compromisos y los detalles finos."),
+];
+
+pub fn es_nivel(n: &str) -> bool {
+    NIVELES.iter().any(|(k, _)| *k == n)
+}
+
+pub const SISTEMA_REPO: &str = "Eres un ingeniero de software senior que presenta un repositorio de GitHub a un alumno
+que va a leerlo. En español, concreto, apoyándote SOLO en lo que se te da (README, estructura,
+lenguajes y el código de los archivos clave). Usa exactamente estas secciones en markdown:
+
+## Qué es
+Qué problema resuelve y para quién, en 2-4 frases.
+## Cómo está organizado
+Las carpetas y archivos importantes y el papel de cada uno (cita las rutas entre `comillas de código`).
+## Cómo funciona
+El flujo principal: por dónde entra la ejecución y qué pasa después.
+## Tecnologías y conceptos
+Lenguajes, librerías y patrones que usa, y qué aprender para entenderlo.
+## Por dónde empezar a leer
+Un orden de lectura de 4-6 archivos concretos, con el porqué de cada uno.
+## Cómo probarlo
+Los pasos para instalarlo y ejecutarlo en local, si se deducen del repositorio.
+
+No inventes archivos ni funciones que no aparezcan.";
+
+pub const SISTEMA_ARCHIVO: &str = "Eres un ingeniero de software senior que lee un archivo de un repositorio de GitHub JUNTO
+al alumno. En español y apoyándote en el código que se te da. Usa estas secciones en markdown:
+
+### Qué hace
+El propósito del archivo en 2-3 frases.
+### Partes importantes
+Las funciones, clases o bloques clave en orden, qué hace cada uno (cita el código entre `comillas`).
+### Cómo encaja en el proyecto
+Quién lo usa o a quién llama, según la estructura del repositorio.
+### Conceptos
+Las ideas de programación que aparecen y merecen aprenderse.
+### Para pensar
+Una pregunta o un pequeño cambio que el alumno podría intentar.";
+
+pub const SISTEMA_PREGUNTAR: &str = "Eres un ingeniero de software senior que lee con el alumno un repositorio de GitHub. Responde en español, claro y breve (menos de 200 palabras), apoyándote en el código. Si algo no está en lo que ves, dilo.";
+
+static CLAVE_ARCHIVOS: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(^|/)(readme[^/]*|setup\.py|pyproject\.toml|requirements[^/]*\.txt|package\.json|cargo\.toml|go\.mod|main\.[a-z]+|app\.[a-z]+|__main__\.py|index\.[jt]sx?|cli\.py|manage\.py|dockerfile|makefile)$",
+    )
+    .unwrap()
+});
+static PRUEBAS_Y_DOCS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(^|/)(tests?|docs?|examples?|\.github)/").unwrap());
+static IMAGENES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"!\[[^\]]*\]\([^)]*\)|<img[^>]*>").unwrap());
+
+fn corta(t: &str, n: usize) -> String {
+    t.chars().take(n).collect()
+}
+
+fn bytes_de(a: &Mapa) -> f64 {
+    a.get("bytes").and_then(Valor::num).unwrap_or(0.0)
+}
+
+/// El árbol resumido: carpetas con su número de archivos y los archivos de la raíz
+pub fn estructura(info: &Mapa, max_lineas: usize) -> String {
+    let mut carpetas: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
+    let mut raiz = Vec::new();
+    for a in archivos(info) {
+        let ruta = s(a.valor("ruta"));
+        let partes: Vec<&str> = ruta.split('/').collect();
+        if partes.len() == 1 {
+            raiz.push(ruta.clone());
+        } else {
+            for n in 1..partes.len().min(3) {
+                *carpetas.entry(format!("{}/", partes[..n].join("/"))).or_insert(0) += 1;
+            }
+        }
+    }
+    raiz.sort();
+    let mut lineas: Vec<String> = carpetas.iter().map(|(c, n)| format!("{c}  ({n} archivos)")).collect();
+    lineas.extend(raiz);
+    let mut t = lineas.iter().take(max_lineas).cloned().collect::<Vec<_>>().join("\n");
+    if lineas.len() > max_lineas {
+        t.push_str("\n…");
+    }
+    t
+}
+
+/// Los que mejor cuentan el proyecto: configuración, puntos de entrada y el código de la raíz del paquete
+pub fn archivos_clave(info: &Mapa, limite: usize) -> Vec<String> {
+    let readme = info.get("readme_ruta").map(s);
+    let codigo: Vec<Mapa> =
+        archivos(info).into_iter().filter(|a| !BINARIOS.is_match(&s(a.valor("ruta"))) && bytes_de(a) > 0.0 && bytes_de(a) <= 60_000.0).collect();
+    let mut clave: Vec<String> = codigo
+        .iter()
+        .map(|a| s(a.valor("ruta")))
+        .filter(|r| CLAVE_ARCHIVOS.is_match(r) && Some(r) != readme.as_ref())
+        .collect();
+    clave.sort_by(|a, b| (a.matches('/').count(), a).cmp(&(b.matches('/').count(), b)));
+    let mut fuente: Vec<&Mapa> = codigo
+        .iter()
+        .filter(|a| {
+            let r = s(a.valor("ruta"));
+            !["plaintext", "markdown", "json", "yaml", "toml"].contains(&lenguaje(&r)) && !PRUEBAS_Y_DOCS.is_match(&r) && !clave.contains(&r)
+        })
+        .collect();
+    fuente.sort_by(|a, b| {
+        let (ra, rb) = (s(a.valor("ruta")), s(b.valor("ruta")));
+        ra.matches('/').count().cmp(&rb.matches('/').count()).then(bytes_de(b).partial_cmp(&bytes_de(a)).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    let mut salida: Vec<String> = clave.into_iter().take(4).collect();
+    salida.extend(fuente.into_iter().map(|a| s(a.valor("ruta"))));
+    salida.truncate(limite);
+    salida
+}
+
+fn o_texto(v: Option<&Valor>, defecto: &str) -> String {
+    match v {
+        Some(x) if x.verdad() => s(x),
+        _ => defecto.to_string(),
+    }
+}
+
+/// El repositorio para el modelo: datos, estructura, README y el código de los archivos clave (hasta el presupuesto)
+pub fn contexto_repo(info: &Mapa, presupuesto: usize) -> String {
+    let r = s(info.valor("ref"));
+    let lenguajes: Vec<String> = info
+        .lista("lenguajes")
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|l| if let Valor::Mapa(l) = l { Some(format!("{} {}%", s(l.valor("nombre")), s(l.valor("pct")))) } else { None })
+        .collect();
+    let temas: Vec<String> = info.lista("temas").unwrap_or(&[]).iter().map(s).collect();
+    let temas = if temas.is_empty() { "-".to_string() } else { temas.join(", ") };
+    let mut partes = vec![
+        format!("REPOSITORIO: {r} · {}", o_texto(info.get("descripcion"), "sin descripción")),
+        format!("Lenguajes: {}", lenguajes.join(", ")),
+        format!(
+            "Temas: {temas} · Estrellas: {} · Licencia: {}",
+            info.get("estrellas").cloned().unwrap_or(Valor::Nulo).texto_py(),
+            o_texto(info.get("licencia"), "-")
+        ),
+        format!("ESTRUCTURA ({} archivos):\n{}", archivos(info).len(), estructura(info, 120)),
+    ];
+    if let Some(readme) = info.get("readme").filter(|x| x.verdad()) {
+        partes.push(format!("README:\n{}", corta(&IMAGENES.replace_all(&s(readme), ""), 4000)));
+    }
+    let mut usado: usize = partes.iter().map(|p| p.chars().count()).sum();
+    for ruta in archivos_clave(info, 8) {
+        if usado > presupuesto {
+            break;
+        }
+        let Ok(a) = leer_archivo(&r, &ruta) else { continue };
+        let contenido = a.get("contenido").filter(|c| c.verdad()).map(s);
+        let Some(contenido) = contenido else { continue };
+        let tope = 800usize.max(3500usize.min(presupuesto.saturating_sub(usado)));
+        let trozo = corta(&contenido, tope);
+        usado += trozo.chars().count();
+        partes.push(format!("--- {ruta} ---\n{trozo}"));
+    }
+    partes.join("\n\n")
+}
+
+/// (prompt, sistema) para explicar un archivo. Error: no se puede explicar (binario o demasiado grande)
+pub fn pedido_archivo(info: &Mapa, ruta: &str, nivel: &str) -> Result<(String, String), Fallo> {
+    let a = leer_archivo(&s(info.valor("ref")), ruta)?;
+    let contenido = a.get("contenido").filter(|c| c.verdad()).map(s);
+    let Some(contenido) = contenido else { return error("Ese archivo no se puede explicar (es binario o demasiado grande).") };
+    let recortado = if contenido.chars().count() > 12000 { "\n… (archivo recortado)" } else { "" };
+    let prompt = format!(
+        "REPOSITORIO: {} · {}\n\nESTRUCTURA:\n{}\n\nARCHIVO {ruta} ({} líneas):\n{}{recortado}",
+        s(info.valor("ref")),
+        o_texto(info.get("descripcion"), ""),
+        estructura(info, 60),
+        a.get("lineas").cloned().unwrap_or(Valor::Nulo).texto_py(),
+        corta(&contenido, 12000)
+    );
+    let nivel = NIVELES.iter().find(|(k, _)| *k == nivel).map(|(_, v)| *v).unwrap_or(NIVELES[1].1);
+    Ok((prompt, format!("{SISTEMA_ARCHIVO}\n\n{nivel}")))
+}
+
+/// El prompt de una pregunta sobre el repositorio (o el archivo abierto)
+pub fn pedido_pregunta(info: &Mapa, ruta: Option<&str>, mensajes: &[Valor], modelo: &str) -> String {
+    let mut contexto = format!(
+        "REPOSITORIO: {} · {}\n\nESTRUCTURA:\n{}",
+        s(info.valor("ref")),
+        o_texto(info.get("descripcion"), ""),
+        estructura(info, 60)
+    );
+    if let Some(r) = ruta.filter(|r| !r.is_empty()) {
+        if let Ok(a) = leer_archivo(&s(info.valor("ref")), r) {
+            contexto.push_str(&format!("\n\nARCHIVO ABIERTO {r}:\n{}", corta(&a.get("contenido").map(s).unwrap_or_default(), 8000)));
+        }
+    }
+    let resumen = explicacion_guardada(info, None, "", modelo).or_else(|| explicaciones_repo(info).into_iter().next());
+    if let Some(r) = resumen.filter(|r| !r.is_empty()) {
+        contexto.push_str(&format!("\n\nRESUMEN DEL REPOSITORIO:\n{}", corta(&r, 2500)));
+    }
+    let historial = mensajes[mensajes.len().saturating_sub(10)..]
+        .iter()
+        .map(|m| {
+            let m = match m {
+                Valor::Mapa(m) => m.clone(),
+                _ => Mapa::new(),
+            };
+            let quien = if m.get("rol") == Some(&Valor::Texto("usuario".into())) { "Alumno" } else { "Profesor" };
+            format!("{quien}: {}", corta(&m.get("texto").cloned().unwrap_or(Valor::Nulo).texto_py(), 1500))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("{contexto}\n\nCONVERSACIÓN:\n{historial}\nProfesor:")
+}
+
+fn clave_explicacion(info: &Mapa, ruta: Option<&str>, nivel: &str, modelo: &str) -> String {
+    match ruta {
+        None => {
+            let shas: Vec<Valor> = archivos(info).iter().take(400).map(|a| a.get("sha").cloned().unwrap_or(Valor::Nulo)).collect();
+            let h = Sha1::digest(prig_plataforma::json::escribir_compacto(&Valor::Lista(shas)).as_bytes());
+            let hex: String = h.iter().map(|b| format!("{b:02x}")).collect();
+            format!("repo:{modelo}:{}", &hex[..10])
+        }
+        Some(r) => {
+            let sha = archivos(info)
+                .iter()
+                .find(|a| s(a.valor("ruta")) == r)
+                .and_then(|a| a.get("sha").filter(|x| x.verdad()).map(s))
+                .unwrap_or_default();
+            format!("archivo:{r}:{nivel}:{modelo}:{}", corta(&sha, 10))
+        }
+    }
+}
+
+pub fn explicacion_guardada(info: &Mapa, ruta: Option<&str>, nivel: &str, modelo: &str) -> Option<String> {
+    match explicaciones(&s(info.valor("ref"))).ok()?.get(&clave_explicacion(info, ruta, nivel, modelo)) {
+        Some(Valor::Mapa(e)) => e.get("texto").filter(|t| t.verdad()).map(s),
+        _ => None,
+    }
+}
+
+fn explicaciones_repo(info: &Mapa) -> Vec<String> {
+    let Ok(e) = explicaciones(&s(info.valor("ref"))) else { return Vec::new() };
+    let mut repo: Vec<(String, String)> = e
+        .iter()
+        .filter(|(k, _)| k.starts_with("repo:"))
+        .filter_map(|(_, v)| if let Valor::Mapa(v) = v { Some((o_texto(v.get("fecha"), ""), s(v.valor("texto")))) } else { None })
+        .collect();
+    repo.sort_by(|a, b| b.0.cmp(&a.0));
+    repo.into_iter().map(|(_, t)| t).collect()
+}
+
+pub fn guardar_explicacion(info: &Mapa, ruta: Option<&str>, nivel: &str, modelo: &str, texto: &str) -> Result<(), Fallo> {
+    let _g = CERROJO.lock().unwrap_or_else(|e| e.into_inner());
+    let r = s(info.valor("ref"));
+    let mut datos = explicaciones(&r)?;
+    datos.poner(
+        clave_explicacion(info, ruta, nivel, modelo),
+        Mapa::new()
+            .con("texto", texto)
+            .con("ruta", ruta.map(Valor::from).unwrap_or(Valor::Nulo))
+            .con("nivel", nivel)
+            .con("modelo", modelo)
+            .con("fecha", ahora_s()),
+    );
+    escribir_json(&carpeta().join("explicaciones").join(format!("{}.json", r.replace('/', "__"))), &Valor::Mapa(datos))
 }

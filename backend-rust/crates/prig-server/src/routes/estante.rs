@@ -21,7 +21,7 @@ fn error_500() -> Response {
 }
 
 /// `get_saved_projects`: `saved_projects` de la configuración, tal cual
-fn guardados(state: &AppState) -> Vec<Valor> {
+pub fn guardados(state: &AppState) -> Vec<Valor> {
     match prig_aprendizaje::desafios::leer_json(&state.config_path) {
         Some(Valor::Mapa(m)) => match m.get("saved_projects") {
             Some(Valor::Lista(l)) => l.clone(),
@@ -31,7 +31,7 @@ fn guardados(state: &AppState) -> Vec<Valor> {
     }
 }
 
-fn rutas_guardadas(l: &[Valor]) -> Vec<String> {
+pub fn rutas_guardadas(l: &[Valor]) -> Vec<String> {
     l.iter()
         .filter_map(|p| match p {
             Valor::Mapa(m) => m.texto("path").map(String::from),

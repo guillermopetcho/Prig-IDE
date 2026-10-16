@@ -124,36 +124,6 @@ class PruebaEndpoints(unittest.TestCase):
         cls.app = main_app
         cls.client = TestClient(main_app.app)
 
-    def test_listar_y_detalle(self):
-        r = self.client.get("/api/referencias", params={"tipo": "libro"}).json()
-        self.assertTrue(r["referencias"] and all(x["tipo"] == "libro" for x in r["referencias"]))
-        self.assertNotIn("resumen_original", r["referencias"][0])
-        d = self.client.get("/api/referencias/detalle", params={"id": "arxiv_1706_03762"}).json()
-        self.assertEqual(d["titulo"], "Attention Is All You Need")
-        self.assertTrue(d["tiene_pdf"] and d["resumen_original"])
-        self.assertEqual(self.client.get("/api/referencias/detalle", params={"id": "no-existe"}).status_code, 404)
-
-    def test_pdf_solo_desde_el_catalogo(self):
-        pedidas = []
-
-        def falso(url):
-            pedidas.append(url)
-            return b"%PDF-1.4 prueba"
-        with mock.patch.object(self.app, "_descargar_pdf", falso):
-            r = self.client.get("/api/referencias/pdf", params={"id": "arxiv_1706_03762"})
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.headers["content-type"], "application/pdf")
-        self.assertEqual(pedidas, ["https://arxiv.org/pdf/1706.03762"])
-        # una página web sin PDF directo no se descarga
-        sin_pdf = next(x for x in rm.cargar()["referencias"] if not x.get("url_pdf") and not x["url"].endswith(".pdf"))
-        self.assertEqual(self.client.get("/api/referencias/pdf", params={"id": sin_pdf["id"]}).status_code, 404)
-
-    def test_abrir_en_navegador(self):
-        with mock.patch.object(self.app, "_lanzar_navegador_sistema", return_value=True) as lanzar:
-            r = self.client.post("/api/referencias/abrir", json={"id": "arxiv_1412_6980"}).json()
-        lanzar.assert_called_once_with("https://arxiv.org/abs/1412.6980")
-        self.assertTrue(r["ok"])
-
     def test_guardar_en_biblioteca_e_indexar(self):
         importados = []
 
@@ -171,11 +141,6 @@ class PruebaEndpoints(unittest.TestCase):
         self.assertTrue(nombre.startswith("Vaswani et al 2017 - Attention Is All You Need") and nombre.endswith(".pdf"))
         self.assertTrue(r["indexed"])
         self.assertEqual(r["chunks_count"], 7)
-
-    def test_relacionadas_endpoint(self):
-        r = self.client.get("/api/referencias/relacionadas", params={"q": "explica XGBoost"}).json()["referencias"]
-        self.assertIn("XGBoost: A Scalable Tree Boosting System", [x["titulo"] for x in r])
-        self.assertTrue(all(set(x) >= {"id", "titulo", "url", "cita", "tipo"} for x in r))
 
     def test_chats_de_las_secciones_reciben_las_referencias(self):
         prompt, refs = self.app._con_referencias("resumen de random forest", "PREGUNTA")

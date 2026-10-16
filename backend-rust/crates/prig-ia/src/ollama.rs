@@ -584,3 +584,32 @@ pub fn descargar_propios(propios: &[String]) {
         let _ = c.post(format!("{base}/api/generate")).header("Content-Type", "application/json").body(cuerpo).send();
     }
 }
+
+/// `_parse_version`: los tres primeros números
+fn tres_numeros(v: &str) -> Vec<i64> {
+    let mut n: Vec<i64> = regex::Regex::new(r"\d+").unwrap().find_iter(v).take(3).filter_map(|m| m.as_str().parse().ok()).collect();
+    n.resize(3, 0);
+    n
+}
+
+/// `_version_ollama()`: la del Ollama en marcha o la del mejor binario instalado (la mayor de las dos), o «?»
+pub fn version_texto(raiz: &Path) -> String {
+    let activa = cliente(3.0)
+        .and_then(|c| c.get(format!("{}/api/version", base_url())).send().ok())
+        .filter(|r| r.status().as_u16() == 200)
+        .and_then(|r| r.text().ok())
+        .and_then(|t| prig_plataforma::json::leer(&t).ok())
+        .and_then(|v| match v {
+            Valor::Mapa(m) => m.get("version").filter(|x| x.verdad()).map(Valor::texto_py),
+            _ => None,
+        });
+    let mejor = mejor_binario(raiz).map(|(_, v)| v).filter(|v| v != "0.0.0");
+    match (activa, mejor) {
+        (Some(a), Some(m)) => {
+            if tres_numeros(&m) >= tres_numeros(&a) { m } else { a }
+        }
+        (Some(a), None) => a,
+        (None, Some(m)) => m,
+        (None, None) => "?".into(),
+    }
+}

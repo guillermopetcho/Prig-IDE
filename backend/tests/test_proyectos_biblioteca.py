@@ -4,7 +4,6 @@ Pruebas integrales de gestión de carpetas, proyectos guardados y su integració
 
 import os
 import sys
-import json
 import tempfile
 import shutil
 import unittest
@@ -60,53 +59,7 @@ class TestProyectosYBiblioteca(unittest.TestCase):
         self.assertEqual(proyecto_item["category"], "PROJECTS")
         self.assertEqual(proyecto_item["title"], "Mi Proyecto ML")
 
-        # Leer contenido del proyecto
-        contenido = self.book_service.get_book_content(proj_dir)
-        self.assertTrue(contenido.get("is_project"))
-        self.assertEqual(contenido.get("type"), "project")
-        self.assertEqual(contenido.get("files_count"), 2)
-        self.assertEqual(contenido.get("dirs_count"), 1)
-        self.assertTrue(any("main.py" in s for s in contenido.get("sample_files", [])))
-
-    def test_endpoints_api_proyectos(self):
-        p_dir = os.path.join(self.tmp, "proyecto_api")
-        os.makedirs(p_dir, exist_ok=True)
-
-        # 1. Guardar proyecto
-        res_save = self.client.post("/api/workspace/projects/save", json={
-            "path": p_dir,
-            "nombre": "Proyecto Test API",
-            "origen": "test"
-        })
-        self.assertEqual(res_save.status_code, 200)
-        self.assertTrue(res_save.json().get("success"))
-
-        # 2. Listar proyectos
-        res_list = self.client.get("/api/workspace/projects")
-        self.assertEqual(res_list.status_code, 200)
-        data = res_list.json()
-        rutas = [p["path"] for p in data.get("guardados", [])]
-        self.assertIn(p_dir, rutas)
-
-        # 3. Explorar directorios
-        res_dirs = self.client.get(f"/api/workspace/directories?ruta={self.tmp}")
-        self.assertEqual(res_dirs.status_code, 200)
-        dirs_data = res_dirs.json()
-        self.assertEqual(dirs_data["current"], self.tmp)
-        self.assertTrue(any(d["name"] == "proyecto_api" for d in dirs_data["subdirectories"]))
-        self.assertTrue(len(dirs_data["shortcuts"]) > 0)
-
-        # 4. Eliminar proyecto
-        res_del = self.client.post("/api/workspace/projects/remove", json={
-            "path": p_dir
-        })
-        self.assertEqual(res_del.status_code, 200)
-        self.assertTrue(res_del.json().get("success"))
-
-        # 5. Verificar que ya no está guardado
-        res_list_after = self.client.get("/api/workspace/projects")
-        rutas_after = [p["path"] for p in res_list_after.json().get("guardados", [])]
-        self.assertNotIn(p_dir, rutas_after)
+        # El resumen del proyecto (leerlo): prig-server/tests/libros_tests.rs
 
 
 if __name__ == "__main__":

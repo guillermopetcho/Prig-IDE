@@ -11,16 +11,24 @@ API, incluido el error 400 API_KEY_INVALID medido con una clave inventada. Se pr
   · el streaming ignora el pensamiento del modelo y explica bloqueos, cuota y errores;
   · el tutor de desafíos funciona igual con Gemini: crea un desafío y lo verifica ejecutándolo;
   · la sesión de Gemini CLI (~/.gemini/oauth_creds.json) no se usa.
+
+Gemini es del servidor de Rust (prig_ia::gemini): estas pruebas lo arrancan de verdad (target/release/prig-server)
+y hablan con él por HTTP, como la interfaz. Sin el binario compilado, se omiten.
 """
 
 import json
 import os
 import shutil
+import socket
 import stat
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
+
+import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -30,83 +38,110 @@ from runner import CodeRunner
 from desafios import tutor
 from desafios.ejecucion import ErrorDesafio
 
+SERVIDOR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                        "backend-rust", "target", "release", "prig-server")
 
+
+class ErrorGemini(Exception):
+    pass
+
+
+@unittest.skipUnless(os.path.exists(SERVIDOR), "falta el servidor de Rust (cargo build --release -p prig-server)")
 class _ConServidor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.url, cls.servidor = falso.arrancar()
+        cls.tmp = tempfile.mkdtemp(prefix="prig_gemini_")
+        cls.archivo = os.path.join(cls.tmp, "gemini.json")
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            cls.puerto = s.getsockname()[1]
+        entorno = {k: v for k, v in os.environ.items() if k != "GEMINI_API_KEY"}
+        entorno.update(PRIG_GEMINI_ARCHIVO=cls.archivo, PRIG_GEMINI_URL=cls.url, HOME=cls.tmp,
+                       PRIG_SIN_MOTOR_SUAVE="1", PRIG_SIN_AUTOARRANQUE_OLLAMA="1", PRIG_SIN_LIMPIAR_HUERFANOS="1")
+        cls.rust = subprocess.Popen([SERVIDOR, "--port", str(cls.puerto), "--fallback-port", "9"], env=entorno,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(100):
+            try:
+                requests.get(f"http://127.0.0.1:{cls.puerto}/api/health", timeout=1)
+                break
+            except requests.RequestException:
+                time.sleep(0.1)
 
     @classmethod
     def tearDownClass(cls):
+        cls.rust.terminate()
+        cls.rust.wait(10)
         cls.servidor.shutdown()
+        shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="prig_gemini_")
         entorno = {k: v for k, v in os.environ.items() if k != "GEMINI_API_KEY"}
-        entorno.update(PRIG_GEMINI_ARCHIVO=os.path.join(self.tmp, "gemini.json"), PRIG_GEMINI_URL=self.url)
+        entorno.update(PRIG_GEMINI_ARCHIVO=self.archivo, PRIG_PUERTO_RUST=str(self.puerto))
         self.env = mock.patch.dict(os.environ, entorno, clear=True)
         self.env.start()
-        gm._cache.clear()
+        requests.delete(self.api("/api/gemini/clave"))      # sin clave ni caché de una prueba anterior
         falso.Manejador.peticiones.clear()
 
     def tearDown(self):
         self.env.stop()
-        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def api(self, ruta):
+        return f"http://127.0.0.1:{self.puerto}{ruta}"
+
+    def estado(self):
+        return requests.get(self.api("/api/gemini/estado")).json()
+
+    def guardar_clave(self, clave, acepto_aviso=True):
+        r = requests.post(self.api("/api/gemini/clave"), json={"clave": clave, "acepto_aviso": acepto_aviso})
+        if r.status_code == 400:
+            raise ErrorGemini(r.json()["detail"])
+        return r.json()
+
+    def listar_modelos(self):
+        r = requests.get(self.api("/api/gemini/modelos"))
+        if r.status_code == 400:
+            raise ErrorGemini(r.json()["detail"])
+        return r.json()["modelos"]
 
     def conectar(self):
-        return gm.guardar_clave(falso.CLAVE_VALIDA, acepto_aviso=True)
+        return self.guardar_clave(falso.CLAVE_VALIDA)
 
 
 class PruebaClave(_ConServidor):
 
     def test_sin_conectar(self):
-        e = gm.estado()
+        e = self.estado()
         self.assertFalse(e["configurado"])
         self.assertIn("mejorar sus productos", e["aviso"])
         self.assertEqual(e["url_claves"], "https://aistudio.google.com/apikey")
-        with self.assertRaises(gm.ErrorGemini):
-            gm.listar_modelos()
+        with self.assertRaises(ErrorGemini):
+            self.listar_modelos()
 
     def test_clave_nueva_de_ai_studio_con_formato_aq(self):
         """ El fallo real: la clave «AQ.…» (con puntos) se rechazaba como «no parece una clave» """
-        r = gm.guardar_clave(falso.CLAVE_AQ, acepto_aviso=True)
+        r = self.guardar_clave(falso.CLAVE_AQ)
         self.assertTrue(r["configurado"])
         self.assertEqual(r["clave"], "AQ.A…5678")
         self.assertEqual(gm.clave_actual()[0], falso.CLAVE_AQ)
         self.assertEqual(falso.Manejador.peticiones[-1]["clave"], falso.CLAVE_AQ)   # tal cual, en la cabecera
-        self.assertEqual([m["id"] for m in gm.listar_modelos()], ["gemini-3-flash", "gemini-3.1-flash-lite"])
+        self.assertEqual([m["id"] for m in self.listar_modelos()], ["gemini-3-flash", "gemini-3.1-flash-lite"])
 
     def test_aq_desconocida_explica_en_castellano(self):
-        with self.assertRaises(gm.ErrorGemini) as e:
-            gm.guardar_clave("AQ.Ab8RN6PRUEBAinventada_no-valida.000000000000", acepto_aviso=True)
+        with self.assertRaises(ErrorGemini) as e:
+            self.guardar_clave("AQ.Ab8RN6PRUEBAinventada_no-valida.000000000000")
         self.assertIn("Google no reconoce esta clave", str(e.exception))
         self.assertNotIn("OAuth", str(e.exception))
         self.assertNotIn("inventada", str(e.exception))
 
-    def test_limpiar_lo_pegado(self):
-        for pegado in (f"  {falso.CLAVE_AQ}\n", f'"{falso.CLAVE_AQ}"', f"'{falso.CLAVE_AQ}'", f"`{falso.CLAVE_AQ}`",
-                       f"GEMINI_API_KEY={falso.CLAVE_AQ}", f'export GEMINI_API_KEY="{falso.CLAVE_AQ}"',
-                       f"x-goog-api-key: {falso.CLAVE_AQ}", f"\u200b{falso.CLAVE_AQ}\ufeff",
-                       f"https://generativelanguage.googleapis.com/v1beta/models?key={falso.CLAVE_AQ}&pageSize=1"):
-            self.assertEqual(gm.limpiar_clave(pegado), falso.CLAVE_AQ, repr(pegado))
-        self.assertEqual(gm.limpiar_clave(falso.CLAVE_VALIDA), falso.CLAVE_VALIDA)
-        casos = {"": "ninguna clave", "   ": "ninguna clave", "AQ.corta": "falta un trozo",
-                 "AQ.Ab8RN6 PRUEBA_formato.nuevo123": "espacios", f"{falso.CLAVE_AQ}\nsegunda línea": "espacios",
-                 "AQ.Ab8RN6PRUEBAñandú_formato.nuevo": "caracteres"}
-        for pegado, motivo in casos.items():
-            with self.assertRaises(gm.ErrorGemini, msg=repr(pegado)) as e:
-                gm.limpiar_clave(pegado)
-            self.assertIn(motivo, str(e.exception))
-            self.assertNotIn("PRUEBA", str(e.exception))         # nunca repite lo pegado
-
     def test_guardar_exige_aviso_y_clave_valida(self):
-        with self.assertRaises(gm.ErrorGemini) as e:
-            gm.guardar_clave(falso.CLAVE_VALIDA, acepto_aviso=False)
+        with self.assertRaises(ErrorGemini) as e:
+            self.guardar_clave(falso.CLAVE_VALIDA, acepto_aviso=False)
         self.assertIn("aviso", str(e.exception))
-        with self.assertRaises(gm.ErrorGemini):
-            gm.guardar_clave("esto no es una clave", acepto_aviso=True)
-        with self.assertRaises(gm.ErrorGemini) as e:
-            gm.guardar_clave("AIzaSyPRUEBA_inventada_no_valida_000", acepto_aviso=True)
+        with self.assertRaises(ErrorGemini):
+            self.guardar_clave("esto no es una clave")
+        with self.assertRaises(ErrorGemini) as e:
+            self.guardar_clave("AIzaSyPRUEBA_inventada_no_valida_000")
         self.assertIn("no es válida", str(e.exception))
         self.assertFalse(os.path.exists(gm.ruta_config()))       # la rechazada no se guarda
 
@@ -119,26 +154,29 @@ class PruebaClave(_ConServidor):
         self.assertEqual(r["clave"], "AIza…abcd")
         self.assertTrue(r["aviso_aceptado"])
         self.assertTrue(all(not p["clave_en_url"] for p in falso.Manejador.peticiones))
-        self.assertFalse(gm.borrar_clave()["configurado"])
+        self.assertFalse(requests.delete(self.api("/api/gemini/clave")).json()["configurado"])
         self.assertFalse(os.path.exists(gm.ruta_config()))
 
     def test_clave_por_variable_de_entorno(self):
         with mock.patch.dict(os.environ, {"GEMINI_API_KEY": falso.CLAVE_VALIDA}):
-            e = gm.estado()
-            self.assertEqual((e["configurado"], e["origen"]), (True, "entorno"))
+            self.assertEqual(gm.clave_actual(), (falso.CLAVE_VALIDA, "entorno"))
 
     def test_no_usa_la_sesion_de_gemini_cli(self):
-        fuente = open(gm.__file__, encoding="utf-8").read()
-        codigo = fuente.split('"""', 2)[2]                       # sin el docstring que lo explica
-        self.assertNotIn("oauth_creds", codigo)
-        self.assertNotIn(".gemini", codigo)
+        raiz = os.path.dirname(SERVIDOR).replace(os.path.join("target", "release"), "")
+        for fuente in (gm.__file__, os.path.join(raiz, "crates", "prig-ia", "src", "gemini.rs")):
+            with open(fuente, encoding="utf-8") as f:
+                codigo = f.read()
+            codigo = codigo.split('"""', 2)[2] if fuente.endswith(".py") else \
+                "\n".join(l for l in codigo.splitlines() if not l.lstrip().startswith("//"))
+            self.assertNotIn("oauth_creds", codigo)
+            self.assertNotIn(".gemini/", codigo)
 
 
 class PruebaModelosYStreaming(_ConServidor):
 
     def test_lista_solo_gemini_de_texto_y_pagina(self):
         self.conectar()
-        ids = [m["id"] for m in gm.listar_modelos()]
+        ids = [m["id"] for m in self.listar_modelos()]
         self.assertEqual(ids, ["gemini-3-flash", "gemini-3.1-flash-lite"])
         self.assertTrue(any("pageToken=pagina2" in p["ruta"] for p in falso.Manejador.peticiones))
 
@@ -167,14 +205,8 @@ class PruebaModelosYStreaming(_ConServidor):
         salida = "".join(motor.generate_response("x", "gemini-3-flash"))
         self.assertIn("límite gratuito", salida)
         self.assertNotIn(falso.CLAVE_SIN_CUOTA, salida)
-        self.assertNotIn(falso.CLAVE_VALIDA, gm._explicar(403, json.dumps({"error": {"message": f"clave {falso.CLAVE_VALIDA} mala"}}), falso.CLAVE_VALIDA))
-        gm.borrar_clave()
+        requests.delete(self.api("/api/gemini/clave"))
         self.assertIn("no está conectado", "".join(motor.generate_response("x", "gemini-3-flash")))
-
-    def test_sin_internet(self):
-        self.conectar()
-        with mock.patch.dict(os.environ, {"PRIG_GEMINI_URL": "http://127.0.0.1:9/v1beta"}):
-            self.assertIn("Sin conexión", "".join(gm.MotorGemini(json.loads).generate_response("x", "gemini-3-flash")))
 
 
 class PruebaDesafiosConGemini(_ConServidor):

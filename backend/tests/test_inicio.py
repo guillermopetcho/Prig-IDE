@@ -79,35 +79,5 @@ class TestActividad(Base):
         self.assertEqual(sum(d["n"] for d in s), 4)
 
 
-class TestResumen(Base):
-    def test_un_bloque_roto_no_tira_el_resto(self):
-        def roto():
-            raise RuntimeError("Ollama apagado")
-        r = inicio.resumen({"progreso": lambda: {"racha": {"actual": 3}, "actividad": {}}, "modelos": roto,
-                            "gemini": lambda: {"configurado": False}, "lecturas": lambda: []})
-        self.assertEqual(r["errores"], {"modelos": "Ollama apagado"})
-        self.assertEqual(r["modelos"], [])
-        self.assertEqual(r["progreso"]["racha"], {"actual": 3})
-        self.assertEqual(r["gemini"], {"configurado": False})
-        self.assertIsNone(r["sistema"])                         # fuente que no se dio
-        self.assertEqual(len(r["semana"]), 7)
-
-    def test_endpoint(self):
-        from fastapi.testclient import TestClient
-        import app as prig
-        with mock.patch.object(prig.gestor_modelos, "instalados", return_value=[{"nombre": "m", "bytes": 1}]), \
-                mock.patch.object(prig.gestor_modelos, "cargados", return_value=[]):
-            cliente = TestClient(prig.app)
-            r = cliente.get("/api/inicio")
-            self.assertEqual(r.status_code, 200)
-            d = r.json()
-            for clave in ("perfil", "progreso", "semana", "actividad", "modelos", "sistema", "proyecto", "kaggle", "errores"):
-                self.assertIn(clave, d)
-            self.assertEqual(d["modelos"], [{"nombre": "m", "bytes": 1}])
-            r = cliente.patch("/api/inicio/perfil", json={"nombre": "Prueba", "mostrar_al_abrir": False})
-            self.assertEqual((r.json()["nombre"], r.json()["mostrar_al_abrir"]), ("Prueba", False))
-            self.assertTrue(os.path.exists(os.path.join(self.tmp, "inicio.json")))
-
-
 if __name__ == "__main__":
     unittest.main()

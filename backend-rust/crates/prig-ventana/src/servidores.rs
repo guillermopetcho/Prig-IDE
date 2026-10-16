@@ -231,6 +231,8 @@ impl Servidores {
                     let assets = Some(raiz_srv.join("assets")).filter(|a| a.exists());
                     let mut estado = prig_server::AppState::new(raiz_srv.clone(), frontend, assets, format!("http://{HOST}:{puerto_python}"));
                     estado.puerto = puerto;
+                    // lo que Python preparaba al arrancar (las citas de muestra de las librerías)
+                    prig_server::routes::librerias::preparar();
                     let app = prig_server::create_app(estado);
                     let l = match tokio::net::TcpListener::from_std(listener) {
                         Ok(l) => l,

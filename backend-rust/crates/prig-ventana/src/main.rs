@@ -28,6 +28,8 @@ enum Aviso {
     Fallo(String),
     /// Ctrl+C o SIGTERM: se cierra todo
     Cerrar,
+    /// La interfaz pide entrar o salir de la pantalla completa (`/api/ide/pantalla-completa`)
+    PantallaCompleta,
 }
 
 fn pagina_espera() -> String {
@@ -143,7 +145,59 @@ fn elegir_destino(sugerido: &Path) -> Option<PathBuf> {
     }
 }
 
+/// `prig --nota URL`: el bloc de notas en una ventana suelta (lo pide `/api/note/open-standalone`), sin servidores
+/// propios: la página es la del Prig que ya está en marcha
+fn ventana_nota(url: &str) -> ! {
+    gtk::glib::set_prgname(Some("Prig-IDE"));
+    let event_loop = tao::event_loop::EventLoop::new();
+    let ventana = WindowBuilder::new()
+        .with_title("Note - Bloc de Notas (Prig IDE)")
+        .with_inner_size(tao::dpi::LogicalSize::new(840.0, 590.0))
+        .with_min_inner_size(tao::dpi::LogicalSize::new(450.0, 400.0))
+        .with_resizable(true)
+        .build(&event_loop)
+        .unwrap_or_else(|e| {
+            eprintln!("⚠️ No se pudo crear la ventana de notas ({e}).");
+            std::process::exit(1)
+        });
+    {
+        use gtk::prelude::GtkWindowExt;
+        use tao::platform::unix::WindowExtUnix;
+        let icono = prig_server::resolve_project_root().join("assets/icon.svg");
+        if icono.exists() {
+            let _ = ventana.gtk_window().set_icon_from_file(&icono);
+        }
+    }
+    let _vista = {
+        use tao::platform::unix::WindowExtUnix;
+        use wry::WebViewBuilderExtUnix;
+        let caja = ventana.default_vbox().expect("la ventana de tao trae su caja");
+        WebViewBuilder::new()
+            .with_url(url)
+            .with_clipboard(true)
+            .with_new_window_req_handler(|u, _| {
+                navegador::abrir(&u);
+                NewWindowResponse::Deny
+            })
+            .build_gtk(caja)
+            .unwrap_or_else(|e| {
+                eprintln!("⚠️ No se pudo crear la vista web ({e}).");
+                std::process::exit(1)
+            })
+    };
+    event_loop.run(move |evento, _, control| {
+        *control = ControlFlow::Wait;
+        if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = evento {
+            *control = ControlFlow::Exit;
+        }
+    })
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--nota") {
+        ventana_nota(args.get(i + 1).map(String::as_str).unwrap_or("http://127.0.0.1:8000/static/note.html"));
+    }
     let raiz = prig_server::resolve_project_root();
     let url_raiz = |puerto: u16| format!("http://{}:{puerto}", servidores::HOST);
 
@@ -278,6 +332,12 @@ fn main() {
             let _ = proxy.send_event(Aviso::Listo);
         }
     }
+    {
+        let p = std::sync::Mutex::new(proxy.clone());
+        prig_server::routes::escritorio::al_pedir_pantalla_completa(move || {
+            let _ = p.lock().map(|p| p.send_event(Aviso::PantallaCompleta));
+        });
+    }
     escuchar_senales(Some(proxy), servidores.clone());
 
     let mut cerrando = false;
@@ -296,6 +356,11 @@ fn main() {
                 false
             }
             Event::UserEvent(Aviso::Cerrar) => true,
+            Event::UserEvent(Aviso::PantallaCompleta) => {
+                let completa = ventana.fullscreen().is_some();
+                ventana.set_fullscreen(if completa { None } else { Some(tao::window::Fullscreen::Borderless(None)) });
+                false
+            }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => true,
             _ => false,
         };

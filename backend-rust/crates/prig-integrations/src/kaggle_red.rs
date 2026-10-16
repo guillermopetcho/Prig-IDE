@@ -931,7 +931,7 @@ pub fn competicion(texto: &str, espacio: Option<&Path>) -> Result<Mapa, Fallo> {
 // ---------------------------------------------------------------------------------------------- descargar
 
 /// `_tam(n)`
-fn tam(n: f64) -> String {
+pub fn tam(n: f64) -> String {
     let mut n = n;
     for u in ["B", "KB", "MB", "GB"] {
         if n < 1024.0 || u == "GB" {

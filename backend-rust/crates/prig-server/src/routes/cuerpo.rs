@@ -327,6 +327,7 @@ pub fn mensaje(tipo: &str) -> &'static str {
         "int_type" => "Input should be a valid integer",
         "bool_parsing" => "Input should be a valid boolean, unable to interpret input",
         "dict_type" => "Input should be a valid dictionary",
+        "list_type" => "Input should be a valid list",
         _ => "Input should be a valid boolean",
     }
 }
@@ -355,7 +356,25 @@ pub fn tipados_con_errores(m: &Mapa, campos: &[(&str, &prig_plataforma::modelo::
         };
         match prig_plataforma::modelo::validar_tipo(t, v.clone(), k) {
             Ok(x) => salida.poner(*k, x),
-            Err(f) => errores.push(Error { tipo: f.tipo, loc: loc(&["body", k]), msg: mensaje(f.tipo).into(), entrada: v.clone(), ctx: None }),
+            Err(f) => {
+                // dentro de una lista o un dict: la ubicación y la entrada son las del elemento que falla
+                let mut ubicacion = vec![Valor::Texto("body".into())];
+                let mut entrada = v.clone();
+                for (i, parte) in f.donde.split('.').enumerate() {
+                    if i > 0 {
+                        entrada = match &entrada {
+                            Valor::Lista(l) => parte.parse::<usize>().ok().and_then(|n| l.get(n).cloned()).unwrap_or(Valor::Nulo),
+                            Valor::Mapa(m) => m.get(parte).cloned().unwrap_or(Valor::Nulo),
+                            _ => Valor::Nulo,
+                        };
+                    }
+                    ubicacion.push(match parte.parse::<i128>() {
+                        Ok(n) if i > 0 => Valor::Entero(n),
+                        _ => Valor::Texto(parte.into()),
+                    });
+                }
+                errores.push(Error { tipo: f.tipo, loc: ubicacion, msg: mensaje(f.tipo).into(), entrada, ctx: None })
+            }
         }
     }
     (salida, errores)

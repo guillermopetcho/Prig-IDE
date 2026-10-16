@@ -14,6 +14,7 @@ Sale con 0 si todo coincide; con 1 y las diferencias si no.
 """
 import argparse
 import json
+import re
 import os
 import shutil
 import signal
@@ -82,6 +83,9 @@ def pedir(base: str, caso: dict):
 # hora en que se marcó cada bloque bajo el id del bloque)
 VOLATILES_CASO = set()
 CONTENEDORES_CASO = set()
+# La vista previa de exportación: Python resalta con pygments y Rust con syntect; se compara todo menos ese bloque
+SIN_RESALTADO = [False]
+RESALTADO = re.compile(r'<div class="highlight" style="[^"]*"><pre style="line-height: 125%;"><span></span>.*?</pre></div>\n', re.S)
 
 
 def normalizar(v):
@@ -91,6 +95,8 @@ def normalizar(v):
                     else normalizar(x)) for k, x in v.items()}
     if isinstance(v, list):
         return [normalizar(x) for x in v]
+    if isinstance(v, str) and SIN_RESALTADO[0]:
+        return RESALTADO.sub("<resaltado>", v)
     return v
 
 
@@ -114,7 +120,13 @@ def diferencia(a, b, ruta="") -> str:
             if d:
                 return d
         return ""
-    return "" if a == b else f"{ruta or '.'}: {str(a)[:160]!r} ≠ {str(b)[:160]!r}"
+    if a == b:
+        return ""
+    if isinstance(a, str) and isinstance(b, str) and len(a) > 160:
+        # un texto largo: lo que hay alrededor de la primera diferencia
+        i = next((n for n, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+        return f"{ruta or '.'} (carácter {i}): {a[max(0, i - 60):i + 100]!r} ≠ {b[max(0, i - 60):i + 100]!r}"
+    return f"{ruta or '.'}: {str(a)[:160]!r} ≠ {str(b)[:160]!r}"
 
 
 def copia_de_prig(tmp: str) -> str:
@@ -122,7 +134,8 @@ def copia_de_prig(tmp: str) -> str:
     la de verdad. Se copian `backend` y `.prig_dataset`; lo que solo se lee se enlaza """
     copia = os.path.join(tmp, "prig")
     os.makedirs(copia)
-    shutil.copytree(os.path.join(RAIZ, "backend"), os.path.join(copia, "backend"),
+    # PRIG_COMPARADOR_BACKEND: otro backend de Python (p. ej. el del último commit, para recomparar rutas retiradas)
+    shutil.copytree(os.environ.get("PRIG_COMPARADOR_BACKEND") or os.path.join(RAIZ, "backend"), os.path.join(copia, "backend"),
                     ignore=shutil.ignore_patterns("__pycache__", ".index"))
     if os.path.isdir(os.path.join(RAIZ, ".prig_dataset")):
         shutil.copytree(os.path.join(RAIZ, ".prig_dataset"), os.path.join(copia, ".prig_dataset"))
@@ -195,6 +208,52 @@ def sembrar_desafios(home: str):
     for x in desafios:
         with open(os.path.join(d, x["id"] + ".json"), "w", encoding="utf-8") as f:
             json.dump(x, f, ensure_ascii=False, indent=1)
+
+
+def sembrar_buscador(home: str):
+    """ Dos modelos seguidos y una revisión de actualizaciones reciente (sin red no se puede llegar a ellos) """
+    import time
+    datos = {"seguidos": {
+        "ollama:qwen3": {"fuente": "ollama", "id": "qwen3", "titulo": "Qwen 3", "desde": "2026-01-02T03:04:05",
+                         "instantanea": {"8b": {"bytes": 5000, "digest": "abc"}}, "cambios": {"nuevas": ["14b"], "retiradas": [], "cambiadas": []},
+                         "revisado": "2026-01-02T03:04:05"},
+        "huggingface:Qwen/Qwen3-8B-GGUF": {"fuente": "huggingface", "id": "Qwen/Qwen3-8B-GGUF", "titulo": "Qwen/Qwen3-8B-GGUF",
+                                           "desde": "2026-01-02T03:04:05", "instantanea": {}, "cambios": None, "revisado": "2026-01-02T03:04:05"}},
+        "actualizaciones": {"marca": time.time(), "fecha": "2026-01-02T03:04:05", "actualizables": 1,
+                            "modelos": [{"modelo": "qwen2.5-coder:7b", "fuente": "ollama", "estado": "actualizable", "bytes": 9, "local": "a", "remoto": "b"},
+                                        {"modelo": "mio:1b", "fuente": "ollama", "estado": "local", "detalle": "x"}]}}
+    with open(os.path.join(home, ".prig_buscador.json"), "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=1)
+
+
+def sembrar_exportar(proyecto: str):
+    """ Una carpeta para exportar a PDF: código, un cuaderno con salidas, carpetas que se ignoran """
+    raiz = os.path.join(proyecto, "exportar")
+    def escribir(rel, texto):
+        ruta = os.path.join(raiz, rel)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8", newline="") as f:
+            f.write(texto)
+    escribir("a.py", "def f(x):\n    return x * 2  # doble <ñ>\n\nprint(f'{f(2)}')")
+    escribir("b.js", "const a = 1;\r\nconsole.log(a);\r\n")
+    escribir("sub/notas.md", "# Título\n\n**negrita** y `código`\n")
+    escribir("sub/vacio.sql", "")
+    escribir("node_modules/x.js", "x\n")
+    escribir(".oculto/y.py", "y\n")
+    escribir(".z.py", "z\n")
+    escribir("leeme.txt", "no es código\n")
+    nb = {"cells": [
+        {"cell_type": "markdown", "metadata": {}, "source": ["# Cuaderno\n", "Con *énfasis* y <html> & más"]},
+        {"cell_type": "code", "execution_count": 3, "metadata": {}, "source": ["import math\n", "print(math.pi)"],
+         "outputs": [{"output_type": "stream", "name": "stdout", "text": ["3.14 <b>\n"]}]},
+        {"cell_type": "code", "execution_count": None, "metadata": {}, "source": ["1/0"],
+         "outputs": [{"output_type": "error", "ename": "ZeroDivisionError", "evalue": "division by zero", "traceback": ["ZeroDivisionError <x>"]}]},
+        {"cell_type": "code", "execution_count": 0, "metadata": {}, "source": "x", "outputs": [
+            {"output_type": "display_data", "data": {"text/html": ["<b>hola</b>"]}, "metadata": {}},
+            {"output_type": "display_data", "data": {"image/png": "aGV5\n"}, "metadata": {}}]}],
+        "metadata": {}, "nbformat": 4, "nbformat_minor": 5}
+    escribir("cuaderno.ipynb", json.dumps(nb))
+    escribir("roto.ipynb", "{no")
 
 
 def sembrar_kaggle_datos(proyecto: str, home: str):
@@ -279,6 +338,26 @@ def sembrar_guiado(proyecto: str):
                                                        "updated_at": "2026-09-01T10:00:00"})
 
 
+def pdf_minimo(paginas) -> bytes:
+    """ Un PDF de verdad, hecho a mano: una página por texto, en Helvetica """
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", None, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    kids = []
+    for t in paginas:
+        flujo = ("BT /F1 14 Tf 20 150 Td (" + t + ") Tj ET").encode("latin-1")
+        objs.append(b"<< /Length " + str(len(flujo)).encode() + b" >>\nstream\n" + flujo + b"\nendstream")
+        objs.append(("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 200] /Contents %d 0 R /Resources << /Font << /F1 3 0 R >> >> >>" % len(objs)).encode())
+        kids.append("%d 0 R" % len(objs))
+    objs[1] = ("<< /Type /Pages /Kids [" + " ".join(kids) + "] /Count %d >>" % len(paginas)).encode()
+    salida, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(salida))
+        salida += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(salida)
+    salida += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offs)
+    salida += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return salida
+
+
 def sembrar_biblioteca(home: str):
     """ Una biblioteca con fichas, un elemento quitado, carpetas y proyectos guardados (dentro y fuera) """
     lib = os.path.join(home, ".prig_books")
@@ -301,6 +380,29 @@ def sembrar_biblioteca(home: str):
     escribir("metadata/books__Álgebra_lineal-2ed.pdf.json", json.dumps({"title": "Álgebra lineal", "topics": ["vectores"]}))
     escribir("metadata/notas.md.json", json.dumps({"title": "", "analysis_failed": True}))
     escribir("metadata/projects__repo.json", json.dumps({}))
+    # el lector de libros: un PDF de verdad, citas, recortes, una ficha y una página corregida
+    ruta_pdf = os.path.join(lib, "books", "Redes_neuronales.pdf")
+    with open(ruta_pdf, "wb") as f:
+        f.write(pdf_minimo(["Hola mundo, primera pagina de redes", "Segunda pagina: gradiente y redes", "Tercera sin nada"]))
+    escribir("metadata/books__Redes_neuronales.pdf.json", json.dumps({"title": "Redes neuronales", "topics": ["redes"]}, ensure_ascii=False))
+    escribir("citas/Redes_neuronales.json", json.dumps({"libro": "Redes_neuronales.pdf", "titulo": "Redes neuronales", "stem": "Redes_neuronales",
+        "archivo_json": "Redes_neuronales.json", "total_citas": 2, "citas": [
+            {"id": "c1", "pagina": 2, "texto": "El gradiente descendente", "nota": "clave", "tags": ["optimizacion"]},
+            {"id": "c0", "pagina": 1, "texto": "Una neurona", "nota": "", "tags": "basico"}]}, ensure_ascii=False, indent=2))
+    escribir("citas/rota.json", "{mal")
+    escribir("citas/ediciones/Redes_neuronales_p3.txt", "Página corregida a mano\r\n")
+    escribir("snippets.json", json.dumps({"snp_1": {"id": "snp_1", "book_id": "x", "page": 2, "text": "t"}}))
+    escribir("projects/repo/sub/b.py", "y = 2")
+    escribir("projects/repo/.oculto", "z")
+    escribir("documentation/crlf.md", "uno\r\ndos\rtres")
+    escribir("notebooks/n.ipynb", json.dumps({"cells": [{"cell_type": "markdown", "source": ["# T\n", "texto"]}, {"cell_type": "code", "source": "print(1)"}]}))
+    # librerías: una propia, citas con tipos raros y un archivo roto
+    escribir("librerias/lista_librerias.json", json.dumps([{"id": "datasets", "nombre": "Datasets", "repo": "huggingface/datasets"}], indent=2))
+    escribir("librerias/pandas.json", json.dumps({"libreria": "pandas", "nombre": "Pandas", "total_citas": 3, "citas": [
+        {"id": "p1", "tema": "Agrupar con groupby", "funcion": "DataFrame.groupby", "explicacion": "agrupa filas", "tags": ["agrupar", "Tablas"]},
+        {"id": "p2", "tema": "Unir tablas", "funcion": "merge", "explicacion": "join", "tags": "uniones"},
+        {"id": "p3", "tema": 5, "funcion": "x"}]}, ensure_ascii=False, indent=2))
+    escribir("librerias/rota.json", "{no es json")
     escribir(".index/ocultos.json", json.dumps({"version": 1, "ocultos": [
         {"ruta": os.path.join(lib, "books", "oculto.pdf"), "titulo": "oculto", "categoria": "books", "proyecto": False,
          "quitado_en": "2026-10-01T10:00:00"},
@@ -664,8 +766,26 @@ def ollama_falso() -> str:
                     lineas.insert(1, {"error": "invalid model name"})
                 b = "".join((json.dumps(x) if isinstance(x, dict) else x) + "\n" for x in lineas).encode()
                 return self.responder(200, b, "application/x-ndjson")
-            if self.path == "/api/generate":
-                return self.responder(200, {"done": True})
+            if self.path in ("/api/generate", "/api/chat"):
+                if d.get("stream") is False:
+                    return self.responder(200, {"done": True})
+                # en streaming, una respuesta que depende de lo pedido (así se comparan los prompts)
+                import hashlib
+                firma = hashlib.sha1(json.dumps(d, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:8]
+                chat = self.path == "/api/chat"
+                if os.environ.get("PRIG_COMPARADOR_PEDIDOS"):
+                    with open(os.path.join(os.environ["PRIG_COMPARADOR_PEDIDOS"], firma + ".json"), "w") as f:
+                        json.dump(d, f, ensure_ascii=False, indent=1)
+                trozos = ["Explicación ", f"de prueba {firma}."]
+                if "OBJETIVOS DE APRENDIZAJE" in (d.get("system") or ""):
+                    trozos = ['```json\n{"objetivos": [{"titulo": "Uno ' + firma + '", "inicio_timestamp": "0:30", "fin_timestamp": "0:10", "conceptos": "x"}, ',
+                              '{"titulo": "Dos", "inicio_timestamp": "0:05", "fin_timestamp": "9:99"}]}\n```']
+                if "ÚNICAMENTE un objeto JSON válido" in (d.get("system") or ""):
+                    trozos = ['Aquí está:\n```json\n{"tema": "Prueba ' + firma + '", ', '"tags": ["a"]}\n```']
+                lineas = [({"message": {"role": "assistant", "content": t}} if chat else {"response": t}) | {"done": False}
+                          for t in trozos]
+                lineas.append({"done": True, "done_reason": "stop", "eval_count": 2, **({"message": {"role": "assistant", "content": ""}} if chat else {"response": ""})})
+                return self.responder(200, "".join(json.dumps(l) + "\n" for l in lineas).encode(), "application/x-ndjson")
             if self.path == "/api/show":
                 if d.get("model") == "qwen2.5-coder:7b":
                     return self.responder(200, {
@@ -839,7 +959,7 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/github/repo?ref=ana/Repo&refrescar=true", "volatiles": ["descargado"]},
         {"ruta": "/api/github/repo?ref=nadie/x"},
         {"ruta": "/api/github/repo?ref=no"},
-        {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=src/main.py"},
+        {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=src/main.py", "archivo": "{home}/.prig_github/archivos/ana__Repo/bbb222bbb222bbb222.txt", "restaurar": True},
         {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=README.md"},
         {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=src/nul.py"},
         {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=docs/a%20b.md"},
@@ -939,14 +1059,81 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/kaggle/credenciales", "metodo": "POST", "json": {"texto": ""}, "archivo": "{home}/.prig_kaggle.json", "restaurar": True, "archivo_json": True},
         {"ruta": "/api/kaggle/credenciales", "metodo": "POST", "json": {}, "archivo": "{home}/.prig_kaggle.json", "restaurar": True, "archivo_json": True},
         {"ruta": "/api/kaggle/credenciales", "metodo": "DELETE", "archivo": "{home}/.prig_kaggle.json", "restaurar": True, "archivo_json": True},
-        {"ruta": "/api/librerias/list"},
-        {"ruta": "/api/papers/list"},
-        {"ruta": "/api/papers/list?q=regresion"},
-        {"ruta": "/api/papers/list?q=Gradiente%20%20descenso"},
-        {"ruta": "/api/papers/list?q=xgboost&categoria=todas"},
-        {"ruta": "/api/papers/list?categoria=supervisado"},
-        {"ruta": "/api/papers/list?q=%C3%A1rbol"},
-        {"ruta": "/api/papers/list?q=no-aparece-en-ninguno"},
+        {"ruta": "/api/books/read?id=Redes_neuronales.pdf", "solo_rust": True},
+        {"ruta": "/api/books/read?id=books/sin%20ficha.txt", "solo_rust": True},
+        {"ruta": "/api/books/read?id=crlf.md", "solo_rust": True},
+        {"ruta": "/api/books/read?id=repo", "solo_rust": True},
+        {"ruta": "/api/books/read?id=../../etc/passwd", "solo_rust": True},
+        {"ruta": "/api/books/read", "solo_rust": True},
+        {"ruta": "/api/books/metadata?id=Redes_neuronales.pdf", "solo_rust": True},
+        {"ruta": "/api/books/metadata?id=nada.pdf", "solo_rust": True},
+        {"ruta": "/api/books/metadata/notas.md.json", "solo_rust": True},
+        {"ruta": "/api/books/metadata/%C3%81lgebra_lineal-2ed.pdf", "solo_rust": True},
+        {"ruta": "/api/books/snippets", "solo_rust": True},
+        {"ruta": "/api/books/snippet/snp_1", "solo_rust": True},
+        {"ruta": "/api/books/snippet/nada", "solo_rust": True},
+        {"ruta": "/api/books/snippet", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "page": "3", "text": "cita", "box": {"x": 1}}, "archivo": "{home}/.prig_books/snippets.json", "restaurar": True, "archivo_json": True, "claves": ["snp_1"], "volatiles": ["id", "cite_tag"], "solo_rust": True},
+        {"ruta": "/api/books/snippet", "metodo": "POST", "json": {"page": "x"}, "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=Redes_neuronales.pdf", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=Redes_neuronales.pdf&page=2&search=REDES", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=Redes_neuronales.pdf&page=99&search=%20%20", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=Redes_neuronales.pdf&page=-4", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=crlf.md&page=7&search=dos", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=nada.pdf", "solo_rust": True},
+        {"ruta": "/api/books/pdf-pages?id=x&page=uno", "solo_rust": True},
+        {"ruta": "/api/books/pdf-page-save", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "page": 2, "text": "corregida"}, "archivo": "{home}/.prig_books/citas/ediciones/Redes_neuronales_p2.txt", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/books/pdf-page-save", "metodo": "POST", "json": {"book_id": "no existe.pdf", "page": 1, "text": "x"}, "archivo": "{home}/.prig_books/citas/ediciones/no existe_p1.txt", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/books/pdf-page-save", "metodo": "POST", "json": {"book_id": "x"}, "solo_rust": True},
+        {"ruta": "/api/books/citations?id=Redes_neuronales.pdf", "solo_rust": True},
+        {"ruta": "/api/books/citations?id=sin%20ficha.txt", "archivo": "{home}/.prig_books/citas/sin ficha.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations?id=otro_libro-nuevo.pdf", "archivo": "{home}/.prig_books/citas/otro_libro_nuevo.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations?id=rota", "archivo": "{home}/.prig_books/citas/rota.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations/save", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation": {"id": "c2", "pagina": "1", "capitulo": " Cap 1 ", "texto": "x", "tags": "a, b"}}, "archivo": "{home}/.prig_books/citas/Redes_neuronales.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations/save", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation": {"id": "c1", "pagina": 2.9}}, "archivo": "{home}/.prig_books/citas/Redes_neuronales.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations/save", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation": {"id": "c9", "pagina": "x"}}, "solo_rust": True},
+        {"ruta": "/api/books/citations/save", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation": {"id": "c9", "texto": 4}}, "solo_rust": True},
+        {"ruta": "/api/books/citations/delete", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation_id": "c0"}, "archivo": "{home}/.prig_books/citas/Redes_neuronales.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/citations/delete", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "citation_id": "zz"}, "solo_rust": True},
+        {"ruta": "/api/books/citations/export", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "workspace_path": "{proyecto}/citas_libros"}, "archivo": "{proyecto}/citas_libros/Redes_neuronales.json", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/books/citations/export", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf", "workspace_path": "/proc/x"}, "solo_rust": True},
+        {"ruta": "/api/books/all-citations", "solo_rust": True},
+        {"ruta": "/api/books/all-citations?query=gradiente%20basico%20de", "solo_rust": True},
+        {"ruta": "/api/books/analyze", "metodo": "POST", "json": {"book_id": "Redes_neuronales.pdf"}, "archivo": "{home}/.prig_books/metadata/books__Redes_neuronales.pdf.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/analyze", "metodo": "POST", "json": {"book_id": "x", "path": "n.ipynb", "model": "qwen3:8b"}, "archivo": "{home}/.prig_books/metadata/notebooks__n.ipynb.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion", "created_at", "id"], "solo_rust": True},
+        {"ruta": "/api/books/analyze", "metodo": "POST", "json": {"book_id": "nada"}, "solo_rust": True},
+        {"ruta": "/api/librerias/list", "solo_rust": True},
+        {"ruta": "/api/librerias/citations?id=numpy", "solo_rust": True},
+        {"ruta": "/api/librerias/citations?id=%20Pandas%20", "solo_rust": True},
+        {"ruta": "/api/librerias/citations?id=Nueva", "archivo": "{home}/.prig_books/librerias/nueva.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations?id=rota", "archivo": "{home}/.prig_books/librerias/rota.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations?id=datasets", "archivo": "{home}/.prig_books/librerias/datasets.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations", "solo_rust": True},
+        {"ruta": "/api/librerias/citations/save", "metodo": "POST", "json": {"lib_id": "pandas", "citation": {"id": "p2", "tema": "  Unir  ", "funcion_o_clase": "pd.merge", "codigo_ejemplo": "pd.merge(a, b)", "parametros_clave": "on, how ,", "tags": ["join"]}}, "archivo": "{home}/.prig_books/librerias/pandas.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations/save", "metodo": "POST", "json": {"lib_id": "numpy", "citation": {"id": 7, "tema": "", "modulo": None, "parametros_clave": None, "tags": {"a": 1}}}, "archivo": "{home}/.prig_books/librerias/numpy.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations/save", "metodo": "POST", "json": {"lib_id": "numpy", "citation": {"id": "z", "tema": 3}}, "archivo": "{home}/.prig_books/librerias/numpy.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations/save", "metodo": "POST", "json": {"lib_id": "numpy", "citation": []}, "solo_rust": True},
+        {"ruta": "/api/librerias/citations/delete", "metodo": "POST", "json": {"lib_id": "pandas", "citation_id": "p1"}, "archivo": "{home}/.prig_books/librerias/pandas.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations/delete", "metodo": "POST", "json": {"lib_id": "pandas", "citation_id": "nada"}, "solo_rust": True},
+        {"ruta": "/api/librerias/citations/export", "metodo": "POST", "json": {"lib_id": "pandas", "workspace_path": "{proyecto}/citas"}, "archivo": "{proyecto}/citas/pandas.json", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/librerias/citations/export", "metodo": "POST", "json": {"lib_id": "matplotlib"}, "archivo": "{proyecto}/matplotlib.json", "restaurar": True, "volatiles": ["fecha", "fecha_actualizacion"], "solo_rust": True},
+        {"ruta": "/api/librerias/citations/export", "metodo": "POST", "json": {"lib_id": "pandas", "workspace_path": "/proc/no"}, "solo_rust": True},
+        {"ruta": "/api/librerias/add", "metodo": "POST", "json": {"repo": "https://github.com/scikit-learn/scikit-learn/"}, "archivo": "{home}/.prig_books/librerias/lista_librerias.json", "restaurar": True, "archivo_json": True, "volatiles": [], "solo_rust": True},
+        {"ruta": "/api/librerias/add", "metodo": "POST", "json": {"repo": " huggingface/datasets ", "name": "HF", "desc": "datos"}, "archivo": "{home}/.prig_books/librerias/lista_librerias.json", "restaurar": True, "archivo_json": True, "volatiles": [], "solo_rust": True},
+        {"ruta": "/api/librerias/add", "metodo": "POST", "json": {"repo": "sinbarra"}, "solo_rust": True},
+        {"ruta": "/api/librerias/add", "metodo": "POST", "json": {"name": "x"}, "solo_rust": True},
+        {"ruta": "/api/librerias/all-citations", "solo_rust": True},
+        {"ruta": "/api/librerias/all-citations?query=agrupar%20tablas%20de", "solo_rust": True},
+        {"ruta": "/api/librerias/all-citations?query=svd", "solo_rust": True},
+        {"ruta": "/api/librerias/analyze", "metodo": "POST", "json": {"lib_id": "NumPy", "topic": "np.einsum"}, "solo_rust": True},
+        {"ruta": "/api/librerias/analyze", "metodo": "POST", "json": {"lib_id": "otra", "topic": "f", "model": "qwen3:8b"}, "solo_rust": True},
+        {"ruta": "/api/librerias/analyze", "metodo": "POST", "json": {"lib_id": "otra"}, "solo_rust": True},
+        {"ruta": "/api/papers/list", "solo_rust": True},
+        {"ruta": "/api/papers/list?q=regresion", "solo_rust": True},
+        {"ruta": "/api/papers/list?q=Gradiente%20%20descenso", "solo_rust": True},
+        {"ruta": "/api/papers/list?q=xgboost&categoria=todas", "solo_rust": True},
+        {"ruta": "/api/papers/list?categoria=supervisado", "solo_rust": True},
+        {"ruta": "/api/papers/list?q=%C3%A1rbol", "solo_rust": True},
+        {"ruta": "/api/papers/list?q=no-aparece-en-ninguno", "solo_rust": True},
         # escrituras de desafíos (cada lado parte del mismo archivo)
         {"ruta": "/api/desafios/{desafio}/paginas", "metodo": "PUT", "restaurar": True, "archivo_json": True,
          "archivo": "{home}/.prig_desafios/desafios/{desafio}.json",
@@ -1124,7 +1311,7 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         # métodos que la ruta propia de Rust no atiende: tienen que llegar a Python por el proxy, con «/api»
         {"ruta": "/api/flags", "metodo": "POST", "json": {"nombre": "no_existe", "valor": True}},
         {"ruta": "/api/desafios/des_0000000000", "metodo": "DELETE"},
-        {"ruta": "/api/workspace/segunda", "metodo": "POST", "json": {"path": None}},
+        {"ruta": "/api/workspace/segunda", "metodo": "POST", "json": {"path": None}, "solo_rust": True},
         {"ruta": "/api/config/profiles"},
         {"ruta": "/api/config/apariencia"},
         {"ruta": "/api/config/sintaxis"},
@@ -1150,9 +1337,221 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/workspace/directories?ruta={proyecto}/lib"},
         {"ruta": "/api/workspace/directories?ruta=/no/existe"},
         {"ruta": "/api/workspace/projects"},
-        {"ruta": "/api/workspace/segunda"},
+        {"ruta": "/api/workspace/segunda", "solo_rust": True},
         {"ruta": "/api/flags"},
         # el panel del motor MoE: comparado 13 de 13 con Python antes de retirar su ruta (F10, tanda 9)
+        {"ruta": "/api/papers/detail?id=02_regresion_logistica", "solo_rust": True},
+        {"ruta": "/api/papers/detail?id=3&tipo=ficha", "solo_rust": True},
+        {"ruta": "/api/papers/detail?id=../../02_regresion_logistica.md&tipo=", "solo_rust": True},
+        {"ruta": "/api/papers/detail?id=nada", "solo_rust": True},
+        {"ruta": "/api/papers/detail", "solo_rust": True},
+        {"ruta": "/api/papers/download", "metodo": "POST", "json": {"paper_id": "02_regresion_logistica"}, "archivo": "{proyecto}/papers_ml/02_regresion_logistica_analisis.md", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/papers/download", "metodo": "POST", "json": {"paper_id": "1", "tipo": "ficha", "workspace_path": "{proyecto}/otra"}, "archivo": "{proyecto}/otra/papers_ml/1_ficha.md", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/papers/download", "metodo": "POST", "json": {"paper_id": "nada"}, "solo_rust": True},
+        {"ruta": "/api/papers/download", "metodo": "POST", "json": {"tipo": 3}, "solo_rust": True},
+        {"ruta": "/api/papers/ask", "metodo": "POST", "json": {"paper_id": "02_regresion_logistica", "pregunta": "¿qué es la regresión logística?", "historial": [{"rol": "user", "texto": "hola"}, {"rol": "ia", "texto": None}, {"texto": 3}, 5]}, "solo_rust": True},
+        {"ruta": "/api/papers/ask", "metodo": "POST", "json": {"paper_id": "nada_raro", "pregunta": "x", "modelo": "qwen3:8b", "tipo": "ficha"}, "solo_rust": True},
+        {"ruta": "/api/papers/ask", "metodo": "POST", "json": {"paper_id": "x"}, "solo_rust": True},
+        {"ruta": "/api/note/explain", "metodo": "POST", "json": {"topic": "recursión en Python"}, "solo_rust": True},
+        {"ruta": "/api/note/explain", "metodo": "POST", "json": {"topic": "redes neuronales", "model": "qwen3:8b"}, "solo_rust": True},
+        {"ruta": "/api/note/explain", "metodo": "POST", "json": {"model": 3}, "solo_rust": True},
+        {"ruta": "/api/audio/aplicaciones", "solo_rust": True},
+        {"ruta": "/api/audio/datos_actuales", "solo_rust": True},
+        {"ruta": "/api/audio/seleccionar_fuente", "metodo": "POST", "json": {"fuente_id": 42}, "solo_rust": True},
+        {"ruta": "/api/audio/seleccionar_fuente", "metodo": "POST", "json": {}, "solo_rust": True},
+        {"ruta": "/api/audio/seleccionar_fuente", "metodo": "POST", "json": [1], "solo_rust": True},
+        {"ruta": "/api/audio/seleccionar_fuente", "metodo": "POST", "json": {"fuente_id": None}, "solo_rust": True},
+        {"ruta": "/api/audio/datos_actuales", "solo_rust": True},
+        {"ruta": "/api/ide/pantalla-completa", "metodo": "POST", "json": {}, "solo_rust": True},
+        {"ruta": "/api/folder/code-files?path={proyecto}/exportar", "solo_rust": True},
+        {"ruta": "/api/folder/code-files?path={proyecto}/exportar/sub", "solo_rust": True},
+        {"ruta": "/api/folder/code-files?path={proyecto}/exportar/a.py", "solo_rust": True},
+        {"ruta": "/api/folder/code-files?path=/no/existe", "solo_rust": True},
+        {"ruta": "/api/folder/code-files", "solo_rust": True},
+        {"ruta": "/api/export/pdf-preview", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar", "file_paths": ["{proyecto}/exportar/a.py", "{proyecto}/exportar/b.js", "{proyecto}/exportar/sub/notas.md", "{proyecto}/exportar/sub/vacio.sql", "{proyecto}/exportar/cuaderno.ipynb", "{proyecto}/exportar/roto.ipynb", "{proyecto}/exportar/no.py", "{proyecto}/exportar/sub"]}, "sin_resaltado": True, "solo_rust": True},
+        {"ruta": "/api/export/pdf-preview", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar/", "file_paths": ["{proyecto}/exportar/a.py", "{proyecto}/exportar/b.js", "{proyecto}/exportar/sub/notas.md", "{proyecto}/exportar/sub/vacio.sql", "{proyecto}/exportar/cuaderno.ipynb", "{proyecto}/exportar/roto.ipynb", "{proyecto}/exportar/no.py", "{proyecto}/exportar/sub"], "theme": "dark", "options": {"include_outputs": False, "show_line_numbers": False, "include_cover": False, "font_size": "", "page_size": None}}, "sin_resaltado": True, "solo_rust": True},
+        {"ruta": "/api/export/pdf-preview", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar", "file_paths": ["{proyecto}/exportar/a.py"], "theme": "executive", "options": {"font_size": 15, "page_size": "letter"}}, "sin_resaltado": True, "solo_rust": True},
+        {"ruta": "/api/export/pdf-preview", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar", "file_paths": "x"}, "solo_rust": True},
+        {"ruta": "/api/export/pdf-preview", "metodo": "POST", "json": {"file_paths": []}, "solo_rust": True},
+        {"ruta": "/api/export/pdf-download", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar", "file_paths": ["{proyecto}/exportar/a.py", "{proyecto}/exportar/b.js", "{proyecto}/exportar/sub/notas.md", "{proyecto}/exportar/sub/vacio.sql", "{proyecto}/exportar/cuaderno.ipynb", "{proyecto}/exportar/roto.ipynb", "{proyecto}/exportar/no.py", "{proyecto}/exportar/sub"]}, "solo_rust": True},
+        {"ruta": "/api/export/pdf-download", "metodo": "POST", "json": {"folder_path": "/", "file_paths": []}, "solo_rust": True},
+        {"ruta": "/api/export/pdf-download", "metodo": "POST", "json": {"folder_path": "{proyecto}/exportar", "file_paths": [], "options": 3}, "solo_rust": True},
+        {"ruta": "/api/buscador/fuentes", "solo_rust": True},
+        {"ruta": "/api/buscador/buscar?q=qwen", "solo_rust": True},
+        {"ruta": "/api/buscador/buscar?q=qwen&fuentes=ollama,nada&orden=recientes&pagina_ollama=2", "solo_rust": True},
+        {"ruta": "/api/buscador/buscar?fuentes=huggingface&pagina_huggingface=abc&orden=tendencia", "solo_rust": True},
+        {"ruta": "/api/buscador/buscar?pagina_ollama=x", "solo_rust": True},
+        {"ruta": "/api/buscador/localizar", "solo_rust": True},
+        {"ruta": "/api/buscador/localizar?texto=qwen3:8b", "solo_rust": True},
+        {"ruta": "/api/buscador/localizar?texto=https://huggingface.co/Qwen/Qwen3-8B-GGUF", "solo_rust": True},
+        {"ruta": "/api/buscador/localizar?texto=Qwen/Qwen3-8B", "solo_rust": True},
+        {"ruta": "/api/buscador/localizar?texto=", "solo_rust": True},
+        {"ruta": "/api/buscador/variantes", "solo_rust": True},
+        {"ruta": "/api/buscador/variantes?fuente=nada&id=x", "solo_rust": True},
+        {"ruta": "/api/buscador/variantes?fuente=ollama&id=qwen3", "solo_rust": True},
+        {"ruta": "/api/buscador/comprobar?ref=qwen3:8b", "solo_rust": True},
+        {"ruta": "/api/buscador/comprobar?ref=", "solo_rust": True},
+        {"ruta": "/api/buscador/comprobar?ref=a%20b", "solo_rust": True},
+        {"ruta": "/api/buscador/analizar?ref=", "solo_rust": True},
+        {"ruta": "/api/buscador/analizar?ref=qwen3:8b", "solo_rust": True},
+        {"ruta": "/api/buscador/analizar", "solo_rust": True},
+        {"ruta": "/api/buscador/novedades", "solo_rust": True},
+        {"ruta": "/api/buscador/actualizaciones?max_edad=x", "solo_rust": True},
+        {"ruta": "/api/buscador/actualizaciones?forzar=quizas", "solo_rust": True},
+        {"ruta": "/api/buscador/actualizaciones?forzar=true", **{"archivo": "{home}/.prig_buscador.json", "restaurar": True, "archivo_json": True}, "volatiles": ["marca", "fecha"], "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos", "solo_rust": True},
+        {"ruta": "/api/buscador/actualizaciones", "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos?revisar=1", **{"archivo": "{home}/.prig_buscador.json", "restaurar": True, "archivo_json": True}, "volatiles": ["revisado"], "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos?revisar=x", "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos", "metodo": "POST", "json": {"fuente": "ollama", "id": "qwen3"}, **{"archivo": "{home}/.prig_buscador.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos", "metodo": "POST", "json": {"fuente": "nada", "id": "qwen3"}, "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos", "metodo": "POST", "json": {"fuente": "ollama"}, "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos/dejar", "metodo": "POST", "json": {"fuente": "ollama", "id": "qwen3"}, **{"archivo": "{home}/.prig_buscador.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos/dejar", "metodo": "POST", "json": {"id": 3}, "solo_rust": True},
+        {"ruta": "/api/buscador/seguidos/visto", "metodo": "POST", "json": {"fuente": "ollama", "id": "qwen3"}, "solo_rust": True},
+        {"ruta": "/api/modelos", "solo_rust": True},
+        {"ruta": "/api/modelos/catalogo", "solo_rust": True},
+        {"ruta": "/api/modelos/ficha?modelo=qwen2.5-coder:7b", "solo_rust": True},
+        {"ruta": "/api/modelos/ficha?modelo=nada:1b", "solo_rust": True},
+        {"ruta": "/api/modelos/ficha", "solo_rust": True},
+        {"ruta": "/api/modelos/config", "solo_rust": True},
+        {"ruta": "/api/modelos/config?modelo=qwen2.5-coder:7b&uso=tutor", "solo_rust": True},
+        {"ruta": "/api/modelos/config?uso=malo", "solo_rust": True},
+        {"ruta": "/api/modelos/config", "metodo": "POST", "json": {"capa": "modelo", "modelo": "m", "valores": {"temperature": 0.5, "num_ctx": 8192}}, **{"archivo": "{home}/.prig_modelos.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/modelos/config", "metodo": "POST", "json": {"capa": "global", "valores": {"typical_p": 1, "top_k": "x"}}, **{"archivo": "{home}/.prig_modelos.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/modelos/config", "metodo": "POST", "json": {"capa": "x"}, **{"archivo": "{home}/.prig_modelos.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/modelos/config", "metodo": "POST", "json": {"valores": []}, "solo_rust": True},
+        {"ruta": "/api/modelos/plantilla", "metodo": "POST", "json": {"capa": "uso", "uso": "tutor", "plantilla": "codigo"}, **{"archivo": "{home}/.prig_modelos.json", "restaurar": True, "archivo_json": True}, "solo_rust": True},
+        {"ruta": "/api/modelos/plantilla", "metodo": "POST", "json": {"capa": "global", "plantilla": "nada"}, "solo_rust": True},
+        {"ruta": "/api/modelos/probar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b", "prompt": "hola", "system": "s", "opciones": {"temperature": 0.1, "think": False}, "logprobs": 9, "raw": True, "template": "{{ .Prompt }}"}, "solo_rust": True},
+        {"ruta": "/api/modelos/probar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b", "format": "{roto"}, "solo_rust": True},
+        {"ruta": "/api/modelos/probar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b", "format": {"type": "object"}, "suffix": "fin"}, "solo_rust": True},
+        {"ruta": "/api/modelos/probar", "metodo": "POST", "json": {"modelo": "nomic-embed-text:latest", "suffix": "fin"}, "solo_rust": True},
+        {"ruta": "/api/modelos/probar", "metodo": "POST", "json": {"modelo": "m", "opciones": {"typical_p": 1}}, "solo_rust": True},
+        {"ruta": "/api/modelos/crear", "metodo": "POST", "json": {"nombre": "x", "desde": "qwen2.5-coder:7b", "parametros": {"num_gpu": 1, "mirostat": 2}}, "solo_rust": True},
+        {"ruta": "/api/modelos/crear", "metodo": "POST", "json": {"nombre": "no válido!", "desde": "qwen2.5-coder:7b"}, "solo_rust": True},
+        {"ruta": "/api/modelos/copiar", "metodo": "POST", "json": {"origen": "qwen2.5-coder:7b", "destino": "copia:1"}, "solo_rust": True},
+        {"ruta": "/api/modelos/borrar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b"}, "solo_rust": True},
+        {"ruta": "/api/modelos/borrar", "metodo": "POST", "json": {"modelo": "  "}, "solo_rust": True},
+        {"ruta": "/api/modelos/importar", "metodo": "POST", "json": {"ruta": "/etc/x.gguf", "nombre": "x"}, "solo_rust": True},
+        {"ruta": "/api/modelos/importar", "metodo": "POST", "json": {"ruta": "~/x.txt", "nombre": "x"}, "solo_rust": True},
+        {"ruta": "/api/modelos/cargados", "solo_rust": True},
+        {"ruta": "/api/modelos/precargar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b", "uso": "tutor"}, "solo_rust": True},
+        {"ruta": "/api/modelos/descargar", "metodo": "POST", "json": {"modelo": "qwen2.5-coder:7b"}, "solo_rust": True},
+        {"ruta": "/api/modelos/parciales", "solo_rust": True},
+        {"ruta": "/api/modelos/registro", "solo_rust": True},
+        {"ruta": "/api/modelos/registro?lineas=x", "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "indice": 0, "modelo": "qwen2.5-coder:7b"}, "archivo": "{home}/.prig_kaggle/explicaciones/ana__nb-uno.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "indice": 1, "nivel": "avanzado", "incluir_datos": None}, "archivo": "{home}/.prig_kaggle/explicaciones/ana__nb-uno.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "indice": 99}, "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "indice": 0, "modelo": "gemini:x"}, "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "ana/nb-uno"}, "solo_rust": True},
+        {"ruta": "/api/kaggle/guia", "metodo": "POST", "json": {"ref": "ana/nb-uno"}, "archivo": "{home}/.prig_kaggle/explicaciones/ana__nb-uno.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/notebook/estudio_optimo", "metodo": "POST", "json": {"ref": "ana/nb-uno", "regenerar": True}, "archivo": "{home}/.prig_kaggle/explicaciones/ana__nb-uno.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/preguntar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "indice": 1, "mensajes": [{"rol": "usuario", "texto": "¿qué hace?"}]}, "solo_rust": True},
+        {"ruta": "/api/kaggle/preguntar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "mensajes": [{"role": "user", "content": "¿cómo funciona un random forest?"}]}, "solo_rust": True},
+        {"ruta": "/api/kaggle/preguntar", "metodo": "POST", "json": {"ref": "ana/nb-uno", "mensajes": []}, "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar", "metodo": "POST", "json": {"ref": "nada/nada", "indice": 0}, "solo_rust": True},
+        {"ruta": "/api/github/explicar", "metodo": "POST", "json": {"ref": "ana/Repo"}, "archivo": "{home}/.prig_github/explicaciones/ana__Repo.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/github/explicar", "metodo": "POST", "json": {"ref": "ana/Repo", "ruta": "src/main.py", "nivel": "avanzado"}, "archivo": "{home}/.prig_github/explicaciones/ana__Repo.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/github/explicar", "metodo": "POST", "json": {"ref": "ana/Repo", "ruta": "src/nul.py"}, "archivo": "{home}/.prig_github/explicaciones/ana__Repo.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/github/explicar", "metodo": "POST", "json": {"ref": "ana/Repo", "ruta": "no/esta.py"}, "solo_rust": True},
+        {"ruta": "/api/github/explicar", "metodo": "POST", "json": {"ref": "ana/Repo", "modelo": "gemini:x"}, "solo_rust": True},
+        {"ruta": "/api/github/preguntar", "metodo": "POST", "json": {"ref": "ana/Repo", "ruta": "src/main.py", "mensajes": [{"rol": "usuario", "texto": "¿qué imprime?"}]}, "solo_rust": True},
+        {"ruta": "/api/github/preguntar", "metodo": "POST", "json": {"ref": "ana/Repo", "mensajes": []}, "solo_rust": True},
+        {"ruta": "/api/github/preguntar", "metodo": "POST", "json": {"ref": "ana/Repo"}, "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar_datos", "metodo": "POST", "json": {"tipo": "dataset", "ref": "ana/otro-ds"}, "archivo": "{home}/.prig_kaggle/explicaciones/datos__dataset__ana__otro-ds.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar_datos", "metodo": "POST", "json": {"tipo": "competicion", "ref": "titanic", "modelo": "qwen2.5-coder:7b"}, "archivo": "{home}/.prig_kaggle/explicaciones/datos__competicion__titanic.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar_datos", "metodo": "POST", "json": {"tipo": "otro", "ref": "x"}, "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar_datos", "metodo": "POST", "json": {"tipo": "dataset", "ref": "nada/nada"}, "archivo": "{home}/.prig_kaggle/explicaciones/datos__dataset__ana__otro-ds.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"], "solo_rust": True},
+        {"ruta": "/api/kaggle/explicar_datos", "metodo": "POST", "json": {"ref": "x"}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"video_id": "vidES", "titulo": "Clase de listas", "canal": None, "descripcion": " Temario: listas ", "notas_usuario": "", "categoria": "python"}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"video_id": "sinsubs", "titulo": "Sin subtítulos", "modo": "objetivos", "nivel": None}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"video_id": "vidEN", "titulo": "T", "texto_usuario": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "modo": "resumen"}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"video_id": "vidEN", "titulo": "T", "modo": None}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"video_id": "vidEN", "titulo": "T", "modelo": "gemini:x"}, "solo_rust": True},
+        {"ruta": "/api/youtube/analizar", "metodo": "POST", "json": {"titulo": "T"}, "solo_rust": True},
+        {"ruta": "/api/youtube/traducir_texto", "metodo": "POST", "json": {"texto": " def f(x): return x "}, "solo_rust": True},
+        {"ruta": "/api/youtube/traducir_texto", "metodo": "POST", "json": {"texto": "   "}, "solo_rust": True},
+        {"ruta": "/api/youtube/traducir_texto", "metodo": "POST", "json": {"texto": "hola", "modelo": "gemini:x"}, "solo_rust": True},
+        {"ruta": "/api/file?path=main.py", "solo_rust": True},
+        {"ruta": "/api/file?path=datos/tabla.csv", "solo_rust": True},
+        {"ruta": "/api/file?path=nada.py", "solo_rust": True},
+        {"ruta": "/api/file?path=/etc/hostname", "solo_rust": True},
+        {"ruta": "/api/file", "solo_rust": True},
+        {"ruta": "/api/file", "metodo": "POST", "json": {"path": "nuevo.txt", "content": "hola ñandú\n"}, "archivo": "{proyecto}/nuevo.txt", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/file", "metodo": "POST", "json": {"path": "/etc/prig_x", "content": "x"}, "solo_rust": True},
+        {"ruta": "/api/file", "metodo": "POST", "json": {"path": "x.txt"}, "solo_rust": True},
+        {"ruta": "/api/file?path=docs/leeme.md", "metodo": "DELETE", "archivo": "{proyecto}/docs/leeme.md", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/file?path=no_existe.md", "metodo": "DELETE", "solo_rust": True},
+        {"ruta": "/api/create", "metodo": "POST", "json": {"path": "creado.txt"}, "archivo": "{proyecto}/creado.txt", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/create", "metodo": "POST", "json": {"path": "main.py"}, "solo_rust": True},
+        {"ruta": "/api/create", "metodo": "POST", "json": {"path": "/etc/nada", "is_dir": True}, "solo_rust": True},
+        {"ruta": "/api/raw-file?path=main.py", "solo_rust": True},
+        {"ruta": "/api/file/raw?path=datos/tabla.csv", "solo_rust": True},
+        {"ruta": "/api/file/raw?path=nada.png", "solo_rust": True},
+        {"ruta": "/api/raw-file?path=/etc/hostname", "solo_rust": True},
+        {"ruta": "/api/workspace/open", "metodo": "POST", "json": {"path": "/no/existe"}, "solo_rust": True},
+        {"ruta": "/api/workspace/open", "metodo": "POST", "json": {}, "solo_rust": True},
+        {"ruta": "/api/workspace/segunda", "metodo": "POST", "json": {"path": "/no/existe"}, "solo_rust": True},
+        {"ruta": "/api/workspace/projects/save", "metodo": "POST", "json": {"path": "/tmp", "name": "Temporal"}, "archivo": "{home}/.prig_config.json", "restaurar": True, "archivo_json": True, "volatiles": ["created_at", "last_opened"], "solo_rust": True},
+        {"ruta": "/api/workspace/projects/save", "metodo": "POST", "json": {"path": "/no/existe"}, "archivo": "{home}/.prig_config.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/workspace/projects/remove", "metodo": "POST", "json": {"path": "/tmp"}, "archivo": "{home}/.prig_config.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/ide/reemplazar", "metodo": "POST", "json": {"consulta": "hola", "reemplazo": "adiós", "incluir": "*.py"}, "archivo": "{proyecto}/main.py", "restaurar": True, "solo_rust": True},
+        {"ruta": "/api/ide/reemplazar", "metodo": "POST", "json": {"consulta": "hola"}, "solo_rust": True},
+        {"ruta": "/api/ide/reemplazar", "metodo": "POST", "json": {"consulta": "(", "reemplazo": "x", "regex": True}, "solo_rust": True},
+        {"ruta": "/api/ide/renombrar", "metodo": "POST", "json": {"path": "nada.py", "destino": "otra.py"}, "solo_rust": True},
+        {"ruta": "/api/ide/renombrar", "metodo": "POST", "json": {"path": "main.py", "destino": "/etc/main.py"}, "solo_rust": True},
+        {"ruta": "/api/ide/duplicar", "metodo": "POST", "json": {"path": "nada.py"}, "solo_rust": True},
+        {"ruta": "/api/ide/mostrar-en-sistema", "metodo": "POST", "json": {"path": "/etc"}, "solo_rust": True},
+        {"ruta": "/api/ide/problemas", "metodo": "POST", "json": {"lenguaje": "python", "codigo": "def f(:\n  pass\n"}, "solo_rust": True},
+        {"ruta": "/api/ide/problemas", "metodo": "POST", "json": {"lenguaje": "python", "codigo": "if x:\n\tif y:\n        pass\n"}, "solo_rust": True},
+        {"ruta": "/api/ide/problemas", "metodo": "POST", "json": {"lenguaje": "python", "codigo": "a\u0000b"}, "solo_rust": True},
+        {"ruta": "/api/ide/problemas", "metodo": "POST", "json": {"lenguaje": "python", "codigo": "print('ok')\n"}, "solo_rust": True},
+        {"ruta": "/api/ide/problemas", "metodo": "POST", "json": {"lenguaje": "javascript", "codigo": "x("}, "solo_rust": True},
+        {"ruta": "/api/ide/recientes", "metodo": "DELETE", "archivo": "{home}/.prig_config.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/ide/acerca", "solo_rust": True},
+        {"ruta": "/api/system/stats", "volatiles": ["cpu_pct", "ram_pct", "ram_used_gb", "ram_total_gb", "gpu_pct", "vram_used_mb", "vram_free_mb", "temperaturas", "hora", "generado", "fecha", "empezado", "ultima"], "solo_rust": True},
+        {"ruta": "/api/system/health", "volatiles": ["cpu_pct", "ram_pct", "ram_used_gb", "ram_total_gb", "gpu_pct", "vram_used_mb", "vram_free_mb", "temperaturas", "hora", "generado", "fecha", "empezado", "ultima"], "solo_rust": True},
+        {"ruta": "/api/inicio", "volatiles": ["cpu_pct", "ram_pct", "ram_used_gb", "ram_total_gb", "gpu_pct", "vram_used_mb", "vram_free_mb", "temperaturas", "hora", "generado", "fecha", "empezado", "ultima"], "solo_rust": True},
+        {"ruta": "/api/inicio/perfil", "solo_rust": True},
+        {"ruta": "/api/inicio/perfil", "metodo": "PATCH", "json": {"nombre": "  Ana   María ", "nivel": "avanzado", "favoritas": ["kaggle", "x"], "objetivo": None}, "archivo": "{home}/.prig_inicio.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/inicio/perfil", "metodo": "PATCH", "json": {"mostrar_al_abrir": "quizas"}, "solo_rust": True},
+        {"ruta": "/api/inicio/perfil", "metodo": "PATCH", "json": {"nivel": "experto"}, "archivo": "{home}/.prig_inicio.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/ai/catalog", "solo_rust": True},
+        {"ruta": "/api/ai/cancel", "metodo": "POST", "solo_rust": True},
+        {"ruta": "/api/ai/search", "metodo": "POST", "json": {"query": "pandas groupby ejemplo"}, "solo_rust": True},
+        {"ruta": "/api/ai/search", "metodo": "POST", "json": {}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-complete", "metodo": "POST", "json": {"code_prefix": "def suma(a, b):\n    ", "code_suffix": "\n\nprint(suma(1, 2))"}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-complete", "metodo": "POST", "json": {"code_prefix": "x = ", "model": "nomic-embed-text:latest"}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-complete", "metodo": "POST", "json": {"code_suffix": "x"}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-prompt", "metodo": "POST", "json": {"prompt": "suma dos números", "file_content": "import os\n    # Prig//: suma dos números\nprint(1)\n", "line_number": 2, "file_path": "a.py"}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-prompt", "metodo": "POST", "json": {"prompt": "ordena", "prefix_code": "def f(l):\n    x = 1\n", "language": "javascript", "model": "otro (raro)"}, "solo_rust": True},
+        {"ruta": "/api/ai/inline-prompt", "metodo": "POST", "json": {"prompt": "   "}, "solo_rust": True},
+        {"ruta": "/api/guided/cancel", "metodo": "POST", "solo_rust": True},
+        {"ruta": "/api/referencias", "solo_rust": True},
+        {"ruta": "/api/referencias?q=transformer%20atenci%C3%B3n", "solo_rust": True},
+        {"ruta": "/api/referencias?categoria=arboles&tipo=libro", "solo_rust": True},
+        {"ruta": "/api/referencias?q=zzzz", "solo_rust": True},
+        {"ruta": "/api/referencias/detalle?id=pattern_recognition_and_machine_learning", "solo_rust": True},
+        {"ruta": "/api/referencias/detalle?id=nada", "solo_rust": True},
+        {"ruta": "/api/referencias/detalle", "solo_rust": True},
+        {"ruta": "/api/referencias/relacionadas?q=%C2%BFc%C3%B3mo%20funciona%20un%20random%20forest%20con%20xgboost%3F&maximo=3", "solo_rust": True},
+        {"ruta": "/api/referencias/relacionadas?q=transformers%20y%20atenci%C3%B3n%20multi-cabeza", "solo_rust": True},
+        {"ruta": "/api/referencias/relacionadas?q=hola", "solo_rust": True},
+        {"ruta": "/api/referencias/relacionadas?q=x&maximo=dos", "solo_rust": True},
+        {"ruta": "/api/referencias/pdf?id=the_elements_of_statistical_learning_2nd_ed", "solo_rust": True},
+        {"ruta": "/api/referencias/pdf?id=nada", "solo_rust": True},
+        {"ruta": "/api/referencias/abrir", "metodo": "POST", "json": {"id": "nada"}, "solo_rust": True},
+        {"ruta": "/api/referencias/abrir", "metodo": "POST", "json": {}, "solo_rust": True},
+        {"ruta": "/api/gemini/estado", "solo_rust": True},
+        {"ruta": "/api/gemini/modelos", "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "POST", "json": {"clave": "AIzaPRUEBA_valida_1234567890abcd"}, **{"archivo": "{home}/.prig_gemini.json", "restaurar": True, "archivo_json": True, "volatiles": ["aviso_aceptado"]}, "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "POST", "json": {"clave": "  'AQ.Ab8RN6PRUEBA_formato-nuevo.x9Yz12345678' ", "acepto_aviso": True}, **{"archivo": "{home}/.prig_gemini.json", "restaurar": True, "archivo_json": True, "volatiles": ["aviso_aceptado"]}, "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "POST", "json": {"clave": "AIzaSyPRUEBA_inventada_no_valida_000", "acepto_aviso": True}, **{"archivo": "{home}/.prig_gemini.json", "restaurar": True, "archivo_json": True, "volatiles": ["aviso_aceptado"]}, "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "POST", "json": {"clave": "corta", "acepto_aviso": True}, "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "POST", "json": {"acepto_aviso": "x"}, "solo_rust": True},
+        {"ruta": "/api/gemini/clave", "metodo": "DELETE", **{"archivo": "{home}/.prig_gemini.json", "restaurar": True, "archivo_json": True, "volatiles": ["aviso_aceptado"]}, "solo_rust": True},
         {"ruta": "/api/recursos/perfiles", "solo_rust": True},
         {"ruta": "/api/recursos/servidor", "volatiles": ["temp", "tomada", "consumo_w", "uso_pct", "ventilador_pct", "nucleo_max", "rpm", "fecha", "ram_disponible", "ram_libre", "swap_usada", "vram_libre_mb", "vram_usada_mb", "libre_gb", "usado_gb", "ancho_banda_ram_gbps", "temp_gpu", "temp_cpu", "ram_disponible_gb", "vram_libre_gb", "avisos", "carga", "uso_cpu", "pid", "modelos_cargados", "procesos", "consumo", "libre"], "solo_rust": True},
         {"ruta": "/api/recursos/estado", "volatiles": ["temp", "tomada", "consumo_w", "uso_pct", "ventilador_pct", "nucleo_max", "rpm", "fecha", "ram_disponible", "ram_libre", "swap_usada", "vram_libre_mb", "vram_usada_mb", "libre_gb", "usado_gb", "ancho_banda_ram_gbps", "temp_gpu", "temp_cpu", "ram_disponible_gb", "vram_libre_gb", "avisos", "carga", "uso_cpu", "pid", "modelos_cargados", "procesos", "consumo", "libre"], "solo_rust": True},
@@ -1221,11 +1620,11 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/recursos/moe", "metodo": "POST", "json": {"contexto": 5}, **MOE, "solo_rust": True},
         {"ruta": "/api/recursos/moe", "metodo": "POST", "json": {"mtp": "quizas"}, **MOE, "solo_rust": True},
         {"ruta": "/api/recursos/moe", "metodo": "POST", "json": {}, **MOE, "solo_rust": True},
-        {"ruta": "/api/books/list"},
-        {"ruta": "/api/books/list?category=books"},
-        {"ruta": "/api/books/list?category=PROJECTS"},
-        {"ruta": "/api/books/list?category=all"},
-        {"ruta": "/api/books/list?category=nada"},
+        {"ruta": "/api/books/list", "solo_rust": True},
+        {"ruta": "/api/books/list?category=books", "solo_rust": True},
+        {"ruta": "/api/books/list?category=PROJECTS", "solo_rust": True},
+        {"ruta": "/api/books/list?category=all", "solo_rust": True},
+        {"ruta": "/api/books/list?category=nada", "solo_rust": True},
         {"ruta": "/api/books/inventario?id=books/%C3%81lgebra_lineal-2ed.pdf", "solo_rust": True},
         {"ruta": "/api/books/ocultos", "solo_rust": True},
         {"ruta": "/api/books/delete", "metodo": "POST", "json": {"id": "books"}, "solo_rust": True},
@@ -1251,6 +1650,12 @@ def main():
     args = ap.parse_args()
     if not os.path.exists(SERVIDOR):
         sys.exit(f"Falta {SERVIDOR}: cargo build --release -p prig-server")
+    # Con un binario viejo, las rutas nuevas caen en el proxy y se compara Python consigo mismo
+    fuentes_rs = os.path.join(RAIZ, "backend-rust", "crates")
+    mas_nuevo = max((os.path.getmtime(os.path.join(d, f)) for d, _, fs in os.walk(fuentes_rs) if "/target" not in d and "/tests" not in d
+                     for f in fs if f.endswith((".rs", ".toml", ".css", ".json"))), default=0)
+    if mas_nuevo > os.path.getmtime(SERVIDOR):
+        sys.exit(f"{SERVIDOR} es más viejo que el código de Rust: cargo build --release -p prig-server")
 
     tmp = tempfile.mkdtemp(prefix="prig-comparador-")
     procesos = []
@@ -1274,6 +1679,8 @@ def main():
             sembrar_guiado(p["proyecto"])
             sembrar_biblioteca(p["home"])
             sembrar_kaggle_datos(p["proyecto"], p["home"])
+            sembrar_buscador(p["home"])
+            sembrar_exportar(p["proyecto"])
         if args.desafios:
             destino = os.path.join(p["home"], ".prig_desafios", "desafios")
             shutil.copytree(args.desafios, destino, dirs_exist_ok=True)
@@ -1281,9 +1688,16 @@ def main():
                 f.write("{roto")                                 # un desafío dañado
             nombres = sorted(n[:-5] for n in os.listdir(destino) if n.endswith(".json") and n != "des_ffffffffff.json")
             p["desafio"], p["desafio2"] = nombres[0], nombres[-1]
+        # el proyecto de prueba, abierto como lo dejaría Prig (los dos servidores lo leen de la configuración)
+        with open(os.path.join(p["home"], ".prig_config.json"), "w", encoding="utf-8") as f:
+            json.dump({"last_workspace": p["proyecto"]}, f)
         pp, pr = puerto_libre(), puerto_libre()
         p["env"]["PRIG_PUERTO_RUST"] = str(pr)
         p["env"]["PRIG_KAGGLE_API"] = kaggle_falso()
+        sys.path.insert(0, os.path.join(RAIZ, "backend"))
+        from tests import gemini_falso                    # el Google falso de las pruebas de Python
+        p["env"]["PRIG_GEMINI_URL"] = gemini_falso.arrancar()[0]
+        p["env"].pop("GEMINI_API_KEY", None)
         yt = youtube_falso()
         p["env"].update(PRIG_YOUTUBE_URL=yt, PRIG_YOUTUBE_SUGERENCIAS=yt, PRIG_TRADUCTOR=yt,
                         PRIG_CACHE_TRANSCRIPCIONES=os.path.join(tmp, "transcripciones"))
@@ -1302,8 +1716,8 @@ def main():
         if not esperar(f"http://127.0.0.1:{pr}/api/health", rs, 60):
             sys.exit("El servidor de Rust no arrancó: " + open(os.path.join(tmp, "servidores.log")).read()[-2000:])
 
-        # el proyecto de prueba como espacio de trabajo (se guarda en el HOME temporal)
-        r = pedir(f"http://127.0.0.1:{pp}", {"ruta": "/api/workspace/open", "metodo": "POST", "json": {"path": p["proyecto"]}})
+        # el proyecto de prueba como espacio de trabajo: lo abre el servidor de Rust (y se guarda en el HOME temporal)
+        r = pedir(f"http://127.0.0.1:{pr}", {"ruta": "/api/workspace/open", "metodo": "POST", "json": {"path": p["proyecto"]}})
         if r[0] != 200:
             sys.exit(f"No se pudo abrir el proyecto de prueba: {r}")
 
@@ -1321,9 +1735,10 @@ def main():
         for c in casos:
             VOLATILES_CASO.clear()
             VOLATILES_CASO.update(c.get("volatiles", []))
+            SIN_RESALTADO[0] = bool(c.get("sin_resaltado"))
             CONTENEDORES_CASO.clear()
             CONTENEDORES_CASO.update(c.get("contenedores", []))
-            if c.get("solo_rust"):
+            if c.get("solo_rust") and not os.environ.get("PRIG_COMPARAR_RETIRADAS"):
                 b = pedir(f"http://127.0.0.1:{pr}", c)
                 print(f"· {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  solo en Rust ({b[0]}): no hay con qué comparar")
                 continue
@@ -1362,8 +1777,11 @@ def main():
                 escrito_rust = json.dumps(como_json(escrito_rust), ensure_ascii=False).encode()
             if archivo and escrito_python != escrito_rust:
                 fallos += 1
-                print(f"✗ {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  el archivo escrito difiere: "
-                      f"{(escrito_python or b'')[:200]!r} ≠ {(escrito_rust or b'')[:200]!r}")
+                try:
+                    detalle_json = diferencia(json.loads(escrito_python), json.loads(escrito_rust))
+                except Exception:
+                    detalle_json = f"{escrito_python[:200]!r} ≠ {escrito_rust[:200]!r}"
+                print(f"✗ {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  el archivo escrito difiere: {detalle_json}")
                 continue
             etiqueta = f"{c.get('metodo', 'GET'):4} {c['ruta'][:70]}"
             if c.get("solo_archivo"):
@@ -1374,11 +1792,11 @@ def main():
                 print(f"✗ {etiqueta}  estado {a[0]} (Python) ≠ {b[0]} (Rust)  {str(a[1])[:150]} | {str(b[1])[:150]}")
             elif a[1][0] != b[1][0] or diferencia(a[1][1], b[1][1]):
                 fallos += 1
-                d = diferencia(a[1][1], b[1][1]) if a[1][0] == b[1][0] else f"{a[1][0]} ≠ {b[1][0]}"
+                d = diferencia(a[1][1], b[1][1]) if a[1][0] == b[1][0] else f"{a[1][0]} {str(a[1][1])[:300]} ≠ {b[1][0]} {str(b[1][1])[:300]}  (pedido {json.dumps(c.get('json'), ensure_ascii=False)[:120]})"
                 print(f"✗ {etiqueta}  {d}")
             else:
                 print(f"✓ {etiqueta}  {a[0]}")
-        comparados = sum(1 for c in casos if not c.get("solo_rust"))
+        comparados = sum(1 for c in casos if not c.get("solo_rust") or os.environ.get("PRIG_COMPARAR_RETIRADAS"))
         print(f"\n{comparados - fallos} de {comparados} iguales")
         return 1 if fallos else 0
     finally:

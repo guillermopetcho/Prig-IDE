@@ -13,11 +13,11 @@ El perfil editable (nombre, objetivo, nivel, herramientas favoritas, abrir al in
 guarda en ~/.prig_inicio.json (o PRIG_INICIO_ARCHIVO).
 
 El perfil, la línea de actividad y la tira de la semana están en Rust (backend-rust/crates/prig-plataforma,
-inicio.rs). Juntar los bloques (`resumen`) sigue aquí: las fuentes son funciones de Python que pone app.py.
+inicio.rs), y la pantalla entera (`/api/inicio`, cada bloque por separado) la arma el servidor de Rust
+(prig-server, routes/inicio.rs).
 """
 
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def _rs():
@@ -51,46 +51,3 @@ def actividad(progreso_resumen: Optional[Dict[str, Any]], historial: List[Dict[s
 def semana(actividad_por_dia: Dict[str, int], dias: int = 7) -> List[Dict[str, Any]]:
     """ Los últimos días con su número de acciones, para la tira de la semana """
     return _rs().semana(actividad_por_dia, dias)
-
-
-# ===========================================================================
-# Todo junto
-# ===========================================================================
-
-def _bloque(fn: Callable[[], Any], errores: Dict[str, str], nombre: str, vacio: Any = None) -> Any:
-    try:
-        return fn()
-    except Exception as e:  # noqa: BLE001 - un bloque roto no puede tirar la pantalla entera
-        errores[nombre] = str(e)[:300]
-        return vacio
-
-
-def resumen(fuentes: Dict[str, Callable[[], Any]]) -> Dict[str, Any]:
-    """ `fuentes` son funciones sin argumentos (las pone app.py con sus objetos) """
-    errores: Dict[str, str] = {}
-    obtener = lambda nombre, vacio=None: _bloque(fuentes[nombre], errores, nombre, vacio) if nombre in fuentes else vacio  # noqa: E731
-    prog = obtener("progreso", {}) or {}
-    historial = obtener("historial", []) or []
-    lecturas = obtener("lecturas", []) or []
-    guardado = obtener("colecciones_recientes", []) or []
-    descargas = obtener("descargas", []) or []
-    ejercicios = obtener("ejercicios", []) or []
-    return {
-        "perfil": perfil(),
-        "hora": datetime.now().hour,
-        "progreso": {k: prog.get(k) for k in ("desafios", "actividades", "racha", "conceptos", "fuertes", "flojos", "siguientes", "rutas")},
-        "semana": semana(prog.get("actividad") or {}),
-        "actividad": actividad(prog, historial, lecturas, guardado, descargas, ejercicios),
-        "modelos": obtener("modelos", []),
-        "cargados": obtener("cargados", []),
-        "modelo_tutor": obtener("modelo_tutor"),
-        "gemini": obtener("gemini"),
-        "sistema": obtener("sistema"),
-        "temperaturas": obtener("temperaturas"),
-        "proyecto": obtener("proyecto"),
-        "recientes": obtener("recientes", []),
-        "kaggle": {"lecturas": lecturas[:4], "colecciones": (obtener("colecciones", []) or [])[:6],
-                   "recientes": guardado, "cuenta": obtener("kaggle_cuenta")},
-        "errores": errores,
-        "generado": datetime.now().isoformat(timespec="seconds"),
-    }

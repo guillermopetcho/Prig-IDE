@@ -301,3 +301,27 @@ pub fn registrar_envio(espacio: &Path, d: &Mapa, aprobado: bool, pistas: i64, st
     registrar(&c, &Evento { ejercicio: &id, concepto: &concepto, tipo: "submission", aprobado: Some(aprobado), intento, pistas, stderr, segundos })?;
     Ok(())
 }
+
+/// `recientes(n)`: los últimos ejercicios en los que se trabajó, uno por ejercicio (para Inicio). Vacío si la base
+/// no se puede leer.
+pub fn recientes(espacio: &Path, n: i64) -> Vec<Mapa> {
+    let Ok(c) = abrir(espacio) else { return Vec::new() };
+    let consulta = "SELECT exercise_id, concept, MAX(created_at) AS ultima, COUNT(*) AS envios,
+                           MAX(COALESCE(passed, 0)) AS resuelto
+                    FROM exercise_events WHERE event_type = 'submission'
+                    GROUP BY exercise_id ORDER BY ultima DESC LIMIT ?";
+    let Ok(mut st) = c.prepare(consulta) else { return Vec::new() };
+    let filas = st.query_map([n], |f| {
+        let texto = |i: usize| f.get::<_, Option<String>>(i).map(|v| v.map(Valor::Texto).unwrap_or(Valor::Nulo));
+        Ok(Mapa::new()
+            .con("ejercicio", texto(0)?)
+            .con("concepto", texto(1)?)
+            .con("fecha", texto(2)?)
+            .con("envios", f.get::<_, i64>(3)?)
+            .con("resuelto", f.get::<_, Option<i64>>(4)?.unwrap_or(0) != 0))
+    });
+    match filas {
+        Ok(f) => f.filter_map(Result::ok).collect(),
+        Err(_) => Vec::new(),
+    }
+}
