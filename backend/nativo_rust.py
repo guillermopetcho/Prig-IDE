@@ -11,7 +11,7 @@ Instalación (en el .venv de Prig):
 
 from typing import Any
 
-INTERFAZ = 13          # la versión de la interfaz de prig_nativo que entiende Prig
+INTERFAZ = 23          # la versión de la interfaz de prig_nativo que entiende Prig
 
 _modulo: Any = None
 

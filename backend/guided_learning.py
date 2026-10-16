@@ -485,7 +485,7 @@ class GuidedLearningService:
             if raw.get("id") in resumen:
                 resumen[raw["id"]]["source"] = raw.get("source", "rapido")
                 resumen[raw["id"]]["blocks_total"] = len(raw.get("blocks", []))
-        return sorted(resumen.values(), key=lambda x: x.get("created_at", ""), reverse=True)
+        return sorted(resumen.values(), key=lambda x: x.get("created_at") or "", reverse=True)
 
     def get(self, path_id: str) -> Optional[SeguimientoPath]:
         return self.repo.load(path_id)

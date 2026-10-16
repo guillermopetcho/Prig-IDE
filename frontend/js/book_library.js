@@ -59,6 +59,9 @@ class BookLibraryManager {
         const btnDelete = document.getElementById('btn-delete-book');
         if (btnDelete) btnDelete.onclick = () => this.deleteCurrentBook();
 
+        const btnQuitados = document.getElementById('btn-books-quitados');
+        if (btnQuitados) btnQuitados.onclick = () => this.verQuitados();
+
         if (this.btnIndex) this.btnIndex.onclick = () => this.startIndexing();
 
         if (this.searchInput) {
@@ -250,39 +253,27 @@ class BookLibraryManager {
             alert('Selecciona primero un elemento de la biblioteca.');
             return;
         }
-
         const bookObj = this.allBooks.find(b => this.bookKey(b) === this.currentBook);
-        if (bookObj && ((bookObj.category || '').toUpperCase() === 'PROJECTS' || bookObj.is_project)) {
-            const projectPath = bookObj.path || this.currentBook;
-            await this.removeSavedProject(projectPath);
-            return;
-        }
+        // Quitar no borra archivos: el diálogo deja elegir qué borrar de lo que Prig guardó y, en una carpeta, qué quitar
+        this.quitarDeLaBiblioteca((bookObj && bookObj.path) || this.currentBook);
+    }
 
-        const nombre = (bookObj && (bookObj.title || bookObj.filename)) || this.currentBook;
-
-        if (!confirm(`¿Eliminar "${nombre}" de la biblioteca?\n\nSe borrará el archivo, su ficha de IA y su entrada del índice. Esta acción no se puede deshacer.`)) {
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/books/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: this.currentBook })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-
-            this.currentBook = null;
-            this.currentBookData = null;
-            if (this.metadataPane) this.metadataPane.innerHTML = '';
-            if (this.viewerContainer) this.viewerContainer.innerHTML = '';
-
+    quitarDeLaBiblioteca(id) {
+        if (!window.BibliotecaQuitar) return;
+        window.BibliotecaQuitar.abrir(id, async (res, soloParte) => {
+            if (!soloParte) {
+                this.currentBook = null;
+                this.currentBookData = null;
+                if (this.metadataPane) this.metadataPane.innerHTML = '';
+                if (this.viewerContainer) this.viewerContainer.innerHTML = '';
+            }
             await this.loadBooks();
             this.refreshIndexStatus();
-        } catch (e) {
-            alert(`No se pudo eliminar: ${e.message}`);
-        }
+        });
+    }
+
+    verQuitados() {
+        if (window.BibliotecaQuitar) window.BibliotecaQuitar.quitados(() => { this.loadBooks(); this.refreshIndexStatus(); });
     }
 
     switchTab(tabName) {
@@ -827,7 +818,7 @@ class BookLibraryManager {
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="tool-btn" style="background: rgba(243,139,168,0.15); border: 1px solid rgba(243,139,168,0.3); color: var(--accent-red); font-size: 12px; padding: 8px 12px;" onclick="window.bookLibraryMgr.removeSavedProject('${safePath}');">
-                            <i class="fa-solid fa-bookmark-slash"></i> Desvincular
+                            <i class="fa-solid fa-eye-slash"></i> Quitar
                         </button>
                         <button class="btn-primary-action" style="padding: 8px 18px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 8px;" onclick="window.bookLibraryMgr.openProjectAsWorkspace('${safePath}');">
                             <i class="fa-solid fa-folder-open"></i> Abrir en Archivos
@@ -904,33 +895,8 @@ class BookLibraryManager {
     }
 
     async removeSavedProject(path) {
-        if (!confirm(`¿Desvincular este proyecto de la Biblioteca?\n\n${path}\n\nNota: Los archivos físicos NO se borrarán.`)) {
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/workspace/projects/remove', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: path })
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                this.currentBook = null;
-                this.currentBookData = null;
-                if (this.viewerContainer) this.viewerContainer.innerHTML = '';
-                if (this.metadataPane) this.metadataPane.innerHTML = '';
-                await this.loadBooks();
-                if (window.fileTreeMgr) {
-                    window.fileTreeMgr.cargarProyectos();
-                    window.fileTreeMgr.syncWorkspaceIndicator();
-                }
-            } else {
-                alert('No se pudo desvincular: ' + (data.detail || data.error));
-            }
-        } catch (e) {
-            alert('Error al desvincular proyecto: ' + e.message);
-        }
+        // un proyecto guardado se quita igual que lo demás: deja de verse aquí, su carpeta no se toca
+        this.quitarDeLaBiblioteca(path);
     }
 
     // =========================================================================

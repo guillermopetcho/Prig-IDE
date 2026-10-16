@@ -1,0 +1,15 @@
+[package]
+name = "prig-modelos"
+version = "0.1.0"
+edition = "2021"
+
+# Modelos de Ollama (F3 de docs/plan-prig-rust.md): las opciones por capas, la gestión (ficha, variantes, copias,
+# importar GGUF, actualizaciones) y el buscador de modelos en ollama.com, Hugging Face y ModelScope. Rust puro: lo
+# usa el backend de Python por PyO3 (prig-nativo-py) y, después, el servidor en Rust.
+
+[dependencies]
+prig-recursos = { path = "../prig-recursos" }
+prig-plataforma = { path = "../prig-plataforma" }
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+sha2 = "0.10"

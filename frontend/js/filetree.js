@@ -3,6 +3,9 @@ class FileTreeManager {
         this.container = document.getElementById('file-tree-container');
         this.searchInput = document.getElementById('tree-search-input');
         this.rawTreeData = [];
+        // La segunda carpeta (mitad de abajo): sus archivos se abren en la columna derecha del editor
+        this.segunda = null;
+        this.rawTreeData2 = [];
         this.currentFolderData = null;
         this.savedProjects = [];
         this.recentProjects = [];
@@ -34,6 +37,94 @@ class FileTreeManager {
             this.syncWorkspaceIndicator();
         } catch (e) {
             console.error('Error al cargar árbol de archivos:', e);
+        }
+        await this.cargarSegundaCarpeta();
+    }
+
+    /** Lee del backend la segunda carpeta y dibuja su árbol en la mitad de abajo (o la oculta si no hay) */
+    async cargarSegundaCarpeta() {
+        try {
+            const res = await fetch('/api/workspace/segunda');
+            if (!res.ok) return;
+            this.segunda = (await res.json()).path || null;
+            if (this.segunda) {
+                const arbol = await fetch(`/api/tree?path=${encodeURIComponent(this.segunda)}`);
+                this.rawTreeData2 = arbol.ok ? await arbol.json() : [];
+            } else {
+                this.rawTreeData2 = [];
+            }
+        } catch (e) {
+            console.error('Error al cargar la segunda carpeta:', e);
+        }
+        this.mostrarSegundaCarpeta();
+    }
+
+    mostrarSegundaCarpeta() {
+        const panel = document.getElementById('segunda-carpeta-panel');
+        const sidebar = document.getElementById('sidebar-left');
+        if (!panel) return;
+        panel.classList.toggle('activa', !!this.segunda);
+        if (sidebar) sidebar.classList.toggle('dos-carpetas', !!this.segunda);
+        const btn = document.getElementById('btn-segunda-carpeta');
+        if (btn) {
+            btn.style.borderColor = this.segunda ? 'var(--accent-blue)' : '';
+            btn.style.background = this.segunda ? 'rgba(137,180,250,0.25)' : '';
+            btn.title = this.segunda ? 'Salir de la visión múltiple' : 'Visión múltiple: cargar una segunda carpeta debajo (sus archivos se abren en el editor de la derecha)';
+        }
+        if (!this.segunda) return;
+        const nombre = document.getElementById('segunda-carpeta-nombre');
+        if (nombre) {
+            nombre.textContent = this.segunda.split('/').filter(Boolean).pop() || this.segunda;
+            nombre.title = this.segunda;
+        }
+        const termino = this.searchInput ? this.searchInput.value.toLowerCase() : '';
+        const cont = document.getElementById('file-tree-container-2');
+        if (cont) this.render(termino ? this.filtrarItems(this.rawTreeData2, termino) : this.rawTreeData2, cont, !!termino, 1);
+    }
+
+    async fijarSegundaCarpeta(ruta) {
+        const res = await fetch('/api/workspace/segunda', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: ruta || null })
+        });
+        if (!res.ok) {
+            let detalle = `HTTP ${res.status}`;
+            try { detalle = (await res.json()).detail || detalle; } catch (e) {}
+            alert(`No se pudo cargar la carpeta: ${detalle}`);
+            return;
+        }
+        await this.cargarSegundaCarpeta();
+    }
+
+    /** Elige la segunda carpeta con el diálogo del sistema; si no hay diálogo, pide la ruta */
+    async elegirSegundaCarpeta() {
+        try {
+            const res = await fetch('/api/workspace/segunda/browse', { method: 'POST' });
+            if (res.ok) {
+                await this.cargarSegundaCarpeta();
+                return;
+            }
+        } catch (e) {}
+        const ruta = prompt('Ruta de la segunda carpeta:', this.segunda || '');
+        if (ruta && ruta.trim()) await this.fijarSegundaCarpeta(ruta.trim());
+    }
+
+    async quitarSegundaCarpeta() {
+        await this.fijarSegundaCarpeta(null);
+    }
+
+    /** Visión múltiple: con una segunda carpeta la activa (pidiéndola) y sin ella la quita */
+    async alternarVisionMultiple() {
+        if (this.segunda) {
+            await this.quitarSegundaCarpeta();
+        } else {
+            await this.elegirSegundaCarpeta();
+        }
+        // Al entrar, el editor ya queda dividido en dos columnas (izquierda la carpeta 1, derecha la 2)
+        if (this.segunda && window.editorMgr && window.editorMgr.numColumns < 2) {
+            window.editorMgr._abriendoEnColumna = true;
+            try { window.editorMgr.setColumnLayout(2); } finally { window.editorMgr._abriendoEnColumna = false; }
         }
     }
 
@@ -69,11 +160,15 @@ class FileTreeManager {
     }
 
     filterTree(searchTerm) {
+        this.mostrarSegundaCarpeta();
         if (!searchTerm) {
             this.render(this.rawTreeData, this.container);
             return;
         }
+        this.render(this.filtrarItems(this.rawTreeData, searchTerm), this.container, true);
+    }
 
+    filtrarItems(items, searchTerm) {
         const filterItems = (items) => {
             const result = [];
             items.forEach(item => {
@@ -89,11 +184,11 @@ class FileTreeManager {
             return result;
         };
 
-        const filtered = filterItems(this.rawTreeData);
-        this.render(filtered, this.container, true);
+        return filterItems(items);
     }
 
-    render(items, parentEl, expandAll = false) {
+    /** col: la columna del editor donde se abren sus archivos (0 la carpeta de trabajo, 1 la segunda) */
+    render(items, parentEl, expandAll = false, col = 0) {
         parentEl.innerHTML = '';
         if (!items || items.length === 0) {
             if (parentEl === this.container) {
@@ -124,7 +219,7 @@ class FileTreeManager {
             
             const safePath = (item.path || '').replace(/\\/g, '/').replace(/'/g, "\\'");
             const safeName = (item.name || '').replace(/'/g, "\\'");
-            const dirAiBtn = item.is_dir ? '<button title="Análisis inteligente" style="background: var(--accent-blue); color: #111; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.abrirAprendizajeGuiado();"><i class="fa-solid fa-brain"></i></button>' : '';
+            const dirAiBtn = item.is_dir ? `<button title="Ejecutar pensamiento del personaje en archivo" class="btn-pensamiento-carpeta" style="background: var(--accent-blue); color: #111; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.ejecutarPensamientoPersonajeEnArchivo('${safePath}', '${safeName}', this);"><i class="fa-solid fa-brain"></i></button>` : '';
             const dirPdfBtn = item.is_dir ? `<button title="Exportar Notebooks y Código a PDF" style="background: #e74c3c; color: #ffffff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.pdfExporterMgr.openModal('${safePath}', '${safeName}');"><i class="fa-solid fa-file-pdf"></i></button>` : '';
 
             el.innerHTML = `<i class="${icon}"></i> <span class="tree-item-name"></span> ${notebookTag} ${dirAiBtn} ${dirPdfBtn}`;
@@ -145,7 +240,7 @@ class FileTreeManager {
                 };
 
                 if (item.children && item.children.length > 0) {
-                    this.render(item.children, childContainer, expandAll);
+                    this.render(item.children, childContainer, expandAll, col);
                 }
 
                 parentEl.appendChild(el);
@@ -153,7 +248,7 @@ class FileTreeManager {
             } else {
                 el.onclick = (e) => {
                     e.stopPropagation();
-                    this.selectFile(item.path, item.name);
+                    this.selectFile(item.path, item.name, col);
                 };
                 parentEl.appendChild(el);
             }
@@ -175,8 +270,13 @@ class FileTreeManager {
         }
     }
 
-    async selectFile(path, name) {
-        await window.editorMgr.openFileByPath(path, name);
+    async selectFile(path, name, col = 0) {
+        // Con dos carpetas el editor se divide: la de arriba a la izquierda y la de abajo a la derecha
+        if (!window.editorMgr) return;
+        const abierto = await window.editorMgr.openFileByPath(path, name, this.segunda ? col : null);
+        if (!abierto && window.layoutMgr && window.layoutMgr.mensajeEstado) {
+            window.layoutMgr.mensajeEstado(`No se pudo abrir ${name || path}`, 4000);
+        }
     }
 
     escapeHtml(str) {
@@ -702,3 +802,76 @@ class FileTreeManager {
 }
 
 window.fileTreeMgr = new FileTreeManager();
+
+/**
+ * Ejecuta todo el pensamiento y razonamiento del personaje del proyecto sobre una carpeta o workspace,
+ * escribiéndolo en un archivo PENSAMIENTO_DEL_PROYECTO.md y abriéndolo directamente en el editor.
+ */
+window.ejecutarPensamientoPersonajeEnArchivo = async function(carpetaPath, carpetaNombre, btnEl = null) {
+    const nombre = carpetaNombre || 'Proyecto';
+    const notifMsg = `🧠 El personaje del proyecto está analizando "${nombre}" y ejecutando su pensamiento...`;
+    
+    if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+        window.layoutMgr.mensajeEstado(notifMsg, 6000);
+    }
+
+    const btn = btnEl || (window.event && window.event.target ? window.event.target.closest('button') : null);
+    let oldHtml = null;
+    if (btn) {
+        oldHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+    }
+
+    try {
+        const temaId = (window.DIRECTOR_ASCII && window.DIRECTOR_ASCII.temaActivo) || 'tema_mecha_patrol';
+        const resp = await fetch('/api/llm/ejecutar_pensamiento_proyecto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                carpeta: carpetaPath || '',
+                tema_id: temaId
+            })
+        });
+
+        if (!resp.ok) {
+            const errTxt = await resp.text();
+            throw new Error(`Error en servidor (${resp.status}): ${errTxt}`);
+        }
+
+        const data = await resp.json();
+        if (!data.ok) {
+            throw new Error(data.error || 'No se pudo generar el archivo de pensamiento.');
+        }
+
+        // Recargar el árbol para mostrar PENSAMIENTO_DEL_PROYECTO.md
+        if (window.fileTreeMgr && typeof window.fileTreeMgr.loadTree === 'function') {
+            await window.fileTreeMgr.loadTree();
+        }
+
+        // Abrir el archivo directamente en el editor de código
+        if (data.archivo && window.editorMgr && typeof window.editorMgr.openFileByPath === 'function') {
+            await window.editorMgr.openFileByPath(data.archivo, data.nombre || 'PENSAMIENTO_DEL_PROYECTO.md');
+        }
+
+        const exitoMsg = `✅ Pensamiento de "${data.personaje || 'Personaje'}" ejecutado en ${data.nombre || 'PENSAMIENTO_DEL_PROYECTO.md'}`;
+        if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+            window.layoutMgr.mensajeEstado(exitoMsg, 4500);
+        } else {
+            console.log(exitoMsg);
+        }
+    } catch (err) {
+        console.error('Error al ejecutar pensamiento del personaje en archivo:', err);
+        const errDesc = `Error: ${err.message || 'No se pudo completar el análisis'}`;
+        if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+            window.layoutMgr.mensajeEstado(errDesc, 4000);
+        } else {
+            alert(errDesc);
+        }
+    } finally {
+        if (btn && oldHtml) {
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    }
+};

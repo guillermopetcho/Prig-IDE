@@ -252,7 +252,7 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
     // Antes 405: Rust tenía la ruta con otro método y no la pasaba a Python
     for (metodo, uri) in [
         ("POST", "/api/descargas"),
-        ("POST", "/api/flags"),
+        ("POST", "/api/books/analyze"),
         ("DELETE", "/api/modelos/parciales"),
         ("POST", "/api/recursos/servidor"),
         ("POST", "/api/workspace/open"),
@@ -267,14 +267,14 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
     }
     // Consulta, Origin y cabeceras repetidas; las de CORS de Python no se reenvían
     let req = Request::builder()
-        .uri("/api/ai/config?a=1&b=dos")
+        .uri("/api/ai/catalog?a=1&b=dos")
         .header(header::ORIGIN, "http://127.0.0.1:8000")
         .body(Body::empty())
         .unwrap();
     let (estado, cab, cuerpo) = pedir(&app, req).await;
     assert_eq!(estado, StatusCode::OK);
     let v: Value = serde_json::from_slice(&cuerpo).unwrap();
-    assert_eq!(v["uri"], "/api/ai/config?a=1&b=dos");
+    assert_eq!(v["uri"], "/api/ai/catalog?a=1&b=dos");
     assert_eq!(v["origen"], "http://127.0.0.1:8000");
     assert_eq!(cab.get_all(header::SET_COOKIE).iter().count(), 2);
     assert_eq!(cab.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "http://127.0.0.1:8000", "solo la de Rust");

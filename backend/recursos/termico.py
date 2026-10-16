@@ -234,6 +234,7 @@ class Gobernador:
         self.monitor = monitor
         self.guardar = guardar
         self._n = _t().NucleoGobernador(almacen().termico() if guardar else None, guardar)
+        self._vistos = (almacen().termico(), almacen().ritmo()) if guardar else None
         # Modo suave (recursos/ritmo.py): dosifica el trabajo antes de que haga falta cortar.
         # En las pruebas (guardar=False) queda apagado para que el comportamiento sea el de siempre.
         if guardar:
@@ -257,8 +258,9 @@ class Gobernador:
         # Con el modo frío, los modelos en RAM van a los núcleos E (el fijador no los devuelve a todos)
         self.fijador.ram_en_eficientes = lambda: bool({**frio.POR_DEFECTO, **(self._ajustes_frio() or {})}["activo"])
         # PRIG_SIN_MOTOR_SUAVE=1 (lo fijan las pruebas): no instalar ni arrancar el controlador,
-        # que escribiría en el archivo de control de un Prig que esté abierto a la vez.
-        if guardar and os.environ.get("PRIG_SIN_MOTOR_SUAVE") != "1":
+        # que escribiría en el archivo de control de un Prig que esté abierto a la vez. Con el servidor de Rust
+        # (PRIG_PUERTO_RUST), los controladores son suyos (prig_ia::vivo).
+        if guardar and os.environ.get("PRIG_SIN_MOTOR_SUAVE") != "1" and not os.environ.get("PRIG_PUERTO_RUST"):
             threading.Thread(target=self._preparar_motor, daemon=True, name="prig-motor-suave-inicio").start()
 
     def _preparar_motor(self):
@@ -335,6 +337,22 @@ class Gobernador:
 
     def _persistir_ajustes(self, ajustes: Dict[str, Any], texto: Optional[str], datos: Optional[dict]):
         almacen().guardar_termico(ajustes, texto, datos)
+        if self._vistos is not None:
+            self._vistos = (almacen().termico(), self._vistos[1])
+
+    def sincronizar(self):
+        """ Toma lo que el servidor de Rust haya guardado (lo aprendido, el límite, el modo suave): los dos procesos
+        comparten el almacén. Sin tocar una pausa en curso. """
+        if self._vistos is None:
+            return
+        termico, ritmo = almacen().termico(), almacen().ritmo()
+        if termico != self._vistos[0] and self._n.pausa is None:
+            self._n = _t().NucleoGobernador(termico, True)
+            self._vistos = (termico, self._vistos[1])
+        if ritmo != self._vistos[1]:
+            self.ritmo = Ritmo(ritmo, guardar=almacen().guardar_ritmo)
+            self.controlador.ritmo = self.ritmo
+            self._vistos = (self._vistos[0], ritmo)
 
     # -- ajustes
     @property
@@ -448,4 +466,5 @@ def gobernador() -> Gobernador:
     with _cerrojo_global:
         if _gobernador is None:
             _gobernador = Gobernador(m)
-        return _gobernador
+    _gobernador.sincronizar()
+    return _gobernador

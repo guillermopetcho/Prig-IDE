@@ -240,61 +240,6 @@ class PruebaGeneracionRetomada(_Aislado):
         motor._capacidades = {}
         return motor
 
-    def test_corta_enfria_y_continua_sin_perder_lo_escrito(self):
-        class Res:
-            status_code = 200
-
-            def __init__(self, trozos):
-                self.trozos = trozos
-
-            def iter_lines(self):
-                for t, fin in self.trozos:
-                    yield json.dumps({"message": {"content": t}, "done": fin}).encode()
-
-            def close(self):
-                pass
-
-        enviados = []
-        respuestas = [Res([("Hola", False), (" mun", False), ("do", False), (" cruel", False)]),
-                      Res([("do", False), (".", True)])]
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return respuestas.pop(0)
-
-        g = Gobernador(MonitorFalso([40]), guardar=False)
-        cortes = iter([None, "limite"])          # corta en el segundo control, tras " mun"
-        g.debe_cortar = lambda tramo: next(cortes, None)
-        eventos, tramos = [], []
-        g.terminar_tramo = lambda tramo, motivo: tramos.append(motivo)
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post), \
-                mock.patch.object(g, "enfriar", side_effect=lambda *a, **k: eventos.append("enfriar")), \
-                mock.patch("ai_engine.ai_engine_class.time.time",
-                           side_effect=[float(i) * 2 for i in range(100)]):
-            texto = self._motor().generar_con_pausas("di hola", "m", system_prompt="s",
-                                                     gobernador=g, avisar=eventos.append)
-        self.assertEqual(eventos, ["enfriar"])
-        # Segunda petición: lo generado va como inicio de la respuesta del asistente
-        self.assertEqual(enviados[1]["messages"][-1], {"role": "assistant", "content": "Hola mun"})
-        self.assertEqual(enviados[1]["messages"][0], {"role": "system", "content": "s"})
-        self.assertEqual(enviados[1]["options"]["num_predict"], 98)
-        self.assertEqual(texto, "Hola mundo.")
-        # Cada tramo se cierra para aprender: el cortado y el que terminó
-        self.assertEqual(tramos, ["limite", None])
-
-    def test_sin_gobernador_no_corta(self):
-        class Res:
-            status_code = 200
-
-            def iter_lines(self):
-                yield json.dumps({"message": {"content": "ok"}, "done": True}).encode()
-
-            def close(self):
-                pass
-        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res()):
-            self.assertEqual(self._motor().generar_con_pausas("x", "m"), "ok")
-
-
 class PruebaChatConPausas(_Aislado):
     """ El chat del panel izquierdo también respeta el límite (antes solo los flujos) """
     _motor = PruebaGeneracionRetomada._motor
@@ -332,19 +277,6 @@ class PruebaChatConPausas(_Aislado):
                            side_effect=[float(i) * 2 for i in range(200)]):
             eventos = list(motor.chat_eventos([{"role": "user", "content": "hola"}], "m", gobernador=g))
         return eventos, enviados, enfriar, motor
-
-    def test_corta_avisa_y_continua_la_misma_respuesta(self):
-        respuestas = [self.Res([("Hola", False), (" mun", False), ("do", False)]), self.Res([("do", False), (".", True)])]
-        eventos, enviados, enfriar, motor = self._chat(respuestas, [None, "limite"], [40, 62, 62, 45])
-        texto = "".join(e["v"] for e in eventos if e["t"] == "texto")
-        self.assertEqual(texto, "Hola mundo.")
-        termicos = [e for e in eventos if e["t"] == "termico"]
-        self.assertEqual([e["pausa"] for e in termicos], [True, False])
-        self.assertIn("pausa para enfriar", termicos[0]["v"])
-        self.assertEqual(enfriar.call_count, 1)
-        self.assertEqual(enviados[1]["messages"][-1], {"role": "assistant", "content": "Hola mun"})
-        self.assertTrue(any(e["t"] == "stats" for e in eventos))
-        self.assertEqual(motor._cancelables, set())   # se da de baja al terminar
 
     def test_detener_despierta_una_pausa(self):
         from ai_engine import AIEngine

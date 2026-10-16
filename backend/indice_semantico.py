@@ -26,7 +26,6 @@ Dos decisiones que salieron de medir, no de suponer:
 
 import os
 import json
-import math
 import time
 import struct
 import urllib.request
@@ -167,14 +166,15 @@ class IndiceSemantico:
     # Consultar
     # ==================================================================
 
-    def _vectores(self) -> Dict[str, List[float]]:
+    def _vectores(self):
+        """ Los vectores del índice, en Rust (prig_nativo.vectores: puntúa en paralelo y sin el GIL) """
         if self._cache is None:
             with self.kb.conectar() as c:
                 try:
                     filas = c.execute("SELECT concept_id, vector FROM vectores;").fetchall()
                 except Exception:
                     filas = []
-            self._cache = {f["concept_id"]: _desempaquetar(f["vector"]) for f in filas}
+            self._cache = _rs().Vectores([(f["concept_id"], bytes(f["vector"])) for f in filas])
         return self._cache
 
     def hay_indice(self) -> bool:
@@ -186,19 +186,16 @@ class IndiceSemantico:
         vectores = self._vectores()
         if not vectores:
             return []
-        candidatos = ([(cid, vectores[cid]) for cid in concept_ids if cid in vectores]
-                      if concept_ids else list(vectores.items()))
-        if not candidatos:
+        if concept_ids and not any(cid in vectores for cid in concept_ids):
             return []
         try:
             qv = self.embeber([pregunta], timeout=60)[0]
         except Exception:
             return []
         # Otro modelo u otras dimensiones que las del índice: comparar vectores de
-        # tamaños distintos daría basura. Sin resultado, se usa la búsqueda por palabras.
-        if len(qv) != len(candidatos[0][1]):
-            return []
-        return sorted(((_coseno(qv, v), cid) for cid, v in candidatos), reverse=True)
+        # tamaños distintos daría basura (Rust devuelve entonces una lista vacía). Sin
+        # resultado, se usa la búsqueda por palabras.
+        return vectores.puntuar(qv, list(concept_ids) if concept_ids else None)
 
     def filtrar(self, pregunta: str, concept_ids: List[str],
                 umbral: float = UMBRAL_RELATIVO,
@@ -286,15 +283,13 @@ def _empaquetar(v: List[float]) -> bytes:
 
 
 def _desempaquetar(b: bytes) -> List[float]:
-    return list(struct.unpack(f"{len(b) // 4}f", b))
+    return _rs().desempaquetar(b)
 
 
 def _coseno(a: List[float], b: List[float]) -> float:
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    producto = na = nb = 0.0
-    for x, y in zip(a, b):
-        producto += x * y
-        na += x * x
-        nb += y * y
-    return producto / math.sqrt(na * nb) if na and nb else 0.0
+    return _rs().coseno(a, b)
+
+
+def _rs():
+    from nativo_rust import rust
+    return rust().vectores

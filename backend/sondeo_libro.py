@@ -139,6 +139,22 @@ class SondeoLibro:
         return base
 
     def _medir_pdf(self, ruta: str) -> Dict[str, Any]:
+        """ Con PDFium (pdf_nativo, Rust: abre el libro una vez, ~20 veces más rápido) si está; si no, con pypdf """
+        from pdf_nativo import lector as _pdfium
+        pdfium = _pdfium()
+        if pdfium is not None:
+            try:
+                total, muestra, imagenes, marcadores, meta = pdfium.sondeo(ruta, PAGINAS_MUESTRA)
+            except Exception as err:
+                if pdfium.es_de_contrasena(str(err)):
+                    return {"error": "el PDF está protegido con contraseña",
+                            "paginas": 0, "_muestra_texto": "", "cifrado": True}
+                print(f"PDFium no pudo sondear {os.path.basename(ruta)} ({err}); se usa pypdf.")
+            else:
+                if not total:
+                    return {"error": "el PDF no tiene páginas", "paginas": 0, "_muestra_texto": ""}
+                indice = [{"titulo": t, "nivel": nivel} for t, nivel in marcadores]
+                return self._medida_pdf(total, [t for _, t in muestra], imagenes, indice, dict(meta))
         try:
             import pypdf
         except ImportError:
@@ -169,7 +185,7 @@ class SondeoLibro:
             for i in range(PAGINAS_MUESTRA)))
         indices = [i for i in indices if 0 <= i < total]
 
-        textos, imagenes, paginas_vacias = [], 0, 0
+        textos, imagenes = [], 0
         for i in indices:
             try:
                 pagina = lector.pages[i]
@@ -177,12 +193,15 @@ class SondeoLibro:
             except Exception:
                 texto = ""
             textos.append(texto)
-            if len(texto.strip()) < CHARS_PAGINA_ESCANEADO:
-                paginas_vacias += 1
             imagenes += self._contar_imagenes(pagina)
 
-        indice = self._indice_pdf(lector)
-        muestreadas = max(1, len(indices))
+        return self._medida_pdf(total, textos, imagenes, self._indice_pdf(lector), self._metadatos(lector))
+
+    @staticmethod
+    def _medida_pdf(total: int, textos: List[str], imagenes: int, indice: List[Dict[str, Any]],
+                    metadatos: Dict[str, str]) -> Dict[str, Any]:
+        muestreadas = max(1, len(textos))
+        paginas_vacias = sum(1 for t in textos if len(t.strip()) < CHARS_PAGINA_ESCANEADO)
         return {
             "paginas": total,
             "paginas_muestreadas": muestreadas,
@@ -192,7 +211,7 @@ class SondeoLibro:
             "tiene_indice": bool(indice),
             "entradas_indice": len(indice),
             "indice_muestra": indice[:25],
-            "metadatos": self._metadatos(lector),
+            "metadatos": metadatos,
             "_paginas_texto": textos,
             "_muestra_texto": "\n\n".join(t for t in textos if t.strip())[:24000],
         }

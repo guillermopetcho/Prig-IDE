@@ -28,8 +28,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
-API = "https://www.kaggle.com/api/v1"
+API = os.environ.get("PRIG_KAGGLE_API") or "https://www.kaggle.com/api/v1"   # otra solo en las pruebas
 UA = {"User-Agent": "Prig-IDE (lector de notebooks; uso educativo local)"}
 ORDENES = {"relevancia": "relevance", "votos": "voteCount", "populares": "hotness", "recientes": "dateRun",
            "comentados": "commentCount", "vistos": "viewCount", "nuevos": "dateCreated"}
@@ -168,7 +169,7 @@ def _pedir(ruta: str, params: Dict[str, Any], c: Optional[Dict[str, Any]] = None
         raise ErrorKaggle("Para buscar en Kaggle hace falta conectar tu cuenta. Sin ella puedes abrir un notebook pegando su enlace.")
     auth, cab = _auth(c)
     try:
-        r = requests.get(f"{API}/{ruta}", params=params, auth=auth, headers={**UA, **cab}, timeout=30)
+        r = red_http.get(f"{API}/{ruta}", params=params, auth=auth, headers={**UA, **cab}, timeout=30)
     except requests.RequestException:
         raise ErrorKaggle("Sin conexión con Kaggle: comprueba internet.")
     if r.status_code == 401:

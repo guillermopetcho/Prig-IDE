@@ -1,0 +1,16 @@
+[package]
+name = "prig-aprendizaje"
+version = "0.1.0"
+edition = "2021"
+
+# Aprendizaje y desafíos (F6 de docs/plan-prig-rust.md). Rust puro: lo usa el backend de Python por PyO3
+# (prig-nativo-py) y, después, el servidor en Rust.
+
+[dependencies]
+prig-recursos = { path = "../prig-recursos" }
+libc = "0.2"
+rusqlite = { version = "0.40", features = ["bundled"] }
+regex = "1"
+unicode-normalization = "0.1"
+prig-plataforma = { path = "../prig-plataforma" }
+uuid = { version = "1", features = ["v4"] }

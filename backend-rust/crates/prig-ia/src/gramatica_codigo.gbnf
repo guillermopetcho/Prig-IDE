@@ -1,0 +1,5 @@
+root     ::= bloque ("\n" bloque)*
+bloque   ::= archivo? "```" lengua "\n" linea* "```"
+archivo  ::= "### Archivo: " [^\n]+ "\n"
+lengua   ::= [a-zA-Z0-9_+#.-]*
+linea    ::= ([^`\n] [^\n]* | "`" [^`\n] [^\n]* | "``" [^`\n] [^\n]*)? "\n"

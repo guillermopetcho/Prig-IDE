@@ -107,7 +107,12 @@ class LearnerDatasetManager:
         for p in raw_plans:
             plan_id = p.get("plan_id")
             if plan_id:
-                state = self.plan_repo.load_state(plan_id)
+                # Uno dañado se salta: antes tumbaba el dataset entero (y con él guardar cualquier progreso)
+                try:
+                    state = self.plan_repo.load_state(plan_id)
+                except Exception as err:
+                    print(f"⚠️ Plan {plan_id} omitido del dataset: {err}")
+                    continue
                 if state:
                     full_recorridos.append(state.model_dump())
 
@@ -116,7 +121,11 @@ class LearnerDatasetManager:
         for s in raw_segs:
             seg_id = s.get("id")
             if seg_id:
-                path_obj = self.seg_repo.load(seg_id)
+                try:
+                    path_obj = self.seg_repo.load(seg_id)
+                except Exception as err:
+                    print(f"⚠️ Seguimiento {seg_id} omitido del dataset: {err}")
+                    continue
                 if path_obj:
                     full_seguimientos.append(path_obj.model_dump())
 

@@ -313,6 +313,11 @@ pub trait MundoSuave {
     fn ahora(&mut self) -> f64;
     fn escribir_control(&mut self, fraccion: f64, tramo: f64);
     fn quitar_control(&mut self);
+    /// Toma el ritmo. Desde Python hay que esperarlo sin el GIL: si otro hilo lo tiene mientras ejecuta Python, ese
+    /// hilo necesita el GIL para soltarlo (si no, los dos se esperan para siempre y el backend entero se cuelga)
+    fn bloquear<'a>(&mut self, ritmo: &'a Mutex<Ritmo>) -> std::sync::MutexGuard<'a, Ritmo> {
+        ritmo.lock().unwrap_or_else(|e| e.into_inner())
+    }
 }
 
 /// Dos veces por segundo: temperatura → fracción de trabajo → archivo de control. La temperatura se suaviza con una
@@ -331,11 +336,10 @@ impl ControladorSuave {
         let activo = mundo.generando(estado.as_ref());
         if activo {
             let a = mundo.ahora();
-            ritmo.lock().unwrap_or_else(|e| e.into_inner()).marcar(a);
+            mundo.bloquear(ritmo).marcar(a);
         }
-        let ritmo_activo = || ritmo.lock().unwrap_or_else(|e| e.into_inner()).activo();
         let mut temp = None;
-        if activo || ritmo_activo() {
+        if activo || mundo.bloquear(ritmo).activo() {
             temp = mundo.gpu(if activo { 1.0 } else { 3.0 });
         }
         if let Some(t) = temp.as_ref().filter(|t| !t.es_nulo()) {
@@ -345,11 +349,11 @@ impl ControladorSuave {
             });
         }
         let fraccion;
-        if ritmo_activo() {
+        if mundo.bloquear(ritmo).activo() {
             let a = mundo.ahora();
             let media = self.temp_media.as_ref().and_then(Valor::num);
             let (objetivo, tramo) = {
-                let r = ritmo.lock().unwrap_or_else(|e| e.into_inner());
+                let r = mundo.bloquear(ritmo);
                 let tramo = match r.ajustes.get("tramo_motor_s") {
                     Some(v) if v.verdad() => v.num().unwrap_or(0.02),
                     _ => 0.02,

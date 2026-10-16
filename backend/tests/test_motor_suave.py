@@ -259,6 +259,61 @@ class TestControlador(Base):
         self.assertFalse(os.path.exists(os.environ["PRIG_SUAVE_CONTROL"]))
 
 
+class TestSinInterbloqueo(Base):
+    """ El paso tiene su cerrojo mientras llama a Python (la temperatura); quien lea el estado a la vez desde otro hilo
+    (una petición: /api/recursos/temperaturas) tiene que esperar sin el GIL. Antes se esperaban el uno al otro para
+    siempre y el backend entero dejaba de responder con la interfaz abierta. """
+
+    def test_paso_y_lecturas_a_la_vez(self):
+        # En otro proceso: un interbloqueo cuelga el intérprete entero (también el join con tiempo), así que la
+        # prueba lo mide desde fuera y falla en lugar de quedarse colgada
+        codigo = r"""
+import os, sys, threading, time
+sys.path.insert(0, %r)
+from recursos import motor_suave as ms, ritmo as rt
+
+class MonitorLento:
+    temp = 50
+    def gpu(self, max_edad=2.5):
+        time.sleep(0.01)      # leer la GPU tarda y suelta el GIL, como nvidia-smi o los sensores
+        return self.temp
+    def tendencia_gpu(self, desde=None):
+        return 0.0
+
+r = rt.Ritmo({"objetivo_c": 60, "rampa_s": 0, "ritmo_minimo": 0.3})
+c = ms.Controlador(r, MonitorLento())
+fin = time.time() + 1.5
+hechos = {"pasos": 0, "lecturas": 0}
+
+def pasos():
+    while time.time() < fin:
+        with open(os.environ["PRIG_SUAVE_CONTROL"] + ".estado", "w") as f:
+            f.write(f"123 {time.time():.3f} 1.0 0.02 800\n")
+        c.paso()
+        hechos["pasos"] += 1
+
+def lecturas():
+    while time.time() < fin:
+        c.ultimo, c.temp_media, c.fraccion, r.activo
+        hechos["lecturas"] += 1
+
+hilos = [threading.Thread(target=f) for f in (pasos, lecturas, lecturas)]
+for h in hilos:
+    h.start()
+for h in hilos:
+    h.join()
+print(hechos["pasos"], hechos["lecturas"])
+""" % os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        try:
+            r = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            self.fail("interbloqueo: el paso y las lecturas a la vez colgaron el intérprete")
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        pasos, lecturas = map(int, r.stdout.split())
+        self.assertGreater(pasos, 10)
+        self.assertGreater(lecturas, 100)
+
+
 class TestGobernador(Base):
     def test_con_el_motor_dosificando_no_se_cortan_peticiones(self):
         from recursos.termico import Gobernador

@@ -64,10 +64,79 @@ class Respuesta:
         return False
 
 
+class ServidorFalso:
+    """ Un servidor HTTP local que hace de ollama.com, Hugging Face, ModelScope y los registros: anota cada
+    petición (método, ruta, parámetros, cabeceras en minúsculas y cuerpo) y responde con `responder(peticion)` →
+    (código, cuerpo, cabeceras). Nunca la red. """
+
+    def __init__(self):
+        import http.server
+        import urllib.parse
+        self.peticiones = []
+        self.responder = lambda p: (404, b"", {})
+        falso = self
+
+        class Manejador(http.server.BaseHTTPRequestHandler):
+            def _atender(self):
+                largo = int(self.headers.get("Content-Length") or 0)
+                cuerpo = self.rfile.read(largo) if largo else b""
+                ruta, _, query = self.path.partition("?")
+                p = {"metodo": self.command, "ruta": ruta, "query": query,
+                     "params": {k: v[0] if len(v) == 1 else v for k, v in urllib.parse.parse_qs(query).items()},
+                     "cabeceras": {k.lower(): v for k, v in self.headers.items()}, "cuerpo": cuerpo}
+                falso.peticiones.append(p)
+                codigo, salida, cabeceras = falso.responder(p)
+                if not isinstance(salida, bytes):
+                    salida = json.dumps(salida).encode()
+                self.send_response(codigo)
+                for k, v in (cabeceras or {}).items():
+                    self.send_header(k, v)
+                self.send_header("Content-Length", str(len(salida)))
+                self.end_headers()
+                self.wfile.write(salida)
+
+            do_GET = do_PUT = do_POST = _atender
+
+            def log_message(self, *a):
+                pass
+
+        self.servidor = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        threading.Thread(target=self.servidor.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.servidor.server_address[1]}"
+
+    def responder_siempre(self, codigo, cuerpo=b"", cabeceras=None):
+        self.responder = lambda p: (codigo, cuerpo, cabeceras or {})
+
+    @property
+    def ultima(self):
+        return self.peticiones[-1]
+
+    def cerrar(self):
+        self.servidor.shutdown()
+        self.servidor.server_close()
+
+
 class _SinCache(unittest.TestCase):
+    """ Sin caché compartida y sin red: las tres plataformas y los registros son un servidor falso local """
+
     def setUp(self):
         self.cache = mock.patch.object(bm, "_cache", bm.Cache())
         self.cache.start()
+        self.web = ServidorFalso()
+        self.addCleanup(self.web.cerrar)
+        for clase in (bm.Ollama, bm.HuggingFace, bm.ModelScope):
+            p = mock.patch.object(clase, "BASE", self.web.url)
+            p.start()
+            self.addCleanup(p.stop)
+        registro_real = bm.registro_de
+
+        def registro_falso(ref):
+            registro, repo, tag = registro_real(ref)
+            # el host del registro va en la ruta: así se sabe a cuál se pidió (y modelscope.cn sigue en la URL)
+            return f"{self.web.url}/{registro.split('//', 1)[1]}", repo, tag
+        p = mock.patch.object(bm, "registro_de", side_effect=registro_falso)
+        p.start()
+        self.addCleanup(p.stop)
 
     def tearDown(self):
         self.cache.stop()
@@ -202,22 +271,23 @@ class PruebaOllamaCom(_SinCache):
 
     def test_parametros_de_busqueda_y_paginas(self):
         pagina = leer("ollama_busqueda.html")
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, pagina.encode())) as get:
-            r = bm.Ollama().buscar("qwen", "recientes", "tools", 1)
-        self.assertEqual(get.call_args.kwargs["params"], {"q": "qwen", "o": "newest", "c": "tools"})
-        self.assertNotIn("HX-Request", get.call_args.kwargs["headers"])
+        self.web.responder_siempre(200, pagina.encode())
+        r = bm.Ollama().buscar("qwen", "recientes", "tools", 1)
+        self.assertEqual(self.web.ultima["ruta"], "/search")
+        self.assertEqual(self.web.ultima["params"], {"q": "qwen", "o": "newest", "c": "tools"})
+        self.assertNotIn("hx-request", self.web.ultima["cabeceras"])
         self.assertIsNone(r["siguiente"])              # sin el enlace de htmx no hay más
         # ollama.com solo pagina si la petición viene de htmx (con «p» o sin la cabecera repite la primera)
         con_mas = pagina + '<li hx-get="/search?page=3&q=qwen" hx-trigger="revealed"></li>'
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, con_mas.encode())) as get:
-            r = bm.Ollama().buscar("qwen", "recientes", "tools", 2)
-        self.assertEqual(get.call_args.kwargs["params"], {"q": "qwen", "o": "newest", "c": "tools", "page": 2})
-        self.assertEqual(get.call_args.kwargs["headers"]["HX-Request"], "true")
+        self.web.responder_siempre(200, con_mas.encode())
+        r = bm.Ollama().buscar("qwen", "recientes", "tools", 2)
+        self.assertEqual(self.web.ultima["params"], {"q": "qwen", "o": "newest", "c": "tools", "page": "2"})
+        self.assertEqual(self.web.ultima["cabeceras"]["hx-request"], "true")
         self.assertEqual(r["siguiente"], 3)
         self.assertEqual(len(r["modelos"]), 4)         # el <li> de htmx no es un modelo
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, pagina.encode())) as get:
-            bm.Ollama().buscar("", "relevancia", "inventada")
-        self.assertEqual(get.call_args.kwargs["params"], {})
+        self.web.responder_siempre(200, pagina.encode())
+        bm.Ollama().buscar("", "relevancia", "inventada")
+        self.assertEqual(self.web.ultima["params"], {})
 
 
 # ===========================================================================
@@ -244,33 +314,34 @@ class PruebaHuggingFace(_SinCache):
         self.assertTrue(m["requiere_licencia"])
 
     def test_paginacion_por_cabecera_link(self):
-        siguiente = "https://huggingface.co/api/models?filter=gguf&cursor=abc"
-        resp = Respuesta(200, json.loads(leer("hf_busqueda.json")), {"Link": f'<{siguiente}>; rel="next"'})
-        with mock.patch.object(bm.requests, "get", return_value=resp) as get:
-            r = bm.HuggingFace().buscar("qwen3", "tendencia")
-        self.assertEqual(get.call_args.kwargs["params"]["sort"], "trendingScore")
-        self.assertEqual(get.call_args.kwargs["params"]["filter"], "gguf")
+        siguiente = f"{self.web.url}/api/models?filter=gguf&cursor=abc"
+        self.web.responder_siempre(200, json.loads(leer("hf_busqueda.json")), {"Link": f'<{siguiente}>; rel="next"'})
+        r = bm.HuggingFace().buscar("qwen3", "tendencia")
+        self.assertEqual(self.web.ultima["params"]["sort"], "trendingScore")
+        self.assertEqual(self.web.ultima["params"]["filter"], "gguf")
+        self.assertEqual(self.web.ultima["params"]["search"], "qwen3")
+        self.assertEqual(self.web.ultima["params"]["expand[]"], bm.HuggingFace.EXPANDIR)
         self.assertEqual(len(r["modelos"]), 3)
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, [])) as get:
-            bm.HuggingFace().buscar("qwen3", pagina=r["siguiente"])
-        self.assertEqual(get.call_args.args[0], siguiente)
+        self.web.responder_siempre(200, [])
+        bm.HuggingFace().buscar("qwen3", pagina=r["siguiente"])
+        self.assertEqual((self.web.ultima["ruta"], self.web.ultima["query"]), ("/api/models", "filter=gguf&cursor=abc"))
 
     def test_pagina_que_apunta_a_otro_sitio_se_rechaza(self):
         import base64
         malo = base64.urlsafe_b64encode(b"https://atacante.example/api/models?x").decode()
-        with mock.patch.object(bm.requests, "get") as get:
-            with self.assertRaises(ErrorBuscador):
-                bm.HuggingFace().buscar("", pagina=malo)
-            with self.assertRaises(ErrorBuscador):
-                bm.HuggingFace().buscar("", pagina="%%%no-base64")
-        get.assert_not_called()
+        with self.assertRaises(ErrorBuscador):
+            bm.HuggingFace().buscar("", pagina=malo)
+        with self.assertRaises(ErrorBuscador):
+            bm.HuggingFace().buscar("", pagina="%%%no-base64")
+        self.assertEqual(self.web.peticiones, [])
 
     def test_variantes(self):
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, json.loads(leer("hf_repo.json")))):
-            d = bm.HuggingFace().variantes("unsloth/Qwen3-8B-GGUF")
+        self.web.responder_siempre(200, json.loads(leer("hf_repo.json")))
+        d = bm.HuggingFace().variantes("unsloth/Qwen3-8B-GGUF")
+        self.assertEqual((self.web.ultima["ruta"], self.web.ultima["params"]), ("/api/models/unsloth/Qwen3-8B-GGUF", {"blobs": "true"}))
         self.assertEqual(len(d["variantes"]), 25)
         q4 = next(v for v in d["variantes"] if v["etiqueta"] == "Q4_K_M")
-        self.assertEqual(q4["url_archivo"], "https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf")
+        self.assertEqual(q4["url_archivo"], f"{self.web.url}/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf")
         with self.assertRaises(ErrorBuscador):
             bm.HuggingFace().variantes("../../etc")
 
@@ -281,9 +352,10 @@ class PruebaModelScope(_SinCache):
     def test_busqueda_solo_gguf(self):
         datos = json.loads(leer("modelscope_busqueda.json"))
         datos["Data"]["Model"]["TotalCount"] = 45
-        with mock.patch.object(bm.requests, "put", return_value=Respuesta(200, datos)) as put:
-            r = bm.ModelScope().buscar("qwen2.5", "descargas")
-        cuerpo = put.call_args.kwargs["json"]
+        self.web.responder_siempre(200, datos)
+        r = bm.ModelScope().buscar("qwen2.5", "descargas")
+        self.assertEqual((self.web.ultima["metodo"], self.web.ultima["ruta"]), ("PUT", "/api/v1/dolphin/models"))
+        cuerpo = json.loads(self.web.ultima["cuerpo"])
         self.assertEqual(cuerpo["SortBy"], "DownloadsCount")
         # «SingleCriterion» lo ignora ModelScope (devolvía 10 GGUF de cada 30); «Criterion» sí filtra
         self.assertEqual(cuerpo["Criterion"], [{"category": "libraries", "predicate": "contains", "values": ["gguf"]}])
@@ -295,10 +367,11 @@ class PruebaModelScope(_SinCache):
         self.assertEqual(r["siguiente"], 2)
 
     def test_variantes(self):
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, json.loads(leer("modelscope_repo.json")))):
-            d = bm.ModelScope().variantes("Qwen/Qwen2.5-0.5B-Instruct-GGUF")
+        self.web.responder_siempre(200, json.loads(leer("modelscope_repo.json")))
+        d = bm.ModelScope().variantes("Qwen/Qwen2.5-0.5B-Instruct-GGUF")
+        self.assertEqual(self.web.ultima["params"], {"Recursive": "true"})
         v = next(v for v in d["variantes"] if v["etiqueta"] == "q4_k_m")
-        self.assertTrue(v["url_archivo"].startswith("https://modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/"))
+        self.assertTrue(v["url_archivo"].startswith(f"{self.web.url}/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/"))
 
 
 # ===========================================================================
@@ -310,11 +383,12 @@ class PruebaComprobar(_SinCache):
 
     def test_descargable_con_tamano_y_digest_del_manifiesto(self):
         cuerpo = json.dumps(self.MANIFIESTO).encode()
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, cuerpo)) as get:
-            c = bm.comprobar("hf.co/a/b-GGUF:Q4_K_M")
-            bm.comprobar("hf.co/a/b-GGUF:Q4_K_M")
-        self.assertEqual(get.call_count, 1)                          # en caché
-        self.assertEqual(get.call_args.args[0], "https://hf.co/v2/a/b-GGUF/manifests/Q4_K_M")
+        self.web.responder_siempre(200, cuerpo)
+        c = bm.comprobar("hf.co/a/b-GGUF:Q4_K_M")
+        bm.comprobar("hf.co/a/b-GGUF:Q4_K_M")
+        self.assertEqual(len(self.web.peticiones), 1)                       # en caché
+        self.assertEqual(self.web.ultima["ruta"], "/hf.co/v2/a/b-GGUF/manifests/Q4_K_M")
+        self.assertTrue(self.web.ultima["cabeceras"]["accept"].startswith("application/vnd.docker.distribution.manifest.v2"))
         self.assertTrue(c["descargable"])
         self.assertEqual(c["bytes"], 1055)
         self.assertTrue(c["vision"])
@@ -324,13 +398,14 @@ class PruebaComprobar(_SinCache):
     def test_modelscope_se_pide_como_ollama_y_el_resto_no(self):
         """ modelscope.cn devuelve otro manifiesto (y otro digest) si no es Ollama quien lo
         pide; registry.ollama.ai responde 401 al User-Agent de Ollama sin firma. """
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, {"layers": []})) as get:
-            bm.comprobar("modelscope.cn/QuantFactory/SmolLM2-135M-Instruct-GGUF:Q2_K")
-            self.assertTrue(get.call_args.kwargs["headers"]["User-Agent"].startswith("ollama/"))
-            bm.comprobar("qwen3:8b")
-            self.assertFalse(get.call_args.kwargs["headers"]["User-Agent"].startswith("ollama/"))
-            bm.comprobar("hf.co/a/b:Q4_K_M")
-            self.assertFalse(get.call_args.kwargs["headers"]["User-Agent"].startswith("ollama/"))
+        self.web.responder_siempre(200, {"layers": []})
+        bm.comprobar("modelscope.cn/QuantFactory/SmolLM2-135M-Instruct-GGUF:Q2_K")
+        self.assertTrue(self.web.ultima["cabeceras"]["user-agent"].startswith("ollama/"))
+        bm.comprobar("qwen3:8b")
+        self.assertEqual(self.web.ultima["ruta"], "/registry.ollama.ai/v2/library/qwen3/manifests/8b")
+        self.assertFalse(self.web.ultima["cabeceras"]["user-agent"].startswith("ollama/"))
+        bm.comprobar("hf.co/a/b:Q4_K_M")
+        self.assertFalse(self.web.ultima["cabeceras"]["user-agent"].startswith("ollama/"))
 
     def test_motivos_de_no_descargable(self):
         """ Cuerpos reales de hf.co y modelscope.cn al verificar """
@@ -342,17 +417,25 @@ class PruebaComprobar(_SinCache):
             (401, b"{}", "licencia"), (403, b"{}", "denegado"), (502, b"", "502"),
         )
         for i, (codigo, cuerpo, texto) in enumerate(casos):
-            with mock.patch.object(bm.requests, "get", return_value=Respuesta(codigo, cuerpo)):
-                c = bm.comprobar(f"hf.co/a/m{i}:Q4_K_M")
+            self.web.responder_siempre(codigo, cuerpo)
+            c = bm.comprobar(f"hf.co/a/m{i}:Q4_K_M")
             self.assertFalse(c["descargable"])
             self.assertEqual(c["codigo"], codigo)
             self.assertIn(texto, c["motivo"])
 
     def test_sin_conexion_no_se_guarda_en_cache(self):
-        with mock.patch.object(bm.requests, "get", side_effect=requests.ConnectionError("caído")) as get:
+        import socket
+        libre = socket.socket()
+        libre.bind(("127.0.0.1", 0))
+        cerrado = f"http://127.0.0.1:{libre.getsockname()[1]}"
+        libre.close()                                   # nadie escucha ahí: no hay conexión
+        with mock.patch.object(bm, "registro_de", return_value=(cerrado, "library/qwen3", "8b")):
             self.assertFalse(bm.comprobar("qwen3:8b")["descargable"])
-            bm.comprobar("qwen3:8b")
-        self.assertEqual(get.call_count, 2)
+            self.assertIn("Sin conexión", bm.comprobar("qwen3:8b")["motivo"])
+        # con conexión otra vez, se pregunta de nuevo: el fallo no quedó guardado
+        self.web.responder_siempre(200, {"layers": []})
+        self.assertTrue(bm.comprobar("qwen3:8b")["descargable"])
+        self.assertEqual(len(self.web.peticiones), 1)
 
 
 # ===========================================================================
@@ -471,36 +554,37 @@ class PruebaEncontrarModelo(_SinCache):
 
     def test_ficha_repo_existe_o_no(self):
         hf = json.loads(leer("hf_busqueda.json"))[0]
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, hf)) as get:
-            f = bm.ficha_repo("huggingface", "UNSLOTH/qwen3-coder-30b-a3b-instruct-gguf")
-        self.assertEqual(get.call_args.args[0], "https://huggingface.co/api/models/UNSLOTH/qwen3-coder-30b-a3b-instruct-gguf")
+        self.web.responder_siempre(200, hf)
+        f = bm.ficha_repo("huggingface", "UNSLOTH/qwen3-coder-30b-a3b-instruct-gguf")
+        self.assertEqual(self.web.ultima["ruta"], "/api/models/UNSLOTH/qwen3-coder-30b-a3b-instruct-gguf")
         self.assertEqual(f["id"], "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF")        # el nombre bien escrito
         self.assertFalse(f["sin_gguf"])
         # Hugging Face responde 401 a lo que no existe (o es privado)
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(401, {"error": "Invalid username or password."})):
-            self.assertIsNone(bm.ficha_repo("huggingface", "fulano/no-existe"))
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(500, b"")):
-            with self.assertRaises(ErrorBuscador):
-                bm.ficha_repo("huggingface", "a/caido")
+        self.web.responder_siempre(401, {"error": "Invalid username or password."})
+        self.assertIsNone(bm.ficha_repo("huggingface", "fulano/no-existe"))
+        self.web.responder_siempre(500, b"")
+        with self.assertRaises(ErrorBuscador):
+            bm.ficha_repo("huggingface", "a/caido")
         ms = json.loads(leer("modelscope_busqueda.json"))["Data"]["Model"]["Models"][0]       # sin GGUF
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, {"Code": 200, "Data": ms})):
-            f = bm.ficha_repo("modelscope", "Qwen/Qwen2.5-7B-Instruct")
+        self.web.responder_siempre(200, {"Code": 200, "Data": ms})
+        f = bm.ficha_repo("modelscope", "Qwen/Qwen2.5-7B-Instruct")
         self.assertTrue(f["sin_gguf"])
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(404, {"Success": False})):
-            self.assertIsNone(bm.ficha_repo("modelscope", "Qwen/NoExiste"))
+        self.web.responder_siempre(404, {"Success": False})
+        self.assertIsNone(bm.ficha_repo("modelscope", "Qwen/NoExiste"))
         pagina = '<meta name="description" content="Dolphin&#39;s first reasoning models."><span class="inline-flex items-center">tools</span><span class="inline-flex x">8b</span>'
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(200, pagina.encode())) as get:
-            f = bm.ficha_repo("ollama", "huihui_ai/dolphin3-r1")
-        self.assertEqual(get.call_args.args[0], "https://ollama.com/huihui_ai/dolphin3-r1")
+        self.web.responder_siempre(200, pagina.encode())
+        f = bm.ficha_repo("ollama", "huihui_ai/dolphin3-r1")
+        self.assertEqual(self.web.ultima["ruta"], "/huihui_ai/dolphin3-r1")
         self.assertEqual((f["descripcion"], f["capacidades"], f["tamanos"], f["oficial"]),
                          ("Dolphin's first reasoning models.", ["tools"], ["8b"], False))
-        with mock.patch.object(bm.requests, "get", return_value=Respuesta(404, b"")) as get:
-            self.assertIsNone(bm.ficha_repo("ollama", "noexiste"))
-            self.assertIsNone(bm.ficha_repo("ollama", "noexiste"))
-        self.assertEqual(get.call_count, 1)                      # el «no existe» también se recuerda
-        with mock.patch.object(bm.requests, "get") as get:
-            self.assertIsNone(bm.ficha_repo("huggingface", "../../etc"))
-        get.assert_not_called()
+        self.web.responder_siempre(404, b"")
+        antes = len(self.web.peticiones)
+        self.assertIsNone(bm.ficha_repo("ollama", "noexiste"))
+        self.assertIsNone(bm.ficha_repo("ollama", "noexiste"))
+        self.assertEqual(len(self.web.peticiones) - antes, 1)       # el «no existe» también se recuerda
+        antes = len(self.web.peticiones)
+        self.assertIsNone(bm.ficha_repo("huggingface", "../../etc"))
+        self.assertEqual(len(self.web.peticiones), antes)
 
     @staticmethod
     def _modelo(fuente, id_modelo, descargas=0):

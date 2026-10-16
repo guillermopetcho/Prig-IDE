@@ -1151,6 +1151,11 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
 /* =========================================================================
    Menús desplegables (Selects, Options, Optgroups) - Tema Oscuro Garantizado
    ========================================================================= */
+/* Que el motor dibuje sus controles nativos (listas de <select>, barras de desplazamiento) en oscuro */
+:root {
+    color-scheme: dark;
+}
+
 select,
 select option,
 select optgroup {
@@ -1532,3 +1537,98 @@ select optgroup {
     0%, 100% { opacity: 0.3; transform: scaleY(0.97); }
     50% { opacity: 0.8; transform: scaleY(1); }
 }
+
+/* ==========================================================================
+   Modo Editor Transparente y Controles de Cierre de Editor
+   Permite visualizar el lienzo/partículas de fondo directamente detrás del código
+   ========================================================================== */
+
+/* Fondo transparente graduable mediante --editor-bg-alpha en toda la jerarquía del editor */
+body.editor-transparente #seccion-trabajo,
+body.editor-transparente #panel-trabajo-izq,
+body.editor-transparente #trabajo-split-contenedor,
+body.editor-transparente #trabajo-vistas,
+body.editor-transparente #vista-editor,
+body.editor-transparente .editor-area-wrapper,
+body.editor-transparente .editor-grid-container,
+body.editor-transparente .editor-col,
+body.editor-transparente .editor-col-body,
+body.editor-transparente .monaco-container,
+body.editor-transparente .monaco-editor,
+body.editor-transparente .monaco-editor-background,
+body.editor-transparente .monaco-editor .margin,
+body.editor-transparente .monaco-editor .margin-view-overlays,
+body.editor-transparente .monaco-editor .overflow-guard,
+body.editor-transparente .monaco-editor-pane,
+body.editor-transparente #notebook-view-container,
+body.editor-transparente .editor-vacio {
+    background: rgba(30, 30, 30, var(--editor-bg-alpha, 0)) !important;
+    background-color: rgba(30, 30, 30, var(--editor-bg-alpha, 0)) !important;
+}
+
+body.editor-transparente .editor-area-wrapper {
+    backdrop-filter: blur(calc((1 - var(--editor-bg-alpha, 0)) * 8px));
+    -webkit-backdrop-filter: blur(calc((1 - var(--editor-bg-alpha, 0)) * 8px));
+}
+
+body.editor-transparente .editor-layout-bar,
+body.editor-transparente .editor-col-header {
+    background: rgba(10, 12, 20, 0.45) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+body.editor-transparente .editor-tab {
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(6px);
+}
+
+body.editor-transparente .editor-tab.activa {
+    background: rgba(137, 180, 250, 0.20) !important;
+    border-bottom: 2px solid var(--accent-blue, #89b4fa) !important;
+}
+
+body.editor-transparente .editor-panel-razonamiento {
+    background: rgba(17, 17, 27, 0.72) !important;
+    backdrop-filter: blur(14px) !important;
+}
+
+/* Botón cerrar en la barra superior del editor */
+.editor-layout-btn-cerrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: rgba(243, 139, 168, 0.15);
+    border: 1px solid rgba(243, 139, 168, 0.35);
+    color: var(--accent-red, #f38ba8);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11.5px;
+    transition: all 0.2s ease;
+}
+
+.editor-layout-btn-cerrar:hover {
+    background: rgba(243, 139, 168, 0.35) !important;
+    border-color: var(--accent-red, #f38ba8) !important;
+    color: #fff !important;
+    box-shadow: 0 0 8px rgba(243, 139, 168, 0.4);
+}
+
+/* Estilo mejorado para la pantalla de editor vacío */
+.editor-vacio {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(18, 18, 28, 0.45);
+    border-radius: 10px;
+    margin: 12px;
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.editor-vacio-btn-cerrar:hover {
+    background: rgba(243, 139, 168, 0.3) !important;
+    border-color: var(--accent-red, #f38ba8) !important;
+    color: #fff !important;
+}
+

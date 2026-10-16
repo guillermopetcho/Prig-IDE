@@ -1,3 +1,8 @@
+"""
+Búsqueda web para el motor de IA. Encontrar los resultados (DuckDuckGo, con la biblioteca `ddgs` o su página
+lite) sigue aquí, como herramienta; reordenarlos, descargar y leer las páginas en paralelo, la caché y el bloque
+de contexto están en Rust (backend-rust/crates/prig-ia, web.rs), sin el GIL. El HTML se lee con html5ever.
+"""
 import os
 import re
 import json
@@ -26,6 +31,11 @@ except ImportError:
         HAS_DDGS = True
     except ImportError:
         HAS_DDGS = False
+
+def _rs():
+    from nativo_rust import rust
+    return rust().web
+
 
 # Dominios oficiales organizados por ecosistema tecnológico
 OFFICIAL_DOMAINS_BY_CATEGORY = {
@@ -75,31 +85,10 @@ class WebSearchCache:
         return hashlib.md5(text.strip().lower().encode("utf-8")).hexdigest()
 
     def get(self, query: str) -> Optional[Tuple[str, List[Dict[str, str]]]]:
-        key = self._get_key(query)
-        filepath = os.path.join(self.cache_dir, f"{key}.json")
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if time.time() - data.get("timestamp", 0) < self.ttl_seconds:
-                    return data.get("context", ""), data.get("sources", [])
-            except Exception as e:
-                print(f"⚠️ Error leyendo caché de búsqueda: {e}")
-        return None
+        return _rs().cache_leer(self.cache_dir, query, float(self.ttl_seconds))
 
     def set(self, query: str, context: str, sources: List[Dict[str, str]]) -> None:
-        key = self._get_key(query)
-        filepath = os.path.join(self.cache_dir, f"{key}.json")
-        try:
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump({
-                    "query": query,
-                    "timestamp": time.time(),
-                    "context": context,
-                    "sources": sources
-                }, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"⚠️ Error guardando en caché de búsqueda: {e}")
+        _rs().cache_guardar(self.cache_dir, query, context, sources)
 
 
 class WebSearchEngine:
@@ -116,14 +105,7 @@ class WebSearchEngine:
 
     def should_auto_search(self, prompt: str) -> bool:
         """ Evalúa si la consulta del usuario requiere información o documentación de internet """
-        if not prompt or len(prompt.strip()) < 4:
-            return False
-        
-        prompt_lower = prompt.lower()
-        for pattern in AUTO_SEARCH_TRIGGERS:
-            if re.search(pattern, prompt_lower):
-                return True
-        return False
+        return _rs().pide_internet(prompt)
 
     def search_duckduckgo_ddgs(self, query: str) -> List[Dict[str, str]]:
         """ Búsqueda estructurada a través de DDGS """
@@ -179,47 +161,8 @@ class WebSearchEngine:
         return results
 
     def score_and_rerank(self, query: str, items: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """ Algoritmo de Re-Ranking que asigna puntuaciones de relevancia según dominios oficiales y densidad de palabras clave """
-        query_words = set(re.findall(r"\w+", query.lower()))
-
-        def compute_score(item: Dict[str, str]) -> float:
-            score = 0.0
-            href = item.get("href", "").lower()
-            title = item.get("title", "").lower()
-            snippet = item.get("snippet", "").lower()
-
-            # Puntuación por dominio oficial (+50 puntos)
-            if any(domain in href for domain in ALL_OFFICIAL_DOMAINS):
-                score += 50.0
-
-            # Coincidencia de palabras en título y snippet
-            title_words = set(re.findall(r"\w+", title))
-            snippet_words = set(re.findall(r"\w+", snippet))
-
-            title_matches = len(query_words.intersection(title_words))
-            snippet_matches = len(query_words.intersection(snippet_words))
-
-            score += title_matches * 10.0
-            score += snippet_matches * 3.0
-
-            # Penalización a sitios agregadores de anuncios/SEO genérico
-            if any(bad in href for bad in ["geeksforgeeks.org", "javatpoint.com"]):
-                score -= 10.0
-
-            return score
-
-        scored_items = sorted(items, key=compute_score, reverse=True)
-        
-        # Eliminar URLs duplicadas
-        seen_urls = set()
-        unique_items = []
-        for item in scored_items:
-            url = item.get("href")
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                unique_items.append(item)
-
-        return unique_items[:self.max_results]
+        """ Re-Ranking: dominios oficiales y palabras de la consulta en título y resumen; sin URLs repetidas """
+        return _rs().reordenar(query, list(items), self.max_results)
 
     def search(self, query: str, prefer_official: bool = True) -> List[Dict[str, str]]:
         """ Ejecuta búsqueda combinada con Re-Ranking de fuentes """
@@ -240,97 +183,19 @@ class WebSearchEngine:
 
     def fetch_url_content(self, url: str) -> str:
         """ Extrae y limpia el texto principal de una página web HTML """
-        if not url or not url.startswith("http"):
-            return ""
-        try:
-            res = requests.get(url, headers=self.headers, timeout=self.timeout)
-            if res.status_code != 200:
-                return ""
-
-            if HAS_BS4:
-                soup = BeautifulSoup(res.text, "html.parser")
-                for element in soup(["script", "style", "nav", "footer", "header", "form", "aside", "noscript", "svg"]):
-                    element.extract()
-
-                lines = []
-                for elem in soup.find_all(["h1", "h2", "h3", "p", "pre", "code", "li"]):
-                    txt = elem.get_text(strip=True)
-                    if txt:
-                        if elem.name in ["h1", "h2", "h3"]:
-                            lines.append(f"\n### {txt}")
-                        elif elem.name in ["pre", "code"]:
-                            lines.append(f"```\n{txt}\n```")
-                        else:
-                            lines.append(txt)
-
-                full_text = "\n".join(lines)
-                full_text = re.sub(r'\n{3,}', '\n\n', full_text)
-                return full_text[:self.max_chars_per_page]
-            else:
-                clean_text = re.sub(r'<[^>]+>', ' ', res.text)
-                clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-                return clean_text[:self.max_chars_per_page]
-        except Exception as e:
-            print(f"⚠️ Error leyendo contenido de {url}: {e}")
-            return ""
+        return _rs().leer_pagina(url or "", float(self.timeout), self.max_chars_per_page)
 
     def get_web_context(self, query: str) -> Tuple[str, List[Dict[str, str]]]:
         """ Busca en internet con caché local, Re-Ranking y extrae contenidos para el prompt de la IA """
-        # 1. Verificar si existe en caché local
         if self.cache:
             cached_data = self.cache.get(query)
             if cached_data:
                 return cached_data[0], cached_data[1]
-
-        # 2. Ejecutar búsqueda web y Re-Ranking
         search_results = self.search(query, prefer_official=True)
         if not search_results:
             return "", []
-
-        sources_info = []
-        fetched_pages = []
-
-        # Emparejar cada resultado con SU url: usar dos listas y zip() las desalineaba
-        # en cuanto un resultado venía sin href, atribuyendo el contenido a otra fuente.
-        fetchable = [r for r in search_results if r.get("href")]
-
-        # 3. Extraer páginas web en paralelo
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_url = {executor.submit(self.fetch_url_content, item["href"]): item for item in fetchable}
-            for future in future_to_url:
-                item = future_to_url[future]
-                try:
-                    content = future.result()
-                    if content and len(content.strip()) > 50:
-                        domain = urllib.parse.urlparse(item["href"]).netloc
-                        sources_info.append({
-                            "title": item["title"],
-                            "url": item["href"],
-                            "domain": domain,
-                            "snippet": item.get("snippet", "")
-                        })
-                        fetched_pages.append(f"📌 **Fuente [{domain}]**: {item['title']}\n**URL**: {item['href']}\n\n{content}\n")
-                except Exception as e:
-                    print(f"Error extrayendo URL: {e}")
-
-        if not fetched_pages:
-            for item in search_results:
-                domain = urllib.parse.urlparse(item["href"]).netloc if item.get("href") else "Web"
-                sources_info.append({
-                    "title": item.get("title", "Sin título"),
-                    "url": item.get("href", ""),
-                    "domain": domain,
-                    "snippet": item.get("snippet", "")
-                })
-                fetched_pages.append(
-                    f"📌 **Fuente [{domain}]**: {item.get('title', 'Sin título')}\n"
-                    f"**URL**: {item.get('href', '')}\n**Resumen**: {item.get('snippet', '')}\n"
-                )
-
-        context_str = "\n---\n🌐 **INFORMACIÓN Y DOCUMENTACIÓN OFICIAL DE INTERNET (RAG)**:\n" + "\n---\n".join(fetched_pages) + "\n---\n"
-
-        # 4. Guardar resultado en caché local
+        # descargar y leer las páginas (en paralelo, en Rust) y armar el contexto
+        context_str, sources_info = _rs().contexto(list(search_results), float(self.timeout), self.max_chars_per_page)
         if self.cache:
             self.cache.set(query, context_str, sources_info)
-
         return context_str, sources_info

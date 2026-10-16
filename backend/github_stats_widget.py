@@ -25,6 +25,7 @@ if _backend_dir not in sys.path:
 import github_lector as gl
 import inicio
 import kaggle_colecciones
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
 ARCHIVO_CONFIG = os.path.expanduser("~/.prig_github_widget.json")
 
@@ -398,7 +399,7 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
 
     # 1. Obtener usuario autenticado
     try:
-        r_user = requests.get(f"{gl.API}/user", headers=cabeceras, timeout=20)
+        r_user = red_http.get(f"{gl.API}/user", headers=cabeceras, timeout=20)
     except requests.RequestException:
         raise ValueError("Sin conexión con GitHub.")
 
@@ -407,9 +408,9 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
     login = r_user.json()["login"]
 
     # 2. Verificar o crear el repositorio especial login/login
-    r_repo = requests.get(f"{gl.API}/repos/{login}/{login}", headers=cabeceras, timeout=20)
+    r_repo = red_http.get(f"{gl.API}/repos/{login}/{login}", headers=cabeceras, timeout=20)
     if r_repo.status_code == 404:
-        r_crear = requests.post(
+        r_crear = red_http.post(
             f"{gl.API}/user/repos",
             headers=cabeceras,
             json={
@@ -428,7 +429,7 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
     svg_b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
 
     sha_svg = None
-    r_meta_svg = requests.get(f"{gl.API}/repos/{login}/{login}/contents/prig-stats.svg", headers=cabeceras, timeout=20)
+    r_meta_svg = red_http.get(f"{gl.API}/repos/{login}/{login}/contents/prig-stats.svg", headers=cabeceras, timeout=20)
     if r_meta_svg.status_code == 200:
         sha_svg = r_meta_svg.json().get("sha")
 
@@ -439,7 +440,7 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
     if sha_svg:
         payload_svg["sha"] = sha_svg
 
-    r_put_svg = requests.put(
+    r_put_svg = red_http.put(
         f"{gl.API}/repos/{login}/{login}/contents/prig-stats.svg",
         headers=cabeceras,
         json=payload_svg,
@@ -451,7 +452,7 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
     # 4. Actualizar README.md
     readme_actual = f"# {login}\n"
     sha_readme = None
-    r_readme = requests.get(f"{gl.API}/repos/{login}/{login}/contents/README.md", headers=cabeceras, timeout=20)
+    r_readme = red_http.get(f"{gl.API}/repos/{login}/{login}/contents/README.md", headers=cabeceras, timeout=20)
     if r_readme.status_code == 200:
         sha_readme = r_readme.json().get("sha")
         content_b64 = r_readme.json().get("content", "")
@@ -470,7 +471,7 @@ def sincronizar_con_github(token: str, stats: Dict[str, Any], config: Dict[str, 
     if sha_readme:
         payload_readme["sha"] = sha_readme
 
-    r_put_readme = requests.put(
+    r_put_readme = red_http.put(
         f"{gl.API}/repos/{login}/{login}/contents/README.md",
         headers=cabeceras,
         json=payload_readme,

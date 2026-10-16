@@ -18,6 +18,14 @@ bytes = "1.6"
 futures-util = "0.3"
 tokio-tungstenite = "0.24"
 prig-fs = { path = "../prig-fs" }
+# El árbol del explorador, el mismo núcleo que usa el backend de Python (un solo dueño)
+prig-plataforma = { path = "../prig-plataforma" }
+uuid = { version = "1", features = ["v4"] }
+prig-aprendizaje = { path = "../prig-aprendizaje" }
+prig-ia = { path = "../prig-ia" }
+prig-recursos = { path = "../prig-recursos" }
+prig-integrations = { path = "../prig-integrations" }
+prig-biblioteca = { path = "../prig-biblioteca" }
 prig-hardware = { path = "../prig-hardware" }
 banco-core = { path = "../banco-core" }
 regex = "1"

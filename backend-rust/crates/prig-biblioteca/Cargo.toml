@@ -1,0 +1,20 @@
+[package]
+name = "prig-biblioteca"
+version = "0.1.0"
+edition = "2021"
+
+# La biblioteca, el conocimiento y los PDF (F5 de docs/plan-prig-rust.md). Rust puro (PDFium por FFI): lo usa el
+# backend de Python por PyO3 (prig-nativo-py) y, después, el servidor en Rust.
+
+[dependencies]
+regex = "1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha2 = "0.10"
+unicode-normalization = "0.1"
+prig-recursos = { path = "../prig-recursos" }
+prig-plataforma = { path = "../prig-plataforma" }
+# PDFium (el motor de PDF de Chrome), cargado de lib/pdfium/libpdfium.so (herramientas/instalar_pdfium.sh)
+pdfium-render = { version = "0.8", default-features = false, features = ["pdfium_latest", "thread_safe", "sync"] }
+
+[dev-dependencies]
+md-5 = "0.10"

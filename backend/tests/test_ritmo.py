@@ -167,64 +167,8 @@ class Res:
         pass
 
 
-class TestGenerateResponse(unittest.TestCase):
-    def motor(self, gob):
-        from ai_engine import AIEngine
-        m = AIEngine.__new__(AIEngine)
-        m.base_url = "http://x"
-        m.config = {"num_ctx": 4096, "num_gpu": -1, "temperature": 0.3, "num_predict": 50}
-        m._active_streams, m._streams_lock = set(), threading.Lock()
-        m._cancelables, m._capacidades = set(), {}
-        m.gobernador = gob
-        return m
-
-    def correr(self, respuestas, cortes, sistema="sé breve"):
-        enviados = []
-
-        def post(url, json=None, **kw):
-            enviados.append((url, json))
-            return respuestas.pop(0)
-        g = Gobernador(MonitorFalso([50]), guardar=False)
-        cortes = iter(cortes)
-        g.debe_cortar = lambda tramo: (lambda m: (setattr(tramo, "pausa_ritmo", 0.01), m)[1])(next(cortes, None))
-        g.terminar_tramo = lambda *a: None
-        m = self.motor(g)
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post), \
-                mock.patch.object(m, "capacidades", return_value=[]), \
-                mock.patch("ai_engine.ai_engine_class.time.time", side_effect=[float(i) * 2 for i in range(400)]):
-            texto = "".join(m.generate_response("di hola", model="m", system_prompt=sistema))
-        return texto, enviados
-
-    def test_pausa_y_sigue_por_chat_sin_perder_texto(self):
-        texto, enviados = self.correr(
-            [Res([{"response": "Hola"}, {"response": " qué"}, {"response": " no llega"}]),
-             Res([{"message": {"content": " tal"}}, {"message": {"content": "?"}, "done": True}])],
-            [None, "ritmo"])
-        # Lo que no se leyó antes del corte no cuenta: Ollama sigue desde «Hola qué»
-        self.assertEqual(texto, "Hola qué tal?")
-        self.assertTrue(enviados[0][0].endswith("/api/generate"))
-        url, cuerpo = enviados[1]
-        self.assertTrue(url.endswith("/api/chat"))
-        self.assertEqual(cuerpo["messages"][0], {"role": "system", "content": "sé breve"})
-        self.assertEqual(cuerpo["messages"][1], {"role": "user", "content": "di hola"})
-        self.assertEqual(cuerpo["messages"][-1], {"role": "assistant", "content": "Hola qué"})
-        self.assertEqual(cuerpo["options"]["num_predict"], 48)
-        self.assertNotIn("prompt", cuerpo)
-
-    def test_no_corta_a_mitad_del_razonamiento(self):
-        texto, enviados = self.correr(
-            [Res([{"thinking": "pienso"}, {"thinking": " más"}, {"thinking": " y más"}, {"response": "listo", "done": True}])],
-            ["ritmo", "ritmo", "ritmo"])
-        self.assertEqual(len(enviados), 1)
-        self.assertEqual(texto, "listo")
-
-    def test_sin_gobernador_una_sola_peticion(self):
-        m = self.motor(None)
-        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"response": "ok", "done": True}])) as p, \
-                mock.patch.object(m, "capacidades", return_value=[]):
-            self.assertEqual("".join(m.generate_response("x", model="m")), "ok")
-            self.assertEqual(p.call_count, 1)
-
+# Generar con el modo suave (pausar y seguir por /api/chat, no cortar a mitad del razonamiento) está en Rust:
+# prig-ia/tests/generar.rs
 
 class SistemaFalso:
     """ Procesos y núcleos de mentira para el fijador: apunta a qué núcleos se fija cada pid o hilo """
@@ -286,6 +230,19 @@ class TestFijadorCPU(unittest.TestCase):
                 mock.patch.object(f, "_modelos_en_gpu", return_value={blob: True}):
             f.aplicar(forzar=True)
         self.assertEqual(sistema.fijados, {})
+
+    def test_aplicar_con_la_consulta_de_verdad_no_se_bloquea(self):
+        """ aplicar() pregunta a Ollama por la fachada (_modelos_en_gpu) con el fijador tomado: antes se esperaba a sí
+        mismo para siempre y POST /api/recursos/ritmo colgaba el backend """
+        import threading
+        sistema = SistemaFalso([])
+        f = rt.FijadorCPU("http://127.0.0.1:9", sistema=sistema)          # nadie escucha: falla en seguida
+        hecho = []
+        with mock.patch.object(rt, "nucleos_eficientes", return_value=[8, 9, 10, 11]):
+            h = threading.Thread(target=lambda: hecho.append(f.aplicar(forzar=True)), daemon=True)
+            h.start()
+            h.join(10)
+        self.assertTrue(hecho and hecho[0]["aplicado"])
 
     def test_sin_nucleos_de_eficiencia_no_hace_nada(self):
         with mock.patch.object(rt, "nucleos_eficientes", return_value=[]):

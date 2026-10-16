@@ -85,12 +85,12 @@ class Base(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def red(self, respuestas):
-        """ Sustituye requests.get: respuestas es {ruta: Respuesta} """
+        """ Sustituye la petición a la API (red_http.get): respuestas es {ruta: Respuesta} """
         def get(url, params=None, auth=None, headers=None, timeout=None):
             self.llamadas.append({"url": url, "params": params, "auth": auth, "headers": headers})
             ruta = url.split("/api/v1/")[1]
             return respuestas[ruta]
-        return mock.patch.object(kl.requests, "get", side_effect=get)
+        return mock.patch.object(kl.red_http, "get", side_effect=get)
 
 
 class TestCredenciales(Base):

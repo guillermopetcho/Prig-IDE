@@ -102,15 +102,27 @@ class TestBiblioteca(unittest.TestCase):
         self.assertIn("error", self.bs.delete_item("books"))
         self.assertTrue(os.path.isdir(os.path.join(self.lib, "books")))
 
-    def test_borrar_lleva_su_ficha_y_respeta_al_homonimo(self):
+    def test_quitar_no_borra_el_archivo_y_respeta_al_homonimo(self):
         a = os.path.join(self.lib, "books", "notas.md")
         b = os.path.join(self.lib, "documentation", "notas.md")
         open(a, "w").write("a"); open(b, "w").write("b")
         self.bs.save_metadata(a, {"title": "LIBRO"})
         self.bs.save_metadata(b, {"title": "DOC"})
         self.assertTrue(self.bs.delete_item("books/notas.md").get("success"))
-        self.assertIsNone(self.bs.get_metadata(a))
-        self.assertEqual(self.bs.get_metadata(b)["title"], "DOC")
+        # el archivo y lo guardado siguen: solo deja de verse
+        self.assertTrue(os.path.exists(a))
+        self.assertEqual(self.bs.get_metadata(a)["title"], "LIBRO")
+        rutas = [i["path"] for i in self.bs.list_books()]
+        self.assertNotIn(a, rutas)
+        self.assertIn(b, rutas)
+        # importarlo de nuevo lo vuelve a mostrar
+        fuera = tempfile.mkdtemp(prefix="prig_test_imp_")
+        try:
+            open(os.path.join(fuera, "notas.md"), "w").write("a")
+            self.bs.import_file(os.path.join(fuera, "notas.md"), "books")
+            self.assertIn(a, [i["path"] for i in self.bs.list_books()])
+        finally:
+            shutil.rmtree(fuera, ignore_errors=True)
 
     def test_la_muestra_no_reaparece_tras_borrarla(self):
         guia = os.path.join(self.lib, "documentation", "Guia_Fundamentos_Deep_Learning.md")

@@ -180,7 +180,12 @@ def rutas(filas: List[Dict[str, Any]], guided) -> List[Dict[str, Any]]:
             por_bloque[f"{f['ruta_id']}:{f['bloque_id']}"].append(f)
     salida = []
     for resumen_ruta in guided.list_paths():
-        ruta = guided.get(resumen_ruta["id"])
+        # Una ruta dañada se salta: antes tumbaba el resumen entero (y con él la pantalla de Inicio)
+        try:
+            ruta = guided.get(resumen_ruta["id"])
+        except Exception as err:
+            print(f"⚠️ Ruta {resumen_ruta.get('id')} omitida del progreso: {err}")
+            continue
         if not ruta:
             continue
         hechos = set(ruta.completed_blocks or [])

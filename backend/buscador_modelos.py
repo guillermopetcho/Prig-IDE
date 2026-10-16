@@ -24,15 +24,15 @@ Cómo se busca en cada una (verificado):
 Antes de descargar, cada variante se COMPRUEBA pidiendo su manifiesto al registro
 correspondiente: si existe, se descarga seguro y se sabe su tamaño exacto; si no
 (por ejemplo, un GGUF partido en varios archivos), se avisa en vez de fallar a mitad.
+
+Lo que pide y lee está en Rust (backend-rust/crates/prig-modelos, buscador.rs): las peticiones (sin el GIL), leer
+las páginas de ollama.com, normalizar Hugging Face y ModelScope, comprobar en el registro, agrupar los GGUF,
+interpretar enlaces y la caché. Aquí queda lo fino que los junta (repartir una búsqueda entre plataformas, juntar
+variantes con sus comprobaciones, localizar, seguir modelos), que llama a esas piezas por su nombre en este módulo.
 """
 
-import base64
-import hashlib
-import html
 import json
 import os
-import re
-import urllib.parse
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -40,12 +40,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-UA = {"User-Agent": "Prig-IDE (buscador de modelos local)"}
-MANIFIESTO = {"Accept": "application/vnd.docker.distribution.manifest.v2+json", **UA}
+
+def _rs():
+    from nativo_rust import rust
+    return rust().buscador
+
+
+UA = {"User-Agent": _rs().UA}
+MANIFIESTO = {"Accept": _rs().ACEPTA_MANIFIESTO, **UA}
 # modelscope.cn da a Ollama un manifiesto con más campos que a otros clientes, y Ollama
 # usa el sha256 de ese texto como digest del modelo: para poder compararlo hay que pedirlo
 # igual. registry.ollama.ai, en cambio, responde 401 a ese User-Agent sin firma.
-MANIFIESTO_COMO_OLLAMA = {**MANIFIESTO, "User-Agent": "ollama/0.34.1 (Prig)"}
+MANIFIESTO_COMO_OLLAMA = {**MANIFIESTO, "User-Agent": _rs().UA_OLLAMA}
 
 FUENTES = {
     "ollama": {"nombre": "Ollama", "web": "https://ollama.com"},
@@ -60,80 +66,38 @@ ORDENES = {
     "modelscope": {"relevancia": "Default", "descargas": "DownloadsCount", "actualizados": "GmtModified"},
 }
 
-CAPACIDADES_OLLAMA = ("tools", "thinking", "vision", "embedding", "audio", "cloud")
+CAPACIDADES_OLLAMA = tuple(_rs().CAPACIDADES_OLLAMA)
 
-# "Q4_K_M", "UD-Q4_K_XL", "IQ3_XXS", "q4_k_m", "F16", "BF16", "MXFP4_MOE"…
-_CUANT = re.compile(
-    r"(?i)(?:^|[-_.])((?:UD-)?(?:IQ\d(?:_[A-Z]+)?|Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|F16|F32|BF16|MXFP4(?:_MOE)?|NVFP4))$")
-_PARTE = re.compile(r"(?i)-(\d{5})-of-(\d{5})$")
-REF_VALIDA = re.compile(
-    r"^(?:(?:hf\.co|huggingface\.co|modelscope\.cn)/[\w.\-]+/[\w.\-]+|(?:[a-z0-9][\w.\-]*/)?[a-z0-9][\w.\-]*)(?::[\w.\-]+)?$")
-
-
-class ErrorBuscador(Exception):
-    pass
+ErrorBuscador = _rs().ErrorBuscador
 
 
 # ===========================================================================
 # Utilidades
 # ===========================================================================
 
-class Cache:
-    def __init__(self):
-        self._datos: Dict[str, Tuple[float, Any]] = {}
-        self._cerrojo = threading.Lock()
-
-    def obtener(self, clave: str, ttl: float):
-        with self._cerrojo:
-            v = self._datos.get(clave)
-            if v and time.time() - v[0] < ttl:
-                return v[1]
-        return None
-
-    def guardar(self, clave: str, valor: Any):
-        with self._cerrojo:
-            self._datos[clave] = (time.time(), valor)
-            if len(self._datos) > 500:
-                for k in sorted(self._datos, key=lambda k: self._datos[k][0])[:100]:
-                    del self._datos[k]
-        return valor
-
+Cache = _rs().Cache
 
 _cache = Cache()
 
 
 def _texto(fragmento: str) -> str:
-    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fragmento))).strip()
+    return _rs().texto(fragmento)
 
 
 def _numero(texto: str) -> Optional[int]:
-    m = re.match(r"^([\d.,]+)\s*([KMB])?$", (texto or "").strip(), re.I)
-    if not m:
-        return None
-    valor = float(m.group(1).replace(",", ""))
-    return int(valor * {"K": 1e3, "M": 1e6, "B": 1e9}.get((m.group(2) or "").upper(), 1))
+    return _rs().numero(texto)
 
 
 def _bytes(texto: str) -> Optional[int]:
-    m = re.match(r"^([\d.]+)\s*(KB|MB|GB|TB)$", (texto or "").strip(), re.I)
-    if not m:
-        return None
-    return int(float(m.group(1)) * {"KB": 1e3, "MB": 1e6, "GB": 1e9, "TB": 1e12}[m.group(2).upper()])
+    return _rs().bytes_(texto)
 
 
 def cuantizacion_de(nombre_archivo: str) -> Optional[str]:
-    base = os.path.basename(nombre_archivo)
-    base = re.sub(r"(?i)\.gguf$", "", base)
-    base = _PARTE.sub("", base)
-    m = _CUANT.search(base)
-    return m.group(1) if m else None
+    return _rs().cuantizacion_de(nombre_archivo)
 
 
 def validar_ref(ref: str) -> str:
-    ref = (ref or "").strip()
-    if not REF_VALIDA.match(ref) or ".." in ref:
-        raise ErrorBuscador(f"Nombre de modelo no válido: {ref!r}")
-    return ref
+    return _rs().validar_ref(ref)
 
 
 # ===========================================================================
@@ -147,50 +111,14 @@ def registro_de(ref: str) -> Tuple[str, str, str]:
 
 def _motivo_registro(codigo: int, cuerpo: str, tag: str) -> str:
     """ El registro explica el 400 en el cuerpo; se traduce lo conocido """
-    t = (cuerpo or "").lower()
-    if "sharded" in t:
-        return "Partido en varios archivos: Ollama todavía no descarga GGUF partidos desde el registro."
-    if "not a valid quantization" in t:
-        return f"El registro no reconoce «{tag}» como cuantización: esta variante no se puede descargar con Ollama."
-    if "does not exist" in t or codigo == 404:
-        return "No existe en el registro."
-    if codigo == 401:
-        return "Requiere iniciar sesión o aceptar una licencia."
-    if codigo == 403:
-        return "Acceso denegado: modelo privado o con licencia por aceptar."
-    if codigo == 400:
-        return "El registro no puede servir esta variante a Ollama."
-    return f"El registro respondió HTTP {codigo}."
+    return _rs().motivo_registro(codigo, cuerpo, tag)
 
 
 def comprobar(ref: str, timeout: float = 30) -> Dict[str, Any]:
     """ ¿Se puede descargar? Pide el manifiesto al registro que corresponde.
     Devuelve el tamaño exacto, las capas (modelo, plantilla, proyector de visión…)
     y el digest con el que luego se detectan actualizaciones. """
-    ref = validar_ref(ref)
-    clave = f"comprobar:{ref}"
-    guardado = _cache.obtener(clave, 600)
-    if guardado:
-        return guardado
-    registro, repo, tag = registro_de(ref)
-    try:
-        cabeceras = MANIFIESTO_COMO_OLLAMA if "modelscope.cn" in registro else MANIFIESTO
-        r = requests.get(f"{registro}/v2/{repo}/manifests/{tag}", headers=cabeceras, timeout=timeout, allow_redirects=True)
-    except requests.RequestException as e:
-        return {"ref": ref, "descargable": False, "motivo": f"Sin conexión con el registro: {e}"}
-    if r.status_code != 200:
-        return _cache.guardar(clave, {"ref": ref, "descargable": False, "codigo": r.status_code,
-                                      "motivo": _motivo_registro(r.status_code, r.text, tag)})
-    try:
-        m = r.json()
-    except ValueError:
-        return {"ref": ref, "descargable": False, "motivo": "Respuesta del registro no válida"}
-    capas = m.get("layers") or []
-    tipos = sorted({c.get("mediaType", "").split(".")[-1] for c in capas})
-    return _cache.guardar(clave, {
-        "ref": ref, "descargable": True, "bytes": sum(c.get("size", 0) for c in capas),
-        "capas": tipos, "vision": "projector" in tipos, "digest": hashlib.sha256(r.content).hexdigest(),
-    })
+    return _rs().comprobar(ref or "", registro_de((ref or "").strip()), _cache, timeout)
 
 
 # ===========================================================================
@@ -202,106 +130,18 @@ class Ollama:
 
     def buscar(self, consulta: str = "", orden: str = "relevancia", capacidad: Optional[str] = None,
                pagina: int = 1) -> Dict[str, Any]:
-        params: Dict[str, Any] = {}
-        if consulta:
-            params["q"] = consulta
-        o = ORDENES["ollama"].get(orden)
-        if o:
-            params["o"] = o
-        if capacidad in CAPACIDADES_OLLAMA:
-            params["c"] = capacidad
-        cabeceras = dict(UA)
-        if pagina > 1:
-            # Las páginas siguientes las carga htmx al hacer scroll: sin esta cabecera
-            # ollama.com ignora «page» y devuelve otra vez la primera
-            params["page"] = pagina
-            cabeceras["HX-Request"] = "true"
-        clave = "ollama:" + json.dumps(params, sort_keys=True)
-        guardado = _cache.obtener(clave, 600)
-        if guardado:
-            return guardado
-        r = requests.get(f"{self.BASE}/search", params=params, headers=cabeceras, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"ollama.com respondió {r.status_code}")
-        modelos = self.analizar_busqueda(r.text)
-        hay_mas = f'hx-get="/search?page={pagina + 1}' in r.text
-        return _cache.guardar(clave, {"modelos": modelos, "siguiente": pagina + 1 if hay_mas and modelos else None})
+        return _rs().ollama_buscar(self.BASE, consulta or "", orden, capacidad, pagina, _cache)
 
     @staticmethod
     def analizar_busqueda(pagina: str) -> List[Dict[str, Any]]:
-        salida = []
-        for bloque in re.split(r"<li\b", pagina)[1:]:
-            m = re.search(r'<a href="/((?:library/)?[a-z0-9][\w.\-]*(?:/[\w.\-]+)?)" class="group w-full"', bloque)
-            if not m:
-                continue
-            ruta = m.group(1)
-            nombre = ruta[len("library/"):] if ruta.startswith("library/") else ruta
-            titulo = re.search(r"<h2[^>]*>\s*<span[^>]*>([^<]+)</span>", bloque)
-            desc = re.search(r'<p class="max-w-lg[^"]*">(.*?)</p>', bloque, re.S)
-            chips = [html.unescape(c).strip() for c in re.findall(r'<span\s+class="inline-flex my-1[^"]*">([^<]+)</span>', bloque)]
-            tamanos = [c for c in chips if re.match(r"^(?:e?\d+(?:\.\d+)?[bmk]|\d+x\d+(?:\.\d+)?b)$", c, re.I)]
-            capacidades = [c for c in chips if c not in tamanos]
-            plano = _texto(bloque)
-            descargas = re.search(r"([\d.,]+[KMB]?)\s*Pulls?", plano, re.I)
-            etiquetas = re.search(r"(\d+)\s*Tags?", plano, re.I)
-            actualizado = re.search(r"Updated\s+(.+?ago|yesterday|today)", plano, re.I)
-            salida.append({
-                "fuente": "ollama", "id": nombre, "nombre": html.unescape(titulo.group(1)).strip() if titulo else nombre,
-                "autor": "ollama" if "/" not in nombre else nombre.split("/")[0],
-                "oficial": "/" not in nombre,
-                "descripcion": _texto(desc.group(1)) if desc else "",
-                "capacidades": capacidades, "tamanos": tamanos,
-                "descargas": _numero(descargas.group(1)) if descargas else None,
-                "variantes_total": int(etiquetas.group(1)) if etiquetas else None,
-                "actualizado": actualizado.group(1) if actualizado else None,
-                "url": f"https://ollama.com/{ruta}",
-                "solo_nube": capacidades == ["cloud"] or ("cloud" in capacidades and not tamanos),
-            })
-        return salida
+        return _rs().analizar_busqueda(pagina)
 
     def variantes(self, nombre: str) -> Dict[str, Any]:
-        nombre = validar_ref(nombre)
-        clave = f"ollama-variantes:{nombre}"
-        guardado = _cache.obtener(clave, 1800)
-        if guardado:
-            return guardado
-        ruta = nombre if "/" in nombre else f"library/{nombre}"
-        r = requests.get(f"{self.BASE}/{ruta}/tags", headers=UA, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"No se encontró {nombre} en ollama.com ({r.status_code})")
-        return _cache.guardar(clave, {"id": nombre, "variantes": self.analizar_etiquetas(r.text, ruta)})
+        return _rs().ollama_variantes(self.BASE, nombre or "", _cache)
 
     @staticmethod
     def analizar_etiquetas(pagina: str, ruta: str) -> List[Dict[str, Any]]:
-        vistos, salida = set(), []
-        patron = re.compile(r'<a href="/' + re.escape(ruta) + r':([^"]+)" class="md:hidden[^"]*"(.*?)</a>', re.S)
-        for m in patron.finditer(pagina):
-            tag = html.unescape(m.group(1))
-            if tag in vistos:
-                continue
-            vistos.add(tag)
-            plano = _texto(m.group(2))
-            tam = re.search(r"([\d.]+\s*(?:KB|MB|GB|TB))", plano)
-            ctx = re.search(r"([\d.]+[KM]?)\s*context window", plano)
-            entrada = re.search(r"((?:Text|Image|Audio)(?:,\s*(?:Text|Image|Audio))*)\s*input", plano)
-            digest = re.search(r"\b([0-9a-f]{12})\b", plano)
-            cuando = re.search(r"input\s*•\s*(.+?ago|yesterday|today)", plano)
-            ref = f"{ruta[len('library/'):] if ruta.startswith('library/') else ruta}:{tag}"
-            nota = None
-            if "mlx" in tag.lower():
-                nota = "Formato MLX: solo para Mac con Apple Silicon."
-            elif "cloud" in tag.lower():
-                nota = "Se ejecuta en la nube de Ollama: requiere cuenta."
-            salida.append({
-                "ref": ref, "etiqueta": tag, "bytes": _bytes(tam.group(1)) if tam else None,
-                "contexto": ctx.group(1) if ctx else None,
-                "entrada": [x.strip() for x in entrada.group(1).split(",")] if entrada else [],
-                "digest": digest.group(1) if digest else None,
-                "actualizado": cuando.group(1) if cuando else None,
-                "predeterminada": "latest" in plano.split(tag, 1)[-1][:40],
-                "nota": nota, "descargable": None if nota is None else False,
-            })
-        return salida
+        return _rs().analizar_etiquetas(pagina, ruta)
 
 
 # ===========================================================================
@@ -310,85 +150,18 @@ class Ollama:
 
 class HuggingFace:
     BASE = "https://huggingface.co"
-    EXPANDIR = ["downloads", "likes", "lastModified", "createdAt", "gguf", "pipeline_tag", "tags", "trendingScore", "gated", "cardData"]
+    EXPANDIR = list(_rs().EXPANDIR)
 
     def buscar(self, consulta: str = "", orden: str = "relevancia", pagina: Optional[str] = None,
                limite: int = 30) -> Dict[str, Any]:
-        if pagina:
-            try:
-                url = base64.urlsafe_b64decode(pagina.encode()).decode()
-            except Exception:
-                raise ErrorBuscador("Página no válida")
-            if not url.startswith(f"{self.BASE}/api/models?"):
-                raise ErrorBuscador("Página no válida")
-            params = None
-        else:
-            url = f"{self.BASE}/api/models"
-            params = {"filter": "gguf", "sort": ORDENES["huggingface"].get(orden, "downloads"), "direction": -1,
-                      "limit": limite, "expand[]": self.EXPANDIR}
-            if consulta:
-                params["search"] = consulta
-        clave = "hf:" + url + json.dumps(params, sort_keys=True, default=str)
-        guardado = _cache.obtener(clave, 600)
-        if guardado:
-            return guardado
-        r = requests.get(url, params=params, headers=UA, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"Hugging Face respondió {r.status_code}")
-        siguiente = None
-        m = re.search(r'<([^>]+)>;\s*rel="next"', r.headers.get("Link", ""))
-        if m:
-            siguiente = base64.urlsafe_b64encode(m.group(1).encode()).decode()
-        return _cache.guardar(clave, {"modelos": [self.normalizar(x) for x in r.json()], "siguiente": siguiente})
+        return _rs().hf_buscar(self.BASE, consulta or "", orden, pagina, limite, _cache)
 
     @staticmethod
     def normalizar(m: Dict[str, Any]) -> Dict[str, Any]:
-        tags = m.get("tags") or []
-        gguf = m.get("gguf") or {}
-        capacidades = []
-        if m.get("pipeline_tag") in ("image-text-to-text",) or "vision" in tags or "multimodal" in tags:
-            capacidades.append("vision")
-        if "conversational" in tags:
-            capacidades.append("chat")
-        base = next((t[len("base_model:quantized:"):] for t in tags if t.startswith("base_model:quantized:")), None) \
-            or next((t.split(":", 1)[1] for t in tags if t.startswith("base_model:") and t.count(":") == 1), None)
-        arquitectura = gguf.get("architecture")
-        if arquitectura == "clip":          # los metadatos son los del proyector de visión, no los del modelo
-            arquitectura = None
-            if "vision" not in capacidades:
-                capacidades.append("vision")
-        licencia = next((t.split(":", 1)[1] for t in tags if t.startswith("license:")), None)
-        return {
-            "fuente": "huggingface", "id": m["id"], "nombre": m["id"].split("/")[-1], "autor": m["id"].split("/")[0],
-            "oficial": False, "descripcion": " · ".join(x for x in (f"basado en {base}" if base else "", arquitectura or "") if x),
-            "capacidades": capacidades, "tamanos": [], "descargas": m.get("downloads"), "me_gusta": m.get("likes"),
-            "tendencia": m.get("trendingScore"), "actualizado": m.get("lastModified"), "creado": m.get("createdAt"),
-            "contexto": gguf.get("context_length"), "arquitectura": arquitectura,
-            "parametros": gguf.get("total") if arquitectura else None, "licencia": licencia, "modelo_base": base,
-            "requiere_licencia": bool(m.get("gated")), "url": f"https://huggingface.co/{m['id']}",
-        }
+        return _rs().hf_normalizar(m)
 
     def variantes(self, repo: str) -> Dict[str, Any]:
-        if not re.match(r"^[\w.\-]+/[\w.\-]+$", repo or ""):
-            raise ErrorBuscador("Repositorio no válido")
-        clave = f"hf-variantes:{repo}"
-        guardado = _cache.obtener(clave, 1800)
-        if guardado:
-            return guardado
-        r = requests.get(f"{self.BASE}/api/models/{repo}", params={"blobs": "true"}, headers=UA, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"No se encontró {repo} en Hugging Face ({r.status_code})")
-        d = r.json()
-        archivos = [(s["rfilename"], s.get("size") or 0) for s in d.get("siblings", [])]
-        variantes = agrupar_gguf(archivos, prefijo=f"hf.co/{repo}")
-        for v in variantes:
-            v["url_archivo"] = f"{self.BASE}/{repo}/resolve/main/{v['archivos'][0]}"
-        gguf = d.get("gguf") or {}
-        return _cache.guardar(clave, {
-            "id": repo, "variantes": variantes, "contexto": gguf.get("context_length"),
-            "arquitectura": gguf.get("architecture"), "requiere_licencia": bool(d.get("gated")),
-            "vision": any("mmproj" in a[0].lower() for a in archivos),
-        })
+        return _rs().hf_variantes(self.BASE, repo or "", _cache)
 
 
 # ===========================================================================
@@ -399,51 +172,14 @@ class ModelScope:
     BASE = "https://modelscope.cn"
 
     def buscar(self, consulta: str = "", orden: str = "relevancia", pagina: int = 1, limite: int = 30) -> Dict[str, Any]:
-        cuerpo = {"PageSize": limite, "PageNumber": max(1, int(pagina)), "SortBy": ORDENES["modelscope"].get(orden, "Default"),
-                  "Target": "", "Name": consulta,
-                  # «Criterion» con «gguf» en minúsculas filtra en el servidor; «SingleCriterion» se ignora
-                  "Criterion": [{"category": "libraries", "predicate": "contains", "values": ["gguf"]}]}
-        clave = "ms:" + json.dumps(cuerpo, sort_keys=True)
-        guardado = _cache.obtener(clave, 600)
-        if guardado:
-            return guardado
-        r = requests.put(f"{self.BASE}/api/v1/dolphin/models", json=cuerpo, headers=UA, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"ModelScope respondió {r.status_code}")
-        datos = (r.json().get("Data") or {}).get("Model") or {}
-        modelos = [self.normalizar(m) for m in datos.get("Models") or []
-                   if "gguf" in [x.lower() for x in (m.get("Libraries") or [])]]
-        total = datos.get("TotalCount") or 0
-        return _cache.guardar(clave, {"modelos": modelos, "siguiente": pagina + 1 if pagina * limite < total else None})
+        return _rs().ms_buscar(self.BASE, consulta or "", orden, int(pagina), limite, _cache)
 
     @staticmethod
     def normalizar(m: Dict[str, Any]) -> Dict[str, Any]:
-        repo = f"{m.get('Path')}/{m.get('Name')}"
-        ts = m.get("LastUpdatedTime")
-        return {
-            "fuente": "modelscope", "id": repo, "nombre": m.get("Name"), "autor": m.get("Path"), "oficial": False,
-            "descripcion": " · ".join(x for x in (m.get("ChineseName") or "", f"basado en {', '.join(m.get('BaseModel') or [])}" if m.get("BaseModel") else "") if x),
-            "capacidades": [], "tamanos": [], "descargas": m.get("Downloads"), "me_gusta": m.get("Stars"),
-            "actualizado": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)) if ts else None,
-            "licencia": m.get("License"), "url": f"https://modelscope.cn/models/{repo}",
-        }
+        return _rs().ms_normalizar(m)
 
     def variantes(self, repo: str) -> Dict[str, Any]:
-        if not re.match(r"^[\w.\-]+/[\w.\-]+$", repo or ""):
-            raise ErrorBuscador("Repositorio no válido")
-        clave = f"ms-variantes:{repo}"
-        guardado = _cache.obtener(clave, 1800)
-        if guardado:
-            return guardado
-        r = requests.get(f"{self.BASE}/api/v1/models/{repo}/repo/files", params={"Recursive": "true"}, headers=UA, timeout=25)
-        if r.status_code != 200:
-            raise ErrorBuscador(f"No se encontró {repo} en ModelScope ({r.status_code})")
-        archivos = [(f["Path"], f.get("Size") or 0) for f in ((r.json().get("Data") or {}).get("Files") or []) if f.get("Type") != "tree"]
-        variantes = agrupar_gguf(archivos, prefijo=f"modelscope.cn/{repo}")
-        for v in variantes:
-            v["url_archivo"] = f"{self.BASE}/models/{repo}/resolve/master/{v['archivos'][0]}"
-        return _cache.guardar(clave, {"id": repo, "variantes": variantes,
-                                      "vision": any("mmproj" in a[0].lower() for a in archivos)})
+        return _rs().ms_variantes(self.BASE, repo or "", _cache)
 
 
 def agrupar_gguf(archivos: List[Tuple[str, int]], prefijo: str) -> List[Dict[str, Any]]:
@@ -453,27 +189,7 @@ def agrupar_gguf(archivos: List[Tuple[str, int]], prefijo: str) -> List[Dict[str
     entrada; el proyector de visión (mmproj) no es una variante. La etiqueta de Ollama
     es la cuantización tal como aparece en el nombre (Q4_K_M, UD-Q4_K_XL, q4_k_m…).
     """
-    grupos: Dict[str, Dict[str, Any]] = {}
-    for ruta, tam in archivos:
-        if not ruta.lower().endswith(".gguf") or "mmproj" in ruta.lower():
-            continue
-        cuant = cuantizacion_de(ruta) or cuantizacion_de(os.path.dirname(ruta) + ".gguf")
-        if not cuant:
-            continue
-        g = grupos.setdefault(cuant.lower(), {"etiqueta": cuant, "archivos": [], "bytes": 0, "partes": 0})
-        g["archivos"].append(ruta)
-        g["bytes"] += tam
-        g["partes"] += 1
-    salida = []
-    for g in grupos.values():
-        partido = g["partes"] > 1 or any(_PARTE.search(re.sub(r"(?i)\.gguf$", "", a)) for a in g["archivos"])
-        salida.append({
-            "ref": f"{prefijo}:{g['etiqueta']}", "etiqueta": g["etiqueta"], "bytes": g["bytes"],
-            "archivos": sorted(g["archivos"]), "partes": g["partes"],
-            "nota": "Partido en varios archivos: Ollama no siempre puede descargarlo; se comprueba antes." if partido else None,
-            "descargable": None,
-        })
-    return sorted(salida, key=lambda v: v["bytes"])
+    return _rs().agrupar_gguf(list(archivos), prefijo)
 
 
 # ===========================================================================
@@ -544,11 +260,7 @@ def novedades() -> Dict[str, Any]:
 
 
 def fuente_de_ref(ref: str) -> str:
-    if ref.startswith(("hf.co/", "huggingface.co/")):
-        return "huggingface"
-    if ref.startswith("modelscope.cn/"):
-        return "modelscope"
-    return "ollama"
+    return _rs().fuente_de_ref(ref)
 
 
 def actualizaciones_instalados(instalados: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -593,17 +305,6 @@ def analizar_variante(ref: str) -> Dict[str, Any]:
 # Encontrar un modelo concreto: por nombre o pegando un enlace
 # ===========================================================================
 
-_WEB = re.compile(r"^(?:https?://)?(?:www\.)?(ollama\.com|huggingface\.co|hf\.co|modelscope\.cn)(?:/(.*))?$", re.I)
-_SEGMENTO = re.compile(r"^[\w.\-]+$")
-
-
-def _separar_etiqueta(nombre: str) -> Tuple[str, Optional[str]]:
-    if ":" in nombre:
-        base, tag = nombre.split(":", 1)
-        return base, (tag or None)
-    return nombre, None
-
-
 def interpretar(texto: str) -> Dict[str, Any]:
     """ Qué ha escrito o pegado el usuario.
 
@@ -613,128 +314,25 @@ def interpretar(texto: str) -> Dict[str, Any]:
     · «propietario/repositorio», que puede estar en cualquier plataforma → {"tipo": "repo"}
     · cualquier otra cosa es un nombre a buscar  → {"tipo": "nombre", consulta, etiqueta}
     """
-    t = (texto or "").strip().strip("\"'`<>")
-    t = re.sub(r"^ollama\s+(?:run|pull)\s+", "", t, flags=re.I).strip()
-    if not t:
-        raise ErrorBuscador("Escribe un nombre o pega un enlace")
-    if len(t) > 400:
-        raise ErrorBuscador("Texto demasiado largo")
-
-    web = _WEB.match(t.split()[0]) if " " not in t else None
-    if web:
-        sitio = web.group(1).lower()
-        ruta = urllib.parse.unquote(re.split(r"[?#]", web.group(2) or "", 1)[0]).strip("/")
-        consulta = urllib.parse.parse_qs(urllib.parse.urlsplit("http://x/" + (web.group(2) or "")).query)
-        partes = [x for x in ruta.split("/") if x]
-        fuente = {"ollama.com": "ollama", "modelscope.cn": "modelscope"}.get(sitio, "huggingface")
-        busqueda = (consulta.get("q") or consulta.get("search") or consulta.get("name") or [None])[0]
-        if busqueda:
-            return interpretar_nombre(busqueda)
-
-        if fuente == "ollama":
-            if partes[:1] == ["library"]:
-                partes = partes[1:]
-            for i, x in enumerate(partes):          # …/tags, …/blobs/<digest>
-                if x in ("tags", "blobs"):
-                    partes = partes[:i]
-                    break
-            if not partes or len(partes) > 2 or partes[0] in ("search", "models", "download", "blog", "settings", "signin"):
-                raise ErrorBuscador("El enlace de ollama.com no apunta a un modelo")
-            base, tag = _separar_etiqueta("/".join(partes))
-            return _validar_enlace("ollama", base, tag)
-
-        if fuente == "modelscope" and partes[:1] == ["models"]:
-            partes = partes[1:]
-        if fuente == "huggingface" and partes[:1] in (["models"], ["api"]):
-            partes = partes[2:] if partes[:2] == ["api", "models"] else partes[1:]
-        if len(partes) < 2:
-            raise ErrorBuscador("El enlace no apunta a un repositorio (propietario/nombre)")
-        repo_nombre, tag = _separar_etiqueta(partes[1])
-        if not tag:      # enlace a un archivo .gguf o a la carpeta de una cuantización
-            tag = next((c for c in (cuantizacion_de(x) for x in reversed(partes[2:])) if c), None)
-        return _validar_enlace(fuente, f"{partes[0]}/{repo_nombre}", tag)
-
-    if re.fullmatch(r"[\w.\-]+/[\w.\-]+(?::[\w.\-]+)?", t):
-        base, tag = _separar_etiqueta(t)
-        return {"tipo": "repo", "fuente": None, "id": base, "etiqueta": tag, "consulta": base.split("/")[1]}
-    return interpretar_nombre(t)
+    return _rs().interpretar(texto)
 
 
 def interpretar_nombre(texto: str) -> Dict[str, Any]:
-    t = texto.strip()
-    tag = None
-    if re.fullmatch(r"[\w.\-]+:[\w.\-]+", t):
-        t, tag = _separar_etiqueta(t)
-    t = re.sub(r"\s+", " ", t)
-    if not re.search(r"\w", t):
-        raise ErrorBuscador("Escribe un nombre o pega un enlace")
-    return {"tipo": "nombre", "fuente": None, "id": None, "etiqueta": tag, "consulta": t[:100]}
-
-
-def _validar_enlace(fuente: str, id_modelo: str, tag: Optional[str]) -> Dict[str, Any]:
-    if not all(_SEGMENTO.match(x) for x in id_modelo.split("/")) or id_modelo.count("/") > 1 or ".." in id_modelo:
-        raise ErrorBuscador("El enlace no tiene un nombre de modelo válido")
-    if tag is not None and not _SEGMENTO.match(tag):
-        tag = None
-    return {"tipo": "enlace", "fuente": fuente, "id": id_modelo, "etiqueta": tag,
-            "consulta": id_modelo.split("/")[-1]}
+    return _rs().interpretar_nombre(texto)
 
 
 def _clave(nombre: str) -> str:
     """ «unsloth/Qwen3-8B-GGUF», «qwen3-8b» y «Qwen3 8B» son el mismo nombre """
-    base = (nombre or "").split("/")[-1].split(":")[0].lower()
-    base = re.sub(r"[-_. ]?gguf$", "", base)
-    return re.sub(r"[^a-z0-9]", "", base)
+    return _rs().clave(nombre)
 
 
 def _parecido(consulta: str, id_modelo: str) -> bool:
-    fichas = [x for x in re.split(r"[^a-z0-9]+", consulta.lower()) if x]
-    texto = id_modelo.lower()
-    return bool(fichas) and all(f in texto for f in fichas)
+    return _rs().parecido(consulta, id_modelo)
 
 
 def ficha_repo(fuente: str, id_modelo: str) -> Optional[Dict[str, Any]]:
     """ Datos de un modelo concreto, o None si no existe (o es privado) en esa plataforma """
-    if not re.fullmatch(r"[\w.\-]+(?:/[\w.\-]+)?", id_modelo or "") or ".." in id_modelo:
-        return None
-    clave = f"ficha:{fuente}:{id_modelo}"
-    guardado = _cache.obtener(clave, 600)
-    if guardado is not None:
-        return guardado or None
-    resultado: Optional[Dict[str, Any]] = None
-    if fuente == "huggingface" and "/" in id_modelo:
-        r = requests.get(f"{HuggingFace.BASE}/api/models/{id_modelo}", params={"expand[]": HuggingFace.EXPANDIR}, headers=UA, timeout=25)
-        if r.status_code == 200:
-            d = r.json()
-            resultado = HuggingFace.normalizar(d)
-            resultado["sin_gguf"] = "gguf" not in (d.get("tags") or []) and not d.get("gguf")
-        elif r.status_code not in (401, 404):
-            raise ErrorBuscador(f"Hugging Face respondió {r.status_code}")
-    elif fuente == "modelscope" and "/" in id_modelo:
-        r = requests.get(f"{ModelScope.BASE}/api/v1/models/{id_modelo}", headers=UA, timeout=25)
-        if r.status_code == 200 and (r.json().get("Data") or {}).get("Name"):
-            d = r.json()["Data"]
-            resultado = ModelScope.normalizar(d)
-            resultado["sin_gguf"] = "gguf" not in [x.lower() for x in (d.get("Libraries") or [])]
-        elif r.status_code not in (200, 404):
-            raise ErrorBuscador(f"ModelScope respondió {r.status_code}")
-    elif fuente == "ollama":
-        ruta = id_modelo if "/" in id_modelo else f"library/{id_modelo}"
-        r = requests.get(f"{Ollama.BASE}/{ruta}", headers=UA, timeout=25)
-        if r.status_code == 200:
-            desc = re.search(r'<meta name="description" content="([^"]*)"', r.text)
-            chips = [html.unescape(c).strip() for c in re.findall(r'<span\s+class="inline-flex[^"]*"[^>]*>\s*([^<]+?)\s*</span>', r.text)]
-            resultado = {
-                "fuente": "ollama", "id": id_modelo, "nombre": id_modelo, "autor": id_modelo.split("/")[0] if "/" in id_modelo else "ollama",
-                "oficial": "/" not in id_modelo, "descripcion": html.unescape(desc.group(1)) if desc else "",
-                "capacidades": [c for c in chips if c in CAPACIDADES_OLLAMA],
-                "tamanos": [c for c in chips if re.fullmatch(r"e?\d+(?:\.\d+)?[bmk]|\d+x\d+(?:\.\d+)?b", c, re.I)],
-                "url": f"{Ollama.BASE}/{ruta}", "sin_gguf": False,
-            }
-        elif r.status_code != 404:
-            raise ErrorBuscador(f"ollama.com respondió {r.status_code}")
-    _cache.guardar(clave, resultado or {})
-    return resultado
+    return _rs().ficha_repo(fuente, id_modelo, (Ollama.BASE, HuggingFace.BASE, ModelScope.BASE), _cache)
 
 
 def localizar(texto: str) -> Dict[str, Any]:
@@ -808,8 +406,7 @@ def localizar(texto: str) -> Dict[str, Any]:
 
 def _clave_ollama(consulta: str) -> Optional[str]:
     """ «Qwen3» → «qwen3»: los modelos oficiales de Ollama van en minúsculas y sin espacios """
-    c = consulta.strip().lower()
-    return c if re.fullmatch(r"[a-z0-9][a-z0-9.\-_]*", c) else None
+    return _rs().clave_ollama(consulta)
 
 
 # ===========================================================================

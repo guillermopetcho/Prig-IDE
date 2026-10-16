@@ -18,6 +18,7 @@ except ImportError:
     from backend import github_lector as gl
 
 from . import enlaces
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
 
 class ErrorGitHubHub(Exception):
@@ -36,7 +37,7 @@ class Cuenta:
 
     def _pedir(self, metodo: str, ruta: str, **kw):
         try:
-            r = requests.request(metodo, f"{gl.API}/{ruta}", headers=_cab(self.token), timeout=30, **kw)
+            r = red_http.request(metodo, f"{gl.API}/{ruta}", headers=_cab(self.token), timeout=30, **kw)
         except requests.RequestException:
             raise ErrorGitHubHub("Sin conexión con GitHub.")
         if r.status_code == 401:
@@ -99,7 +100,7 @@ def es_hub(url: str) -> bool:
     if not crudo:
         return False
     try:
-        r = requests.get(crudo, headers={"User-Agent": gl.UA["User-Agent"]}, timeout=10)
+        r = red_http.get(crudo, headers={"User-Agent": gl.UA["User-Agent"]}, timeout=10)
     except requests.RequestException:
         return False
     return r.status_code == 200 and "tipo" in r.text[:4000] and len(r.content) < 64 * 1024

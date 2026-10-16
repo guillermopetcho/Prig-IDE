@@ -136,6 +136,26 @@ class CalculadoraVentas:
         lentes = [director._obtener_siguiente_lente()["id"] for _ in range(6)]
         self.assertEqual(len(set(lentes)), 6)
 
+    def test_ejecutar_pensamiento_en_archivo(self):
+        director = LLMDirectorAgentes()
+        # Crear un archivo de prueba en la carpeta temporal
+        with open(os.path.join(self.tmp, "modulo_test.py"), "w", encoding="utf-8") as f:
+            f.write("def ejecutar_tarea(val: int) -> int:\n    return val * 2\n")
+
+        res = director.ejecutar_pensamiento_en_archivo(self.tmp, tema_id="tema_mecha_patrol")
+        self.assertTrue(res["ok"])
+        self.assertTrue(os.path.exists(res["archivo"]))
+        self.assertEqual(res["nombre"], "PENSAMIENTO_DEL_PROYECTO.md")
+        self.assertEqual(res["personaje"], "Titán Mecha MK-VII")
+
+        # Verificar que el contenido generado contiene las secciones de pensamiento y AST
+        with open(res["archivo"], "r", encoding="utf-8") as f_res:
+            contenido = f_res.read()
+            self.assertIn("Bitácora de Pensamiento", contenido)
+            self.assertIn("Chain-of-Thought", contenido)
+            self.assertIn("modulo_test.py", contenido)
+            self.assertIn("ejecutar_tarea", contenido)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

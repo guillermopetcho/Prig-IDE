@@ -15,7 +15,12 @@ import re
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
+
+# Otras direcciones solo en las pruebas (un YouTube y un traductor falsos, sin red)
+YOUTUBE = os.environ.get("PRIG_YOUTUBE_URL") or "https://www.youtube.com"
+TRADUCTOR = os.environ.get("PRIG_TRADUCTOR") or "https://translate.googleapis.com"
 
 PRESUPUESTO_TRANSCRIPCION = 16000  # caracteres de transcripción que ve el modelo al analizar
 
@@ -66,7 +71,7 @@ def formatear_segundos_hms(segundos: float) -> str:
 
 DEFAULT_INNERTUBE_API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 VERSION_TRANSCRIPCION = 2  # 2: intervalos sin solapes; las cachés anteriores se recalculan
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "cache_transcripciones")
+CACHE_DIR = os.environ.get("PRIG_CACHE_TRANSCRIPCIONES") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "cache_transcripciones")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
@@ -104,7 +109,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
 
     # 1. Consulta directa a Innertube Android con clave estándar (ultra rápido, ~0.8s)
     try:
-        url_it = f"https://www.youtube.com/youtubei/v1/player?key={DEFAULT_INNERTUBE_API_KEY}"
+        url_it = f"{YOUTUBE}/youtubei/v1/player?key={DEFAULT_INNERTUBE_API_KEY}"
         req_it = urllib.request.Request(
             url_it,
             data=payload_android,
@@ -113,7 +118,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
                 "User-Agent": "com.google.android.youtube/20.10.38"
             }
         )
-        with urllib.request.urlopen(req_it, timeout=5) as resp_it:
+        with red_http.urlopen(req_it, timeout=5) as resp_it:
             data_it = json.loads(resp_it.read().decode("utf-8", errors="ignore"))
             tracks = data_it.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
             if tracks:
@@ -123,7 +128,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
 
     # 2. Fallback: Scraping de watch?v= para extraer clave dinámica o ytInitialPlayerResponse
     try:
-        url_watch = f"https://www.youtube.com/watch?v={video_id}"
+        url_watch = f"{YOUTUBE}/watch?v={video_id}"
         req_w = urllib.request.Request(
             url_watch,
             headers={
@@ -131,13 +136,13 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
                 "Accept-Language": "es,en;q=0.9"
             }
         )
-        with urllib.request.urlopen(req_w, timeout=5) as resp_w:
+        with red_http.urlopen(req_w, timeout=5) as resp_w:
             html_watch = resp_w.read().decode("utf-8", errors="ignore")
 
         m_key = re.search(r'"INNERTUBE_API_KEY":\s*"([a-zA-Z0-9_-]+)"', html_watch)
         api_key = m_key.group(1) if m_key else ""
         if api_key and api_key != DEFAULT_INNERTUBE_API_KEY:
-            url_it2 = f"https://www.youtube.com/youtubei/v1/player?key={api_key}"
+            url_it2 = f"{YOUTUBE}/youtubei/v1/player?key={api_key}"
             req_it2 = urllib.request.Request(
                 url_it2,
                 data=payload_android,
@@ -146,7 +151,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
                     "User-Agent": "com.google.android.youtube/20.10.38"
                 }
             )
-            with urllib.request.urlopen(req_it2, timeout=5) as resp_it2:
+            with red_http.urlopen(req_it2, timeout=5) as resp_it2:
                 data_it2 = json.loads(resp_it2.read().decode("utf-8", errors="ignore"))
                 tracks = data_it2.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
                 if tracks:
@@ -164,7 +169,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
 
     # 3. Fallback a cliente Web
     try:
-        url_web = "https://www.youtube.com/youtubei/v1/player"
+        url_web = f"{YOUTUBE}/youtubei/v1/player"
         payload_web = json.dumps({
             "context": {
                 "client": {
@@ -184,7 +189,7 @@ def _obtener_caption_tracks(video_id: str) -> List[Dict[str, Any]]:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
         )
-        with urllib.request.urlopen(req_web, timeout=5) as resp_web:
+        with red_http.urlopen(req_web, timeout=5) as resp_web:
             data_web = json.loads(resp_web.read().decode("utf-8", errors="ignore"))
             tracks = data_web.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
             if tracks:
@@ -207,7 +212,7 @@ def _descargar_xml_timedtext(url: str) -> str:
                 "Accept-Language": "es,en;q=0.9"
             }
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with red_http.urlopen(req, timeout=5) as resp:
             return resp.read().decode("utf-8", errors="ignore")
     except Exception:
         pass
@@ -220,7 +225,7 @@ def _descargar_xml_timedtext(url: str) -> str:
                 "Accept-Language": "es,en;q=0.9"
             }
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with red_http.urlopen(req, timeout=5) as resp:
             return resp.read().decode("utf-8", errors="ignore")
     except Exception:
         return ""
@@ -272,9 +277,9 @@ def _traducir_texto_rapido(texto: str, idioma_destino: str = "es") -> str:
         return texto
     try:
         q = urllib.parse.quote(texto)
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={idioma_destino}&dt=t&q={q}"
+        url = f"{TRADUCTOR}/translate_a/single?client=gtx&sl=auto&tl={idioma_destino}&dt=t&q={q}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with red_http.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="ignore"))
             partes = [item[0] for item in data[0] if item and item[0]]
             res = "".join(partes).strip()
@@ -322,9 +327,9 @@ def _traducir_lote_parrafos(textos: List[str], idioma_destino: str = "es") -> Li
         texto_unido = SEP.join(items_validos)
         try:
             q = urllib.parse.quote(texto_unido)
-            url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={idioma_destino}&dt=t&q={q}"
+            url = f"{TRADUCTOR}/translate_a/single?client=gtx&sl=auto&tl={idioma_destino}&dt=t&q={q}"
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=6) as resp:
+            with red_http.urlopen(req, timeout=6) as resp:
                 data = json.loads(resp.read().decode("utf-8", errors="ignore"))
                 res_trad = "".join([item[0] for item in data[0] if item and item[0]])
                 partes = res_trad.split("|||")

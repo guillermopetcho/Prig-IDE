@@ -61,7 +61,6 @@ from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
 import perfiles_config
 from recursos import termico as recursos_termico
-from recursos.perfiles import PERFILES as RECURSOS_PERFILES, TIRADORES as RECURSOS_TIRADORES
 from exercise_engine import ExerciseEngine
 from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
@@ -84,13 +83,9 @@ from datetime import datetime
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
-    # Un llama-server del motor MoE que sobrevivió a un cierre brusco de Prig sigue ocupando la VRAM
-    try:
-        from ai_engine import motor_moe
-        if motor_moe.limpiar_huerfanos():
-            print("🧹 Motor MoE: cerrado un servidor que quedó de una sesión anterior")
-    except Exception as e:
-        print(f"⚠️ No se pudo revisar el motor MoE: {e}")
+    # Un llama-server del motor MoE que sobrevivió a un cierre brusco de Prig sigue ocupando la VRAM. Un segundo
+    # backend (el comparador de rutas, una prueba) no debe tocarlo: sería el del Prig que está abierto.
+    # (el llama-server del motor MoE que sobrevivió a un cierre brusco lo cierra el servidor de Rust, su dueño)
     yield
     cleanup_all_processes()
 
@@ -147,7 +142,7 @@ def _gpu_libre_para_banco() -> bool:
     """ El banco embebe en la GPU solo si no hay ningún generador en ella (motor MoE u Ollama) """
     try:
         from ai_engine import motor_moe as _mm
-        if _mm._motor is not None and _mm._motor.en_marcha():
+        if _mm.pid_en_marcha() is not None:
             return False
         cargados = requests_lib.get(f"{ai_engine.base_url}/api/ps", timeout=2).json().get("models", [])
     except Exception:
@@ -293,6 +288,8 @@ def rebind_workspace(new_base_dir: str) -> None:
     telemetry = LearningTelemetry(new_base_dir)
     exercise_store = ExerciseStore(new_base_dir)
     guided = GuidedLearningService(new_base_dir, ai_engine, book_service)
+    # el explorador de libros también deja navegar el espacio de trabajo: el abierto ahora, no el del arranque
+    explorador.workspace = os.path.abspath(new_base_dir)
 
 
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
@@ -2796,7 +2793,7 @@ def github_widget_config():
     user_info = None
     if token:
         try:
-            r = requests_lib.get("https://api.github.com/user", headers={
+            r = requests_lib.get(f"{github_lector.API}/user", headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "Prig-IDE"
@@ -2845,7 +2842,7 @@ def github_widget_preview(req: GithubWidgetPreviewRequest):
     login = "username"
     if token:
         try:
-            r = requests_lib.get("https://api.github.com/user", headers={
+            r = requests_lib.get(f"{github_lector.API}/user", headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "Prig-IDE"
@@ -2894,7 +2891,11 @@ def github_widget_publicar(req: GithubWidgetPublicarRequest):
         extras_cliente=req.extras
     )
 
-    res = github_stats_widget.sincronizar_con_github(token, stats, cfg)
+    try:
+        res = github_stats_widget.sincronizar_con_github(token, stats, cfg)
+    except ValueError as e:
+        # el motivo (token sin permisos, sin conexión...) para el usuario: antes llegaba como un 500
+        raise HTTPException(status_code=400, detail=str(e))
     if not res.get("ok"):
         raise HTTPException(status_code=400, detail=res.get("mensaje", "Error al sincronizar con GitHub"))
     return res
@@ -3038,6 +3039,28 @@ def open_workspace(req: OpenFolderRequest):
     rebind_workspace(file_mgr.base_dir)
     ide.anotar_reciente(file_mgr.base_dir)
     return res
+
+class SegundaCarpetaRequest(BaseModel):
+    path: Optional[str] = None
+
+@app.get("/api/workspace/segunda")
+def get_segunda_carpeta():
+    ruta = file_mgr.segunda_dir
+    return {"path": ruta, "name": (os.path.basename(ruta) or ruta) if ruta else None}
+
+@app.post("/api/workspace/segunda")
+def set_segunda_carpeta(req: SegundaCarpetaRequest):
+    res = file_mgr.set_segunda_dir(req.path)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@app.post("/api/workspace/segunda/browse")
+def browse_segunda_carpeta():
+    elegida = file_mgr.elegir_carpeta_nativa("Seleccionar segunda carpeta - Prig IDE")
+    if not elegida:
+        raise HTTPException(status_code=400, detail="No se eligió ninguna carpeta")
+    return file_mgr.set_segunda_dir(elegida)
 
 @app.post("/api/workspace/browse")
 def browse_workspace():
@@ -5329,38 +5352,6 @@ def recursos_gestor():
     return _gestor_recursos(catalogo)
 
 
-_recursos_cancelar = threading.Event()
-
-# Qué campo de la configuración de IA corresponde a cada opción recomendada.
-# Solo el tutor vive en esa configuración; los demás usos guardan lo aplicado en el
-# almacén de recursos y lo leen de ahí.
-_CAMPOS_TUTOR = ("agent1_model", "num_ctx", "num_gpu", "keep_alive")
-
-
-def _config_tutor() -> Dict[str, Any]:
-    cfg = ai_engine.get_config()
-    return {k: cfg.get(k) for k in _CAMPOS_TUTOR}
-
-
-def _propuesta_tutor(rec: Dict[str, Any]) -> Dict[str, Any]:
-    opc = rec.get("opciones") or {}
-    return {"agent1_model": rec["modelo"], "num_ctx": opc.get("num_ctx"),
-            # Automático: forzar capas no aceleró nada y provocó falta de memoria
-            "num_gpu": -1, "keep_alive": opc.get("keep_alive")}
-
-
-def _diferencias(actual: Dict[str, Any], propuesta: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [{"campo": k, "actual": actual.get(k), "nuevo": v}
-            for k, v in propuesta.items() if v is not None and actual.get(k) != v]
-
-
-def _perfil_valido(perfil: str, tirador: str = "equilibrado"):
-    if perfil not in RECURSOS_PERFILES:
-        raise HTTPException(status_code=400, detail=f"Perfil desconocido: {perfil}")
-    if tirador not in RECURSOS_TIRADORES:
-        raise HTTPException(status_code=400, detail=f"Preferencia desconocida: {tirador}")
-
-
 def _flujo_cancelable(contenido):
     """ Envuelve el cuerpo de una respuesta en streaming para que se detenga si el cliente se va.
 
@@ -5470,460 +5461,38 @@ def _gpu_ocupada() -> bool:
         return bool(ai_engine._active_streams)
 
 
-@app.get("/api/recursos/maquina")
-def recursos_maquina(fresca: bool = False):
-    g = recursos_gestor()
+class HerramientaInternaRequest(BaseModel):
+    sesion: str
+    nombre: str
+    argumentos: Any = None
+
+
+@app.post("/api/interno/herramienta")
+def interno_herramienta(req: HerramientaInternaRequest):
+    """ El servidor de Rust genera el chat y pide aquí cada herramienta (siguen en Python mientras su subsistema no
+    pase a Rust) """
+    from ai_engine.ai_engine_class import SESIONES_HERRAMIENTAS
+    herramientas = SESIONES_HERRAMIENTAS.get(req.sesion)
+    if herramientas is None:
+        raise HTTPException(status_code=404, detail="Esa conversación ya terminó.")
     try:
-        maq = g.maquina(fresca=fresca)
+        resultado = herramientas.ejecutar(req.nombre, req.argumentos if req.argumentos is not None else {})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No se pudo analizar la máquina: {e}")
-    rad = maq.radiografia
-    cal = recursos_almacen().calibracion(rad["huella"])
-    return {
-        "huella": rad["huella"],
-        "sistema": rad.get("sistema"), "cpu": rad.get("cpu"), "memoria": rad.get("memoria"),
-        "gpus": rad.get("gpus"), "disco": rad.get("disco"), "energia": rad.get("energia"),
-        "ancho_banda_ram_gbps": rad.get("ancho_banda_ram_gbps"),
-        "resumen": maq.resumen(),
-        "servidor": recursos_srv.estado(rad.get("ollama")),
-        "calibracion": ({k: v for k, v in cal.items() if k not in ("muestras", "detalle")}
-                        if cal else None),
-        "vivo": g.estado_vivo(),
-    }
+        resultado = f"Error al ejecutar {req.nombre}: {e}"
+    return {"resultado": str(resultado)}
 
 
-@app.get("/api/recursos/estado")
-def recursos_estado():
-    return recursos_gestor().estado_vivo()
+@app.get("/api/ai/ocupada")
+def ai_ocupada():
+    """ Para el servidor de Rust (dueño de los recursos): ¿está generando este backend? """
+    return {"ocupada": _gpu_ocupada()}
 
 
-@app.get("/api/recursos/perfiles")
-def recursos_perfiles():
-    return {"perfiles": [{"id": k, **v} for k, v in RECURSOS_PERFILES.items()],
-            "tiradores": [{"id": k, "nombre": v} for k, v in RECURSOS_TIRADORES.items()]}
+# La máquina, los perfiles, los veredictos, recomendar, aplicar, restaurar, probar, calibrar y el servidor de Ollama:
+# los sirve el servidor de Rust (routes/recursos.rs; prig_ia::gestor)
 
-
-@app.get("/api/recursos/modelos")
-def recursos_modelos(perfil: str = "tutor", tirador: str = "equilibrado"):
-    _perfil_valido(perfil, tirador)
-    return recursos_gestor().veredictos(perfil, tirador)
-
-
-class RecursosRecomendarRequest(BaseModel):
-    modelo: Optional[str] = None
-    perfil: str = "tutor"
-    tirador: str = "equilibrado"
-
-
-@app.post("/api/recursos/recomendar")
-def recursos_recomendar(req: RecursosRecomendarRequest):
-    """ Sin modelo: elige el mejor instalado para el uso. Con modelo: cómo abrirlo. """
-    _perfil_valido(req.perfil, req.tirador)
-    g = recursos_gestor()
-    modelo = req.modelo
-    ranking = None
-    if not modelo:
-        ranking = g.veredictos(req.perfil, req.tirador)["modelos"]
-        utiles = [m for m in ranking if m.get("util")]
-        if not ranking:
-            raise HTTPException(status_code=404, detail="No hay modelos instalados.")
-        modelo = (utiles or ranking)[0]["modelo"]
-    try:
-        rec = g.recomendar(modelo, req.perfil, req.tirador)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    rec["elegido_automaticamente"] = not req.modelo
-    if ranking is not None:
-        rec["ranking"] = [{k: m.get(k) for k in ("modelo", "veredicto", "etiqueta", "util",
-                                                  "calidad_esperada", "puntos")}
-                          | {"tok_s": m["estimacion"].get("tok_s")} for m in ranking[:8]]
-    if req.perfil == "tutor":
-        rec["cambios"] = _diferencias(_config_tutor(), _propuesta_tutor(rec))
-    else:
-        previo = recursos_almacen().aplicado(req.perfil) or {}
-        actual = {"modelo": previo.get("modelo"), **(previo.get("opciones") or {})}
-        rec["cambios"] = _diferencias(actual, {"modelo": rec["modelo"], **rec["opciones"]})
-    rec["aplicado"] = recursos_almacen().aplicado(req.perfil)
-    rec["gpu_ocupada"] = _gpu_ocupada()
-    return rec
-
-
-class RecursosAplicarRequest(BaseModel):
-    modelo: str
-    perfil: str = "tutor"
-    tirador: str = "equilibrado"
-
-
-@app.post("/api/recursos/aplicar")
-def recursos_aplicar(req: RecursosAplicarRequest):
-    """ Aplica la recomendación, guardando lo que había para poder restaurarlo.
-
-    La recomendación se recalcula aquí y no se acepta del cliente: lo aplicado es
-    siempre lo que la calculadora dice para la máquina de ESTE momento.
-    """
-    _perfil_valido(req.perfil, req.tirador)
-    g = recursos_gestor()
-    try:
-        rec = g.recomendar(req.modelo, req.perfil, req.tirador)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    if rec["veredicto"] == "no_viable":
-        raise HTTPException(status_code=409, detail=rec["motivo"])
-    if req.perfil == "tutor":
-        actual = _config_tutor()
-        propuesta = _propuesta_tutor(rec)
-        cambios = _diferencias(actual, propuesta)
-        recursos_almacen().registrar_aplicado("tutor", rec["modelo"], rec["opciones"], actual)
-        ai_engine.update_config({k: v for k, v in propuesta.items() if v is not None})
-    else:
-        previo = recursos_almacen().aplicado(req.perfil) or {}
-        cambios = _diferencias({"modelo": previo.get("modelo"), **(previo.get("opciones") or {})},
-                               {"modelo": rec["modelo"], **rec["opciones"]})
-        recursos_almacen().registrar_aplicado(req.perfil, rec["modelo"], rec["opciones"], {})
-    return {"ok": True, "cambios": cambios, "recomendacion": rec,
-            "config": ai_engine.get_config()}
-
-
-class RecursosPerfilRequest(BaseModel):
-    perfil: str = "tutor"
-
-
-@app.post("/api/recursos/restaurar")
-def recursos_restaurar(req: RecursosPerfilRequest):
-    _perfil_valido(req.perfil)
-    anterior = recursos_almacen().quitar_aplicado(req.perfil)
-    if anterior is None:
-        raise HTTPException(status_code=404, detail="No hay nada aplicado que restaurar.")
-    if req.perfil == "tutor" and anterior:
-        ai_engine.update_config({k: v for k, v in anterior.items() if v is not None})
-    return {"ok": True, "restaurado": anterior, "config": ai_engine.get_config()}
-
-
-class RecursosProbarRequest(BaseModel):
-    modelo: str
-    perfil: str = "tutor"
-    tirador: str = "equilibrado"
-    forzar: bool = False
-
-
-@app.post("/api/recursos/probar")
-def recursos_probar(req: RecursosProbarRequest):
-    """ Prueba real y corta de la recomendación; guarda lo medido """
-    _perfil_valido(req.perfil, req.tirador)
-    if _gpu_ocupada() and not req.forzar:
-        raise HTTPException(status_code=409,
-                            detail="Hay una generación en curso; espera a que termine.")
-    g = recursos_gestor()
-    try:
-        f = g.ficha(req.modelo, red=False)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    if f.get("estimada"):
-        raise HTTPException(status_code=409, detail="Descarga el modelo antes de probarlo.")
-    _recursos_cancelar.clear()
-
-    def trabajo(avisar):
-        maq = g.maquina(fresca=True)
-        r = recursos_cal.probar_recomendacion(f, maq, req.perfil, req.tirador,
-                                              avisar, _recursos_cancelar)
-        huella = maq.radiografia["huella"]
-        guardar = {k: v for k, v in r.items() if k != "recomendacion"}
-        recursos_almacen().guardar_prueba(huella, f["nombre"], req.perfil, guardar)
-        if r.get("deducido"):
-            previa = recursos_almacen().calibracion(huella)
-            recursos_almacen().guardar_calibracion(
-                huella, recursos_cal.combinar(previa, [r["deducido"]]))
-        return guardar
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/recursos/calibrar")
-def recursos_calibrar():
-    if _gpu_ocupada():
-        raise HTTPException(status_code=409,
-                            detail="Hay una generación en curso; espera a que termine.")
-    g = recursos_gestor()
-    _recursos_cancelar.clear()
-
-    def trabajo(avisar):
-        maq = g.maquina(fresca=True)
-        huella = maq.radiografia["huella"]
-        previa = recursos_almacen().calibracion(huella)
-        r = recursos_cal.calibrar(g.fichas_instaladas(), maq, avisar,
-                                  _recursos_cancelar, previa)
-        for p in r.get("pruebas", []):
-            if p.get("ok"):
-                recursos_almacen().guardar_prueba(huella, p["modelo"], "calibracion", p)
-        if r.get("ok"):
-            recursos_almacen().guardar_calibracion(huella, r["valores"],
-                                                   {"pruebas": len(r["pruebas"])})
-            r["maquina"] = g.maquina().resumen()
-        return r
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/recursos/cancelar")
-def recursos_cancelar():
-    _recursos_cancelar.set()
-    return {"ok": True}
-
-
-@app.post("/api/recursos/olvidar-calibracion")
-def recursos_olvidar():
-    recursos_almacen().olvidar_calibracion()
-    return {"ok": True}
-
-
-@app.get("/api/recursos/servidor")
-def recursos_servidor():
-    return recursos_srv.estado()
-
-
-class RecursosServidorRequest(BaseModel):
-    cambios: Dict[str, Optional[str]]
-    reiniciar: bool = True
-    forzar: bool = False
-
-
-@app.post("/api/recursos/servidor")
-def recursos_servidor_aplicar(req: RecursosServidorRequest):
-    if _gpu_ocupada() and req.reiniciar and not req.forzar:
-        raise HTTPException(status_code=409,
-                            detail="Hay una generación en curso: reiniciar Ollama la cortaría.")
-    try:
-        r = recursos_srv.aplicar(req.cambios, ai_engine, req.reiniciar, req.forzar)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    recursos_gestor().radiografia(fresca=True)
-    return r
-
-
-@app.get("/api/recursos/temperaturas")
-def recursos_temperaturas(historial: bool = False):
-    """ Temperaturas de los componentes y estado del gobernador térmico """
-    mon = recursos_termico.monitor()
-    gob = recursos_termico.gobernador()
-    lectura = mon.lectura()
-    datos = {**lectura, "gobernador": gob.estado(),
-             "umbrales": {"gpu_limite": gob.limite, "gpu_reanudar": gob.reanudar,
-                          "cpu_aviso": recursos_termico.CPU_AVISO,
-                          "cpu_alto": recursos_termico.CPU_ALTO}}
-    if historial:
-        datos["historial"] = list(mon.historial)
-    return datos
-
-
-class RecursosTermicoRequest(BaseModel):
-    limite_gpu: Optional[float] = None
-    olvidar: bool = False
-
-
-class RitmoRequest(BaseModel):
-    activo: Optional[bool] = None
-    objetivo_c: Optional[float] = None
-    rampa_s: Optional[float] = None
-    ritmo_minimo: Optional[float] = None
-    tramo_s: Optional[float] = None
-    cpu_eficiente: Optional[bool] = None
-
-
-@app.get("/api/recursos/ritmo")
-def recursos_ritmo():
-    """ Modo suave: ajustes, fracción de trabajo ahora mismo y núcleos de eficiencia """
-    gob = recursos_termico.gobernador()
-    return {**gob.ritmo.estado(gob.monitor.gpu()), "motor": gob.estado_motor()}
-
-
-@app.post("/api/recursos/ritmo")
-def recursos_ritmo_ajustar(req: RitmoRequest):
-    gob = recursos_termico.gobernador()
-    cambios = {k: v for k, v in req.model_dump().items() if v is not None}
-    gob.ritmo.fijar(cambios)
-    gob.aplicar_motor_suave()
-    gob.controlador.paso()
-    if gob.ritmo.activo and gob.ritmo.ajustes.get("cpu_eficiente"):
-        gob.fijador.aplicar(forzar=True)
-    else:
-        gob.fijador.soltar()
-    return {**gob.ritmo.estado(gob.monitor.gpu()), "motor": gob.estado_motor()}
-
-
-# ---------------------------------------------------------------------------
-# Modo frío: modelos en RAM sin calentar la CPU (recursos/frio.py) y energía con root
-# (recursos/energia.py, opcional, siempre con contraseña de administrador)
-# ---------------------------------------------------------------------------
-class FrioRequest(BaseModel):
-    activo: Optional[bool] = None
-    objetivo_c: Optional[float] = None
-
-
-class EnergiaRequest(BaseModel):
-    frio: bool
-    vatios: Optional[int] = None
-
-
-def _frio_estado() -> Dict[str, Any]:
-    from recursos import frio as rfrio, energia as renergia
-    gob = recursos_termico.gobernador()
-    ajustes = {**rfrio.POR_DEFECTO, **recursos_almacen().frio()}
-    try:
-        energia = renergia.estado()
-    except Exception as e:
-        energia = {"error": str(e)}
-    return {"ajustes": ajustes, "control": gob.frio.ultimo or {},
-            "nucleos_eficientes": rfrio.nucleos_eficientes(), "hilos": rfrio.hilos_en_frio(),
-            "energia": energia, "vatios": int(ajustes.get("vatios") or 20)}
-
-
-@app.get("/api/recursos/frio")
-def recursos_frio():
-    return _frio_estado()
-
-
-@app.post("/api/recursos/frio")
-def recursos_frio_ajustar(req: FrioRequest):
-    actual = recursos_almacen().frio()
-    if req.activo is not None:
-        actual["activo"] = bool(req.activo)
-    if req.objetivo_c is not None:
-        actual["objetivo_c"] = max(40.0, min(85.0, float(req.objetivo_c)))
-    recursos_almacen().guardar_frio(actual, "Ajustes del modo frío")
-    recursos_termico.gobernador().frio.paso()
-    return _frio_estado()
-
-
-@app.post("/api/recursos/energia/instalar")
-def recursos_energia_instalar():
-    from recursos import energia as renergia
-    try:
-        renergia.instalar()
-    except renergia.ErrorEnergia as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return _frio_estado()
-
-
-@app.post("/api/recursos/energia")
-def recursos_energia(req: EnergiaRequest):
-    from recursos import energia as renergia
-    try:
-        if req.frio:
-            vatios = int(req.vatios or recursos_almacen().frio().get("vatios") or renergia.VATIOS_POR_DEFECTO)
-            renergia.frio(vatios)
-            actual = recursos_almacen().frio()
-            actual["vatios"] = vatios
-            recursos_almacen().guardar_frio(actual, f"Energía fría: turbo apagado, tope {vatios} W")
-        else:
-            renergia.normal()
-            recursos_almacen().evento("frio", "Energía normal restaurada")
-    except renergia.ErrorEnergia as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return _frio_estado()
-
-
-class MoeRequest(BaseModel):
-    contexto: Optional[str] = None      # "auto" o un número de tokens
-    hilos: Optional[int] = None
-    calientes: Optional[str] = None     # "auto" o un número de expertos por capa
-    modo: Optional[str] = None          # exacto | equilibrado | rapido
-    mtp: Optional[bool] = None
-    nucleo: Optional[str] = None        # q8 (más calidad) | q4 (más rápido)
-    detener: bool = False
-    olvidar_proyectos: bool = False     # borra los proyectos guardados en disco
-    # Caché de estados en disco (docs/plan-texto-primero.md): tope en GB (0 = no se guarda ninguno) y disco libre
-    # que nunca toca
-    cache_gb: Optional[float] = None
-    cache_reserva_gb: Optional[float] = None
-
-
-def _moe_estado() -> Dict[str, Any]:
-    from ai_engine import motor_moe as motor_moe_mod
-    cfg = ai_engine.get_config()
-    return {**ai_engine.motor_moe().estado(),
-            "ajustes": {"contexto": cfg.get("moe_contexto"), "hilos": cfg.get("moe_hilos"),
-                        "calientes": cfg.get("moe_calientes"), "modo": cfg.get("moe_modo"),
-                        "mtp": cfg.get("moe_mtp", True), "nucleo": cfg.get("moe_nucleo"),
-                        "cache_gb": cfg.get("moe_cache_gb"), "cache_reserva_gb": cfg.get("moe_cache_reserva_gb")},
-            "modos": list(motor_moe_mod.MODOS)}
-
-
-@app.get("/api/recursos/moe")
-def recursos_moe():
-    return _moe_estado()
-
-
-@app.post("/api/recursos/moe")
-def recursos_moe_ajustar(req: MoeRequest):
-    """ Los ajustes se aplican en el próximo arranque del motor: «detener» lo para ya """
-    cambios: Dict[str, Any] = {}
-    if req.contexto is not None:
-        from ai_engine import motor_moe as motor_moe_mod
-        valor = str(req.contexto).strip().lower()
-        if valor != "auto":
-            try:
-                valor = max(2048, min(motor_moe_mod.CONTEXTO_MAX, int(valor)))
-            except ValueError:
-                raise HTTPException(status_code=400, detail="contexto: «auto» o un número de tokens")
-        cambios["moe_contexto"] = valor
-    if req.hilos is not None:
-        cambios["moe_hilos"] = max(0, min(16, int(req.hilos)))
-    if req.calientes is not None:
-        valor = str(req.calientes).strip().lower()
-        if valor != "auto":
-            try:
-                valor = max(0, min(128, int(valor)))
-            except ValueError:
-                raise HTTPException(status_code=400, detail="calientes: «auto» o un número")
-        cambios["moe_calientes"] = valor
-    if req.modo is not None:
-        from ai_engine import motor_moe as motor_moe_mod
-        if req.modo not in motor_moe_mod.MODOS:
-            raise HTTPException(status_code=400, detail=f"modo: uno de {', '.join(motor_moe_mod.MODOS)}")
-        cambios["moe_modo"] = req.modo
-    if req.mtp is not None:
-        cambios["moe_mtp"] = bool(req.mtp)
-    if req.nucleo is not None:
-        from ai_engine import motor_moe as motor_moe_mod
-        if req.nucleo not in motor_moe_mod.NUCLEOS:
-            raise HTTPException(status_code=400, detail="nucleo: q8 o q4")
-        cambios["moe_nucleo"] = req.nucleo
-    if req.cache_gb is not None:
-        if not 0 <= float(req.cache_gb) <= 2000:
-            raise HTTPException(status_code=400, detail="cache_gb: entre 0 y 2000 GB (0 = no guardar)")
-        cambios["moe_cache_gb"] = float(req.cache_gb)
-    if req.cache_reserva_gb is not None:
-        if not 0 <= float(req.cache_reserva_gb) <= 1000:
-            raise HTTPException(status_code=400, detail="cache_reserva_gb: entre 0 y 1000 GB")
-        cambios["moe_cache_reserva_gb"] = float(req.cache_reserva_gb)
-    if cambios:
-        ai_engine.update_config(cambios)
-    if req.cache_gb is not None or req.cache_reserva_gb is not None:
-        try:
-            ai_engine.motor_moe().podar()            # el tope nuevo se aplica ya, no en el próximo guardado
-        except Exception:
-            pass
-    if req.detener:
-        ai_engine.motor_moe().detener()
-    if req.olvidar_proyectos:
-        ai_engine.motor_moe().olvidar_proyectos()
-    return _moe_estado()
-
-
-@app.post("/api/recursos/termico")
-def recursos_termico_ajustar(req: RecursosTermicoRequest):
-    gob = recursos_termico.gobernador()
-    try:
-        if req.limite_gpu is not None:
-            gob.fijar_limite(req.limite_gpu)
-        if req.olvidar:
-            gob.olvidar()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return gob.estado()
-
-
-@app.get("/api/recursos/eventos")
-def recursos_eventos(limite: int = 50):
-    return {"eventos": recursos_almacen().eventos(max(1, min(limite, 200)))}
+# Temperaturas y gobernador, modo suave (ritmo), modo frío, energía, eventos y el motor MoE: los sirve el servidor de
+# Rust, dueño de los controladores (backend-rust/crates/prig-server/src/routes/recursos.rs y moe.rs; prig_ia::vivo)
 
 
 # ===========================================================================
@@ -7557,6 +7126,31 @@ def limpiar_memoria_cerebro():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+class EjecutarPensamientoProyectoRequest(BaseModel):
+    carpeta: Optional[str] = ""
+    tema_id: Optional[str] = "tema_mecha_patrol"
+    modelo: Optional[str] = None
+    endpoint: Optional[str] = None
+
+@app.post("/api/llm/ejecutar_pensamiento_proyecto")
+def ejecutar_pensamiento_proyecto_endpoint(req: EjecutarPensamientoProyectoRequest):
+    """
+    Ejecuta el razonamiento y pensamiento del personaje temático sobre la carpeta
+    o proyecto y lo materializa en un archivo markdown estructurado en el disco.
+    """
+    try:
+        res = director_llm.ejecutar_pensamiento_en_archivo(
+            carpeta=req.carpeta,
+            tema_id=req.tema_id or "tema_mecha_patrol",
+            modelo_personalizado=req.modelo,
+            endpoint_personalizado=req.endpoint
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error ejecutando pensamiento del proyecto: {e}", exc_info=True)
+        return {"ok": False, "error": str(e)}
+
+
 
 # ============================================================================
 # API MOTOR DE APRENDIZAJE POR GRAFO DE NODOS (YouTube, GitHub, Kaggle, Prig Hub)
@@ -7647,8 +7241,70 @@ def obtener_estadisticas_aprendizaje():
 
 
 
+# ===========================================================================
+# Módulo SQL Studio (Compatibilidad y fallback Python con dialecto MySQL)
+# El motor principal de alto rendimiento reside en Rust (backend-rust/crates/prig-server/src/routes/sql.rs)
+# ===========================================================================
+import sql_service
+
+class SQLQueryRequest(BaseModel):
+    db: Optional[str] = None
+    sql: str = ""
+
+class SQLCrearDbRequest(BaseModel):
+    nombre: str
+
+@app.get("/api/sql/databases")
+def sql_databases():
+    try:
+        return {"success": True, "databases": sql_service.listar_bases_datos()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/sql/databases/create")
+def sql_databases_create(req: SQLCrearDbRequest):
+    try:
+        return sql_service.crear_base_datos(req.nombre)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/sql/tables")
+def sql_tables(db: Optional[str] = Query(None)):
+    try:
+        db_name = db or "mysql_prig"
+        tablas = sql_service.listar_tablas(db_name)
+        return {"success": True, "database": db_name, "tables": tablas, "total": len(tablas)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/sql/schema")
+def sql_schema(db: Optional[str] = Query(None), table: Optional[str] = Query(None)):
+    if not table:
+        raise HTTPException(status_code=400, detail="Parámetro 'table' es requerido")
+    try:
+        db_name = db or "mysql_prig"
+        return sql_service.obtener_esquema(db_name, table)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/sql/query")
+def sql_query(req: SQLQueryRequest):
+    try:
+        return sql_service.ejecutar_consulta(req.db, req.sql)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/sql/seed")
+def sql_seed(req: Optional[SQLQueryRequest] = None):
+    db_name = req.db if (req and req.db) else "mysql_prig"
+    try:
+        return sql_service.sembrar_datos_ejemplo(db_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Serve frontend static assets
+
 
 
 if os.path.exists(frontend_dir):

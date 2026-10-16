@@ -23,7 +23,6 @@ import os
 import re
 import sys
 import time
-import unicodedata
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -136,8 +135,13 @@ TEMAS_GENERICOS = {"python", "introduccion", "datasets", "prediccion", "texto", 
 
 # ---------------------------------------------------------------------------------------------- lectura
 def _normalizar(texto: str) -> str:
-    t = unicodedata.normalize("NFKD", (texto or "").lower())
-    return "".join(ch for ch in t if not unicodedata.combining(ch))
+    """ Minúsculas, NFKD y sin marcas combinantes (en Rust: prig_nativo.referencias) """
+    return _rs().normalizar(texto or "")
+
+
+def _rs():
+    from nativo_rust import rust
+    return rust().referencias
 
 
 _cache: Dict[str, Any] = {"mtime": None, "datos": None}
@@ -185,51 +189,29 @@ def _texto_busqueda(r: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------------------------- para el chat
 def _aparece(clave: str, texto: str) -> bool:
     # admite el plural («transformer» encuentra «transformers», «red neuronal» no encuentra «redes»)
-    return re.search(r"(?<![a-z0-9])" + re.escape(clave) + r"(?:s|es)?(?![a-z0-9])", texto) is not None
+    return _rs().aparece(clave, texto)
+
+
+_indice: Dict[str, Any] = {"datos": None, "catalogo": None}
+
+
+def _catalogo(datos: Dict[str, Any]):
+    """ El índice en Rust del catálogo cargado (se rehace cuando cargar() relee el archivo) """
+    if _indice["datos"] is not datos:
+        refs = [(r.get("estado") == "caido", list(r.get("categorias", [])), list(r.get("temas", [])),
+                 r.get("titulo", ""), r.get("tipo")) for r in datos["referencias"]]
+        _indice.update(datos=datos, catalogo=_rs().Catalogo([(c["id"], list(c["claves"])) for c in CATEGORIAS], refs,
+                                                            set(TEMAS_GENERICOS)))
+    return _indice["catalogo"]
 
 
 def relacionadas(texto: str, maximo: int = 5) -> List[Dict[str, Any]]:
     """ Las referencias que vienen al caso de una pregunta o un texto: por los temas de la pregunta
     (claves de cada familia) y por coincidencias con el título o los temas de cada referencia.
     Prioriza formularios y libros (lo que sirve para estudiar) y luego los papers fundacionales. """
-    t = _normalizar(texto)
-    if len(t) < 3:
-        return []
-    puntos_cat: Dict[str, float] = {}
-    for c in CATEGORIAS:
-        n = sum(1 + 0.2 * len(k.split()) for k in c["claves"] if _aparece(k, t))
-        if n:
-            puntos_cat[c["id"]] = n
-    candidatas: List[Tuple[float, Dict[str, Any]]] = []
-    peso_tipo = {"formulario": 1.2, "libro": 1.5, "apuntes": 1.0, "survey": 1.1, "paper": 0.8, "articulo": 0.6,
-                 "documentacion": 0.4}
-    for r in cargar()["referencias"]:
-        if r.get("estado") == "caido":
-            continue
-        p = sum(puntos_cat.get(c, 0) * (1.0 if i == 0 else 0.5) for i, c in enumerate(r.get("categorias", [])))
-        temas = [_normalizar(x) for x in r.get("temas", []) if _normalizar(x) not in TEMAS_GENERICOS]
-        propios = sum(2.5 for x in temas if len(x) > 2 and _aparece(x, t))
-        titulo = _normalizar(r.get("titulo", ""))
-        # el nombre del paper o del libro en la pregunta («attention is all you need», «xgboost»)
-        if len(titulo) > 8 and titulo in t:
-            propios += 6
-        if not p and not propios:
-            continue
-        candidatas.append((p + propios + peso_tipo.get(r.get("tipo"), 0.5) * (1 if p else 0), r))
-    candidatas.sort(key=lambda x: -x[0])
-    elegidas: List[Dict[str, Any]] = []
-    por_tipo: Dict[str, int] = {}
-    for puntos, r in candidatas:
-        if puntos < 2.0:
-            break
-        # variedad: no cinco papers del mismo tema
-        if por_tipo.get(r.get("tipo"), 0) >= 2:
-            continue
-        por_tipo[r.get("tipo")] = por_tipo.get(r.get("tipo"), 0) + 1
-        elegidas.append(r)
-        if len(elegidas) >= maximo:
-            break
-    return elegidas
+    datos = cargar()
+    refs = datos["referencias"]
+    return [refs[i] for i in _catalogo(datos).relacionadas(texto or "", maximo)]
 
 
 def cita_corta(r: Dict[str, Any]) -> str:

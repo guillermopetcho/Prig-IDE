@@ -20,6 +20,10 @@ VIEWABLE_EXTENSIONS = {
     'json', 'html', 'css', 'cpp', 'c', 'csv', 'tsv', 'parquet',
 }
 
+# Carpetas de la raíz que son de Prig, no del usuario: las citas, los trabajos exportados, el analista de librerías y
+# los paquetes de conocimiento. Se colaban en la lista como si fueran proyectos («citas», «jobs»...).
+INFRAESTRUCTURA = {"metadata", ".index", "citas", "jobs", "librerias", "packs"}
+
 # Subconjunto que el motor de conocimiento sabe fragmentar e indexar
 INDEXABLE_EXTENSIONS = {'pdf', 'md', 'txt', 'rst', 'ipynb', 'py', 'js', 'sql'}
 
@@ -32,6 +36,37 @@ CATEGORIES = {
     "datasets": {"name": "DATASETS", "label": "Datasets & Datos", "icon": "fa-database"},
     "projects": {"name": "PROJECTS", "label": "Proyectos & Repositorios", "icon": "fa-folder-tree"}
 }
+
+def rutas_ocultas(books_dir: str) -> List[str]:
+    """ Lo que el usuario quitó de la biblioteca (`.index/ocultos.json`, lo escribe el servidor de Rust). Quitar no
+    borra el archivo: deja de verse y de indexarse hasta que se vuelve a poner. """
+    try:
+        with open(os.path.join(books_dir, ".index", "ocultos.json"), "r", encoding="utf-8") as f:
+            datos = json.load(f)
+        return [o["ruta"] for o in datos.get("ocultos", []) if isinstance(o, dict) and isinstance(o.get("ruta"), str)]
+    except Exception:
+        return []
+
+
+def esta_oculto(ruta: str, ocultos: List[str]) -> bool:
+    """ ¿Está quitado `ruta` o una carpeta que lo contiene? """
+    return any(ruta == o or ruta.startswith(o.rstrip("/") + "/") for o in ocultos)
+
+
+def volver_a_mostrar(books_dir: str, ruta: str) -> None:
+    """ Importar de nuevo algo quitado lo vuelve a poner en la biblioteca """
+    archivo = os.path.join(books_dir, ".index", "ocultos.json")
+    try:
+        with open(archivo, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+        antes = datos.get("ocultos", [])
+        datos["ocultos"] = [o for o in antes if not (isinstance(o, dict) and o.get("ruta") == ruta)]
+        if len(datos["ocultos"]) != len(antes):
+            with open(archivo, "w", encoding="utf-8") as f:
+                json.dump(datos, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
 
 class BookService:
     def __init__(self, books_dir: str = None):
@@ -169,6 +204,7 @@ class BookService:
                 scan_dirs.append((os.path.join(self.books_dir, cat), cat))
 
         seen_paths = set()
+        ocultos = rutas_ocultas(self.books_dir)
 
         for sdir, cat_name in scan_dirs:
             if not os.path.isdir(sdir):
@@ -183,7 +219,7 @@ class BookService:
                 fpath = os.path.join(sdir, fname)
                 # .index guarda el catálogo SQLite y metadata los JSON del
                 # analizador: son infraestructura, no elementos de la biblioteca.
-                if fname in ("metadata", ".index") or fname.startswith(".") or fpath in seen_paths:
+                if fname == "metadata" or fname.startswith(".") or fpath in seen_paths or (sdir == self.books_dir and fname in INFRAESTRUCTURA):
                     continue
                 # Las carpetas de categoría son contenedores, no elementos:
                 # aparecían en la lista como si fueran libros llamados "books",
@@ -204,6 +240,8 @@ class BookService:
                     seen_paths.add(fpath)
                     item_category = cat_name or self.detect_category(fpath)
                     size_mb = round(os.path.getsize(fpath) / (1024 * 1024), 2) if not is_dir else 0.0
+                    if esta_oculto(fpath, ocultos):
+                        continue
 
                     meta = self.get_metadata(fpath)
                     # El título nunca puede ser None: el frontend hace
@@ -235,6 +273,8 @@ class BookService:
             for sp in self.get_saved_projects():
                 p_path = sp.get("path") if isinstance(sp, dict) else str(sp)
                 if not p_path or p_path in seen_paths or not os.path.isdir(p_path):
+                    continue
+                if esta_oculto(os.path.abspath(p_path), ocultos):
                     continue
                 seen_paths.add(p_path)
                 p_name = (sp.get("name") if isinstance(sp, dict) else None) or os.path.basename(p_path) or p_path
@@ -365,6 +405,14 @@ class BookService:
 
 
     def extract_pdf_text(self, pdf_path: str, max_pages: int = 25) -> str:
+        from pdf_nativo import lector as _pdfium
+        pdfium = _pdfium()
+        if pdfium is not None:
+            try:
+                return "\n\n".join(f"--- Página {i+1} ---\n{txt}"
+                                     for i, txt in enumerate(pdfium.primeras(pdf_path, max_pages)) if txt)
+            except Exception:
+                pass                    # con pypdf
         if not PYPDF_AVAILABLE:
             return "pypdf no disponible para extracción de PDF."
         try:
@@ -465,6 +513,7 @@ class BookService:
                 else:
                     shutil.copy2(abs_src, dest_path)
 
+            volver_a_mostrar(self.books_dir, os.path.abspath(dest_path))
             size_mb = round(os.path.getsize(dest_path) / (1024 * 1024), 2) if os.path.isfile(dest_path) else 0.0
             ext = os.path.splitext(filename)[1].lower().replace('.', '')
             return {
@@ -572,37 +621,39 @@ class BookService:
             return fallback_meta
 
     def delete_item(self, book_id_or_path: str) -> Dict[str, Any]:
-        """ Elimina un elemento de la biblioteca junto con su ficha de IA """
+        """ Quita un elemento de la biblioteca SIN borrar el archivo: deja de verse y de indexarse.
+
+        Antes hacía rmtree/remove del archivo o la carpeta. La biblioteca es del usuario: quitar algo de la vista no
+        puede costarle su copia. Lo normal es que lo atienda el servidor de Rust (`POST /api/books/delete`), que además
+        deja elegir qué borrar de lo que Prig guardó; esto queda para el modo sin él.
+        """
         fpath = self._resolve_item(book_id_or_path)
         if not fpath:
             return {"error": f"Elemento no encontrado: {book_id_or_path}"}
-
-        # No permitir borrar la raíz ni las carpetas de categoría
         if os.path.abspath(fpath) == self.books_dir:
-            return {"error": "No se puede eliminar la raíz de la biblioteca."}
+            return {"error": "No se puede quitar la raíz de la biblioteca."}
         rel = os.path.relpath(fpath, self.books_dir)
         if rel in CATEGORIES:
-            return {"error": f"'{rel}' es una carpeta de categoría y no puede eliminarse."}
+            return {"error": f"'{rel}' es una carpeta de categoría y no puede quitarse."}
 
-        key = self._metadata_key(fpath)
-
+        archivo = os.path.join(self.books_dir, ".index", "ocultos.json")
         try:
-            if os.path.isdir(fpath):
-                shutil.rmtree(fpath)
-            else:
-                os.remove(fpath)
+            with open(archivo, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+        except Exception:
+            datos = {"version": 1, "ocultos": []}
+        ruta = os.path.abspath(fpath)
+        lista = [o for o in datos.get("ocultos", []) if not (isinstance(o, dict) and o.get("ruta") == ruta)]
+        lista.append({"ruta": ruta, "titulo": (self.get_metadata(fpath) or {}).get("title") or self._fallback_title(os.path.basename(fpath)),
+                      "categoria": rel.split(os.sep)[0] if os.sep in rel else self.detect_category(fpath),
+                      "proyecto": not ruta.startswith(self.books_dir + os.sep), "quitado_en": datetime.now().isoformat()})
+        datos["ocultos"] = lista
+        try:
+            os.makedirs(os.path.dirname(archivo), exist_ok=True)
+            with open(archivo, "w", encoding="utf-8") as f:
+                json.dump(datos, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            return {"error": f"No se pudo eliminar: {e}"}
-
-        # Retirar también la ficha de IA (nueva y antigua) para no dejar huérfanos
-        for name in filter(None, [f"{key}.json" if key else None, f"{os.path.basename(fpath)}.json"]):
-            meta_file = os.path.join(self.metadata_dir, name)
-            if os.path.exists(meta_file):
-                try:
-                    os.remove(meta_file)
-                except Exception:
-                    pass
-
+            return {"error": f"No se pudo quitar: {e}"}
         return {"success": True, "path": fpath, "relative_path": rel}
 
     def save_snippet(self, book_id: str, page: int, box: dict, text: str, label: str) -> Dict[str, Any]:
@@ -681,12 +732,34 @@ class BookService:
             except Exception as e:
                 return {"error": f"Error leyendo documento: {str(e)}"}
 
-        if not PYPDF_AVAILABLE:
+        # Las páginas: con PDFium (pdf_nativo, Rust) si está; si no, con pypdf
+        from pdf_nativo import lector as _pdfium
+        pdfium = _pdfium()
+        reader = None
+        if pdfium is not None:
+            try:
+                total_pages = pdfium.num_paginas(fpath)
+                texto_de = lambda i: pdfium.pagina(fpath, i)  # noqa: E731
+                primeras = lambda n: pdfium.primeras(fpath, n)  # noqa: E731
+            except Exception:
+                pdfium = None
+        if pdfium is None and not PYPDF_AVAILABLE:
             return {"error": "pypdf no está instalado en el entorno. No se puede leer el PDF página por página."}
 
         try:
-            reader = pypdf.PdfReader(fpath)
-            total_pages = len(reader.pages)
+            if pdfium is None:
+                reader = pypdf.PdfReader(fpath)
+                total_pages = len(reader.pages)
+                texto_de = lambda i: reader.pages[i].extract_text() or ""  # noqa: E731
+
+                def primeras(n):
+                    salida = []
+                    for i in range(n):
+                        try:
+                            salida.append(reader.pages[i].extract_text() or "")
+                        except Exception:
+                            salida.append("")
+                    return salida
             if total_pages == 0:
                 return {"error": "El archivo PDF no contiene páginas legibles."}
 
@@ -706,18 +779,21 @@ class BookService:
 
             if not page_text:
                 try:
-                    raw_text = reader.pages[page_idx - 1].extract_text() or ""
+                    raw_text = texto_de(page_idx - 1) or ""
                     # Limpiar saltos de línea excesivos
                     page_text = raw_text.replace("\r\n", "\n")
                 except Exception as ex:
                     page_text = f"(No se pudo extraer texto de la página {page_idx}: {ex})"
 
             matches = []
-            if search_query and search_query.strip():
+            if search_query and search_query.strip() and pdfium is not None:
+                # En Rust, sobre el texto ya extraído (caché de los últimos libros): buscar no vuelve a leer el PDF
+                matches = [{"page": n, "snippet": t}
+                           for n, t in pdfium.buscar(fpath, search_query.strip().lower(), min(total_pages, 200))]
+            elif search_query and search_query.strip():
                 sq = search_query.strip().lower()
-                for i in range(min(total_pages, 200)):
+                for i, p_txt in enumerate(primeras(min(total_pages, 200))):
                     try:
-                        p_txt = reader.pages[i].extract_text() or ""
                         if sq in p_txt.lower():
                             pos = p_txt.lower().find(sq)
                             start = max(0, pos - 40)
@@ -742,7 +818,7 @@ class BookService:
             }
 
         except Exception as e:
-            return {"error": f"Error abriendo PDF con pypdf: {str(e)}"}
+            return {"error": f"Error abriendo PDF: {str(e)}"}
 
     def save_pdf_page_edit(self, book_id: str, page: int, edited_text: str) -> Dict[str, Any]:
         fpath = self._resolve_item(book_id)

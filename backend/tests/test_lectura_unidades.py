@@ -20,8 +20,14 @@ import particion_proyecto as pp
 
 
 class MotorFalso:
+    """ Como el cliente del motor de Rust: lo que hizo con el prefijo se toma una vez """
     def __init__(self):
         self._proyecto_cargado = None
+        self.ultimo_proyecto = {}
+
+    def tomar_ultimo_proyecto(self):
+        p, self.ultimo_proyecto = self.ultimo_proyecto, {}
+        return p
 
 
 class AIFalsa:

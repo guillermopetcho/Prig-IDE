@@ -563,49 +563,8 @@ class PruebaServidor(unittest.TestCase):
             self.assertEqual(env["PATH"], "/usr/bin")
 
 
-class PruebaRecuperacionEnElMotor(_SinSensores):
-
-    def test_generate_response_sobrevive_a_un_oom(self):
-        from ai_engine import AIEngine
-        from recursos import gestor as gestor_mod
-
-        class Res:
-            def __init__(self, codigo, cuerpo=None, lineas=()):
-                self.status_code = codigo
-                self._cuerpo = cuerpo or {}
-                self._lineas = lineas
-
-            def json(self):
-                return self._cuerpo
-
-            def iter_lines(self):
-                return iter(self._lineas)
-
-            def close(self):
-                pass
-
-        enviados = []
-        respuestas = [Res(500, {"error": "llama runner process has terminated: "
-                                         "cudaMalloc failed: out of memory"}),
-                      Res(200, lineas=[json.dumps({"response": "hola", "done": True}).encode()])]
-
-        def post(url, json=None, **kw):
-            enviados.append(json["options"].copy())
-            return respuestas.pop(0)
-
-        motor = AIEngine.__new__(AIEngine)
-        motor.base_url = "http://x"
-        motor.config = {"num_ctx": 4096, "num_gpu": -1, "temperature": 0.3}
-        motor._active_streams, motor._streams_lock = set(), threading.Lock()
-        g = gestor_mod.Gestor()
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post), \
-                mock.patch.object(gestor_mod, "_gestor", g), \
-                mock.patch.object(g, "ficha", return_value=QWEN25_7B):
-            salida = "".join(motor.generate_response("hola", model="qwen2.5-coder:7b"))
-        self.assertEqual(salida, "hola")
-        self.assertEqual(enviados[0]["num_ctx"], 4096)
-        self.assertEqual(enviados[1]["num_ctx"], 2048)
-        self.assertEqual(motor._active_streams, set())
+# La recuperación de una falta de memoria al generar está en Rust: prig-ia/tests/generar.rs
+# (generar_sobrevive_a_una_falta_de_memoria)
 
 
 if __name__ == "__main__":

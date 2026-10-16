@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ollama_opciones as oo
 from ollama_opciones import ConfigModelos, ErrorConfig
+from ollama_gestion import GestorModelos
 
 
 class _Temporal(unittest.TestCase):
@@ -190,200 +191,6 @@ class PruebaMotor(_Temporal):
                                "eval_count": 50, "eval_duration": 1e9, "done_reason": "length"}, 1000)
         self.assertEqual((m["generacion_tok_s"], m["lectura_tok_s"], m["cortada"], m["contexto_usado_pct"]), (50.0, 200.0, True, 15.0))
 
-    def test_generate_response_informa_de_las_metricas(self):
-        motor = _motor()
-        vistas = []
-        final = {"response": "", "done": True, "done_reason": "stop", "eval_count": 2, "eval_duration": 1e8,
-                 "prompt_eval_count": 3, "prompt_eval_duration": 1e7, "total_duration": 2e8, "load_duration": 0}
-        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"response": "hola", "done": False}, final])):
-            texto = "".join(motor.generate_response("x", "m", on_stats=vistas.append))
-        self.assertEqual(texto, "hola")
-        self.assertEqual(vistas[0]["motivo_fin"], "stop")
-
-    def test_chat_eventos_razonamiento_texto_confianza_y_stats(self):
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "thinking"])}
-        enviados = []
-        lineas = [{"message": {"thinking": "pienso"}}, {"message": {"content": "Hola"}, "logprobs": [{"token": "Hola", "logprob": -0.1, "top_logprobs": [{"token": "Hola", "logprob": -0.1}]}]},
-                  {"message": {"content": ""}, "done": True, "done_reason": "length", "eval_count": 1, "eval_duration": 1e8,
-                   "prompt_eval_count": 1, "prompt_eval_duration": 1e7, "total_duration": 1e8, "load_duration": 0}]
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(lineas)
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "hola"}, {"role": "assistant", "content": "Ho"}],
-                                              "m", "tutor", think=True, logprobs=2))
-        tipos = [e["t"] for e in eventos]
-        self.assertEqual(tipos, ["pensando", "texto", "logprobs", "stats"])
-        self.assertTrue(eventos[-1]["v"]["cortada"])
-        self.assertEqual(enviados[0]["messages"][-1], {"role": "assistant", "content": "Ho"})   # continuar
-        self.assertEqual((enviados[0]["think"], enviados[0]["top_logprobs"]), (True, 2))
-
-    def test_chat_eventos_bucle_de_herramientas(self):
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
-        rondas = [
-            [{"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 2, "b": 3}}}]}},
-             {"message": {}, "done": True, "done_reason": "stop"}],
-            [{"message": {"content": "Da 5."}}, {"message": {}, "done": True, "done_reason": "stop"}],
-        ]
-        enviados = []
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(rondas.pop(0))
-
-        class Herr:
-            def definiciones(self):
-                return [{"type": "function", "function": {"name": "sumar"}}]
-
-            def ejecutar(self, nombre, argumentos):
-                return str(argumentos["a"] + argumentos["b"])
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "2+3"}], "m", herramientas=Herr()))
-        self.assertEqual([e["t"] for e in eventos], ["herramienta", "resultado", "texto", "stats"])
-        segunda = enviados[1]["messages"]
-        self.assertEqual(segunda[-1], {"role": "tool", "tool_name": "sumar", "content": "5"})
-        self.assertIn("tool_calls", segunda[-2])
-
-    def test_chat_eventos_tope_de_tokens(self):
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion"])}
-        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"message": {"content": "ok"}, "done": True}])) as p:
-            list(motor.chat_eventos([{"role": "user", "content": "x"}], "m", max_tokens=4096))
-        self.assertEqual(p.call_args.kwargs["json"]["options"]["num_predict"], 4096)
-
-    def test_con_razonamiento_el_tope_supera_al_de_la_configuracion(self):
-        """ num_predict de 4096 en la configuración: sin razonar manda la configuración; con «Pensar», el razonamiento
-        cuenta dentro del tope y con 4096 la respuesta salía vacía (B2 de E8, 2 de 2) """
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "thinking"])}
-        motor.config["num_predict"] = 4096
-        for think, esperado in ((False, 4096), (True, 16384)):
-            with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"message": {"content": "ok"}, "done": True}])) as p:
-                list(motor.chat_eventos([{"role": "user", "content": "x"}], "m", think=think, max_tokens=16384 if think else 4096))
-            self.assertEqual(p.call_args.kwargs["json"]["options"]["num_predict"], esperado)
-
-    def test_chat_eventos_consulta_repetida_no_se_repite_y_termina_respondiendo(self):
-        """ Estudio del banco: una respuesta repitió 4 veces el mismo código fallido y otra agotó 16 rondas sin
-        responder. Una consulta idéntica no se vuelve a ejecutar; a la segunda repetición se le pide que
-        responda (las herramientas siguen en la petición: quitarlas cambia el prefijo guardado del motor MoE) """
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
-        llamada = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 2, "b": 3}}}]}}
-        fin = {"message": {}, "done": True, "done_reason": "stop"}
-        rondas = [[llamada, fin], [llamada, fin], [llamada, fin], [{"message": {"content": "Da 5."}}, fin]]
-        enviados, ejecutadas = [], []
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(rondas.pop(0))
-
-        class Herr:
-            def definiciones(self):
-                return [{"type": "function", "function": {"name": "sumar"}}]
-
-            def ejecutar(self, nombre, argumentos):
-                ejecutadas.append(argumentos)
-                return str(argumentos["a"] + argumentos["b"])
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "2+3"}], "m", herramientas=Herr(), max_rondas=9))
-        self.assertEqual(len(ejecutadas), 1)                                      # las repetidas no se ejecutan
-        resultados = [e["v"] for e in eventos if e["t"] == "resultado"]
-        self.assertEqual(resultados[0], "5")
-        self.assertTrue(all("Ya hiciste exactamente esta consulta" in r for r in resultados[1:]))
-        self.assertEqual(enviados[-1]["tools"], enviados[0]["tools"])            # el mismo prefijo: no relee nada
-        self.assertIn("No hay más consultas", enviados[-1]["messages"][-1]["content"])
-        self.assertEqual([e["v"] for e in eventos if e["t"] == "texto"], ["Da 5."])
-
-    def test_chat_eventos_la_ultima_ronda_responde(self):
-        """ En la última ronda se le pide responder con las herramientas todavía en la petición (T7: sacarlas hacía
-        que el motor MoE releyera la unidad guardada, 26 s, y guardara otro estado de 246 MB) """
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
-        fin = {"message": {}, "done": True, "done_reason": "stop"}
-        rondas = [[{"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 1, "b": 1}}}]}}, fin],
-                  [{"message": {"content": "Da 2."}}, fin]]
-        enviados = []
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(rondas.pop(0))
-        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "sumar"}}],
-                         ejecutar=lambda n, a: "2")
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "1+1"}], "m", herramientas=herr, max_rondas=2))
-        self.assertIn("tools", enviados[0])
-        self.assertEqual(enviados[1]["tools"], enviados[0]["tools"])
-        self.assertIn("No hay más consultas", enviados[1]["messages"][-1]["content"])
-        self.assertIn("Da 2.", [e.get("v") for e in eventos])
-
-    def test_chat_eventos_si_en_la_ultima_ronda_consulta_igual(self):
-        """ Si en la última ronda pide otra consulta en vez de responder: no se ejecuta y hay una ronda más, esa sí
-        sin herramientas (el único caso en que cambia el prefijo) """
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
-        fin = {"message": {}, "done": True, "done_reason": "stop"}
-        llamada = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 1, "b": 1}}}]}}
-        otra = {"message": {"content": "", "tool_calls": [{"function": {"name": "sumar", "arguments": {"a": 5, "b": 5}}}]}}
-        rondas = [[llamada, fin], [otra, fin], [{"message": {"content": "Da 2."}}, fin]]
-        enviados, ejecutadas = [], []
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(rondas.pop(0))
-        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "sumar"}}],
-                         ejecutar=lambda n, a: ejecutadas.append(a) or "2")
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "1+1"}], "m", herramientas=herr, max_rondas=2))
-        self.assertEqual(ejecutadas, [{"a": 1, "b": 1}])                          # la de la última ronda, no
-        self.assertEqual(len(enviados), 3)
-        self.assertIn("tools", enviados[1])
-        self.assertNotIn("tools", enviados[2])
-        self.assertEqual([e["v"] for e in eventos if e["t"] == "texto"], ["Da 2."])
-        self.assertFalse(any(e["t"] == "herramienta" and e["argumentos"] == {"a": 5, "b": 5} for e in eventos))
-        self.assertNotIn("Se alcanzó el máximo", " ".join(str(e.get("v")) for e in eventos))
-
-    def test_chat_eventos_corta_un_bucle_de_texto_y_pide_la_conclusion(self):
-        """ Revisando una función, una respuesta repitió el mismo párrafo hasta el tope (B2 de E8): se corta al
-        repetirse y se le pide la conclusión, con las herramientas todavía en la petición """
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion", "tools"])}
-        parrafo = ("Espera, creo que el error está en la línea 96. Cuando se cierra una sub-pieza intermedia se usa "
-                   "`nombres if primero else []`, pero `nombres` es la lista del tramo original, así que esto es correcto. ")
-        enbucle = [{"message": {"content": "Reviso. "}}] + [{"message": {"content": parrafo}} for _ in range(40)] + \
-                  [{"message": {}, "done": True, "done_reason": "length"}]
-        rondas = [enbucle, [{"message": {"content": "Conclusión: la línea 97 pierde una línea."}},
-                            {"message": {}, "done": True, "done_reason": "stop"}]]
-        enviados = []
-
-        def post(url, json=None, **kw):
-            enviados.append(json)
-            return Res(rondas.pop(0))
-        herr = mock.Mock(definiciones=lambda: [{"type": "function", "function": {"name": "consola"}}], ejecutar=lambda n, a: "")
-        with mock.patch("ai_engine.ai_engine_class.requests.post", side_effect=post):
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "¿Tiene algún error?"}], "m", herramientas=herr, max_rondas=9))
-        textos = "".join(e["v"] for e in eventos if e["t"] == "texto")
-        self.assertLess(textos.count("Espera, creo"), 10)                         # se cortó, no llegó a las 40
-        self.assertIn("Conclusión: la línea 97", textos)
-        segunda = enviados[1]["messages"]
-        from ai_engine.ai_engine_class import SALIR_DEL_BUCLE, corte_de_bucle
-        self.assertEqual(segunda[-1]["content"], SALIR_DEL_BUCLE)
-        self.assertEqual(segunda[-2]["role"], "assistant")
-        self.assertLessEqual(segunda[-2]["content"].count("Espera, creo"), 2)     # sin el bucle
-        self.assertEqual(enviados[1]["tools"], enviados[0]["tools"])              # el mismo prefijo
-        self.assertIsNone(corte_de_bucle(parrafo * 2 + "Fin."))                   # repetir una vez no es un bucle
-
-    def test_herramientas_a_modelo_sin_capacidad(self):
-        motor = _motor()
-        motor._caps_cache = {"m": (1e18, ["completion"])}
-        with mock.patch("ai_engine.ai_engine_class.requests.post", return_value=Res([{"message": {"content": "ok"}, "done": True}])) as p:
-            eventos = list(motor.chat_eventos([{"role": "user", "content": "x"}], "m", herramientas=mock.Mock(definiciones=lambda: [{}])))
-        self.assertEqual(eventos[0]["t"], "aviso")
-        self.assertNotIn("tools", p.call_args.kwargs["json"])
-
-
 # ===========================================================================
 class PruebaHerramientas(unittest.TestCase):
 
@@ -426,10 +233,54 @@ class PruebaHerramientas(unittest.TestCase):
 
 
 # ===========================================================================
+class OllamaFalso:
+    """ Un servidor HTTP local que hace de Ollama (y del registro): `responder(método, ruta, cuerpo)` da
+    (código, cuerpo). Nunca el Ollama del usuario. """
+
+    def __init__(self, responder):
+        import http.server
+        import threading
+
+        class Manejador(http.server.BaseHTTPRequestHandler):
+            def _atender(self):
+                if self.headers.get("Transfer-Encoding", "").lower() == "chunked":
+                    cuerpo = b""
+                    while True:
+                        n = int(self.rfile.readline().strip(), 16)
+                        if n == 0:
+                            self.rfile.readline()
+                            break
+                        cuerpo += self.rfile.read(n)
+                        self.rfile.readline()
+                else:
+                    cuerpo = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                codigo, salida = responder(self.command, self.path, cuerpo)
+                self.send_response(codigo)
+                self.send_header("Content-Length", str(len(salida)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(salida)
+
+            do_GET = do_POST = do_HEAD = do_DELETE = _atender
+
+            def log_message(self, *a):
+                pass
+
+        self.servidor = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        self.hilo = threading.Thread(target=self.servidor.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.hilo.start()
+        return f"http://127.0.0.1:{self.servidor.server_address[1]}"
+
+    def __exit__(self, *a):
+        self.servidor.shutdown()
+        self.servidor.server_close()
+
+
 class PruebaGestion(unittest.TestCase):
 
     def setUp(self):
-        from ollama_gestion import GestorModelos
         self.g = GestorModelos("http://x")
         self.tmp = tempfile.mkdtemp(prefix="prig_gestion_")
 
@@ -462,25 +313,19 @@ class PruebaGestion(unittest.TestCase):
         digest = "sha256:" + hashlib.sha256(datos).hexdigest()
         creado = {}
 
-        class R:
-            status_code = 201
-            def json(self): return {}
-        def head(url, **kw):
-            return mock.Mock(status_code=404)
-        def post(url, data=None, json=None, stream=False, **kw):
-            if "/api/blobs/" in url:
-                b"".join(data)
-                creado["subido"] = url.endswith(digest)
-                return R()
-            creado["cuerpo"] = json
-            r = mock.MagicMock(status_code=200)
-            r.__enter__.return_value = r
-            r.iter_lines.return_value = [b'{"status":"success"}']
-            return r
-        with mock.patch("ollama_gestion.requests.head", side_effect=head), \
-                mock.patch("ollama_gestion.requests.post", side_effect=post):
-            eventos = list(self.g.importar_gguf(ruta, "mi-modelo"))
-        self.assertTrue(creado["subido"])
+        def responder(metodo, ruta_http, cuerpo):
+            if metodo == "HEAD" and ruta_http == f"/api/blobs/{digest}":
+                return 404, b""
+            if metodo == "POST" and ruta_http == f"/api/blobs/{digest}":
+                creado["subido"] = cuerpo
+                return 201, b""
+            if metodo == "POST" and ruta_http == "/api/create":
+                creado["cuerpo"] = json.loads(cuerpo)
+                return 200, b'{"status":"success"}\n'
+            return 404, b""
+        with OllamaFalso(responder) as url:
+            eventos = list(GestorModelos(url).importar_gguf(ruta, "mi-modelo"))
+        self.assertEqual(creado["subido"], datos)
         self.assertEqual(creado["cuerpo"]["files"], {"m.gguf": digest})
         self.assertEqual(eventos[-1], {"fase": "listo", "modelo": "mi-modelo"})
 
@@ -495,18 +340,19 @@ class PruebaGestion(unittest.TestCase):
         self.assertEqual(os.listdir(blobs), ["sha256-bbb"])
 
     def test_actualizaciones(self):
+        import ollama_gestion
         manifiesto = b'{"layers": []}'
         local = hashlib.sha256(manifiesto).hexdigest()
         tags = {"models": [{"name": "a:1", "digest": local}, {"name": "b:1", "digest": "otro"}, {"name": "mio:latest", "digest": "x"}]}
 
-        def get(url, **kw):
-            if url.endswith("/api/tags"):
-                return mock.Mock(status_code=200, json=lambda: tags)
-            if "/mio/" in url:
-                return mock.Mock(status_code=404)
-            return mock.Mock(status_code=200, content=manifiesto)
-        with mock.patch("ollama_gestion.requests.get", side_effect=get):
-            estados = {x["modelo"]: x["estado"] for x in self.g.actualizaciones()}
+        def responder(metodo, ruta_http, cuerpo):
+            if ruta_http == "/api/tags":
+                return 200, json.dumps(tags).encode()
+            if "/mio/" in ruta_http:
+                return 404, b""
+            return 200, manifiesto
+        with OllamaFalso(responder) as url, mock.patch.object(ollama_gestion, "REGISTRO", url):
+            estados = {x["modelo"]: x["estado"] for x in GestorModelos(url).actualizaciones()}
         self.assertEqual(estados, {"a:1": "al_dia", "b:1": "actualizable", "mio:latest": "local"})
 
 

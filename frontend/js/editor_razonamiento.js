@@ -1274,6 +1274,12 @@
         }
 
         /** Actualiza el SVG Overlay con flechas curvas y corchetes grandes jerárquicos */
+        /** Vuelve a medir el editor de código (Monaco) tras cambiar el tamaño de la ventana o del panel */
+        _refrescarLayoutMonaco() {
+            const ed = window.editorMgr && window.editorMgr.editor;
+            if (ed && typeof ed.layout === 'function') ed.layout();
+        }
+
         actualizarOverlay() {
             if (typeof requestAnimationFrame === 'undefined') return;
             if (this._timerRedibujado) cancelAnimationFrame(this._timerRedibujado);

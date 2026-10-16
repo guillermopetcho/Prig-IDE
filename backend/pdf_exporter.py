@@ -8,12 +8,6 @@ import pygments
 from pygments.lexers import get_lexer_by_name, guess_lexer, PythonLexer, TextLexer
 from pygments.formatters import HtmlFormatter
 
-# ReportLab imports for direct PDF generation
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted, Table, TableStyle, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 
 class PDFExporter:
     CODE_EXTENSIONS = {
@@ -665,70 +659,12 @@ class PDFExporter:
         theme: str = "light",
         options: Optional[Dict[str, Any]] = None
     ) -> bytes:
-        """ Genera un archivo binario PDF nativo utilizando ReportLab """
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            leftMargin=0.5*inch, rightMargin=0.5*inch,
-            topMargin=0.5*inch, bottomMargin=0.5*inch
-        )
-
-        styles = getSampleStyleSheet()
-
-        title_style = ParagraphStyle(
-            'CoverTitle',
-            parent=styles['Heading1'],
-            fontName='Helvetica-Bold',
-            fontSize=24,
-            leading=28,
-            textColor=colors.HexColor('#0969da'),
-            alignment=1, # Center
-            spaceAfter=12
-        )
-
-        subtitle_style = ParagraphStyle(
-            'CoverSubtitle',
-            parent=styles['Normal'],
-            fontName='Helvetica',
-            fontSize=13,
-            leading=16,
-            textColor=colors.HexColor('#555555'),
-            alignment=1,
-            spaceAfter=24
-        )
-
-        banner_style = ParagraphStyle(
-            'FileBanner',
-            parent=styles['Heading2'],
-            fontName='Helvetica-Bold',
-            fontSize=14,
-            leading=18,
-            textColor=colors.HexColor('#ffffff'),
-            backColor=colors.HexColor('#0969da'),
-            borderPadding=8,
-            spaceBefore=12,
-            spaceAfter=8
-        )
-
-        code_style = ParagraphStyle(
-            'CodeText',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            textColor=colors.HexColor('#1a1a1a')
-        )
-
-        story = []
-
+        """ El PDF de la exportación: lo compone Typst en Rust (prig_nativo.documentos), con el código resaltado """
         abs_folder = os.path.abspath(folder_path)
         folder_name = os.path.basename(abs_folder) or abs_folder
-
-        story.append(Spacer(1, 20))
-        story.append(Paragraph(f"Exportación de Código: {folder_name}", title_style))
-        story.append(Paragraph(f"Generado con Prig IDE | Total archivos: {len(file_paths)}", subtitle_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e1e4e8'), spaceAfter=20))
+        bloques: List[Dict[str, Any]] = [
+            {"tipo": "titulo", "texto": f"Exportación de Código: {folder_name}",
+             "sub": f"Generado con Prig IDE | Total archivos: {len(file_paths)}"}]
 
         from file_manager import FileManager
         fm = FileManager()
@@ -741,7 +677,7 @@ class PDFExporter:
             rel_path = os.path.relpath(fpath, abs_folder)
             ext = os.path.splitext(fname)[1].lower()
 
-            story.append(Paragraph(f"📄 {fname}  ({rel_path})", banner_style))
+            bloques.append({"tipo": "banner", "texto": f"{fname}  ({rel_path})"})
 
             if ext == '.ipynb':
                 try:
@@ -754,28 +690,25 @@ class PDFExporter:
                         c_type = cell.get("type", "code")
                         c_src = cell.get("source", "")
                         c_exec = cell.get("execution_count", None)
-
-                        cell_tag = f"<b>Markdown</b>" if c_type == "markdown" else f"<b>In [{c_exec or idx}]:</b>"
-                        story.append(Paragraph(cell_tag, styles['Normal']))
-
-                        src_lines = c_src.splitlines()
-                        formatted_src = "\n".join(src_lines[:100]) # Prevenir overflows excesivos
-                        story.append(Preformatted(formatted_src, code_style))
-                        story.append(Spacer(1, 6))
-
+                        bloques.append({"tipo": "celda", "texto": "Markdown" if c_type == "markdown" else f"In [{c_exec or idx}]:"})
+                        # Prevenir overflows excesivos
+                        bloques.append({"tipo": "codigo", "texto": "\n".join(c_src.splitlines()[:100]),
+                                        "lenguaje": None if c_type == "markdown" else "python"})
                 except Exception as e:
-                    story.append(Paragraph(f"Error procesando notebook: {e}", styles['Normal']))
+                    bloques.append({"tipo": "nota", "texto": f"Error procesando notebook: {e}"})
             else:
                 try:
                     with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
                         code_content = f.read()
-                    lines = code_content.splitlines()
-                    formatted_code = "\n".join(lines[:300]) # Cap en 300 líneas para el PDF rápido
-                    story.append(Preformatted(formatted_code, code_style))
+                    # Cap en 300 líneas para el PDF rápido
+                    bloques.append({"tipo": "codigo", "texto": "\n".join(code_content.splitlines()[:300]),
+                                    "lenguaje": self.CODE_EXTENSIONS.get(ext)})
                 except Exception as e:
-                    story.append(Paragraph(f"Error procesando archivo: {e}", styles['Normal']))
+                    bloques.append({"tipo": "nota", "texto": f"Error procesando archivo: {e}"})
 
-            story.append(Spacer(1, 15))
+            bloques.append({"tipo": "espacio", "alto": 15})
 
-        doc.build(story)
-        return buffer.getvalue()
+        from nativo_rust import rust
+        documento = {"titulo": f"Exportación de Código: {folder_name}", "estilo": "codigo", "bloques": bloques}
+        datos, _ = rust().documentos.pdf(json.dumps(documento, ensure_ascii=False))
+        return datos

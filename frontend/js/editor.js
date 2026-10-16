@@ -11,6 +11,8 @@ class EditorManager {
         ];
         this._isAutoCommenting = false;
         this._restaurando = false;
+        this.nivelTransparencia = this.obtenerNivelTransparencia();
+        this.fondoTransparente = this.nivelTransparencia > 0;
         this.initMonaco();
     }
 
@@ -63,9 +65,20 @@ class EditorManager {
         this.setupTabDragAndDrop();
         this.pintarVacio();
 
+        // Aplicar transparencia inicial guardada
+        this.aplicarFondoTransparente(this.fondoTransparente);
+
         // Restaurar disposición y sesión de inmediato
         this.restoreLayoutState();
         this.restoreSessionState();
+
+        // Atajo global Alt+T para alternar fondo de código transparente
+        window.addEventListener('keydown', (e) => {
+            if (e.altKey && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                this.alternarFondoTransparente();
+            }
+        });
 
         // Carga diferida o actualización con Monaco si require está presente
         if (typeof require !== 'undefined' && typeof require.config === 'function') {
@@ -83,6 +96,21 @@ class EditorManager {
     _onMonacoAvailable() {
         if (typeof monaco === 'undefined' || !monaco.editor) return;
 
+        // Registrar tema transparente nativo para Monaco
+        monaco.editor.defineTheme('prig-transparent', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#00000000',
+                'editorGutter.background': '#00000000',
+                'editor.lineHighlightBackground': 'rgba(255,255,255,0.04)',
+                'editorLineNumber.foreground': '#7f849c',
+                'editorLineNumber.activeForeground': '#00f0ff',
+                'editorIndentGuide.background': 'rgba(255,255,255,0.06)'
+            }
+        });
+
         if (window.sintaxisMgr) {
             window.sintaxisMgr.aplicar();
         } else {
@@ -91,13 +119,18 @@ class EditorManager {
                 inherit: true,
                 rules: [],
                 colors: {
-                    'editor.background': '#1e1e1e',
+                    'editor.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
+                    'editorGutter.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
                     'editor.lineHighlightBackground': '#2a2d2e',
                     'editorLineNumber.foreground': '#858585',
                     'editorLineNumber.activeForeground': '#cccccc',
                     'editorIndentGuide.background': '#333333'
                 }
             });
+        }
+
+        if (this.fondoTransparente) {
+            this.aplicarFondoTransparente(true);
         }
 
         // Si alguna columna usaba el editor fallback, reemplazarla por Monaco conservando contenido
@@ -351,6 +384,17 @@ class EditorManager {
             currentModel: null,
             focus: () => textarea.focus(),
             layout: () => updateGutter(),
+            // Lo que se aplica antes de que cargue Monaco (preferencias de apariencia y vista): el resto de opciones
+            // no tiene equivalente en una textarea y se ignora
+            updateOptions: (o) => {
+                if (!o) return;
+                if (o.fontSize) wrapper.style.fontSize = `${o.fontSize}px`;
+                if (o.fontFamily) wrapper.style.fontFamily = o.fontFamily;
+                if (o.tabSize) textarea.style.tabSize = String(o.tabSize);
+                if (o.wordWrap) textarea.style.whiteSpace = o.wordWrap === 'on' ? 'pre-wrap' : 'pre';
+                if (o.lineNumbers) gutter.style.display = o.lineNumbers === 'off' ? 'none' : '';
+            },
+            getAction: () => null,
             getValue: () => textarea.value,
             setValue: (val) => {
                 textarea.value = val || '';
@@ -453,7 +497,18 @@ class EditorManager {
             this.setActivePane(colIndex);
         });
 
-        return instance;
+        // Mientras carga Monaco, el resto del IDE llama a métodos de Monaco que una textarea no tiene: los eventos
+        // (on…) devuelven algo que se puede soltar, las consultas (get…) nada, y lo demás no hace nada. Sin esto,
+        // la primera llamada que faltaba cortaba el arranque de su módulo (pasaba en WebKitGTK, que carga Monaco
+        // más tarde).
+        return new Proxy(instance, {
+            get(objetivo, nombre) {
+                if (nombre in objetivo || typeof nombre !== 'string') return objetivo[nombre];
+                if (/^on[A-Z]/.test(nombre)) return () => ({ dispose() {} });
+                if (/^get[A-Z]/.test(nombre)) return () => null;
+                return () => undefined;
+            },
+        });
     }
 
     /** Crea una instancia de Monaco Editor para una columna dada */
@@ -463,7 +518,9 @@ class EditorManager {
         const ed = monaco.editor.create(containerEl, {
             value: '',
             language: 'python',
-            theme: window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'),
+            theme: this.fondoTransparente
+                ? 'prig-transparent'
+                : (window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark')),
             automaticLayout: true,
             fontSize: parseInt(localStorage.getItem('prig_editor_font_size') || '14', 10),
             fontFamily: "'Fira Code', monospace",
@@ -890,7 +947,10 @@ class EditorManager {
             if (col1) { col1.style.flex = 'none'; col1.style.width = `${100 - w0}%`; }
 
             // Si Col 1 no tiene pestañas y Col 0 tiene varias, mover una o clonar la activa para ver 2 códigos
-            if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length > 1) {
+            // (no cuando se abre a propósito un archivo en esa columna: ese archivo la ocupa)
+            if (this._abriendoEnColumna) {
+                // nada
+            } else if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length > 1) {
                 const moverRuta = this.panes[0].tabs[1] || this.panes[0].tabs[this.panes[0].tabs.length - 1];
                 this.moveTabToPane(moverRuta, 0, 1);
             } else if (this.panes[1].tabs.length === 0 && this.panes[0].activePath) {
@@ -1220,7 +1280,12 @@ class EditorManager {
 
         const destCol = targetCol !== null ? targetCol : this.activeCol;
         if (destCol >= this.numColumns) {
-            this.setColumnLayout(destCol + 1, false);
+            this._abriendoEnColumna = true;
+            try {
+                this.setColumnLayout(destCol + 1, false);
+            } finally {
+                this._abriendoEnColumna = false;
+            }
         }
 
         const targetPane = this.panes[destCol];
@@ -1229,7 +1294,13 @@ class EditorManager {
         }
 
         this.setActiveTabInPane(destCol, path);
-        this.setActivePane(destCol);
+        const wrapper = document.getElementById('editor-area-wrapper');
+        if (wrapper) wrapper.style.display = 'flex';
+        const gridEl = document.getElementById('editor-grid-container');
+        if (gridEl) gridEl.style.display = 'flex';
+        const vacio = document.getElementById('editor-vacio');
+        if (vacio) vacio.hidden = true;
+
         this.saveLayoutState();
         this.saveSessionState();
 
@@ -1491,21 +1562,144 @@ class EditorManager {
         }
     }
 
+    /** Nivel de transparencia guardado (0 a 100) */
+    obtenerNivelTransparencia() {
+        const guardado = localStorage.getItem('prig_editor_transparencia');
+        if (guardado !== null) {
+            const num = parseInt(guardado, 10);
+            return isNaN(num) ? 0 : Math.max(0, Math.min(100, num));
+        }
+        return localStorage.getItem('prig_editor_transparente') === '1' ? 100 : 0;
+    }
+
+    /** Indica si el fondo del código tiene algún grado de transparencia */
+    esFondoTransparente() {
+        return (this.nivelTransparencia || 0) > 0;
+    }
+
+    /** Alterna entre 0% y el último valor positivo (o 100%) */
+    alternarFondoTransparente() {
+        if (this.esFondoTransparente()) {
+            this._ultimoNivelPositivo = this.nivelTransparencia;
+            this.establecerNivelTransparencia(0);
+        } else {
+            const restaurar = this._ultimoNivelPositivo && this._ultimoNivelPositivo > 0 ? this._ultimoNivelPositivo : 100;
+            this.establecerNivelTransparencia(restaurar);
+        }
+        if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+            window.layoutMgr.mensajeEstado(
+                this.esFondoTransparente()
+                    ? `Fondo de código: ${this.nivelTransparencia}% de transparencia`
+                    : 'Fondo de código opaco restaurado (0%)',
+                2200
+            );
+        }
+    }
+
+    /** Establece el nivel de transparencia del editor (0 a 100) */
+    establecerNivelTransparencia(porcentaje) {
+        const p = Math.max(0, Math.min(100, parseInt(porcentaje, 10) || 0));
+        this.nivelTransparencia = p;
+        this.fondoTransparente = p > 0;
+        try {
+            localStorage.setItem('prig_editor_transparencia', String(p));
+            localStorage.setItem('prig_editor_transparente', this.fondoTransparente ? '1' : '0');
+        } catch (e) {}
+
+        const alpha = ((100 - p) / 100).toFixed(3);
+        document.documentElement.style.setProperty('--editor-bg-alpha', String(alpha));
+        document.body.classList.toggle('editor-transparente', this.fondoTransparente);
+
+        // Forzar tema transparente o restaurar en Monaco
+        if (typeof monaco !== 'undefined' && monaco.editor) {
+            if (window.sintaxisMgr && typeof window.sintaxisMgr.aplicar === 'function') {
+                window.sintaxisMgr.aplicar();
+            } else {
+                const tema = this.fondoTransparente
+                    ? 'prig-transparent'
+                    : (localStorage.getItem('prig_editor_theme') || 'vs-dark');
+                try {
+                    monaco.editor.setTheme(tema);
+                } catch (e) {}
+            }
+            this.panes.forEach(pane => {
+                if (pane && pane.editor && typeof pane.editor.updateOptions === 'function') {
+                    pane.editor.updateOptions({
+                        theme: this.fondoTransparente
+                            ? (window.sintaxisMgr ? ('prig-custom-syntax-v' + (window.sintaxisMgr._temaVersion || 1)) : 'prig-transparent')
+                            : (window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'))
+                    });
+                }
+            });
+        }
+
+        window.dispatchEvent(new CustomEvent('prig:editor-transparencia-cambiada', {
+            detail: { porcentaje: p, transparente: this.fondoTransparente, alpha: parseFloat(alpha) }
+        }));
+    }
+
+    /** Compatibilidad: aplica fondo transparente con booleano o porcentaje */
+    aplicarFondoTransparente(activo) {
+        if (typeof activo === 'number') {
+            this.establecerNivelTransparencia(activo);
+        } else {
+            this.establecerNivelTransparencia(activo ? (this.nivelTransparencia || 100) : 0);
+        }
+    }
+
+    /** Cierra la vista del editor y vuelve a Inicio o a la vista siguiente */
+    cerrarVistaEditor() {
+        if (this.openTabs.size > 0) {
+            let tieneSucios = false;
+            for (const [p] of this.openTabs) {
+                if (this.isDirty(p)) {
+                    tieneSucios = true;
+                    break;
+                }
+            }
+            if (tieneSucios) {
+                if (!confirm('Hay archivos con cambios sin guardar en el editor.\n\n¿Cerrar el editor de todos modos?')) {
+                    return;
+                }
+            }
+        }
+        if (window.workArea && typeof window.workArea.cerrar === 'function') {
+            window.workArea.cerrar('editor');
+        }
+    }
+
     /** Dibuja el estado vacío cuando no hay archivos abiertos */
     pintarVacio() {
         const vacio = document.getElementById('editor-vacio');
-        if (!vacio) return;
-        const sinArchivos = this.openTabs.size === 0;
-        vacio.hidden = !sinArchivos;
-
+        const wrapper = document.getElementById('editor-area-wrapper');
         const gridEl = document.getElementById('editor-grid-container');
-        if (gridEl) gridEl.style.display = sinArchivos ? 'none' : 'flex';
+        const panelRaz = document.getElementById('editor-panel-razonamiento');
+        const sinArchivos = this.openTabs.size === 0;
 
-        if (!vacio.dataset.conectado) {
+        if (vacio) vacio.hidden = !sinArchivos;
+        // Ocultar el wrapper completo y el panel de razonamiento para que no quede el plano residual de color
+        if (wrapper) wrapper.style.display = sinArchivos ? 'none' : 'flex';
+        if (gridEl) gridEl.style.display = sinArchivos ? 'none' : 'flex';
+        if (panelRaz && sinArchivos) panelRaz.style.display = 'none';
+        else if (panelRaz && !panelRaz.classList.contains('oculto')) panelRaz.style.display = 'flex';
+
+        if (vacio && !vacio.dataset.conectado) {
             vacio.dataset.conectado = '1';
             vacio.addEventListener('click', (e) => {
                 const b = e.target.closest('[data-cmd]');
-                if (b && window.PrigCommands) window.PrigCommands.ejecutar(b.dataset.cmd);
+                if (!b) return;
+                const cmd = b.dataset.cmd;
+                if (cmd === 'editor.cerrar') {
+                    this.cerrarVistaEditor();
+                } else if (cmd === 'herr.inicio') {
+                    if (window.Inicio && typeof window.Inicio.abrir === 'function') {
+                        window.Inicio.abrir();
+                    } else if (window.PrigCommands) {
+                        window.PrigCommands.ejecutar('herr.inicio');
+                    }
+                } else if (window.PrigCommands) {
+                    window.PrigCommands.ejecutar(cmd);
+                }
             });
         }
     }

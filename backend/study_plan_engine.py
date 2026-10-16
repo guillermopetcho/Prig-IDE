@@ -685,7 +685,9 @@ class StudyPlanRepository:
                 if os.path.exists(manifest_path):
                     try:
                         with open(manifest_path, 'r', encoding='utf-8') as f:
-                            plans.append(json.load(f))
+                            manifiesto = json.load(f)
+                        if isinstance(manifiesto, dict):        # otra cosa no es un plan
+                            plans.append(manifiesto)
                     except Exception:
                         pass
             elif item.endswith('.json'):
@@ -703,10 +705,13 @@ class StudyPlanRepository:
                 except Exception:
                     pass
 
-        plans.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+        plans.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
         return plans
 
     def delete_plan(self, plan_id: str) -> bool:
+        # Un id es un nombre suelto: con «..» la carpeta era el espacio de trabajo y rmtree borraba el proyecto entero
+        if not plan_id or plan_id in (".", "..") or "/" in plan_id or "\0" in plan_id:
+            return False
         pdir = os.path.join(self.plans_dir, plan_id)
         if os.path.exists(pdir) and os.path.isdir(pdir):
             shutil.rmtree(pdir)
@@ -814,7 +819,8 @@ class SeguimientoRepository:
                         })
                 except Exception:
                     pass
-        items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        # `or ""`: un seguimiento sin fecha (None) hacía fallar la lista entera al comparar None con texto
+        items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return items
 
     def delete(self, seg_id: str) -> bool:

@@ -5,6 +5,9 @@ from backend.knowledge.indexing.db_catalog import DBCatalog
 from backend.knowledge.ingestion.book_ingestor import BookIngestor
 from backend.ai_engine.reasoning_engine import ReasoningEngine
 
+# Llama al Ollama de verdad (el modelo corre en la GPU, ~100 s): solo cuando se pide expresamente
+@unittest.skipUnless(os.environ.get("PRIG_PRUEBAS_CON_MODELO") == "1",
+                     "usa el modelo real en la GPU: PRIG_PRUEBAS_CON_MODELO=1 para correrla")
 class TestBenchmarkPhase4A(unittest.TestCase):
     def setUp(self):
         self.test_dir = "/tmp/test_prig_benchmark_phase4a"
