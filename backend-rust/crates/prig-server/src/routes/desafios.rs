@@ -77,7 +77,7 @@ pub async fn github_guardados() -> Response {
     json_py(StatusCode::OK, &Valor::Mapa(Mapa::new().con("repos", v)))
 }
 
-fn error_500() -> Response {
+pub(crate) fn error_500() -> Response {
     use axum::response::IntoResponse;
     (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
 }
@@ -87,14 +87,14 @@ fn error_500() -> Response {
 use axum::body::Bytes;
 use crate::routes::cuerpo;
 
-fn error_obtener(e: ErrorObtener) -> Response {
+pub(crate) fn error_obtener(e: ErrorObtener) -> Response {
     match e {
         ErrorObtener::Desafio(t) => detalle(StatusCode::BAD_REQUEST, t),
         ErrorObtener::Otro(_) => error_500(),
     }
 }
 
-fn mapa_de(v: Option<&Valor>) -> Mapa {
+pub(crate) fn mapa_de(v: Option<&Valor>) -> Mapa {
     match v {
         Some(Valor::Mapa(m)) => m.clone(),
         _ => Mapa::new(),
@@ -390,7 +390,7 @@ fn tiene_main(t: &str) -> bool {
 }
 
 /// `comprobar(runner, paginas, privado)` de desafios/ejecucion.py: pasa las pruebas ocultas a las páginas
-fn comprobar(state: &AppState, paginas: &[Mapa], privado: &Mapa, run_id: &str) -> Result<Mapa, ErrorObtener> {
+pub(crate) fn comprobar(state: &AppState, paginas: &[Mapa], privado: &Mapa, run_id: &str) -> Result<Mapa, ErrorObtener> {
     let timeout = 30;
     let vacio = Valor::Mapa(Mapa::new().con("tipo", "ninguna"));
     let c = mapa_de(Some(if privado.verdad("comprobacion") { privado.valor("comprobacion") } else { &vacio }));

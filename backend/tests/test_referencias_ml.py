@@ -146,12 +146,8 @@ class PruebaEndpoints(unittest.TestCase):
         prompt, refs = self.app._con_referencias("resumen de random forest", "PREGUNTA")
         self.assertTrue(prompt.endswith("PREGUNTA") and "REFERENCIAS DE LA BIBLIOTECA" in prompt and refs)
         self.assertEqual(self.app._con_referencias("hola", "PREGUNTA"), ("PREGUNTA", []))
-        mensajes = [{"role": "user", "content": "¿qué es XGBoost?"}, {"role": "assistant", "content": "…"},
-                    {"role": "user", "content": "resume el paper de XGBoost"}]
-        nuevos = self.app._mensajes_con_referencias(mensajes)
-        self.assertIn("arxiv.org/abs/1603.02754", nuevos[-1]["content"])
-        self.assertEqual(nuevos[0]["content"], "¿qué es XGBoost?")      # solo el último mensaje del alumno
-        self.assertEqual(mensajes[-1]["content"], "resume el paper de XGBoost")  # la original no se toca
+        # las referencias delante del último mensaje del alumno (`_mensajes_con_referencias`) están en Rust:
+        # routes/profesor.rs
 
 
 if __name__ == "__main__":

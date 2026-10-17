@@ -514,3 +514,23 @@ pub async fn youtube_traducir(State(state): State<AppState>, b: Bytes) -> Respon
     })
     .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn referencias_solo_en_el_ultimo_mensaje_del_alumno() {
+        let raiz = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.."));
+        let m = |rol: &str, t: &str| Valor::Mapa(Mapa::new().con("role", rol).con("content", t));
+        let mensajes = vec![m("user", "¿qué es XGBoost?"), m("assistant", "…"), m("user", "resume el paper de XGBoost")];
+        let nuevos = mensajes_con_referencias(raiz, &mensajes);
+        let contenido = |v: &Valor| match v {
+            Valor::Mapa(x) => x.valor("content").texto_py(),
+            _ => String::new(),
+        };
+        assert!(contenido(&nuevos[2]).contains("arxiv.org/abs/1603.02754"));
+        assert_eq!(contenido(&nuevos[0]), "¿qué es XGBoost?");
+        assert_eq!(contenido(&mensajes[2]), "resume el paper de XGBoost");
+    }
+}

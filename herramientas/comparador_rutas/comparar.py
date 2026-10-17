@@ -210,6 +210,19 @@ def sembrar_desafios(home: str):
              [{"nombre": "sol.h", "contenido": "inline int doble(int x) { return 2 * x; }\n"}]),
         base("des_aaaaaaaaa6", {"tipo": "asserts", "asserts": ["assert True"]}, py,
              origen={"tipo": "prig-hub", "ref": "ana/Prig-ml#pilas", "version": "1.2"}),
+        # para el tutor: resuelto, con enunciado y teoría, pistas propias, la última comprobación y pruebas internas
+        base("des_aaaaaaaaa7", {"tipo": "asserts", "asserts": ["from sol import doble\nassert doble(2) == 4"]}, py,
+             enunciado="Escribe *doble*.", teoria="La teoría", nivel="avanzado",
+             paginas_usuario=[{"nombre": "sol.py", "contenido": "def doble(x):\n    return x + x\n", "descripcion": "mía"}],
+             ultima_comprobacion={"aprobado": False, "total": 2, "pasados": 1, "fallos": [{"nombre": "t1", "mensaje": "1 != 2"}]},
+             progreso={"estado": "resuelto", "intentos": 2, "pistas": 0},
+             privado={"comprobacion": {"tipo": "asserts", "asserts": ["from sol import doble\nassert doble(2) == 4"]},
+                      "referencia": py, "pistas_fuente": "Piensa en sumar", "pruebas": True}),
+        # con el razonamiento y la traducción ya guardados
+        base("des_aaaaaaaaa8", {"tipo": "ninguna"}, py, enunciado="Write *double*.", enunciado_es="Escribe *doble*.",
+             razonamiento={"pasos": [{"titulo": "a", "contenido": "b"}], "modelo": "m"}),
+        # sin progreso: lo que lo modifica es un 500 en Python
+        {"id": "des_aaaaaaaaa9", "titulo": "sin progreso", "paginas": py, "enunciado": "x"},
     ]
     for x in desafios:
         with open(os.path.join(d, x["id"] + ".json"), "w", encoding="utf-8") as f:
@@ -877,6 +890,15 @@ def ollama_falso() -> str:
                     cr = {"target_agent": "KNOWLEDGE_ARCHITECT", "action": m.group(1), "target": m.group(2), "reason": "Por " + firma} \
                         if m else {"firma": firma}
                     trozos = [json.dumps(cr, ensure_ascii=False)]
+                elif "profesor de RESOLUCIÓN DE PROBLEMAS" in (d.get("system") or ""):
+                    trozos = ["<think>pienso</think>## 1. Qué me piden\nA " + firma + "\n## 2. Ejemplos\n```python\ndef f():\n    pass\n```\n",
+                              "## 3) Partes\n```\nsolo texto\n```\n## 4.\n\n## \nsin título\n"]
+                elif "TUTOR Y EVALUADOR EXPERTO DE PROGRAMACIÓN" in (d.get("system") or ""):
+                    ev = {"aprobado": "falla" not in (d.get("prompt") or ""), "calificacion": 9, "estado": "aprobado",
+                          "resumen": "Bien " + firma, "analisis_salida": "s", "analisis_codigo": "c", "consejos": ["x"]}
+                    trozos = [json.dumps(ev, ensure_ascii=False)]
+                    if "sinjson" in (d.get("prompt") or ""):
+                        trozos = ["Todo ", "correcto " + firma]
                 elif "AGENTE ORGANIZADOR DE TEMAS" in (d.get("system") or ""):
                     # los arreglos de run_topic_organizer: sin título, temas sueltos, tipo raro, bloque que no es dict
                     pedido = d.get("prompt") or ""
@@ -1945,6 +1967,62 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
             ("/api/guided/challenge", {"goal": "SQL", "block": {"topics": []}}),
             ("/api/guided/challenge", {"goal": "SQL", "block": {"topics": "ab"}}),
             ("/api/guided/challenge", {"block": {}}),
+        ]),
+        # el tutor de los desafíos (tanda 43): cada caso deja el desafío como estaba
+        *({"ruta": r, "metodo": "POST", **({"json": j} if j is not None else {}), "restaurar": True, "archivo_json": True,
+           "archivo": "{home}/.prig_desafios/desafios/" + r.split("/")[3] + ".json", "solo_rust": True} for r, j in [
+            ("/api/desafios/des_aaaaaaaaa7/razonamiento", {}),
+            ("/api/desafios/des_aaaaaaaaa8/razonamiento", {"modelo": "qwen3:8b"}),
+            ("/api/desafios/des_aaaaaaaaa8/razonamiento", {"regenerar": True, "modelo": "qwen3:8b"}),
+            ("/api/desafios/des_aaaaaaaaa7/plan", {"plan": "Primero recorro la lista " * 300}),
+            ("/api/desafios/des_aaaaaaaaa1/plan", {"plan": "   "}),
+            ("/api/desafios/des_aaaaaaaaa9/plan", {"plan": "x"}),
+            ("/api/desafios/des_aaaaaaaaa1/plan", {}),
+            ("/api/desafios/des_aaaaaaaaa7/pista", {"nivel": 0}),
+            ("/api/desafios/des_aaaaaaaaa1/pista", {"nivel": 0}),
+            ("/api/desafios/des_aaaaaaaaa7/pista", {"nivel": 2}),
+            ("/api/desafios/des_aaaaaaaaa7/pista", {"nivel": 7, "paginas": [{"nombre": "otra.py", "contenido": "x", "descripcion": 5}]}),
+            ("/api/desafios/des_aaaaaaaaa7/pista", {"nivel": -3}),
+            ("/api/desafios/des_aaaaaaaaa1/pista", {"paginas": [{"nombre": "mal nombre"}]}),
+            ("/api/desafios/des_aaaaaaaaa9/pista", {"nivel": 1}),
+            ("/api/desafios/des_aaaaaaaaa7/pista", {"nivel": "x"}),
+            ("/api/desafios/des_aaaaaaaaa7/reflexion", {}),
+            ("/api/desafios/des_aaaaaaaaa1/reflexion", {}),
+            ("/api/desafios/des_aaaaaaaaa7/traducir", {}),
+            ("/api/desafios/des_aaaaaaaaa8/traducir", {}),
+            ("/api/desafios/des_aaaaaaaaa8/traducir", {"regenerar": True}),
+            ("/api/desafios/des_0000000000/razonamiento", {}),
+            ("/api/desafios/des_0000000000/plan", {"plan": "x"}),
+            ("/api/desafios/des_0000000000/traducir", {}),
+        ]),
+        *({"ruta": r, "metodo": "POST", "json": j, "solo_rust": True} for r, j in [
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "¿qué practico?"}, {"rol": "tutor", "texto": "pilas"},
+                                                 {"role": "user", "content": "redes neuronales"}]}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "no me sale"}], "desafio_id": "des_aaaaaaaaa7"}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario"}] * 14, "desafio_id": "des_aaaaaaaaa1",
+                                    "paginas": [{"nombre": "a.py", "contenido": None}]}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "x"}], "desafio_id": "des_aaaaaaaaa1", "paginas": [{"contenido": "x"}]}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "x"}], "desafio_id": "des_0000000000"}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "x"}], "desafio_id": ""}),
+            ("/api/desafios/chat", {"mensajes": []}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": 1}]}),
+            ("/api/desafios/chat", {"mensajes": [{"rol": "usuario", "texto": "x"}], "modelo": "gemini:flash"}),
+            ("/api/desafios/analizar-propuesta", {"propuesta": "  Un trie para autocompletar  ", "lenguaje": "CPP", "nivel": "senior"}),
+            ("/api/desafios/analizar-propuesta", {"propuesta": "Ordenar", "lenguaje": None, "nivel": ""}),
+            ("/api/desafios/analizar-propuesta", {"propuesta": "  "}),
+            ("/api/desafios/analizar-propuesta", {}),
+            ("/api/desafios/evaluar-salida", {"codigo": "print(1)", "salida": "1\n", "titulo": "Imprime"}),
+            ("/api/desafios/evaluar-salida", {"codigo": "x", "salida": "", "stderr": "Traceback", "exit_code": 1, "enunciado": "sinjson"}),
+            ("/api/desafios/evaluar-salida", {"codigo": "x", "salida": "ok", "enunciado": "sinjson"}),
+            ("/api/desafios/evaluar-salida", {"id": "", "codigo": "x"}),
+            ("/api/desafios/evaluar-salida", {"id": "des_0000000000", "codigo": "x", "nombre_archivo": None}),
+            ("/api/desafios/evaluar-salida", {"id": "des_aaaaaaaaa1", "codigo": "def doble(x):\n    return x\n", "salida": "falla"}),
+            ("/api/desafios/evaluar-salida", {"exit_code": "x"}),
+        ]),
+        *({"ruta": "/api/desafios/evaluar-salida", "metodo": "POST", "json": j, "restaurar": True, "archivo_json": True,
+           "archivo": "{home}/.prig_desafios/desafios/des_aaaaaaaaa7.json", "restaurar_otro": "{proyecto}/.prig_dataset/learning.db", "solo_rust": True} for j in [
+            {"id": "des_aaaaaaaaa7", "codigo": "def doble(x):\n    return 2 * x\n", "nombre_archivo": "sol.py", "salida": "4"},
+            {"id": "des_aaaaaaaaa7", "codigo": "def doble(x):\n    return x\n", "nombre_archivo": "sol.py", "salida": "falla"},
         ]),
         {"ruta": "/api/guided/seg_aaaa0006/generate-notebook", "metodo": "POST", "archivo": "{proyecto}/Ruta__lgebra_seg_aa.ipynb",
          "restaurar": True, "archivo_json": True, "solo_rust": True},

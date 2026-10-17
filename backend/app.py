@@ -458,7 +458,6 @@ def referencias_guardar(req: ReferenciaAccionRequest):
     return res
 
 
-
 # ==========================================
 # ENDPOINTS: APRENDIZAJE GUIADO (rutas unificadas)
 # ==========================================
@@ -1515,16 +1514,6 @@ def _con_referencias(texto_para_buscar: str, prompt: str) -> Tuple[str, List[Dic
         logger.warning(f"Referencias de ML no disponibles: {err}")
         return prompt, []
     return (f"{bloque}\n\n{prompt}" if bloque else prompt), refs
-
-
-def _mensajes_con_referencias(mensajes: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """ Copia de la conversación con las referencias relacionadas delante del último mensaje del alumno """
-    copia = [dict(m) for m in mensajes]
-    for m in reversed(copia):
-        if m.get("role") == "user" and m.get("content"):
-            m["content"] = _con_referencias(m["content"], m["content"])[0]
-            break
-    return copia
 
 
 def _formatear_citas(citas: Optional[List[Dict[str, Any]]] = None, citas_lib: Optional[List[Dict[str, Any]]] = None) -> str:
@@ -2710,52 +2699,8 @@ class DesafioEjecutarRequest(BaseModel):
     pagina: str
 
 
-class DesafioModeloRequest(BaseModel):
-    modelo: Optional[str] = None
-    paginas: List[Dict[str, Any]] = []
-    regenerar: bool = False
-
-
-class DesafioPlanRequest(BaseModel):
-    plan: str
-    modelo: Optional[str] = None
-
-
-class DesafioPistaRequest(BaseModel):
-    nivel: int = 1
-    modelo: Optional[str] = None
-    paginas: List[Dict[str, Any]] = []
-
-
 class DesafioPasosRequest(BaseModel):
     pasos_vistos: int
-
-
-class DesafioChatRequest(BaseModel):
-    mensajes: List[Dict[str, str]]
-    modelo: Optional[str] = None
-    desafio_id: Optional[str] = None
-    paginas: List[Dict[str, Any]] = []
-
-
-class DesafioAnalizarPropuestaRequest(BaseModel):
-    propuesta: str
-    lenguaje: Optional[str] = "python"
-    nivel: Optional[str] = "intermedio"
-    modelo: Optional[str] = None
-
-
-class DesafioEvaluarSalidaRequest(BaseModel):
-    id: Optional[str] = None
-    titulo: Optional[str] = None
-    enunciado: Optional[str] = None
-    lenguaje: Optional[str] = "python"
-    codigo: str = ""
-    nombre_archivo: Optional[str] = "solucion.py"
-    salida: str = ""
-    stderr: Optional[str] = ""
-    exit_code: int = 0
-    modelo: Optional[str] = None
 
 
 class YouTubeAnalisisRequest(BaseModel):
@@ -2918,7 +2863,6 @@ def desafios_github_replicar(req: DesafioReplicarGitHubRequest):
     return _ndjson_en_hilo(trabajo)
 
 
-
 @app.get("/api/desafios/internet/buscar")
 def desafios_buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[str] = None,
                     modelo: Optional[str] = None, ayuda_modelo: bool = False,
@@ -2992,202 +2936,9 @@ def desafios_crear(req: DesafioCrearRequest):
         return AlmacenDesafios.publico(d)
     return _ndjson_en_hilo(trabajo)
 
-@app.post("/api/desafios/{id_}/razonamiento")
-def desafios_razonamiento(id_: str, req: DesafioModeloRequest):
-    """ Caja de razonamiento: se genera una vez y se guarda (NDJSON) """
-    d = _desafio(desafios_almacen.obtener, id_)
-    if d.get("razonamiento") and not req.regenerar:
-        guardado = d["razonamiento"]
 
-        def ya_hecho(avisar):
-            return guardado
-        return _ndjson_en_hilo(ya_hecho)
-    modelo = _modelo_desafios(req.modelo)
-    motor, nombre_modelo = _motor_desafios(modelo)
-
-    def trabajo(avisar):
-        pasos = _consumir(des_tutor.razonamiento(motor, nombre_modelo, d), avisar)
-        if not pasos:
-            raise ErrorDesafio("El modelo no devolvió el razonamiento. Prueba otra vez u otro modelo.")
-        r = {"pasos": pasos, "modelo": modelo}
-
-        def cambio(x):
-            x["razonamiento"] = r
-        desafios_almacen.modificar(id_, cambio)
-        return r
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/{id_}/plan")
-def desafios_plan(id_: str, req: DesafioPlanRequest):
-    d = _desafio(desafios_almacen.obtener, id_)
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-
-    def cambio(x):
-        x["progreso"]["plan"] = req.plan[:5000]
-        AlmacenDesafios.empezar(x)
-    _desafio(desafios_almacen.modificar, id_, cambio)
-
-    def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.revisar_plan(motor, nombre_modelo, d, req.plan), avisar)}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/{id_}/pista")
-def desafios_pista(id_: str, req: DesafioPistaRequest):
-    """ nivel 0: pistas del ejercicio original (si las trae); 1-3: pistas graduadas del modelo """
-    d = _desafio(desafios_almacen.obtener, id_)
-
-    def contar(x):
-        x["progreso"]["pistas"] = max(x["progreso"].get("pistas", 0), req.nivel if req.nivel else 1)
-        AlmacenDesafios.empezar(x)
-    if req.nivel == 0:
-        texto = (d.get("privado") or {}).get("pistas_fuente")
-        if not texto:
-            raise HTTPException(status_code=404, detail="Este desafío no trae pistas propias.")
-        _desafio(desafios_almacen.modificar, id_, contar)
-        return {"titulo": "Pistas del ejercicio original", "texto": texto}
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-    paginas = _desafio(des_ejec.validar_paginas, req.paginas) if req.paginas else (d.get("paginas_usuario") or d["paginas"])
-    _desafio(desafios_almacen.modificar, id_, contar)
-
-    def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.pista(motor, nombre_modelo, d, req.nivel, paginas, d.get("ultima_comprobacion")), avisar)}
-    return _ndjson_en_hilo(trabajo)
-
-@app.post("/api/desafios/{id_}/reflexion")
-def desafios_reflexion(id_: str, req: DesafioModeloRequest):
-    d = _desafio(desafios_almacen.obtener, id_)
-    if (d.get("progreso") or {}).get("estado") != "resuelto":
-        raise HTTPException(status_code=409, detail="La reflexión se abre al resolver el desafío.")
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-    paginas = _desafio(des_ejec.validar_paginas, req.paginas) if req.paginas else (d.get("paginas_usuario") or d["paginas"])
-
-    def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.reflexion(motor, nombre_modelo, d, paginas), avisar)}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/{id_}/traducir")
-def desafios_traducir(id_: str, req: DesafioModeloRequest):
-    """ Enunciado (y teoría) al español; se guarda la traducción """
-    d = _desafio(desafios_almacen.obtener, id_)
-    if d.get("enunciado_es") and not req.regenerar:
-        guardado = {"enunciado_es": d["enunciado_es"], "teoria_es": d.get("teoria_es", "")}
-        return _ndjson_en_hilo(lambda avisar: guardado)
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-
-    def trabajo(avisar):
-        enunciado = _consumir(des_tutor.traducir(motor, nombre_modelo, d.get("enunciado") or ""), avisar)
-        teoria = ""
-        if d.get("teoria"):
-            avisar({"tipo": "progreso", "mensaje": "Traduciendo la teoría…"})
-            teoria = _consumir(des_tutor.traducir(motor, nombre_modelo, d["teoria"]), lambda e: None)
-
-        def cambio(x):
-            x["enunciado_es"], x["teoria_es"] = enunciado, teoria
-        desafios_almacen.modificar(id_, cambio)
-        return {"enunciado_es": enunciado, "teoria_es": teoria}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/chat")
-def desafios_chat(req: DesafioChatRequest):
-    if not req.mensajes:
-        raise HTTPException(status_code=400, detail="Escribe un mensaje.")
-    d = _desafio(desafios_almacen.obtener, req.desafio_id) if req.desafio_id else None
-    paginas = req.paginas or ((d.get("paginas_usuario") or d.get("paginas")) if d else [])
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-
-    def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.chat(motor, nombre_modelo, _mensajes_con_referencias(req.mensajes), d, paginas,
-                                                  (d or {}).get("ultima_comprobacion")), avisar)}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/analizar-propuesta")
-def desafios_analizar_propuesta(req: DesafioAnalizarPropuestaRequest):
-    """ Analiza la propuesta o idea del usuario y devuelve evaluación, complejidad y lo solicitado (NDJSON). """
-    if not (req.propuesta or "").strip():
-        raise HTTPException(status_code=400, detail="Escribe tu propuesta o planteo.")
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-
-    def trabajo(avisar):
-        return {"texto": _consumir(des_tutor.analizar_propuesta(motor, nombre_modelo, req.propuesta,
-                                                               req.lenguaje or "python",
-                                                               req.nivel or "intermedio"), avisar)}
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/evaluar-salida")
-def desafios_evaluar_salida(req: DesafioEvaluarSalidaRequest):
-    """ El modelo evalúa la solución del alumno analizando tanto el código como la salida de ejecución. """
-    d = None
-    if req.id:
-        try:
-            d = _desafio(desafios_almacen.obtener, req.id)
-        except Exception:
-            d = None
-
-    if not d:
-        d = {
-            "id": req.id or "desafio_editor",
-            "titulo": req.titulo or "Desafío de programación",
-            "enunciado": req.enunciado or "Desafío resuelto en el editor de código.",
-            "nivel": "intermedio",
-            "lenguaje": req.lenguaje or "python",
-            "paginas": [{"nombre": req.nombre_archivo or "solucion.py", "contenido": req.codigo}]
-        }
-
-    paginas = [{"nombre": req.nombre_archivo or "solucion.py", "contenido": req.codigo}]
-
-    # Si el desafío tiene pruebas internas, correr comprobación automatizada para enriquecer la evaluación
-    resultado_pruebas = None
-    if d and d.get("privado") and d.get("privado", {}).get("pruebas"):
-        try:
-            resultado_pruebas = _desafio(
-                des_ejec.comprobar,
-                runner,
-                paginas,
-                d.get("privado") or {},
-                run_id=f"eval_{d.get('id', 'editor')}"
-            )
-        except Exception as e:
-            print(f"Comprobación automática opcional no pudo ejecutarse: {e}")
-
-    modelo = _modelo_desafios(req.modelo, "codigo")
-    motor, nombre_modelo = _motor_desafios(modelo)
-
-    resultado = des_tutor.evaluar_con_salida(
-        ai=motor,
-        modelo=nombre_modelo,
-        d=d,
-        paginas=paginas,
-        salida=req.salida or "",
-        stderr=req.stderr or "",
-        exit_code=req.exit_code,
-        resultado_pruebas=resultado_pruebas
-    )
-
-    # Si es un desafío guardado y la solución fue aprobada, actualizar progreso
-    if req.id and d and resultado.get("aprobado"):
-        try:
-            def cambio(x):
-                x["paginas_usuario"] = paginas
-                if "progreso" in x:
-                    x["progreso"]["estado"] = "resuelto"
-                    x["progreso"]["intentos"] = x["progreso"].get("intentos", 0) + 1
-            desafios_almacen.modificar(req.id, cambio)
-            _registrar_telemetria(d, "submission", passed=True, hints_used=0, stderr=req.stderr or "", elapsed=0)
-        except Exception as e:
-            print(f"No se pudo actualizar estado en almacén: {e}")
-
-    return {
-        "ok": True,
-        "evaluacion": resultado,
-        "desafio_id": req.id,
-        "pruebas_automatizadas": resultado_pruebas
-    }
+# La caja de razonamiento, el plan, las pistas, la reflexión, traducir, el chat, analizar una propuesta y
+# evaluar la salida: servidor de Rust (routes/desafios_tutor.rs)
 
 
 # Analizar un video y traducir un fragmento: servidor de Rust (routes/profesor.rs)
@@ -3372,7 +3123,6 @@ def ejecutar_pensamiento_proyecto_endpoint(req: EjecutarPensamientoProyectoReque
         return {"ok": False, "error": str(e)}
 
 
-
 # ============================================================================
 # API MOTOR DE APRENDIZAJE POR GRAFO DE NODOS (YouTube, GitHub, Kaggle, Prig Hub)
 # ============================================================================
@@ -3461,14 +3211,12 @@ def obtener_estadisticas_aprendizaje():
         return {"ok": False, "error": str(e)}
 
 
-
 # ===========================================================================
 # Módulo SQL Studio (Compatibilidad y fallback Python con dialecto MySQL)
 # El motor principal de alto rendimiento reside en Rust (backend-rust/crates/prig-server/src/routes/sql.rs)
 # ===========================================================================
 
 # Serve frontend static assets
-
 
 
 if os.path.exists(frontend_dir):

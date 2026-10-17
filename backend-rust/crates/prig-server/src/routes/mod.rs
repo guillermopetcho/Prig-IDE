@@ -7,6 +7,7 @@ pub mod config;
 pub mod conocimiento;
 pub mod cuerpo;
 pub mod desafios;
+pub mod desafios_tutor;
 pub mod ejercicios;
 pub mod escritorio;
 pub mod estante;
