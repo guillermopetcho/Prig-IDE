@@ -236,3 +236,12 @@ impl Vectorial {
         ordenar(puntos, top_k)
     }
 }
+
+/// `sum(v)` de Python 3.12 sobre reales (con su suma compensada)
+pub(crate) fn suma_py(v: &[f64]) -> f64 {
+    let mut s = Suma { f: 0.0, c: 0.0, empezada: false };
+    for x in v {
+        s.mas(*x);
+    }
+    if s.empezada { s.valor() } else { 0.0 }
+}

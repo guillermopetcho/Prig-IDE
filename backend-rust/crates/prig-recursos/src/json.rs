@@ -194,7 +194,19 @@ pub fn leer(texto: &str) -> Result<Valor, String> {
     if texto.starts_with('\u{feff}') {
         return Err("Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)".into());
     }
-    let mut l = Lector { c: texto.as_bytes(), p: 0, t: texto };
+    leer_con(texto, true)
+}
+
+/// `json.loads(texto, strict=False)`: admite caracteres de control dentro de las cadenas
+pub fn leer_flexible(texto: &str) -> Result<Valor, String> {
+    if texto.starts_with('\u{feff}') {
+        return Err("Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)".into());
+    }
+    leer_con(texto, false)
+}
+
+fn leer_con(texto: &str, estricto: bool) -> Result<Valor, String> {
+    let mut l = Lector { c: texto.as_bytes(), p: 0, t: texto, estricto };
     l.blancos();
     let v = l.valor(0)?;
     l.blancos();
@@ -220,6 +232,7 @@ struct Lector<'a> {
     c: &'a [u8],
     p: usize,
     t: &'a str,
+    estricto: bool,
 }
 
 impl<'a> Lector<'a> {
@@ -379,11 +392,11 @@ impl<'a> Lector<'a> {
                         _ => return self.error_en(self.p - 2, "Invalid \\escape"),
                     }
                 }
-                c if c < 0x20 => return self.error("Invalid control character at"),
+                c if c < 0x20 && self.estricto => return self.error("Invalid control character at"),
                 _ => {
                     // un trozo sin escapes de una vez (el texto ya es UTF-8 válido)
                     let ini = self.p;
-                    while self.p < self.c.len() && !matches!(self.c[self.p], b'"' | b'\\') && self.c[self.p] >= 0x20 {
+                    while self.p < self.c.len() && !matches!(self.c[self.p], b'"' | b'\\') && (self.c[self.p] >= 0x20 || !self.estricto) {
                         self.p += 1;
                     }
                     s.push_str(&self.t[ini..self.p]);

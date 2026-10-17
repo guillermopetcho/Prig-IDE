@@ -30,6 +30,12 @@ class ActionEnum(str, Enum):
     INCREASE_DEPTH = "INCREASE_DEPTH"
     SWAP_NOTEBOOK = "SWAP_NOTEBOOK"
     CUSTOM_CORRECTION = "CUSTOM_CORRECTION"
+    # Las que ofrece el asistente de cambios y aplica apply_change_request (faltaban: comparar con ellas lanzaba
+    # AttributeError y cualquier cambio que no fuera un prerrequisito acababa en un 500)
+    ADD_CONCEPT = "ADD_CONCEPT"
+    REMOVE_CONCEPT = "REMOVE_CONCEPT"
+    MODIFY_OBJECTIVE = "MODIFY_OBJECTIVE"
+    ADD_PRACTICAL_MODULE = "ADD_PRACTICAL_MODULE"
 
 class ConceptTypeEnum(str, Enum):
     FOUNDATIONAL = "FOUNDATIONAL"

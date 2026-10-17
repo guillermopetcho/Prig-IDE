@@ -533,7 +533,10 @@ class EditorManager {
             fontFamily: "'Fira Code', monospace",
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
-            smoothScrolling: true
+            smoothScrolling: true,
+            // Espacio entre número de línea y el inicio del código (evita que el cursor tape la primera letra)
+            lineDecorationsWidth: 18,
+            lineNumbersMinChars: 3
         });
 
         // Evento de foco: actualizar la columna activa

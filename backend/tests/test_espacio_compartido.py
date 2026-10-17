@@ -40,15 +40,17 @@ class PruebaEspacioCompartido(unittest.TestCase):
 
     def test_toma_la_carpeta_que_abrio_rust(self):
         self.escribir({"last_workspace": self.nueva, "segunda_carpeta": self.nueva})
-        r = self.cliente.get("/api/workspace").json()
-        self.assertEqual(r["path"], self.nueva)
+        self.cliente.get("/api/ai/ocupada")         # cualquier petición: el middleware sigue la configuración
+        self.assertEqual(app.file_mgr.base_dir, self.nueva)
         self.assertEqual(app.file_mgr.segunda_dir, self.nueva)
         self.assertEqual(app.explorador.workspace, os.path.abspath(self.nueva))
 
     def test_una_carpeta_que_no_existe_no_se_toma(self):
-        antes = self.cliente.get("/api/workspace").json()["path"]
+        self.cliente.get("/api/ai/ocupada")
+        antes = app.file_mgr.base_dir
         self.escribir({"last_workspace": "/no/existe/prig"})
-        self.assertEqual(self.cliente.get("/api/workspace").json()["path"], antes)
+        self.cliente.get("/api/ai/ocupada")
+        self.assertEqual(app.file_mgr.base_dir, antes)
 
 
 if __name__ == "__main__":

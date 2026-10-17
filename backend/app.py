@@ -10,7 +10,6 @@ import signal
 import logging
 import threading
 import subprocess
-import zipfile
 import requests as requests_lib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -30,18 +29,15 @@ from book_service import BookService
 import librerias_service
 from knowledge_service import KnowledgeService
 from knowledge_base import KnowledgeBase
-from pack_importer import PackImporter, PackImportError
 from knowledge_context import ContextAssembler
 from contexto_modelo import CompiladorContexto
 from indice_semantico import IndiceSemantico
-from job_exporter import JobExporter
 import agent_flows
 from agent_flows import FlowEngine, FlowStore
 import agent_flows_v2
 from agent_flows_v2 import DynamicFlowEngine, plantillas_profesionales_sota, ROLES_V2
 from perfil_libro import PerfilLibro
 from explorador import Explorador
-from sondeo_libro import SondeoLibro
 from ide_servicios import ServiciosIDE, ErrorIDE
 import ollama_opciones
 from ollama_opciones import ErrorConfig
@@ -64,11 +60,7 @@ from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
 from exercise_store import ExerciseStore
 from guided_learning import GuidedLearningService
-from study_plan_engine import (
-    StudyPlanEngine, NotebookSafetyLayer, PlanValidator, KnowledgeMap, PracticalCurriculum,
-    ExecutableLearningPlan, ChangeRequest, ActionEnum, PlanStatusEnum, DecisionTrace, TraceStep,
-    SeguimientoPath, SeguimientoRepository
-)
+from study_plan_engine import SeguimientoPath, SeguimientoRepository
 import kaggle_lector
 import kaggle_explorar
 import kaggle_colecciones
@@ -118,16 +110,12 @@ book_service = BookService()
 # book_service: los mismos archivos, pero fragmentados y buscables.
 knowledge_service = KnowledgeService(book_service.books_dir)
 
-# Todos los repositorios cuelgan del workspace activo. Antes StudyPlanEngine usaba
-# os.getcwd() mientras el resto usaba file_mgr.base_dir, así que los planes se
-# escribían en una carpeta y el perfil los leía de otra.
-study_plan_engine = StudyPlanEngine(file_mgr.base_dir)
+# Todos los repositorios cuelgan del workspace activo (no de os.getcwd()).
 seguimiento_repo = SeguimientoRepository(file_mgr.base_dir)
 dataset_mgr = LearnerDatasetManager(file_mgr.base_dir)
 
 
 knowledge_base = KnowledgeBase()
-pack_importer = PackImporter(knowledge_base)
 compilador_contexto = CompiladorContexto(knowledge_base)
 context_assembler = ContextAssembler(knowledge_base, compilador_contexto)
 indice_semantico = IndiceSemantico(knowledge_base)
@@ -184,12 +172,9 @@ def _guardia_analista() -> Optional[str]:
 
 
 bancos.guardia = _guardia_analista
-job_exporter = JobExporter(book_service.books_dir)
 flow_store = FlowStore(file_mgr.base_dir)
 perfil_libro = PerfilLibro(knowledge_base)
 explorador = Explorador(file_mgr.base_dir)
-from explorador import EXTENSIONES as explorador_extensiones
-sondeo = SondeoLibro(ai_engine)
 exercise_engine = ExerciseEngine(ai_engine, runner)
 flags = FeatureFlags()
 telemetry = LearningTelemetry(file_mgr.base_dir)
@@ -276,8 +261,7 @@ def rebind_workspace(new_base_dir: str) -> None:
     Sin esto los objetos quedaban congelados en la carpeta que había al arrancar,
     de modo que los planes y seguimientos nuevos seguían guardándose en la antigua.
     """
-    global study_plan_engine, seguimiento_repo, dataset_mgr, telemetry, exercise_store, guided
-    study_plan_engine = StudyPlanEngine(new_base_dir)
+    global seguimiento_repo, dataset_mgr, telemetry, exercise_store, guided
     seguimiento_repo = SeguimientoRepository(new_base_dir)
     dataset_mgr = LearnerDatasetManager(new_base_dir)
     telemetry = LearningTelemetry(new_base_dir)
@@ -506,10 +490,6 @@ class GuidedGenerateRequest(BaseModel):
 class GuidedProgressRequest(BaseModel):
     completed_blocks: List[str]
 
-@app.get("/api/guided/list")
-def guided_list():
-    return {"paths": guided.list_paths()}
-
 @app.post("/api/guided/generate")
 def guided_generate(req: GuidedGenerateRequest):
     """ Una sola puerta de entrada; la diferencia es la profundidad del análisis """
@@ -569,25 +549,6 @@ def guided_delete(path_id: str):
         raise HTTPException(status_code=404, detail="Ruta no encontrada")
     return {"status": "deleted", "id": path_id}
 
-@app.post("/api/guided/{path_id}/progress")
-def guided_progress(path_id: str, req: GuidedProgressRequest):
-    path = guided.get(path_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Ruta no encontrada")
-
-    ahora = datetime.now().isoformat()
-    nuevos = set(req.completed_blocks) - set(path.completed_blocks)
-    for bid in nuevos:
-        path.completion_dates[bid] = ahora
-    for bid in set(path.completed_blocks) - set(req.completed_blocks):
-        path.completion_dates.pop(bid, None)
-
-    path.completed_blocks = req.completed_blocks
-    guided.repo.save(path)
-    dataset_mgr.build_and_save_dataset()
-    return path.model_dump()
-
-
 # ==========================================
 # ENDPOINTS: BANDERAS, MÉTRICAS DE APRENDIZAJE Y SALUD DEL ENTORNO
 # ==========================================
@@ -596,661 +557,34 @@ class FlagUpdateRequest(BaseModel):
     name: str
     enabled: Optional[bool] = None   # None = volver al valor por defecto
 
-@app.get("/api/flags")
-def get_flags():
-    return flags.all()
-
-@app.post("/api/flags")
-def set_flag(req: FlagUpdateRequest):
-    try:
-        value = flags.reset(req.name) if req.enabled is None else flags.set(req.name, req.enabled)
-    except KeyError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    return {"name": req.name, "enabled": value, "flags": flags.all()}
-
-@app.get("/api/learning/metrics")
-def learning_metrics(days: int = Query(default=30, ge=1, le=365)):
-    """ Métricas de competencia real, derivadas de ejecutar el código del alumno """
-    return telemetry.metrics(days=days)
-
 # ==========================================
 # ENDPOINTS: EJERCICIOS VERIFICABLES POR EJECUCIÓN
 # ==========================================
 
-class ExerciseGenerateRequest(BaseModel):
-    concept: str
-    model: str = "qwen2.5-coder:7b"
-    level: str = "intermedio"
-    attempts: int = 3
-
-class ExerciseSubmitRequest(BaseModel):
-    exercise_id: str
-    code: str
-    hints_used: int = 0
-
-@app.post("/api/exercise/generate")
-def generate_exercise(req: ExerciseGenerateRequest):
-    """ Devuelve un ejercicio YA VERIFICADO: su solución de referencia pasa sus
-    propios tests y esos tests fallan con el código de partida. """
-    result = exercise_engine.generate_validated(
-        req.concept, model=req.model, level=req.level, attempts=max(1, min(req.attempts, 5))
-    )
-    if not result["ok"]:
-        raise HTTPException(
-            status_code=422,
-            detail=f"No se pudo generar un ejercicio verificable sobre '{req.concept}'. "
-                   f"Prueba otro modelo o reformula el concepto."
-        )
-
-    exercise = result["exercise"]
-    exercise_store.save(exercise)
-
-    if flags.is_enabled("learning_telemetry"):
-        telemetry.record(exercise["exercise_id"], req.concept, "generated",
-                         attempt_num=exercise.get("attempts_used", 1))
-
-    public = ExerciseEngine.public_view(exercise)
-    public["generation_history"] = result["history"]
-    return public
-
-@app.post("/api/exercise/submit")
-def submit_exercise(req: ExerciseSubmitRequest):
-    """ Corrige la entrega ejecutándola contra los tests ocultos """
-    exercise = exercise_store.get(req.exercise_id)
-    if not exercise:
-        raise HTTPException(status_code=404, detail="Ejercicio no encontrado. Genera uno nuevo.")
-
-    result = exercise_engine.grade_submission(exercise, req.code)
-
-    if flags.is_enabled("learning_telemetry"):
-        attempt = telemetry.attempt_number(req.exercise_id)
-        telemetry.record(
-            req.exercise_id, exercise.get("concept", ""), "submission",
-            passed=result["passed"], attempt_num=attempt,
-            hints_used=req.hints_used, stderr=result.get("stderr", ""),
-            elapsed=result.get("elapsed", 0),
-        )
-        result["attempt"] = attempt
-
-    return result
-
-@app.get("/api/exercise/recent")
-def list_recent_exercises(limit: int = Query(default=20, ge=1, le=100),
-                          concept: Optional[str] = Query(default=None)):
-    """ Ejercicios guardados, para poder retomar uno a medias tras reiniciar """
-    return {"exercises": exercise_store.list_recent(limit=limit, concept=concept),
-            "total": exercise_store.count()}
-
-@app.get("/api/exercise/{exercise_id}")
-def get_exercise(exercise_id: str):
-    exercise = exercise_store.get(exercise_id)
-    if not exercise:
-        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
-    return ExerciseEngine.public_view(exercise)
-
-class ExerciseHintRequest(BaseModel):
-    level: int = 1
-    model: str = "qwen2.5-coder:7b"
-
-@app.post("/api/exercise/{exercise_id}/hint")
-def exercise_hint(exercise_id: str, req: ExerciseHintRequest):
-    """ Pista graduada: conceptual, de estructura o concreta """
-    exercise = exercise_store.get(exercise_id)
-    if not exercise:
-        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
-    return exercise_engine.hint(exercise, level=req.level, model=req.model)
-
-@app.get("/api/exercise/{exercise_id}/solution")
-def reveal_solution(exercise_id: str):
-    """ Solución de referencia, solo cuando el alumno la pide explícitamente """
-    exercise = exercise_store.get(exercise_id)
-    if not exercise:
-        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
-
-    # Pedir la solución es un dato pedagógico: significa que el alumno se rindió
-    if flags.is_enabled("learning_telemetry"):
-        telemetry.record(exercise_id, exercise.get("concept", ""), "solution_revealed")
-
-    return {
-        "exercise_id": exercise_id,
-        "reference_solution": exercise["reference_solution"],
-        "tests": exercise["tests"],
-    }
-
+# Generar (verificado ejecutándolo), corregir, las pistas, la solución y los recientes: servidor de Rust
+# (routes/ejercicios.rs)
 
 # ==========================================
 # ENDPOINTS: MOTOR DE CONOCIMIENTO (RAG SOBRE LA BIBLIOTECA)
 # ==========================================
 
-class KnowledgeIndexRequest(BaseModel):
-    force: bool = False
-
-class KnowledgeSearchRequest(BaseModel):
-    query: str
-    top_k: int = 8
-    expand: bool = True
-    model: str = "qwen2.5-coder:7b"
-    max_context_tokens: Optional[int] = None
-
-class KnowledgeAskRequest(BaseModel):
-    query: str
-    model: str = "qwen2.5-coder:7b"
-    top_k: int = 6
-    expand: bool = True
-    max_context_tokens: Optional[int] = None
-
-@app.get("/api/knowledge/status")
-def knowledge_status():
-    return knowledge_service.get_status()
-
-@app.post("/api/knowledge/index")
-def knowledge_index(req: KnowledgeIndexRequest):
-    """ Indexa la biblioteca en segundo plano; el progreso se lee en /status """
-    return knowledge_service.index_library_async(force=req.force)
-
-def _context_budget(requested: Optional[int] = None) -> int:
-    """ Presupuesto de evidencias en función de la ventana configurada.
-
-    Estaba fijo en 1800 tokens: con num_ctx=2048 desbordaba y con 32768 desperdiciaba
-    casi toda la ventana. Se reserva ~45% para las evidencias y el resto para el
-    prompt de sistema, la pregunta y la respuesta.
-    """
-    try:
-        num_ctx = int(ai_engine.config.get("num_ctx", 4096))
-    except (TypeError, ValueError):
-        num_ctx = 4096
-    budget = max(400, int(num_ctx * 0.45))
-    return min(requested, budget) if requested else budget
-
-
-def _expanded(query: str, expand: bool, model: str) -> List[str]:
-    if not expand or not flags.is_enabled("query_expansion"):
-        return []
-    try:
-        return ai_engine.expand_query(query, model=model)
-    except Exception:
-        return []
-
-@app.post("/api/knowledge/search")
-def knowledge_search(req: KnowledgeSearchRequest):
-    """ Recuperación pura, sin modelo: rápida y verificable de un vistazo """
-    return knowledge_service.search(
-        req.query,
-        top_k=req.top_k,
-        max_context_tokens=_context_budget(req.max_context_tokens),
-        expansions=_expanded(req.query, req.expand, req.model)
-    )
-
-def _contexto_destilado(pregunta: str, presupuesto: int) -> Optional[Dict[str, Any]]:
-    """ Contexto a partir de afirmaciones verificadas, si la base lo tiene.
-
-    Es mejor material que los fragmentos crudos: ya está clasificado por tipo, ya
-    trae la cita comprobada contra el texto original y ya reúne lo que dicen varios
-    libros del mismo concepto. Cuando la base no conoce el tema, se devuelve None y
-    se recae en la recuperación por fragmentos, que siempre encuentra algo.
-    """
-    try:
-        if not knowledge_base.estadisticas().get("libros"):
-            return None
-        ctx = context_assembler.ensamblar(pregunta, presupuesto_tokens=presupuesto)
-        return None if ctx.get("vacio") else ctx
-    except Exception:
-        return None
-
-
-@app.post("/api/knowledge/ask")
-def knowledge_ask(req: KnowledgeAskRequest):
-    """ Respuesta del tutor fundamentada en la biblioteca, con citas """
-    presupuesto = _context_budget(req.max_context_tokens)
-    destilado = _contexto_destilado(req.query, presupuesto)
-
-    result = knowledge_service.search(
-        req.query,
-        top_k=req.top_k,
-        # Si hay contexto destilado se deja sitio para él: los fragmentos pasan a
-        # ser complemento, no la fuente principal.
-        max_context_tokens=(presupuesto // 3 if destilado else presupuesto),
-        expansions=_expanded(req.query, req.expand, req.model)
-    )
-
-    if destilado:
-        contexto = (destilado["texto"] + "\n\n--- FRAGMENTOS ADICIONALES ---\n"
-                    + result["context_prompt"]) if result["found"] else destilado["texto"]
-    else:
-        contexto = result["context_prompt"]
-    # Lecturas del catálogo de referencias de ML: van después de los fragmentos (la fuente principal sigue
-    # siendo lo que el alumno tiene en su biblioteca) y el modelo puede recomendarlas con su enlace
-    bloque_refs, referencias = referencias_ml.bloque_para_prompt(req.query)
-    if bloque_refs:
-        contexto = f"{contexto}\n\n--- LECTURAS RECOMENDADAS (catálogo) ---\n{bloque_refs}"
-
-    def event_stream():
-        # Las fuentes van primero para que la interfaz pueda pintarlas mientras
-        # el modelo todavía está redactando.
-        yield json.dumps({
-            "type": "sources",
-            "found": result["found"] or bool(destilado),
-            "evidence": result.get("evidence"),
-            "verificado": bool(destilado),
-            "conceptos": destilado["conceptos"] if destilado else [],
-            "citas": destilado["fuentes"] if destilado else [],
-            "chunks": [
-                {
-                    "n": i + 1,
-                    "chunk_id": c["chunk_id"],
-                    "source_id": c["source_id"],
-                    "source_title": c.get("source_title", c["source_id"]),
-                    "page": c["page"],
-                    "content_type": c["content_type"],
-                    "preview": c["content"][:220],
-                }
-                for i, c in enumerate(result["chunks"])
-            ],
-            "stats": result["stats"],
-            "referencias": [referencias_ml.resumen_publico(r) for r in referencias],
-        }, ensure_ascii=False) + "\n"
-
-        for chunk in ai_engine.answer_from_library(
-            req.query, contexto, model=req.model
-        ):
-            yield json.dumps({"type": "token", "text": chunk}, ensure_ascii=False) + "\n"
-
-        yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="application/x-ndjson")
+# El estado del índice, indexar, buscar y preguntar: servidor de Rust (prig_biblioteca::conocimiento,
+# routes/conocimiento.rs)
 
 # ======================================================================
 # Base de conocimiento: paquetes extraídos de libros completos
 # ======================================================================
 
-PACKS_DIR = os.path.join(os.path.expanduser("~/.prig_books"), "packs")
-
-
-class PackImportRequest(BaseModel):
-    ruta: Optional[str] = None      # un .prigpack concreto; si falta, toda la carpeta
-    forzar: bool = False
-
-
-class ContextRequest(BaseModel):
-    pregunta: str
-    presupuesto_tokens: Optional[int] = None
-    dominio: Optional[str] = None
-    nivel: str = "intermedio"
-
-
-@app.get("/api/kb/status")
-def kb_status():
-    """ Lo que hay en la base y si está listo para consultarse """
-    os.makedirs(PACKS_DIR, exist_ok=True)
-    disponibles = [f for f in sorted(os.listdir(PACKS_DIR)) if f.endswith(".prigpack")]
-    try:
-        stats = knowledge_base.estadisticas()
-    except Exception as e:
-        return {"disponible": False, "error": str(e), "packs_en_carpeta": disponibles}
-    with knowledge_base.conectar() as c:
-        dentro = {r[0] for r in c.execute("SELECT source_id FROM books;")}
-    return {
-        "disponible": bool(stats.get("libros")),
-        "carpeta_packs": PACKS_DIR,
-        "packs_en_carpeta": disponibles,
-        "sin_importar": [f for f in disponibles
-                         if not _pack_ya_importado(os.path.join(PACKS_DIR, f), dentro)],
-        **stats,
-    }
-
-
-def _pack_ya_importado(ruta: str, dentro: Optional[set] = None) -> bool:
-    """ Un paquete ya está dentro si su libro figura en la base.
-
-    Solo se lee el manifiesto. Verificar el paquete entero aquí obligaría a
-    descomprimir y resumir con sha256 cada archivo de cada paquete: con cien
-    libros eso convierte una consulta de estado en varios segundos de disco.
-    """
-    try:
-        with zipfile.ZipFile(ruta) as z:
-            source_id = json.loads(z.read("manifest.json")).get("source_id")
-    except Exception:
-        return False
-    if not source_id:
-        return False
-    if dentro is not None:
-        return source_id in dentro
-    with knowledge_base.conectar() as c:
-        return c.execute("SELECT 1 FROM books WHERE source_id = ?;",
-                         (source_id,)).fetchone() is not None
-
-
-@app.post("/api/kb/verify")
-def kb_verify_pack(req: PackImportRequest):
-    """ Revisa un paquete sin tocar la base """
-    ruta = req.ruta or ""
-    if not os.path.isabs(ruta):
-        ruta = os.path.join(PACKS_DIR, os.path.basename(ruta))
-    if not os.path.isfile(ruta):
-        raise HTTPException(status_code=404, detail=f"No existe el paquete: {ruta}")
-    try:
-        return pack_importer.verificar(ruta)
-    except PackImportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/api/kb/import")
-def kb_import(req: PackImportRequest):
-    """ Importa, unifica conceptos, precomputa dosieres y verifica.
-
-    Es una sola operación a propósito: un paquete importado sin unificar deja
-    afirmaciones sin concepto canónico, y eso no da error — simplemente el tutor
-    deja de encontrarlas.
-    """
-    os.makedirs(PACKS_DIR, exist_ok=True)
-    try:
-        if req.ruta:
-            ruta = req.ruta if os.path.isabs(req.ruta) else os.path.join(
-                PACKS_DIR, os.path.basename(req.ruta))
-            if not os.path.isfile(ruta):
-                raise HTTPException(status_code=404, detail=f"No existe: {ruta}")
-            importacion = {"importados": [pack_importer.importar(ruta, forzar=req.forzar)],
-                           "fallidos": [], "total": 1}
-        else:
-            importacion = pack_importer.importar_carpeta(PACKS_DIR)
-        unificacion = pack_importer.unificar()
-        dosieres = pack_importer.construir_dosieres()
-        # Compilar el contexto denso aquí y no al responder: al importar sobra
-        # tiempo, y al responder es cuando menos margen hay.
-        compilacion = compilador_contexto.precompilar()
-        # El índice semántico es lo que evita servirle al modelo conceptos que no
-        # vienen a cuento. Si el embebedor no está descargado, se omite sin ruido:
-        # todo sigue funcionando con la búsqueda por palabras.
-        indexado = indice_semantico.indexar(compilador_contexto)
-        verificacion = pack_importer.verificar_integridad()
-    except PackImportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"importacion": importacion, "unificacion": unificacion,
-            "dosieres": dosieres, "compilacion": compilacion,
-            "indice_semantico": indexado, "verificacion": verificacion}
-
-
-@app.get("/api/kb/books")
-def kb_books():
-    """ Informe libro a libro: qué se guardó de cada uno y si quedó completo """
-    return pack_importer.verificar_integridad()
-
-
-@app.get("/api/kb/concept")
-def kb_concept(nombre: str = Query(...)):
-    """ El dosier completo de un concepto, por cualquiera de sus nombres """
-    concepto = knowledge_base.resolver(nombre)
-    if not concepto:
-        raise HTTPException(status_code=404,
-                            detail=f"'{nombre}' no aparece en la biblioteca")
-    dosier = context_assembler.dosier(concepto["concept_id"])
-    return {"concepto": concepto, "dosier": dosier,
-            "prerrequisitos": knowledge_base.prerrequisitos(concepto["concept_id"])}
-
-
-@app.post("/api/kb/compilar")
-def kb_compilar():
-    """ Recompila el contexto denso de todos los conceptos.
-
-    Se hace solo al importar; esto es para cuando cambias el formato o quieres
-    medir cuánto se ahorra sobre lo que ya tienes.
-    """
-    return compilador_contexto.precompilar()
-
-
-@app.get("/api/kb/contexto")
-def kb_contexto(pregunta: str = Query(...), presupuesto: int = Query(default=1200),
-                compilado: bool = Query(default=True)):
-    """ El contexto exacto que recibiría el modelo, en el formato que se pida.
-
-    Expuesto para poder comparar los dos formatos sobre la misma pregunta: si el
-    tutor responde mal, lo primero es ver qué tenía delante y cuánto le costó.
-    """
-    r = context_assembler.ensamblar(pregunta, presupuesto_tokens=presupuesto,
-                                    compilado=compilado)
-    return {k: v for k, v in r.items() if k != "fuentes"} | {
-        "citas_disponibles": len(r.get("fuentes") or [])}
-
-
-@app.get("/api/kb/indice")
-def kb_indice_estado():
-    """ Si el índice semántico está en pie y con qué modelo """
-    return indice_semantico.estado()
-
-
-@app.post("/api/kb/indexar")
-def kb_indexar():
-    """ Reconstruye el índice semántico.
-
-    Se hace solo al importar; esto es para cuando descargas el embebedor después
-    de haber importado ya, o cambias de modelo.
-    """
-    r = indice_semantico.indexar(compilador_contexto)
-    if not r.get("ok"):
-        raise HTTPException(status_code=400, detail=r.get("motivo", "no se pudo indexar"))
-    return r
-
-
-@app.get("/api/kb/bridges")
-def kb_bridges(limite: int = Query(default=50, le=200)):
-    """ Conceptos que aparecen en varios campos: los atajos entre materias """
-    return {"puentes": knowledge_base.puentes(limite=limite)}
-
-
-@app.post("/api/kb/search")
-def kb_search(req: KnowledgeSearchRequest):
-    return {"resultados": knowledge_base.buscar(req.query, limite=req.top_k or 20)}
-
-
-@app.post("/api/kb/context")
-def kb_context(req: ContextRequest):
-    """ El contexto que se le inyectaría al tutor para esta pregunta.
-
-    Expuesto aparte del chat para poder verlo: si el tutor responde mal, lo primero
-    que hay que saber es qué material tenía delante.
-    """
-    return context_assembler.prompt_tutor(
-        req.pregunta,
-        presupuesto_tokens=_context_budget(req.presupuesto_tokens),
-        dominio_preferido=req.dominio,
-        nivel=req.nivel,
-    )
+# La base de conocimiento entera (estado, búsqueda, conceptos, contexto del tutor, compilar, índice semántico y
+# verificar e importar paquetes): servidor de Rust (prig_biblioteca::{base_kb, contexto_kb, paquetes}, routes/kb.rs)
 
 
 # ======================================================================
 # Preparar el trabajo para la GPU externa
 # ======================================================================
 
-JOBS_DIR = os.path.join(os.path.expanduser("~/.prig_books"), "jobs")
-
-
-class JobPrepareRequest(BaseModel):
-    # [{"path": "...", "domain": "math", "ajustes": {...}}, ...]
-    libros: List[Dict[str, Any]]
-    max_chunk_tokens: int = 500
-
-
-def _libro_aceptable(ruta: str) -> Optional[str]:
-    """ Por qué NO se puede meter este archivo en un trabajo, o None si se puede.
-
-    El alcance correcto aquí es el del explorador, no el de `file_manager`. Son dos
-    permisos distintos: `file_manager` guarda la lectura y escritura de archivos
-    cualesquiera (el editor de código) y tiene que seguir siendo estrecho; esto solo
-    lee LIBROS que el usuario ha señalado uno a uno en su propia carpeta personal.
-    Confundirlos era lo que hacía que preparar un libro del Escritorio respondiera
-    "Ruta no permitida" sin explicar nada.
-    """
-    if not ruta:
-        return "ruta vacía"
-    completa = os.path.abspath(os.path.expanduser(str(ruta)))
-    if not os.path.exists(completa):
-        return "el archivo ya no está ahí"
-    if not os.path.isfile(completa):
-        return "no es un archivo"
-    if os.path.splitext(completa)[1].lower() not in explorador_extensiones:
-        return (f"no es un libro ({os.path.splitext(completa)[1] or 'sin extensión'}); "
-                f"se admiten " + ", ".join(sorted(explorador_extensiones)))
-    if not explorador.permitida(completa):
-        return ("está fuera de tu carpeta personal. Cópialo dentro, o ábrelo desde "
-                "Buscar libros")
-    return None
-
-
-@app.get("/api/job/books")
-def job_books():
-    """ Libros que se pueden mandar a extraer, con el campo que se les propone.
-
-    El campo se propone solo por el nombre del archivo: abrir cien PDF para mirar
-    su primera página tardaría demasiado para una lista. Se revisa antes de enviar,
-    porque un libro mal clasificado contamina todo lo que salga de él.
-    """
-    from domains import DOMAINS as _D, sugerir_dominio_con_confianza as _sug
-    libros, vistos = [], {}
-    for b in job_exporter.libros_disponibles():
-        try:
-            clave = (os.path.getsize(b["path"]), os.path.basename(b["path"]))
-        except OSError:
-            continue
-        propuesta = _sug("", b["name"])
-        libros.append({**b,
-                       "domain": propuesta["dominio"],
-                       "revisar": not propuesta["seguro"],
-                       "motivo": propuesta["motivo"],
-                       "duplicado": clave in vistos,
-                       "duplicado_de": vistos.get(clave)})
-        vistos.setdefault(clave, b["path"])
-    return {"libros": libros,
-            "dominios": {k: {"nombre": v["name"], "icono": v.get("icon", "")}
-                         for k, v in _D.items()},
-            "carpeta_trabajos": JOBS_DIR}
-
-
-def _preparar_trabajo(libros: List[Dict[str, Any]], max_chunk_tokens: int,
-                      progreso=None) -> Dict[str, Any]:
-    """ Valida la selección y trocea lo que sea válido, sin abortar por lo que no.
-
-    Rechazar el lote entero por un libro es la peor respuesta posible cuando has
-    seleccionado veinte: obliga a repetir todo lo que ya había salido bien.
-    """
-    aceptados, rechazados = [], []
-    for l in libros:
-        ruta = l.get("path") or l.get("ruta")
-        motivo = _libro_aceptable(ruta)
-        if motivo:
-            rechazados.append({"ruta": ruta, "nombre": os.path.basename(str(ruta or "")),
-                               "motivo": motivo})
-        else:
-            aceptados.append({"path": os.path.abspath(os.path.expanduser(str(ruta))),
-                              "domain": l.get("domain"),
-                              "ajustes": l.get("ajustes") or {}})
-
-    if not aceptados:
-        detalle = "; ".join(f"{r['nombre'] or r['ruta']}: {r['motivo']}"
-                            for r in rechazados[:4]) or "no has elegido ningún libro"
-        raise HTTPException(status_code=400, detail=f"No se puede preparar nada. {detalle}")
-
-    os.makedirs(JOBS_DIR, exist_ok=True)
-    destino = os.path.join(JOBS_DIR, f"prig_job_{datetime.now():%Y%m%d_%H%M%S}")
-    manifest = job_exporter.preparar(aceptados, destino,
-                                     max_chunk_tokens=max_chunk_tokens,
-                                     progreso=progreso)
-    manifest["rechazados"] = rechazados
-    if not manifest.get("total_books"):
-        motivos = [f["motivo"] for f in manifest.get("failed", [])][:3]
-        raise HTTPException(
-            status_code=400,
-            detail="Ningún libro se pudo trocear. " + ("; ".join(motivos) or
-                   "Revisa que no estén escaneados."))
-    return manifest
-
-
-@app.post("/api/job/prepare")
-def job_prepare(req: JobPrepareRequest):
-    """ Trocea los libros y deja la carpeta lista para subir a Kaggle.
-
-    Se hace en local a propósito: el troceado no necesita GPU, el resultado pesa
-    mucho menos que los PDF y así los libros originales no salen del equipo.
-    """
-    if not req.libros:
-        raise HTTPException(status_code=400, detail="No has elegido ningún libro")
-    try:
-        return _preparar_trabajo(req.libros, req.max_chunk_tokens)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No se pudo preparar: {e}")
-
-
-@app.post("/api/job/prepare-stream")
-def job_prepare_stream(req: JobPrepareRequest):
-    """ Igual, pero informando libro a libro según avanza.
-
-    Un PDF de 600 páginas tarda unos segundos en trocearse, y una selección de
-    veinte son minutos. Sin avance, la pantalla parece colgada y no hay forma de
-    saber si va bien o se atascó en uno concreto.
-    """
-    if not req.libros:
-        raise HTTPException(status_code=400, detail="No has elegido ningún libro")
-
-    cola: "queue.Queue" = queue.Queue()
-    resultado: Dict[str, Any] = {}
-
-    def trabajar():
-        try:
-            resultado["manifest"] = _preparar_trabajo(
-                req.libros, req.max_chunk_tokens, progreso=cola.put)
-        except HTTPException as e:
-            resultado["error"] = e.detail
-        except Exception as e:
-            resultado["error"] = str(e)
-        finally:
-            cola.put(None)
-
-    hilo = threading.Thread(target=trabajar, daemon=True)
-    hilo.start()
-
-    def emitir():
-        yield json.dumps({"tipo": "inicio", "total": len(req.libros)}) + "\n"
-        while True:
-            evento = cola.get()
-            if evento is None:
-                break
-            yield json.dumps(evento, ensure_ascii=False) + "\n"
-        hilo.join(timeout=5)
-        if resultado.get("error"):
-            yield json.dumps({"tipo": "error", "mensaje": resultado["error"]},
-                             ensure_ascii=False) + "\n"
-        else:
-            yield json.dumps({"tipo": "fin", "manifest": resultado.get("manifest", {})},
-                             ensure_ascii=False) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
-
-
-@app.get("/api/job/list")
-def job_list():
-    """ Trabajos ya preparados, para volver a subirlos o borrarlos """
-    os.makedirs(JOBS_DIR, exist_ok=True)
-    salida = []
-    for nombre in sorted(os.listdir(JOBS_DIR), reverse=True):
-        ruta = os.path.join(JOBS_DIR, nombre)
-        manifiesto = os.path.join(ruta, "manifest.json")
-        if not os.path.isfile(manifiesto):
-            continue
-        try:
-            with open(manifiesto, encoding="utf-8") as f:
-                m = json.load(f)
-        except Exception:
-            continue
-        salida.append({
-            "nombre": nombre, "ruta": ruta,
-            "job_id": m.get("job_id"), "creado": m.get("created_at"),
-            "libros": m.get("total_books"), "fragmentos": m.get("total_chunks"),
-            "dominios": m.get("domains", []),
-            "mb": round(sum(os.path.getsize(os.path.join(ruta, f))
-                            for f in os.listdir(ruta)) / (1024 * 1024), 2),
-        })
-    return {"trabajos": salida, "carpeta": JOBS_DIR}
+# Preparar el trabajo de extracción (libros disponibles, preparar, la lista): servidor de Rust
+# (prig_biblioteca::trabajos, routes/trabajos.rs)
 
 
 # ======================================================================
@@ -1680,17 +1014,6 @@ def guardar_perfiles_config(req: perfiles_config.PerfilGuardarRequest):
     return {"exito": True, "perfil_activo": req.perfil_activo}
 
 
-@app.post("/api/config/profiles/reset")
-def restablecer_perfiles_config():
-    """ Restablece los perfiles a los predeterminados de fábrica. """
-    datos = {
-        "perfil_activo": "catppuccin_equilibrado",
-        "perfiles": perfiles_config.PERFILES_PREDETERMINADOS
-    }
-    perfiles_config.guardar_perfiles(datos)
-    return datos
-
-
 @app.get("/api/config/apariencia")
 def obtener_apariencia_config():
     """ Devuelve la configuración de apariencia y temas guardada en disco. """
@@ -1706,21 +1029,6 @@ def guardar_apariencia_config(datos: Dict[str, Any]):
     return {"ok": True}
 
 
-@app.get("/api/config/sintaxis")
-def obtener_sintaxis_config():
-    """ Devuelve la configuración de sintaxis, tokens y efectos guardada en disco. """
-    return perfiles_config.cargar_sintaxis()
-
-
-@app.post("/api/config/sintaxis")
-def guardar_sintaxis_config(datos: Dict[str, Any]):
-    """ Guarda la configuración de sintaxis y tokens de forma persistente en disco. """
-    exito = perfiles_config.guardar_sintaxis(datos)
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de sintaxis en disco.")
-    return {"ok": True}
-
-
 @app.get("/api/config/motor_movimiento")
 def obtener_motor_movimiento_config():
     """ Devuelve los parámetros del motor de movimiento guardados en disco. """
@@ -1733,21 +1041,6 @@ def guardar_motor_movimiento_config(datos: Dict[str, Any]):
     exito = perfiles_config.guardar_motor_movimiento(datos)
     if not exito:
         raise HTTPException(status_code=500, detail="No se pudo guardar la configuración del motor de movimiento en disco.")
-    return {"ok": True}
-
-
-@app.get("/api/config/audio_reactivo")
-def obtener_audio_reactivo_config():
-    """ Devuelve los parámetros del sistema de audio reactivo guardados en disco. """
-    return perfiles_config.cargar_audio_reactivo()
-
-
-@app.post("/api/config/audio_reactivo")
-def guardar_audio_reactivo_config(datos: Dict[str, Any]):
-    """ Guarda los parámetros del sistema de audio reactivo en disco. """
-    exito = perfiles_config.guardar_audio_reactivo(datos)
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de audio reactivo en disco.")
     return {"ok": True}
 
 
@@ -1769,20 +1062,6 @@ def guardar_accesibilidad_config(datos: Dict[str, Any]):
     return {"ok": True}
 
 
-@app.get("/api/config/estado_completo")
-def obtener_estado_completo():
-    """ Devuelve todo el estado unificado de configuración y apariencia. """
-    return perfiles_config.cargar_estado_completo()
-
-
-@app.post("/api/config/estado_completo")
-def guardar_estado_completo(datos: Dict[str, Any]):
-    """ Guarda todo el estado unificado de configuración en disco. """
-    res = perfiles_config.guardar_estado_completo(datos)
-    return {"ok": True, "detalle": res}
-
-
-
 # ======================================================================
 # Ficha de libro: analizar un libro entero con un flujo de agentes
 # ======================================================================
@@ -1793,33 +1072,7 @@ class FichaRequest(BaseModel):
     flujo_id: Optional[str] = None
 
 
-@app.get("/api/libros/analizables")
-def libros_analizables():
-    """ Los libros importados, con cuánto material hay de cada uno.
-
-    Se enseña el recuento porque decide si merece la pena analizarlo: un libro con
-    veinte conceptos y sin capítulos detectados dará una ficha pobre hagas lo que
-    hagas, y más vale volver a extraerlo que gastar siete pasos de modelo.
-    """
-    return {"libros": perfil_libro.listar()}
-
-
-@app.get("/api/libros/ficha/{source_id}")
-def libro_ficha(source_id: str):
-    ficha = perfil_libro.obtener(source_id)
-    if not ficha:
-        raise HTTPException(status_code=404, detail="Ese libro todavía no tiene ficha")
-    return ficha
-
-
-@app.get("/api/libros/resumen/{source_id}")
-def libro_resumen(source_id: str):
-    """ Lo que leería el flujo, tal cual. Sirve para ver por qué falló un análisis. """
-    variables = perfil_libro.variables(source_id)
-    if not variables:
-        raise HTTPException(status_code=404, detail="Ese libro no está en la base")
-    return {"variables": variables,
-            "tokens": {k: int(len(v) / 3.6) for k, v in variables.items()}}
+# Los libros analizables, la ficha guardada y lo que leería el flujo: servidor de Rust (routes/kb.rs)
 
 
 @app.post("/api/libros/ficha")
@@ -1873,50 +1126,17 @@ def libro_analizar(req: FichaRequest):
     return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
-@app.get("/api/libros/material")
-def libro_material(concepto: str = Query(...)):
-    """ Con qué se puede montar un ejercicio sobre este concepto.
-
-    Devuelve de qué libro sale, en qué páginas, qué ejemplos resueltos hay cerca y
-    qué preguntas trae el propio texto. Un ejercicio construido sobre esto remite a
-    algo que el alumno puede ir a leer; uno inventado, no.
-    """
-    return perfil_libro.material_para_ejercicio(concepto)
-
-
-@app.get("/api/libros/contexto-plan")
-def libro_contexto_plan(objetivo: str = Query(default="")):
-    """ Las fichas resumidas, para que quien arma un plan sepa con qué cuenta """
-    return {"contexto": perfil_libro.contexto_para_plan(objetivo)}
+# El material para un ejercicio y el contexto para el plan: servidor de Rust (prig_biblioteca::perfil)
 
 
 # ======================================================================
 # Explorar carpetas y sondear libros antes de extraerlos
 # ======================================================================
 
-class SondeoRequest(BaseModel):
-    rutas: List[str] = []           # uno o varios libros
-    carpeta: Optional[str] = None   # o una carpeta entera
-    con_modelo: bool = True
-    modelo: Optional[str] = None
-    tope: int = 40
-
-
 @app.get("/api/explorador/atajos")
 def explorador_atajos():
     """ Dónde suele haber libros, para no empezar navegando desde la raíz """
     return {"atajos": explorador.atajos()}
-
-
-@app.get("/api/explorador/listar")
-def explorador_listar(ruta: Optional[str] = None, recursivo: bool = False):
-    """ Carpetas y libros de una ruta. Solo nombres y tamaños, nunca contenido. """
-    try:
-        return explorador.listar(ruta, recursivo=recursivo)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except (NotADirectoryError, FileNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get("/api/explorador/buscar")
@@ -1928,59 +1148,7 @@ def explorador_buscar(q: str = Query(...), desde: Optional[str] = None):
         raise HTTPException(status_code=403, detail=str(e))
 
 
-@app.post("/api/sondeo")
-def sondear_libros(req: SondeoRequest):
-    """ Sondeo rápido: mide el archivo y, si se pide, lo clasifica con el modelo.
-
-    Va en flujo continuo porque una carpeta de treinta libros son treinta medidas
-    y treinta llamadas cortas al modelo: ver los resultados aparecer uno a uno es
-    lo que permite parar en cuanto se ve que la carpeta no era la que tocaba.
-    """
-    rutas = list(req.rutas)
-    if req.carpeta:
-        try:
-            listado = explorador.listar(req.carpeta, recursivo=True)
-        except PermissionError as e:
-            raise HTTPException(status_code=403, detail=str(e))
-        except (NotADirectoryError, FileNotFoundError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        rutas += [l["ruta"] for l in listado["libros"]]
-
-    # Solo lo que el explorador dejaría navegar: el sondeo SÍ lee el archivo, así
-    # que aquí el límite tiene que comprobarse de verdad.
-    rutas = [r for r in dict.fromkeys(rutas) if explorador.permitida(r)][:req.tope]
-    if not rutas:
-        raise HTTPException(status_code=400,
-                            detail="No hay ningún libro que sondear en esa selección")
-
-    modelo = req.modelo or ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-
-    def emitir():
-        yield json.dumps({"tipo": "inicio", "total": len(rutas)}) + "\n"
-        for n, ruta in enumerate(rutas, 1):
-            yield json.dumps({"tipo": "sondeando", "n": n, "total": len(rutas),
-                              "nombre": os.path.basename(ruta)}, ensure_ascii=False) + "\n"
-            try:
-                r = sondeo.sondear(ruta, modelo=modelo, con_modelo=req.con_modelo)
-                r["tipo"] = "resultado"
-                r["n"] = n
-            except Exception as err:
-                r = {"tipo": "fallo", "n": n, "ruta": ruta,
-                     "nombre": os.path.basename(ruta), "mensaje": str(err)}
-            yield json.dumps(r, ensure_ascii=False) + "\n"
-        yield json.dumps({"tipo": "fin"}) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
-
-
-@app.post("/api/sondeo/preparar")
-def sondeo_preparar(req: JobPrepareRequest):
-    """ Del sondeo al trabajo de extracción, con los ajustes que recomendó.
-
-    Es el paso que evita tener que recordar qué decía el sondeo: los libros van con
-    el campo ya elegido y el tamaño de fragmento que les convenía.
-    """
-    return job_prepare(req)
+# El sondeo de libros y preparar desde él: servidor de Rust (prig_biblioteca::sondeo, routes/trabajos.rs)
 
 
 # Kaggle: buscar notebooks de la comunidad y leerlos celda a celda con un modelo
@@ -2041,17 +1209,6 @@ def kaggle_dataset(ref: str):
     return _kaggle_ficha("dataset", ref)
 
 
-@app.get("/api/kaggle/competiciones")
-def kaggle_competiciones(q: str = "", categoria: str = "", orden: str = "agrupadas", pagina: int = Query(default=1, ge=1, le=100),
-                         grupo: str = ""):
-    return _kaggle(kaggle_explorar.buscar_competiciones, q, categoria, orden, pagina, grupo)
-
-
-@app.get("/api/kaggle/competicion")
-def kaggle_competicion(ref: str):
-    return _kaggle_ficha("competicion", ref)
-
-
 @app.post("/api/kaggle/descargar")
 def kaggle_descargar(req: KaggleDatosRequest):
     """ Baja y descomprime los datos en kaggle_datos/<slug>/ del proyecto (NDJSON con el progreso) """
@@ -2093,17 +1250,6 @@ class KagglePdfRequest(BaseModel):
     chat: Optional[List[Dict[str, str]]] = None
 
 
-@app.get("/api/kaggle/colecciones")
-def kaggle_colecciones_listar():
-    return {"colecciones": kaggle_colecciones.listar(), "guardados": kaggle_colecciones.guardados(),
-            "colores": list(kaggle_colecciones.COLORES)}
-
-
-@app.post("/api/kaggle/colecciones")
-def kaggle_colecciones_crear(req: KaggleColeccionRequest):
-    return _kaggle(kaggle_colecciones.crear, req.nombre or "", req.descripcion or "", req.color)
-
-
 @app.get("/api/kaggle/colecciones/{id_}")
 def kaggle_coleccion(id_: str):
     return _kaggle(kaggle_colecciones.obtener, id_)
@@ -2119,48 +1265,12 @@ def kaggle_coleccion_borrar(id_: str):
     return _kaggle(kaggle_colecciones.borrar, id_)
 
 
-@app.post("/api/kaggle/colecciones/{id_}/items")
-def kaggle_coleccion_anadir(id_: str, req: KaggleItemRequest):
-    return _kaggle(kaggle_colecciones.anadir, id_, req.tipo, req.ref, req.datos)
-
-
-@app.delete("/api/kaggle/colecciones/{id_}/items")
-def kaggle_coleccion_quitar(id_: str, tipo: str, ref: str):
-    return _kaggle(kaggle_colecciones.quitar, id_, tipo, ref)
-
-
-@app.patch("/api/kaggle/colecciones/{id_}/items")
-def kaggle_coleccion_nota(id_: str, req: KaggleItemRequest):
-    return _kaggle(kaggle_colecciones.anotar, id_, req.tipo, req.ref, req.nota or "")
-
-
-@app.post("/api/kaggle/pdf")
-def kaggle_pdf_crear(req: KagglePdfRequest):
-    """ Notebook(s) explicado(s) en PDF, en <proyecto>/kaggle_pdf/ """
-    opciones = {"nivel": req.nivel, "solo_explicadas": req.solo_explicadas, "guia": req.guia,
-                "salidas": req.salidas, "chat": req.chat}
-    if req.coleccion:
-        coleccion = _kaggle(kaggle_colecciones.obtener, req.coleccion)
-        return _kaggle(kaggle_pdf.pdf_coleccion, coleccion, file_mgr.base_dir, opciones)
-    if not req.ref:
-        raise HTTPException(status_code=400, detail="Falta el notebook o la colección.")
-    return _kaggle(kaggle_pdf.pdf_notebook, req.ref, file_mgr.base_dir, opciones)
-
-
 def _ruta_pdf_segura(ruta: str) -> str:
     raiz = os.path.realpath(os.path.join(file_mgr.base_dir, kaggle_pdf.CARPETA_PDF))
     real = os.path.realpath(ruta)
     if not real.startswith(raiz + os.sep) or not real.endswith(".pdf") or not os.path.isfile(real):
         raise HTTPException(status_code=404, detail="Ese PDF no existe.")
     return real
-
-
-@app.get("/api/kaggle/pdf")
-def kaggle_pdf_archivo(ruta: str, descargar: bool = False):
-    """ El PDF generado: para verlo dentro de Prig o para «Guardar como…» """
-    real = _ruta_pdf_segura(ruta)
-    return FileResponse(real, media_type="application/pdf", filename=os.path.basename(real),
-                        content_disposition_type="attachment" if descargar else "inline")
 
 
 @app.post("/api/kaggle/pdf/abrir")
@@ -2175,25 +1285,9 @@ def kaggle_pdf_abrir(req: KaggleRefRequest):
     return {"ok": True}
 
 
-@app.get("/api/kaggle/mis_datos")
-def kaggle_mis_datos():
-    return {"datos": kaggle_explorar.mis_datos(file_mgr.base_dir), "carpeta": kaggle_explorar.CARPETA_DATOS}
-
-
 @app.get("/api/kaggle/previa")
 def kaggle_previa(ruta: str):
     return _kaggle(kaggle_explorar.vista_previa, ruta, file_mgr.base_dir)
-
-
-@app.get("/api/kaggle/archivo")
-def kaggle_archivo(ruta: str):
-    """ Una imagen de los datos descargados, para verla en la vista previa """
-    raiz = os.path.realpath(os.path.join(file_mgr.base_dir, kaggle_explorar.CARPETA_DATOS))
-    real = os.path.realpath(ruta)
-    if not real.startswith(raiz + os.sep) or not os.path.isfile(real) or \
-            not real.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
-        raise HTTPException(status_code=404, detail="No encontrado.")
-    return FileResponse(real)
 
 
 # Explicar los datos de un dataset o una competición: servidor de Rust (routes/profesor.rs)
@@ -2243,29 +1337,10 @@ def github_estado():
     return github_lector.estado()
 
 
-@app.post("/api/github/token")
-def github_token(req: GithubTokenRequest):
-    return _github(github_lector.guardar_token, req.texto)
-
-
-@app.delete("/api/github/token")
-def github_borrar_token():
-    return github_lector.borrar_token()
-
-
 @app.get("/api/github/buscar")
 def github_buscar(q: str = "", lenguaje: str = "", orden: str = "estrellas", pagina: int = Query(default=1, ge=1, le=50),
                   estrellas_min: int = Query(default=0, ge=0), tema: str = ""):
     return _github(github_lector.buscar, q, lenguaje, orden, pagina, estrellas_min, tema)
-
-
-@app.get("/api/github/repo")
-def github_repo(ref: str, refrescar: bool = False):
-    info = dict(_github(github_lector.abrir, ref, refrescar))
-    info["explicadas"] = github_lector.explicadas(info)
-    info["guardado"] = any(g["ref"] == info["ref"] for g in github_lector.guardados())
-    info["local"] = github_lector.local(info["ref"], file_mgr.base_dir)
-    return info
 
 
 @app.get("/api/github/archivo")
@@ -2291,38 +1366,11 @@ def github_quitar(ref: str):
     return {"repos": github_lector.quitar(ref)}
 
 
-@app.post("/api/github/descargar")
-def github_descargar(req: GithubRefRequest):
-    """ El repositorio en <proyecto>/github_repos/<nombre>/ (NDJSON con el progreso) """
-    cancelar = threading.Event()
-    with ai_engine._streams_lock:
-        ai_engine.__dict__.setdefault("_cancelables", set()).add(cancelar)
-
-    def trabajo(avisar):
-        try:
-            return github_lector.descargar(req.ref, file_mgr.base_dir, avisar, cancelar)
-        finally:
-            with ai_engine._streams_lock:
-                ai_engine._cancelables.discard(cancelar)
-    return _ndjson_en_hilo(trabajo)
-
-
 @app.post("/api/github/exportar")
 def github_exportar(req: GithubRefRequest):
     """ nota="md": la explicación en Markdown; nota="pdf": el código explicado en PDF """
     fn = github_lector.exportar_pdf if (req.nota or "pdf") == "pdf" else github_lector.exportar_markdown
     return _github(fn, req.ref, file_mgr.base_dir)
-
-
-@app.get("/api/github/exportado")
-def github_exportado(ruta: str, descargar: bool = False):
-    raiz = os.path.realpath(os.path.join(file_mgr.base_dir, github_lector.CARPETA_EXPORT))
-    real = os.path.realpath(ruta)
-    if not real.startswith(raiz + os.sep) or not os.path.isfile(real):
-        raise HTTPException(status_code=404, detail="No existe.")
-    tipo = "application/pdf" if real.endswith(".pdf") else "text/markdown; charset=utf-8"
-    return FileResponse(real, media_type=tipo, filename=os.path.basename(real),
-                        content_disposition_type="attachment" if descargar else "inline")
 
 
 # WIDGET GITHUB PROFILE (github_stats_widget.py)
@@ -2362,52 +1410,6 @@ def github_widget_guardar_config(req: GithubWidgetConfigRequest):
     return {"ok": True, "config": cfg}
 
 
-@app.post("/api/github/widget/preview")
-def github_widget_preview(req: GithubWidgetPreviewRequest):
-    cfg = github_stats_widget.leer_config()
-    if req.config:
-        cfg.update(req.config)
-
-    almacen = globals().get("desafios_almacen")
-    prog = globals().get("progreso")
-
-    stats = github_stats_widget.recolectar_estadisticas(
-        progreso_mgr=prog,
-        almacen_desafios=almacen,
-        extras_cliente=req.extras
-    )
-    svg = github_stats_widget.generar_svg(stats, cfg)
-
-    token = (github_lector.token() or {}).get("token")
-    login = "username"
-    if token:
-        try:
-            r = requests_lib.get(f"{github_lector.API}/user", headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "Prig-IDE"
-            }, timeout=5)
-            if r.status_code == 200:
-                login = r.json().get("login") or "username"
-        except Exception:
-            pass
-
-    markdown = (
-        f"<!-- PRIG-STATS:START -->\n"
-        f"[![Prig IDE Stats](https://raw.githubusercontent.com/{login}/{login}/main/prig-stats.svg)]"
-        f"(https://github.com/{login})\n"
-        f"<!-- PRIG-STATS:END -->"
-    )
-
-    return {
-        "svg": svg,
-        "stats": stats,
-        "config": cfg,
-        "login": login,
-        "markdown": markdown
-    }
-
-
 @app.post("/api/github/widget/publicar")
 def github_widget_publicar(req: GithubWidgetPublicarRequest):
     token = (github_lector.token() or {}).get("token")
@@ -2441,12 +1443,6 @@ def github_widget_publicar(req: GithubWidgetPublicarRequest):
     return res
 
 
-@app.get("/api/kaggle/estado")
-def kaggle_estado():
-    """ Si hay cuenta conectada; nunca devuelve la clave ni el token """
-    return kaggle_lector.estado()
-
-
 @app.post("/api/kaggle/credenciales")
 def kaggle_credenciales(req: KaggleCredencialesRequest):
     return _kaggle(kaggle_lector.guardar_credenciales, req.texto)
@@ -2455,15 +1451,6 @@ def kaggle_credenciales(req: KaggleCredencialesRequest):
 @app.delete("/api/kaggle/credenciales")
 def kaggle_borrar_credenciales():
     return kaggle_lector.borrar_credenciales()
-
-
-@app.get("/api/kaggle/buscar")
-def kaggle_buscar(q: str = "", orden: str = "relevancia", pagina: int = Query(default=1, ge=1, le=100),
-                  competicion: str = "", dataset: str = "", usuario: str = "", tipo: str = "",
-                  votos_min: int = Query(default=0, ge=0), dias: int = Query(default=0, ge=0),
-                  gpu: Optional[bool] = None, padre: str = ""):
-    return _kaggle(kaggle_lector.buscar, q, orden, pagina, competicion, dataset, usuario,
-                   tipo=tipo, votos_min=votos_min, dias=dias, gpu=gpu, padre=padre)
 
 
 @app.get("/api/kaggle/notebook")
@@ -2480,12 +1467,6 @@ def kaggle_notebook(ref: str, refrescar: bool = False):
     return vista
 
 
-@app.post("/api/kaggle/importar")
-def kaggle_importar(req: KaggleRefRequest):
-    """ El .ipynb ORIGINAL en kaggle_notebooks/ del proyecto abierto """
-    return _kaggle(kaggle_lector.guardar_en_workspace, req.ref, file_mgr.base_dir)
-
-
 @app.get("/api/kaggle/lecturas")
 def kaggle_lecturas():
     return {"lecturas": kaggle_lector.resumen_lecturas()}
@@ -2493,13 +1474,6 @@ def kaggle_lecturas():
 
 # Explicar un notebook (celda, guía, ruta de estudio, preguntas): servidor de Rust (routes/profesor.rs)
 
-
-@app.get("/api/workspace")
-def get_workspace():
-    return {
-        "path": file_mgr.base_dir,
-        "name": os.path.basename(file_mgr.base_dir) or file_mgr.base_dir
-    }
 
 class SegundaCarpetaRequest(BaseModel):
     path: Optional[str] = None
@@ -2543,12 +1517,6 @@ class IdeBuscarRequest(BaseModel):
     solo: Optional[List[str]] = None
 
 
-@app.post("/api/ide/buscar")
-def ide_buscar(req: IdeBuscarRequest):
-    return _ide(ide.buscar, req.consulta, req.regex, req.mayusculas, req.palabra,
-                req.incluir, req.excluir)
-
-
 class IdeRenombrarRequest(BaseModel):
     path: str
     destino: str
@@ -2561,11 +1529,6 @@ class IdeRutaRequest(BaseModel):
 class IdeProblemasRequest(BaseModel):
     lenguaje: str
     codigo: str
-
-
-@app.get("/api/ide/recientes")
-def ide_recientes():
-    return {"carpetas": ide.recientes()}
 
 
 # ---------------------------------------------------------------------------
@@ -2582,18 +1545,6 @@ class RemoveProjectRequest(BaseModel):
     path: str
 
 
-@app.get("/api/workspace/projects")
-def workspace_projects():
-    return {
-        "actual": {
-            "path": file_mgr.base_dir,
-            "name": os.path.basename(file_mgr.base_dir) or file_mgr.base_dir
-        },
-        "guardados": ide.proyectos_guardados(),
-        "recientes": ide.recientes()
-    }
-
-
 @app.get("/api/workspace/directories")
 def workspace_directories(ruta: Optional[str] = Query(default=None)):
     return _ide(ide.listar_directorios, ruta)
@@ -2601,10 +1552,6 @@ def workspace_directories(ruta: Optional[str] = Query(default=None)):
 
 # La pantalla completa la alterna la ventana de Rust (routes/escritorio.rs)
 
-
-@app.get("/api/tree")
-def get_tree(path: Optional[str] = None):
-    return file_mgr.get_file_tree(path)
 
 def _exec_timeout() -> int:
     try:
@@ -2637,10 +1584,6 @@ def api_shutdown():
     """ Endpoint para solicitar el apagado seguro de análisis y procesos desde el cliente """
     cleanup_all_processes()
     return {"status": "ok", "message": "Análisis y procesos apagados correctamente."}
-
-@app.get("/api/ai/status")
-def get_ai_status():
-    return ai_engine.check_ollama_status()
 
 @app.post("/api/ai/reload")
 @app.get("/api/ai/reload")
@@ -2860,10 +1803,6 @@ def launch_terminal_update():
 
     return {"status": "error", "message": "No se encontró un emulador de terminal compatible instalado en el sistema."}
 
-@app.get("/api/ai/config")
-def get_ai_config():
-    return ai_engine.get_config()
-
 class AIConfigUpdateRequest(BaseModel):
     ollama_url: Optional[str] = None
     agent1_model: Optional[str] = None
@@ -2888,27 +1827,12 @@ class AIConfigUpdateRequest(BaseModel):
     repeat_penalty: Optional[float] = None
     exec_timeout: Optional[int] = None
 
-@app.post("/api/ai/config")
-def update_ai_config(req: AIConfigUpdateRequest):
-    data = req.model_dump(exclude_unset=True)
-    return ai_engine.update_config(data)
-
 class ModelDeleteRequest(BaseModel):
     model: str
-
-@app.get("/api/ai/models")
-def get_ai_models():
-    status = ai_engine.check_health()
-    return {"models": status.get("models", [])}
 
 @app.get("/api/ai/models/detailed")
 def get_detailed_models():
     return ai_engine.get_detailed_models()
-
-@app.post("/api/ai/models/delete")
-def delete_ai_model(req: ModelDeleteRequest):
-    success = ai_engine.delete_model(req.model)
-    return {"status": "success" if success else "error", "model": req.model}
 
 @app.post("/api/ai/pull")
 def pull_model(req: ModelPullRequest):
@@ -3735,287 +2659,8 @@ def banco_borrar():
     return {"borrado": bancos.borrar(raiz)}
 
 
-# ==========================================
-# ENDPOINTS: SISTEMA DE PLAN DE ESTUDIO (3 AGENTES ESPECIALISTAS)
-# ==========================================
+# Plan de estudio de los tres agentes (/api/study-plan/*): en el servidor de Rust (routes/plan_estudio.rs y guiado.rs)
 
-class StudyPlanInitRequest(BaseModel):
-    user_goal: str
-
-class StudyPlanAgentRunRequest(BaseModel):
-    plan_id: str
-    model: str = "qwen2.5-coder:7b"
-
-class StudyPlanApproveRequest(BaseModel):
-    plan_id: str
-    step: str # "knowledge" | "practical" | "learning"
-
-class StudyPlanChangeRequestInput(BaseModel):
-    plan_id: str
-    user_prompt: str
-    model: str = "qwen2.5-coder:7b"
-
-@app.post("/api/study-plan/init")
-def init_study_plan(req: StudyPlanInitRequest):
-    state = study_plan_engine.create_new_plan(req.user_goal)
-    return state.model_dump()
-
-@app.get("/api/study-plan/list")
-def list_study_plans():
-    return study_plan_engine.list_all_plans()
-
-@app.get("/api/study-plan/state/{plan_id}")
-def get_study_plan_state(plan_id: str, version: Optional[int] = Query(default=None)):
-    state = study_plan_engine.load_state(plan_id, version)
-    if not state:
-        raise HTTPException(status_code=404, detail="Plan de estudio no encontrado.")
-    return state.model_dump()
-
-@app.delete("/api/study-plan/{plan_id}")
-def delete_study_plan(plan_id: str):
-    success = study_plan_engine.delete_plan(plan_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Plan no encontrado para eliminar.")
-    return {"status": "deleted", "plan_id": plan_id}
-
-
-@app.post("/api/study-plan/agent1")
-def run_agent1_knowledge_architect(req: StudyPlanAgentRunRequest):
-    state = study_plan_engine.load_state(req.plan_id)
-    if not state:
-        raise HTTPException(status_code=404, detail="Plan no encontrado.")
-
-    library_items = book_service.list_books()
-    
-    try:
-        raw_kmap = ai_engine.run_knowledge_architect(state.user_goal, library_items, model=req.model)
-        kmap = KnowledgeMap.model_validate(raw_kmap)
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al ejecutar Agente 1 (Knowledge Architect): {str(err)}")
-    
-    # Validación Determinista Cruzada con PlanValidator
-    warnings = PlanValidator.validate_knowledge_map(kmap, library_items)
-
-    state.knowledge_map = kmap
-    state.status = PlanStatusEnum.KNOWLEDGE_REVIEW
-    
-    steps = [
-        TraceStep(step="ANALYZING_GOAL", message=f"Objetivo analizado: '{state.user_goal}'"),
-        TraceStep(step="SCANNING_LIBRARY", message=f"Fuentes escaneadas en Biblioteca: {len(library_items)} ítems"),
-        TraceStep(step="EXTRACTING_CONCEPTS", message="Conceptos y matriz de dependencias extraída con evidencias"),
-        TraceStep(step="BUILDING_KNOWLEDGE_MAP", message="KNOWLEDGE_MAP construido exitosamente")
-    ]
-    if warnings:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message=f"⚠️ PlanValidator detectó {len(warnings)} advertencias de IDs: {'; '.join(warnings)}", status="WARNING"))
-    else:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message="✅ PlanValidator: Validación cruzada de IDs 100% Correcta", status="DONE"))
-
-    trace = DecisionTrace(
-        agent_name="Knowledge Architect",
-        status="COMPLETED",
-        steps=steps,
-        stats={
-            "sources_scanned": len(library_items),
-            "domains_count": len(kmap.domains),
-            "prerequisites_count": len(kmap.prerequisites),
-            "validator_warnings": len(warnings)
-        }
-    )
-    state.decision_traces.append(trace)
-    study_plan_engine.save_state(state)
-    return state.model_dump()
-
-@app.post("/api/study-plan/agent2")
-def run_agent2_practice_architect(req: StudyPlanAgentRunRequest):
-    state = study_plan_engine.load_state(req.plan_id)
-    if not state or not state.knowledge_map:
-        raise HTTPException(status_code=400, detail="Se requiere aprobar o ejecutar el Módulo 1 (KnowledgeMap) primero.")
-
-    try:
-        raw_curr = ai_engine.run_practice_architect(state.knowledge_map.model_dump(), model=req.model)
-        curr = PracticalCurriculum.model_validate(raw_curr)
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al ejecutar Agente 2 (Practice Architect): {str(err)}")
-
-    # Validación Determinista Cruzada con PlanValidator (Conceptos vs KnowledgeMap)
-    warnings = PlanValidator.validate_practical_curriculum(curr, state.knowledge_map)
-
-
-    state.practical_curriculum = curr
-    state.status = PlanStatusEnum.PRACTICAL_REVIEW
-
-    steps = [
-        TraceStep(step="RECEIVING_KNOWLEDGE_MAP", message="KNOWLEDGE_MAP procesado"),
-        TraceStep(step="BUILDING_PRACTICAL_MODULES", message=f"Creados {len(curr.modules)} módulos de objetivos prácticos"),
-        TraceStep(step="DEFINING_VALIDATION_CRITERIA", message="Criterios de validación del estudiante (validation_criteria) establecidos")
-    ]
-    if warnings:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message=f"⚠️ PlanValidator: {'; '.join(warnings)}", status="WARNING"))
-    else:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message="✅ PlanValidator: Coincidencia cruzada de concept_ids 100% Correcta", status="DONE"))
-
-    trace = DecisionTrace(
-        agent_name="Practice & Curriculum Architect",
-        status="COMPLETED",
-        steps=steps,
-        stats={"modules_count": len(curr.modules), "objectives_count": len(curr.objectives), "validator_warnings": len(warnings)}
-    )
-    state.decision_traces.append(trace)
-    study_plan_engine.save_state(state)
-    return state.model_dump()
-
-@app.post("/api/study-plan/agent3")
-def run_agent3_notebook_manager(req: StudyPlanAgentRunRequest):
-    state = study_plan_engine.load_state(req.plan_id)
-    if not state or not state.practical_curriculum:
-        raise HTTPException(status_code=400, detail="Se requiere ejecutar el Módulo 2 (PracticalCurriculum) primero.")
-
-    library_items = book_service.list_books()
-    code_items = [b for b in library_items if b.get("category_id") in ["code", "notebooks"] or b.get("ext") in ["py", "ipynb"]]
-
-    try:
-        raw_exec = ai_engine.run_notebook_manager(state.practical_curriculum.model_dump(), code_items, model=req.model)
-        exec_plan = ExecutableLearningPlan.model_validate(raw_exec)
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al ejecutar Agente 3 (Notebook Manager): {str(err)}")
-
-    # Validación Determinista Cruzada
-    warnings = PlanValidator.validate_executable_plan(exec_plan, state.practical_curriculum)
-
-
-    # Ejecutar duplicación física de cuadernos fuera de la biblioteca e inyección de celdas explicativas
-    workspace_notebooks_dir = os.path.join(study_plan_engine.workspace_dir, "notebooks_plan")
-    os.makedirs(workspace_notebooks_dir, exist_ok=True)
-
-    curr_modules_dict = {m.module_id: m for m in state.practical_curriculum.modules} if state.practical_curriculum else {}
-
-    for mod in exec_plan.modules_notebooks:
-        curr_mod = curr_modules_dict.get(mod.module_id)
-        mod_name = curr_mod.name if curr_mod else mod.module_name
-        mod_obj = curr_mod.objective if curr_mod else "Practicar los conceptos del módulo"
-        val_criteria = curr_mod.validation_criteria if curr_mod else []
-
-        for nb in mod.notebooks:
-            dest_file_name = f"{mod.module_id}_{nb.notebook_id}.ipynb"
-            dest_path = os.path.join(workspace_notebooks_dir, dest_file_name)
-            
-            source_code = ""
-            if nb.source_library_notebook and os.path.exists(nb.source_library_notebook):
-                try:
-                    with open(nb.source_library_notebook, 'r', encoding='utf-8', errors='ignore') as sf:
-                        source_code = sf.read()
-                except Exception:
-                    pass
-
-            nb_content = NotebookSafetyLayer.generate_explained_notebook_content(
-                module_name=mod_name,
-                objective=mod_obj,
-                validation_criteria=val_criteria,
-                source_code=source_code
-            )
-
-            try:
-                written_path = NotebookSafetyLayer.write_executable_notebook(dest_path, nb_content)
-                nb.executable_path = written_path
-                nb.is_original_protected = True
-                nb.line_by_line_explanations_added = True
-                nb.validation_tests_included = True
-            except Exception as err:
-                print("Advertencia en generación de cuaderno:", err)
-
-
-    state.executable_learning_plan = exec_plan
-    state.status = PlanStatusEnum.LEARNING_REVIEW
-
-    steps = [
-        TraceStep(step="SCANNING_LIBRARY_CODE", message=f"Archivos de código analizados: {len(code_items)}"),
-        TraceStep(step="PHYSICAL_COPY_ENFORCEMENT", message="🔒 Copias editables generadas fuera de ~/.prig_books/ (Originales 100% Protegidos)"),
-        TraceStep(step="PLAN_READY", message="EXECUTABLE_LEARNING_PLAN generado exitosamente")
-    ]
-    if warnings:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message=f"⚠️ PlanValidator: {'; '.join(warnings)}", status="WARNING"))
-    else:
-        steps.append(TraceStep(step="PLAN_VALIDATOR_CHECK", message="✅ PlanValidator: Validación de cuadernos y módulos 100% Correcta", status="DONE"))
-
-    trace = DecisionTrace(
-        agent_name="Notebook & Learning Manager",
-        status="COMPLETED",
-        steps=steps,
-        stats={
-            "notebooks_copied": exec_plan.total_notebooks_copied_and_edited,
-            "notebooks_created": exec_plan.total_notebooks_created,
-            "validator_warnings": len(warnings)
-        }
-    )
-    state.decision_traces.append(trace)
-    study_plan_engine.save_state(state)
-    return state.model_dump()
-
-
-@app.post("/api/study-plan/approve")
-def approve_study_plan_step(req: StudyPlanApproveRequest):
-    steps = {
-        "knowledge": study_plan_engine.approve_knowledge_step,
-        "practical": study_plan_engine.approve_practical_step,
-        "learning": study_plan_engine.approve_learning_step,
-    }
-    handler = steps.get(req.step)
-    if handler is None:
-        raise HTTPException(status_code=400, detail=f"Paso de aprobación no válido: {req.step}")
-    try:
-        state = handler(req.plan_id)
-    except ValueError as err:
-        # Plan inexistente o transición de estado no permitida: es un error del cliente
-        raise HTTPException(status_code=400, detail=str(err))
-    return state.model_dump()
-
-@app.post("/api/study-plan/change-request")
-def handle_change_request(req: StudyPlanChangeRequestInput):
-    state = study_plan_engine.load_state(req.plan_id)
-    if not state:
-        raise HTTPException(status_code=404, detail="Plan no encontrado.")
-
-    try:
-        # Asistente Diseñador interpreta la solicitud del usuario en un ChangeRequest estructurado
-        raw_cr = ai_engine.interpret_change_request(req.user_prompt, state.status.value, model=req.model)
-        cr = ChangeRequest(
-            target_agent=raw_cr.get("target_agent", "KNOWLEDGE_ARCHITECT"),
-            action=raw_cr.get("action", ActionEnum.ADD_PREREQUISITE),
-            target=raw_cr.get("target", "General"),
-            parameter=raw_cr.get("parameter", ""),
-            user_prompt=req.user_prompt,
-            reason=raw_cr.get("reason", "Solicitud del usuario")
-        )
-        updated_state = study_plan_engine.apply_change_request(req.plan_id, cr)
-        return updated_state.model_dump()
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al procesar solicitud de cambio: {str(err)}")
-
-
-class ToggleCriterionRequest(BaseModel):
-    plan_id: str
-    module_id: str
-    criterion_text: str
-
-class ToggleNotebookRequest(BaseModel):
-    plan_id: str
-    notebook_id: str
-
-@app.post("/api/study-plan/progress/toggle-criterion")
-def toggle_criterion_progress(req: ToggleCriterionRequest):
-    try:
-        state = study_plan_engine.toggle_validation_criterion(req.plan_id, req.module_id, req.criterion_text)
-    except ValueError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    return state.model_dump()
-
-@app.post("/api/study-plan/progress/toggle-notebook")
-def toggle_notebook_progress(req: ToggleNotebookRequest):
-    try:
-        state = study_plan_engine.toggle_notebook_completion(req.plan_id, req.notebook_id)
-    except ValueError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    return state.model_dump()
 
 class SeguimientoGenerateRequest(BaseModel):
     goal: str
@@ -4036,11 +2681,6 @@ def generate_seguimiento_path(req: SeguimientoGenerateRequest):
         return path_obj.model_dump()
     except Exception as err:
         raise HTTPException(status_code=500, detail=f"Error al generar el seguimiento: {str(err)}")
-
-@app.get("/api/seguimiento/list")
-def list_seguimientos():
-    """ OBSOLETO: usa /api/guided/list. """
-    return seguimiento_repo.list_all()
 
 @app.get("/api/seguimiento/{seg_id}")
 def get_seguimiento(seg_id: str):
@@ -4302,17 +2942,6 @@ def update_seguimiento_progress(seg_id: str, req: SeguimientoProgressRequest):
 def get_dataset_summary():
     ds = dataset_mgr.build_and_save_dataset()
     return ds.model_dump()
-
-@app.get("/api/dataset/export")
-def export_dataset_file():
-    ds = dataset_mgr.build_and_save_dataset()
-    if os.path.exists(dataset_mgr.dataset_file):
-        return FileResponse(
-            dataset_mgr.dataset_file,
-            media_type="application/json",
-            filename="user_learning_dataset.json"
-        )
-    raise HTTPException(status_code=404, detail="Dataset file not found")
 
 # ==========================================
 # LANZADOR DE VENTANA NATIVA INDEPENDIENTE PARA NOTE
@@ -4894,12 +3523,6 @@ class ProgresoAnalisisRequest(BaseModel):
     regenerar: bool = False
 
 
-@app.get("/api/progreso/resumen")
-def progreso_resumen(dias: int = Query(default=120, ge=7, le=365)):
-    """ Todo el avance en un sitio: desafíos, plan de estudios, ejercicios y biblioteca """
-    return _desafio(progreso.resumen, desafios_almacen, guided, telemetry, dataset_mgr, dias, kaggle_lector)
-
-
 # Inicio, su perfil y el estado de la máquina (/api/system/stats, /api/system/health): servidor de Rust
 # (routes/inicio.rs)
 class InicioPerfilRequest(BaseModel):
@@ -4914,11 +3537,6 @@ class InicioPerfilRequest(BaseModel):
 def progreso_historial(estado: Optional[str] = None, concepto: Optional[str] = None,
                        fuente: Optional[str] = None, limite: int = Query(default=200, ge=1, le=500)):
     return {"desafios": _desafio(progreso.historial, desafios_almacen, estado, concepto, fuente, limite)}
-
-
-@app.get("/api/progreso/analisis")
-def progreso_analisis_guardado():
-    return {"analisis": progreso.analisis_guardado()}
 
 
 @app.post("/api/progreso/analisis")
@@ -5083,17 +3701,6 @@ def desafios_crear(req: DesafioCrearRequest):
     return _ndjson_en_hilo(trabajo)
 
 
-@app.get("/api/desafios/{id_}")
-def desafios_obtener(id_: str):
-    return AlmacenDesafios.publico(_desafio(desafios_almacen.obtener, id_))
-
-
-@app.delete("/api/desafios/{id_}")
-def desafios_borrar(id_: str):
-    _desafio(desafios_almacen.obtener, id_)
-    return {"borrado": desafios_almacen.borrar(id_)}
-
-
 @app.put("/api/desafios/{id_}/paginas")
 def desafios_guardar_paginas(id_: str, req: DesafioPaginasRequest):
     """ Guardado automático del trabajo del alumno """
@@ -5108,41 +3715,9 @@ def desafios_guardar_paginas(id_: str, req: DesafioPaginasRequest):
     return {"guardado": d["actualizado"], "estado": d["progreso"]["estado"]}
 
 
-@app.post("/api/desafios/{id_}/ejecutar")
-def desafios_ejecutar(id_: str, req: DesafioEjecutarRequest):
-    _desafio(desafios_almacen.obtener, id_)
-    return _desafio(des_ejec.ejecutar_pagina, runner, req.paginas, req.pagina, run_id=f"desafio_{id_}")
-
-
 @app.post("/api/desafios/{id_}/detener")
 def desafios_detener(id_: str):
     return runner.cancel(f"desafio_{id_}")
-
-
-@app.post("/api/desafios/{id_}/comprobar")
-def desafios_comprobar(id_: str, req: DesafioPaginasRequest):
-    d = _desafio(desafios_almacen.obtener, id_)
-    paginas = _desafio(des_ejec.validar_paginas, req.paginas)
-    resultado = _desafio(des_ejec.comprobar, runner, paginas, d.get("privado") or {}, run_id=f"desafio_{id_}")
-    if not resultado["comprobable"]:
-        return {**resultado, "progreso": d.get("progreso")}
-
-    def cambio(x):
-        x["paginas_usuario"] = [{"nombre": p["nombre"], "contenido": p["contenido"], "descripcion": p.get("descripcion", "")} for p in paginas]
-        AlmacenDesafios.registrar_comprobacion(x, resultado)
-        x["ultima_comprobacion"] = {k: resultado[k] for k in ("aprobado", "total", "pasados", "fallos", "error")}
-    d = _desafio(desafios_almacen.modificar, id_, cambio)
-    _registrar_telemetria(d, "submission", passed=resultado["aprobado"], hints_used=d["progreso"].get("pistas", 0),
-                          stderr=resultado.get("error") or resultado.get("stderr") or "", elapsed=resultado.get("elapsed", 0))
-    origen = d.get("origen") or {}
-    if resultado["aprobado"] and origen.get("tipo") == "prig-hub" and origen.get("ref"):
-        # Un desafío de Prig Hub resuelto cuenta en tu progreso del Hub (y en sus rutas)
-        try:
-            from hub.servicio import Hub
-            Hub().marcar(f"desafio:{origen['ref']}", "terminado", origen["ref"].split("#")[0], origen.get("version") or "")
-        except Exception as e:
-            print(f"⚠️ No se pudo anotar el progreso en Prig Hub: {e}")
-    return {**resultado, "progreso": d["progreso"]}
 
 
 @app.post("/api/desafios/{id_}/razonamiento")
@@ -5169,16 +3744,6 @@ def desafios_razonamiento(id_: str, req: DesafioModeloRequest):
         desafios_almacen.modificar(id_, cambio)
         return r
     return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/{id_}/razonamiento/visto")
-def desafios_pasos_vistos(id_: str, req: DesafioPasosRequest):
-    def cambio(d):
-        p = d["progreso"]
-        p["pasos_vistos"] = max(p.get("pasos_vistos", 0), max(0, min(req.pasos_vistos, 10)))
-        AlmacenDesafios.empezar(d)
-    d = _desafio(desafios_almacen.modificar, id_, cambio)
-    return {"pasos_vistos": d["progreso"]["pasos_vistos"]}
 
 
 @app.post("/api/desafios/{id_}/plan")
@@ -5416,16 +3981,6 @@ def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
 # ----------------------------------------------------------------------------
 # YouTube Search Engine & Registered Keywords (Deep Learning, Machine Learning, Python, C++)
 # ----------------------------------------------------------------------------
-@app.get("/api/youtube/palabras_registradas")
-def youtube_palabras_registradas():
-    """Devuelve las palabras registradas para el motor de búsqueda didáctico de YouTube."""
-    import youtube_buscador
-    return {
-        "status": "ok",
-        "palabras": youtube_buscador.obtener_palabras_registradas()
-    }
-
-
 @app.get("/api/youtube/sugerencias")
 def youtube_sugerencias(
     q: str = Query(..., description="Término o prefijo a autocompletar"),
@@ -5437,35 +3992,6 @@ def youtube_sugerencias(
         return {"query": "", "sugerencias": []}
     sugerencias = youtube_buscador.obtener_sugerencias_youtube(q.strip(), max_sugerencias=limite or 8)
     return {"query": q.strip(), "sugerencias": sugerencias}
-
-
-@app.get("/api/youtube/buscar")
-def youtube_buscar(
-    q: str = Query(..., description="Término o palabra a buscar"),
-    tipo: Optional[str] = Query("todos", description="Tipo: todos, video, playlist"),
-    max_resultados: Optional[int] = Query(16, description="Límite de resultados"),
-    filtro_educativo: Optional[bool] = Query(True, description="Priorizar cursos y tutoriales completos"),
-    idioma: Optional[str] = Query("todos", description="Idioma: todos, es, en"),
-    duracion_filtro: Optional[str] = Query("todas", description="Duración: todas, cortos, clases, cursos, playlists"),
-    orden: Optional[str] = Query("educativo", description="Orden: educativo, duracion, vistas, recientes"),
-    forzar: Optional[bool] = Query(False, description="Forzar refresco sin caché")
-):
-    """Busca cursos, tutoriales y listas de reproducción didácticas en YouTube en tiempo real con ranking multivariable."""
-    import youtube_buscador
-    if not q or not q.strip():
-        raise HTTPException(status_code=400, detail="El parámetro de búsqueda 'q' no puede estar vacío.")
-    
-    resultados = youtube_buscador.buscar_cursos_youtube(
-        query=q.strip(),
-        tipo=tipo or "todos",
-        max_resultados=max_resultados or 16,
-        filtro_educativo=filtro_educativo if filtro_educativo is not None else True,
-        idioma=idioma or "todos",
-        duracion_filtro=duracion_filtro or "todas",
-        orden=orden or "educativo",
-        forzar_refresco=bool(forzar)
-    )
-    return resultados
 
 
 def _lanzar_navegador_sistema(url: str) -> bool:
@@ -5546,15 +4072,6 @@ async def youtube_abrir_externo(request: Request):
     except Exception as e:
         logger.error(f"Error abriendo navegador externo para {url}: {e}")
         return {"ok": False, "error": str(e), "url": url}
-
-
-@app.get("/api/youtube/transcripcion")
-def youtube_transcripcion(video_id: str, idioma: str = "es", forzar: bool = False):
-    """ Extrae la transcripción estructurada y traducida con intervalos de tiempo con soporte de caché persistente """
-    if not video_id:
-        raise HTTPException(status_code=400, detail="Falta el parámetro 'video_id'")
-    import youtube_analisis
-    return youtube_analisis.extraer_transcripcion_estructurada(video_id, idioma_destino=idioma, forzar_refresco=forzar)
 
 
 # ============================================================================
@@ -5786,63 +4303,6 @@ def obtener_estadisticas_aprendizaje():
 # Módulo SQL Studio (Compatibilidad y fallback Python con dialecto MySQL)
 # El motor principal de alto rendimiento reside en Rust (backend-rust/crates/prig-server/src/routes/sql.rs)
 # ===========================================================================
-import sql_service
-
-class SQLQueryRequest(BaseModel):
-    db: Optional[str] = None
-    sql: str = ""
-
-class SQLCrearDbRequest(BaseModel):
-    nombre: str
-
-@app.get("/api/sql/databases")
-def sql_databases():
-    try:
-        return {"success": True, "databases": sql_service.listar_bases_datos()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/sql/databases/create")
-def sql_databases_create(req: SQLCrearDbRequest):
-    try:
-        return sql_service.crear_base_datos(req.nombre)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/api/sql/tables")
-def sql_tables(db: Optional[str] = Query(None)):
-    try:
-        db_name = db or "mysql_prig"
-        tablas = sql_service.listar_tablas(db_name)
-        return {"success": True, "database": db_name, "tables": tablas, "total": len(tablas)}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/api/sql/schema")
-def sql_schema(db: Optional[str] = Query(None), table: Optional[str] = Query(None)):
-    if not table:
-        raise HTTPException(status_code=400, detail="Parámetro 'table' es requerido")
-    try:
-        db_name = db or "mysql_prig"
-        return sql_service.obtener_esquema(db_name, table)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/sql/query")
-def sql_query(req: SQLQueryRequest):
-    try:
-        return sql_service.ejecutar_consulta(req.db, req.sql)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/sql/seed")
-def sql_seed(req: Optional[SQLQueryRequest] = None):
-    db_name = req.db if (req and req.db) else "mysql_prig"
-    try:
-        return sql_service.sembrar_datos_ejemplo(db_name)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # Serve frontend static assets
 

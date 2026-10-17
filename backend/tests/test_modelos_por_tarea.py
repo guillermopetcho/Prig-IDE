@@ -67,12 +67,7 @@ class TestResolver(Base):
         app.ai_engine.config["modelo_explicar"] = ""
         self.assertEqual(app._modelo_desafios(None, "explicar"), "tutor:7b")
 
-    def test_guardar_y_volver_a_automatico(self):
-        r = app.update_ai_config(app.AIConfigUpdateRequest(modelo_codigo="codigo:7b", modelo_autocompletar="chico:1.5b"))
-        self.assertEqual((r["modelo_codigo"], r["modelo_autocompletar"]), ("codigo:7b", "chico:1.5b"))
-        r = app.update_ai_config(app.AIConfigUpdateRequest(modelo_codigo=""))
-        self.assertEqual(r["modelo_codigo"], "")
-        self.assertEqual(r["modelo_autocompletar"], "chico:1.5b")
+    # Guardar los modelos por rol: POST /api/ai/config del servidor de Rust
 
 
 # El modelo de «Prig//:» y el del autocompletado: servidor de Rust (prig-server/tests/asistente_tests.rs)

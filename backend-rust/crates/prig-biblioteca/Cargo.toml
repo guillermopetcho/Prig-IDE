@@ -10,7 +10,10 @@ edition = "2021"
 regex = "1"
 rusqlite = { version = "0.40", features = ["bundled"] }
 sha2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+uuid = { version = "1", features = ["v4"] }
 unicode-normalization = "0.1"
+unicode-general-category = "1"
 prig-recursos = { path = "../prig-recursos" }
 prig-plataforma = { path = "../prig-plataforma" }
 # PDFium (el motor de PDF de Chrome), cargado de lib/pdfium/libpdfium.so (herramientas/instalar_pdfium.sh)

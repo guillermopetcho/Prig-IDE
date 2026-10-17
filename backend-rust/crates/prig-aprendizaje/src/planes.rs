@@ -53,6 +53,7 @@ pub const ESTADOS_PLAN: &[&str] =
     &["DRAFT", "KNOWLEDGE_REVIEW", "KNOWLEDGE_APPROVED", "PRACTICAL_REVIEW", "PRACTICAL_APPROVED", "LEARNING_REVIEW", "APPROVED"];
 pub const ACCIONES: &[&str] = &[
     "ADD_PREREQUISITE", "REMOVE_PREREQUISITE", "ADD_TOPIC", "REMOVE_TOPIC", "REDUCE_DEPTH", "INCREASE_DEPTH", "SWAP_NOTEBOOK", "CUSTOM_CORRECTION",
+    "ADD_CONCEPT", "REMOVE_CONCEPT", "MODIFY_OBJECTIVE", "ADD_PRACTICAL_MODULE",
 ];
 const TIPOS_CONCEPTO: &[&str] = &["FOUNDATIONAL", "PRACTICAL", "ADVANCED"];
 const ACCIONES_CUADERNO_ENUM: &[&str] = &["CREATED_FROM_SCRATCH", "COPIED_AND_EXPLAINED"];
@@ -823,4 +824,386 @@ pub fn alternar_cuaderno(plan: &mut Mapa, cuaderno: &str) {
     }
     plan.poner("completed_notebooks", Valor::Lista(l));
     actualizar_progreso(plan);
+}
+
+// ---------------------------------------------------------------------------------------------- el motor del plan
+
+/// `StudyPlanRepository.load_state(plan_id, version)`: con `version` (si no es 0), su `v{N}.json`; el archivo antiguo
+/// de un plan sin carpeta se carga aunque se pida una versión
+pub fn cargar_plan_version(espacio: &Path, id: &str, version: Option<i128>) -> Result<Option<Mapa>, String> {
+    let dir = dir_planes(espacio).join(id);
+    let ruta = match version {
+        Some(v) if v != 0 && dir.exists() => dir.join(format!("v{v}.json")),
+        _ => return cargar_plan(espacio, id),
+    };
+    if !ruta.exists() {
+        return Ok(None);
+    }
+    let doc = cargar_migrado(&ruta, "study_plan")?;
+    prig_plataforma::modelo::validar(&PLAN, Valor::Mapa(doc)).map(Some).map_err(|f| fallo_py(&PLAN, &f))
+}
+
+/// Un error de validación con la cabecera de `str(ValidationError)` de pydantic
+pub fn fallo_py(m: &Modelo, f: &prig_plataforma::modelo::Fallo) -> String {
+    format!("1 validation error for {}\n{}\n  [type={}]", m.nombre, f.donde, f.tipo)
+}
+
+/// Valida contra un modelo (`Model.model_validate`), con el error como texto
+pub fn validar_modelo(m: &Modelo, v: Valor) -> Result<Mapa, String> {
+    prig_plataforma::modelo::validar(m, v).map_err(|f| fallo_py(m, &f))
+}
+
+/// `StudyPlanEngine.create_new_plan`
+pub fn nuevo_plan(espacio: &Path, objetivo: &str) -> Result<Mapa, String> {
+    let mut p = validar_modelo(&PLAN, Valor::Mapa(Mapa::new().con("user_goal", objetivo).con("status", "DRAFT")))?;
+    guardar_plan(espacio, &mut p).map_err(|e| e.to_string())?;
+    Ok(p)
+}
+
+/// `PlanValidator.VALID_TRANSITIONS`
+fn transiciones(estado: &str) -> &'static [&'static str] {
+    match estado {
+        "DRAFT" => &["KNOWLEDGE_REVIEW"],
+        "KNOWLEDGE_REVIEW" => &["KNOWLEDGE_REVIEW", "KNOWLEDGE_APPROVED"],
+        "KNOWLEDGE_APPROVED" => &["PRACTICAL_REVIEW"],
+        "PRACTICAL_REVIEW" => &["PRACTICAL_REVIEW", "PRACTICAL_APPROVED"],
+        "PRACTICAL_APPROVED" => &["LEARNING_REVIEW"],
+        "LEARNING_REVIEW" => &["LEARNING_REVIEW", "APPROVED"],
+        _ => &[],
+    }
+}
+
+/// `PlanValidator.validate_state_transition`
+pub fn validar_transicion(actual: &str, siguiente: &str) -> Result<(), String> {
+    let permitidas = transiciones(actual);
+    if permitidas.contains(&siguiente) {
+        return Ok(());
+    }
+    let lista: Vec<String> = permitidas.iter().map(|s| format!("'{s}'")).collect();
+    Err(format!("❌ Transición de estado no válida: {actual} ➔ {siguiente}. Permitidas: [{}]", lista.join(", ")))
+}
+
+fn revision(version: Valor, por: &str, cambio: Valor, resumen: String) -> Valor {
+    let r = Mapa::new()
+        .con("version", version)
+        .con("timestamp", prig_plataforma::py::ahora_iso())
+        .con("modified_by", por)
+        .con("change_request", cambio)
+        .con("summary", resumen);
+    validar_modelo(&REVISION, Valor::Mapa(r)).map(Valor::Mapa).unwrap_or(Valor::Nulo)
+}
+
+fn anadir(m: &mut Mapa, clave: &str, v: Valor) {
+    let mut l = m.lista(clave).map(|l| l.to_vec()).unwrap_or_default();
+    l.push(v);
+    m.poner(clave, Valor::Lista(l));
+}
+
+/// `approve_knowledge_step`, `approve_practical_step` y `approve_learning_step`; Err es el `ValueError` (un 400)
+pub fn aprobar(espacio: &Path, id: &str, paso: &str) -> Result<Mapa, String> {
+    let (clave, falta, siguiente, resumen) = match paso {
+        "knowledge" => ("knowledge_map", "No existe un KnowledgeMap válido para aprobar en este plan.", "KNOWLEDGE_APPROVED", "Aprobación del Módulo 1 (Ciclo Básico - KnowledgeMap)"),
+        "practical" => ("practical_curriculum", "No existe un PracticalCurriculum válido para aprobar.", "PRACTICAL_APPROVED", "Aprobación del Módulo 2 (Ciclo Práctico - PracticalCurriculum)"),
+        _ => ("executable_learning_plan", "No existe un ExecutableLearningPlan para aprobar.", "APPROVED", "✨ PLAN APROBADO COMPLETAMENTE PARA COMENZAR"),
+    };
+    let mut p = match cargar_plan(espacio, id)? {
+        Some(p) if matches!(p.get(clave), Some(Valor::Mapa(_))) => p,
+        _ => return Err(falta.into()),
+    };
+    validar_transicion(p.texto("status").unwrap_or(""), siguiente)?;
+    p.poner("status", siguiente);
+    let r = revision(p.valor("version").clone(), "USER", Valor::Nulo, resumen.into());
+    anadir(&mut p, "revisions", r);
+    guardar_plan(espacio, &mut p).map_err(|e| e.to_string())?;
+    Ok(p)
+}
+
+fn minus(t: &str) -> String {
+    t.to_lowercase()
+}
+
+/// `apply_change_request`: aplica la orden de cambio (ya validada como `ChangeRequest`) en una versión nueva del plan
+pub fn aplicar_cambio(espacio: &Path, id: &str, cambio: &Mapa) -> Result<Mapa, String> {
+    let Some(mut p) = cargar_plan(espacio, id)? else { return Err(format!("Plan no encontrado: {id}")) };
+    let version = match p.valor("version") {
+        Valor::Entero(n) => n + 1,
+        _ => 2,
+    };
+    p.poner("version", Valor::Entero(version));
+    let accion = cambio.texto("action").unwrap_or("").to_string();
+    let objetivo = cambio.texto("target").unwrap_or("").to_string();
+    let razon = cambio.get("reason").filter(|r| r.verdad()).map(|r| r.texto_py());
+    let o = minus(&objetivo);
+    let mut km = p.mapa("knowledge_map").cloned();
+    let mut curr = p.mapa("practical_curriculum").cloned();
+    match (accion.as_str(), km.as_mut(), curr.as_mut()) {
+        ("ADD_PREREQUISITE", Some(k), _) => {
+            let pr = Mapa::new()
+                .con("name", objetivo.clone())
+                .con("reason", razon.clone().unwrap_or_else(|| "Añadido por solicitud del usuario".into()))
+                .con("required", true);
+            anadir(k, "prerequisites", Valor::Mapa(validar_modelo(&PRERREQUISITO, Valor::Mapa(pr))?));
+        }
+        ("REMOVE_PREREQUISITE", Some(k), _) => {
+            let quedan: Vec<Valor> = k
+                .lista("prerequisites")
+                .unwrap_or(&[])
+                .iter()
+                .filter(|x| matches!(x, Valor::Mapa(m) if !minus(m.texto("name").unwrap_or("")).contains(&o)))
+                .cloned()
+                .collect();
+            k.poner("prerequisites", Valor::Lista(quedan));
+        }
+        ("ADD_CONCEPT", Some(k), _) => {
+            let mut doms = k.lista("domains").map(|l| l.to_vec()).unwrap_or_default();
+            if let Some(Valor::Mapa(d)) = doms.first_mut() {
+                let mut temas = d.lista("topics").map(|l| l.to_vec()).unwrap_or_default();
+                if let Some(Valor::Mapa(t)) = temas.first_mut() {
+                    let c = Mapa::new()
+                        .con("concept_id", id_al_azar("conc", 6))
+                        .con("name", objetivo.clone())
+                        .con("specifications", razon.clone().unwrap_or_else(|| "Añadido manualmente".into()));
+                    anadir(t, "concepts", Valor::Mapa(validar_modelo(&CONCEPTO, Valor::Mapa(c))?));
+                    d.poner("topics", Valor::Lista(temas));
+                    k.poner("domains", Valor::Lista(doms));
+                }
+            }
+        }
+        ("REMOVE_CONCEPT", Some(k), _) => {
+            let mut doms = k.lista("domains").map(|l| l.to_vec()).unwrap_or_default();
+            for d in doms.iter_mut() {
+                let Valor::Mapa(d) = d else { continue };
+                let mut temas = d.lista("topics").map(|l| l.to_vec()).unwrap_or_default();
+                for t in temas.iter_mut() {
+                    let Valor::Mapa(t) = t else { continue };
+                    let quedan: Vec<Valor> = t
+                        .lista("concepts")
+                        .unwrap_or(&[])
+                        .iter()
+                        .filter(|c| matches!(c, Valor::Mapa(c) if !minus(c.texto("name").unwrap_or("")).contains(&o) && c.texto("concept_id") != Some(objetivo.as_str())))
+                        .cloned()
+                        .collect();
+                    t.poner("concepts", Valor::Lista(quedan));
+                }
+                d.poner("topics", Valor::Lista(temas));
+            }
+            k.poner("domains", Valor::Lista(doms));
+        }
+        ("ADD_TOPIC", Some(k), _) => {
+            let mut doms = k.lista("domains").map(|l| l.to_vec()).unwrap_or_default();
+            if let Some(Valor::Mapa(d)) = doms.first_mut() {
+                let c = Mapa::new().con("concept_id", id_al_azar("conc", 6)).con("name", format!("Concepto {objetivo}"));
+                let t = Mapa::new()
+                    .con("topic_id", id_al_azar("top", 6))
+                    .con("name", objetivo.clone())
+                    .con("concepts", Valor::Lista(vec![Valor::Mapa(c)]));
+                anadir(d, "topics", Valor::Mapa(validar_modelo(&TEMA, Valor::Mapa(t))?));
+                k.poner("domains", Valor::Lista(doms));
+            }
+        }
+        ("MODIFY_OBJECTIVE", Some(k), _) => k.poner("goal", objetivo.clone()),
+        ("ADD_PRACTICAL_MODULE", _, Some(c)) => {
+            let n = c.lista("modules").map(|l| l.len()).unwrap_or(0) + 1;
+            let m = Mapa::new()
+                .con("module_id", format!("mod_{n:02}"))
+                .con("name", objetivo.clone())
+                .con("objective", razon.clone().unwrap_or_else(|| format!("Practicar {objetivo}")))
+                .con("validation_criteria", Valor::Lista(vec![Valor::Texto(format!("✓ Implementar {objetivo}"))]));
+            anadir(c, "modules", Valor::Mapa(validar_modelo(&MODULO_PRACTICO, Valor::Mapa(m))?));
+        }
+        _ => {}
+    }
+    if let Some(k) = km {
+        p.poner("knowledge_map", Valor::Mapa(k));
+    }
+    if let Some(c) = curr {
+        p.poner("practical_curriculum", Valor::Mapa(c));
+    }
+    let r = revision(
+        Valor::Entero(version),
+        "USER_ASSISTANT",
+        Valor::Mapa(cambio.clone()),
+        format!("Versión {version}: Corrección aplicada ({accion} -> {objetivo})"),
+    );
+    anadir(&mut p, "revisions", r);
+    guardar_plan(espacio, &mut p).map_err(|e| e.to_string())?;
+    Ok(p)
+}
+
+fn ids_de_conceptos(km: &Mapa) -> Vec<Valor> {
+    let mut v = Vec::new();
+    for d in km.lista("domains").unwrap_or(&[]) {
+        let Valor::Mapa(d) = d else { continue };
+        for t in d.lista("topics").unwrap_or(&[]) {
+            let Valor::Mapa(t) = t else { continue };
+            for c in t.lista("concepts").unwrap_or(&[]) {
+                if let Valor::Mapa(c) = c {
+                    v.push(c.valor("concept_id").clone());
+                }
+            }
+        }
+    }
+    v
+}
+
+/// `PlanValidator.validate_knowledge_map`
+pub fn avisos_mapa(km: &Mapa) -> Vec<String> {
+    let mut avisos = Vec::new();
+    let mut vistos: Vec<Valor> = Vec::new();
+    for id in ids_de_conceptos(km) {
+        if vistos.contains(&id) {
+            avisos.push(format!("ID de concepto duplicado detectado: {}", id.texto_py()));
+        }
+        vistos.push(id);
+    }
+    for r in km.lista("relationships").unwrap_or(&[]) {
+        let Valor::Mapa(r) = r else { continue };
+        for k in ["source_concept_id", "target_concept_id"] {
+            if !vistos.contains(r.valor(k)) {
+                avisos.push(format!("Relación referencia a concept_id inexistente: {}", r.valor(k).texto_py()));
+            }
+        }
+    }
+    avisos
+}
+
+/// `PlanValidator.validate_practical_curriculum`
+pub fn avisos_curriculo(curr: &Mapa, km: &Mapa) -> Vec<String> {
+    let ids = ids_de_conceptos(km);
+    let mut avisos = Vec::new();
+    for m in curr.lista("modules").unwrap_or(&[]) {
+        let Valor::Mapa(m) = m else { continue };
+        for c in m.lista("concepts").unwrap_or(&[]) {
+            if !ids.is_empty() && !ids.contains(c) {
+                avisos.push(format!(
+                    "Módulo práctico '{}' hace referencia a concept_id no encontrado en KnowledgeMap: {}",
+                    m.valor("module_id").texto_py(),
+                    c.texto_py()
+                ));
+            }
+        }
+    }
+    avisos
+}
+
+/// `PlanValidator.validate_executable_plan`
+pub fn avisos_ejecutable(ej: &Mapa, curr: &Mapa) -> Vec<String> {
+    let ids: Vec<Valor> = curr.lista("modules").unwrap_or(&[]).iter().filter_map(|m| match m { Valor::Mapa(m) => Some(m.valor("module_id").clone()), _ => None }).collect();
+    let mut avisos = Vec::new();
+    for m in ej.lista("modules_notebooks").unwrap_or(&[]) {
+        let Valor::Mapa(m) = m else { continue };
+        if !ids.is_empty() && !ids.contains(m.valor("module_id")) {
+            avisos.push(format!("ExecutableModule hace referencia a module_id no existente en Curriculum: {}", m.valor("module_id").texto_py()));
+        }
+    }
+    avisos
+}
+
+/// `NotebookSafetyLayer.generate_explained_notebook_content`: el `.ipynb` con la cabecera, la teoría y el código
+pub fn cuaderno_explicado(nombre: &str, objetivo: &str, criterios: &[Valor], codigo: &str) -> Valor {
+    let criterios_md = if criterios.is_empty() {
+        "- [ ] Práctica completada con éxito".to_string()
+    } else {
+        criterios.iter().map(|c| format!("- [ ] {}", c.texto_py())).collect::<Vec<_>>().join("\n")
+    };
+    let cabecera = format!(
+        "# 📓 {nombre}\n\n### 🎯 Objetivo de Aprendizaje:\n{objetivo}\n\n### 📋 Criterios de Validación de Aprendizaje (validation_criteria):\n{criterios_md}\n\n---\n*Cuaderno generado automáticamente por el **Notebook & Learning Manager** de Prig IDE.*"
+    );
+    let teoria = "## 💡 Explicación Teórica & Conceptos Base\n\nEn este cuaderno pondremos en práctica los conceptos del módulo.\nRevisa el código a continuación, ejecuta las celdas secuencialmente (`Shift + Enter`) y verifica cada criterio de validación.";
+    let bloque = if codigo.is_empty() {
+        "# Importaciones principales\nimport sys\nimport numpy as np\n\n# Imprimir entorno\nprint('✨ Cuaderno de práctica activo')\n".to_string()
+    } else {
+        prig_plataforma::py::strip(codigo).to_string()
+    };
+    let md = |t: String| Valor::Mapa(Mapa::new().con("cell_type", "markdown").con("metadata", Valor::Mapa(Mapa::new())).con("source", Valor::Lista(vec![Valor::Texto(t)])));
+    let celdas = vec![
+        md(cabecera),
+        md(teoria.to_string()),
+        Valor::Mapa(
+            Mapa::new()
+                .con("cell_type", "code")
+                .con("execution_count", Valor::Nulo)
+                .con("metadata", Valor::Mapa(Mapa::new()))
+                .con("outputs", Valor::Lista(Vec::new()))
+                .con("source", Valor::Lista(vec![Valor::Texto(bloque)])),
+        ),
+    ];
+    Valor::Mapa(
+        Mapa::new()
+            .con("cells", Valor::Lista(celdas))
+            .con("metadata", Valor::Mapa(Mapa::new().con("language_info", Valor::Mapa(Mapa::new().con("name", "python")))))
+            .con("nbformat", Valor::Entero(4))
+            .con("nbformat_minor", Valor::Entero(2)),
+    )
+}
+
+/// `NotebookSafetyLayer.is_path_in_library`: por componentes (una carpeta hermana como `.prig_books_backup` no lo es)
+pub fn en_biblioteca(ruta: &str, biblioteca: &Path) -> bool {
+    let r = prig_plataforma::py::abspath(ruta);
+    let b = prig_plataforma::py::abspath(&biblioteca.to_string_lossy());
+    Path::new(&r).starts_with(Path::new(&b))
+}
+
+/// `NotebookSafetyLayer.write_executable_notebook`: la ruta absoluta escrita, o el error (nunca dentro de la biblioteca)
+pub fn escribir_cuaderno(destino: &Path, contenido: &Valor, biblioteca: &Path) -> Result<String, String> {
+    let abs = prig_plataforma::py::abspath(&destino.to_string_lossy());
+    if en_biblioteca(&abs, biblioteca) {
+        return Err(format!("🔒 PROTECCIÓN FÍSICA VIOLADA: Intento de escritura en archivo protegido de la Biblioteca ({abs})."));
+    }
+    if let Some(p) = Path::new(&abs).parent() {
+        std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&abs, prig_plataforma::json::escribir(contenido, 2)).map_err(|e| e.to_string())?;
+    Ok(abs)
+}
+
+#[cfg(test)]
+mod pruebas_motor {
+    use super::*;
+
+    #[test]
+    fn transiciones_como_python() {
+        assert!(validar_transicion("DRAFT", "KNOWLEDGE_REVIEW").is_ok());
+        assert_eq!(
+            validar_transicion("APPROVED", "APPROVED").unwrap_err(),
+            "❌ Transición de estado no válida: APPROVED ➔ APPROVED. Permitidas: []"
+        );
+        assert_eq!(
+            validar_transicion("KNOWLEDGE_REVIEW", "APPROVED").unwrap_err(),
+            "❌ Transición de estado no válida: KNOWLEDGE_REVIEW ➔ APPROVED. Permitidas: ['KNOWLEDGE_REVIEW', 'KNOWLEDGE_APPROVED']"
+        );
+    }
+
+    #[test]
+    fn cambios_sobre_el_mapa() {
+        let tmp = std::env::temp_dir().join(format!("prig_plan_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let mut p = nuevo_plan(&tmp, "SQL").unwrap();
+        let km = r#"{"goal":"g","prerequisites":[{"name":"Álgebra","reason":"r"}],"domains":[{"domain_id":"d","name":"D","topics":[{"topic_id":"t","name":"T","concepts":[{"concept_id":"c1","name":"Joins"}]}]}]}"#;
+        p.poner("knowledge_map", Valor::Mapa(validar_modelo(&MAPA, prig_plataforma::json::leer(km).unwrap()).unwrap()));
+        guardar_plan(&tmp, &mut p).unwrap();
+        let id = p.texto("plan_id").unwrap().to_string();
+        let orden = |a: &str, t: &str| {
+            validar_modelo(&PETICION_CAMBIO, Valor::Mapa(Mapa::new().con("target_agent", "K").con("action", a).con("target", t).con("user_prompt", "u"))).unwrap()
+        };
+        aplicar_cambio(&tmp, &id, &orden("REMOVE_PREREQUISITE", "álgebra")).unwrap();
+        aplicar_cambio(&tmp, &id, &orden("REMOVE_CONCEPT", "JOIN")).unwrap();
+        let p = aplicar_cambio(&tmp, &id, &orden("ADD_PRACTICAL_MODULE", "x")).unwrap();
+        assert_eq!(p.valor("version"), &Valor::Entero(4));
+        let km = p.mapa("knowledge_map").unwrap();
+        assert_eq!(km.lista("prerequisites").unwrap().len(), 0);
+        assert!(prig_plataforma::json::escribir_compacto(km.valor("domains")).contains(r#""concepts": []"#));
+        assert!(cargar_plan_version(&tmp, &id, Some(2)).unwrap().is_some());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn el_cuaderno_no_se_escribe_en_la_biblioteca() {
+        let bib = Path::new("/tmp/prig_bib_prueba");
+        assert!(en_biblioteca("/tmp/prig_bib_prueba/a/b.ipynb", bib));
+        assert!(!en_biblioteca("/tmp/prig_bib_prueba_copia/b.ipynb", bib));
+        assert!(escribir_cuaderno(&bib.join("x.ipynb"), &Valor::Nulo, bib).is_err());
+        let nb = prig_plataforma::json::escribir_compacto(&cuaderno_explicado("M", "O", &[], ""));
+        assert!(nb.contains("Pr\\u00e1ctica completada con \\u00e9xito"));
+    }
 }

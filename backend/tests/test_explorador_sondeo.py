@@ -12,7 +12,6 @@ vez de fórmulas.
 
 import os
 import sys
-import json
 import tempfile
 import shutil
 import unittest
@@ -20,7 +19,6 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from explorador import Explorador, EXTENSIONES
-from sondeo_libro import SondeoLibro
 
 
 MATEMATICAS = """Teorema 3.2. Sea f una funcion continua en [a,b] y derivable en (a,b).
@@ -57,171 +55,7 @@ partial derivatives of the function. This vector points in the direction of the
 steepest increase, and its magnitude is the rate of change in that direction."""
 
 
-class PruebaDetectores(unittest.TestCase):
-    """ Umbrales por página: 10 para matemáticas, 15 para código. """
-
-    def setUp(self):
-        self.s = SondeoLibro()
-
-    def veredicto(self, texto):
-        mat, cod, _ = self.s._densidades(texto)
-        return ("matemática" if mat >= 10 else "") + ("código" if cod >= 15 else "") or "prosa"
-
-    def test_un_teorema_es_matematicas_no_codigo(self):
-        """ f(b) y g(x) parecen llamadas a función; no deben contar como código. """
-        mat, cod, _ = self.s._densidades(MATEMATICAS)
-        self.assertGreaterEqual(mat, 10, "una demostración debe puntuar como matemáticas")
-        self.assertLess(cod, 15, "una demostración NO debe puntuar como código")
-
-    def test_python_es_codigo(self):
-        self.assertEqual(self.veredicto(CODIGO), "código")
-
-    def test_cpp_es_codigo(self):
-        self.assertEqual(self.veredicto(CPP), "código")
-
-    def test_la_prosa_no_es_ninguna_de_las_dos(self):
-        self.assertEqual(self.veredicto(PROSA), "prosa")
-
-    def test_la_prosa_tecnica_en_ingles_tampoco(self):
-        """ Hablar de gradientes no convierte un párrafo en matemáticas. """
-        self.assertEqual(self.veredicto(INGLES), "prosa")
-
-    def test_detecta_el_idioma(self):
-        import re
-        for texto, esperado in ((PROSA, "es"), (INGLES, "en")):
-            palabras = re.findall(r"[a-zA-Z_]{2,}", texto.lower())
-            self.assertEqual(self.s._idioma(palabras), esperado)
-
-
-class PruebaMedicionPorPagina(unittest.TestCase):
-    """ Se mide página a página, no en promedio: un libro con un tercio de código
-    y dos tercios de prosa da media baja y parecería un libro de texto normal. """
-
-    def setUp(self):
-        self.s = SondeoLibro()
-
-    def test_una_minoria_de_paginas_de_codigo_se_detecta(self):
-        paginas = [CODIGO] + [PROSA] * 3
-        r = self.s._analizar_paginas(paginas, "")
-        self.assertGreaterEqual(r["fraccion_paginas_codigo"], 0.2)
-        self.assertEqual(r["fraccion_paginas_matematicas"], 0.0)
-
-    def test_el_promedio_solo_habria_diluido(self):
-        r = self.s._analizar_paginas([CODIGO] + [PROSA] * 5, "")
-        self.assertGreater(r["pico_codigo"], r["densidad_codigo"],
-                           "el pico debe destacar sobre la media")
-
-    def test_sin_paginas_no_inventa_nada(self):
-        r = self.s._analizar_paginas([], "")
-        self.assertEqual(r["densidad_codigo"], 0.0)
-        self.assertEqual(r["idioma"], "?")
-
-
-class PruebaMedirArchivos(unittest.TestCase):
-
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp()
-        self.s = SondeoLibro()
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def escribir(self, nombre, contenido):
-        ruta = os.path.join(self.tmp, nombre)
-        with open(ruta, "w", encoding="utf-8") as f:
-            f.write(contenido)
-        return ruta
-
-    def test_mide_un_markdown(self):
-        ruta = self.escribir("libro.md", "# Capítulo 1\n\n" + PROSA * 60)
-        m = self.s.medir(ruta)
-        self.assertGreater(m["paginas"], 1)
-        self.assertTrue(m["tiene_indice"])
-        self.assertEqual(m["idioma"], "es")
-
-    def test_detecta_un_libro_de_programacion(self):
-        ruta = self.escribir("curso.md", (CODIGO + "\n\n") * 30)
-        m = self.s.medir(ruta)
-        self.assertIn("de programación", " ".join(m["naturaleza"]))
-
-    def test_detecta_un_libro_matematico(self):
-        ruta = self.escribir("analisis.md", (MATEMATICAS + "\n\n") * 30)
-        m = self.s.medir(ruta)
-        self.assertIn("matemático", " ".join(m["naturaleza"]))
-
-    def test_lee_un_cuaderno_sin_ahogarse_en_el_json(self):
-        nb = {"cells": [{"cell_type": "code", "source": [CODIGO]},
-                        {"cell_type": "markdown", "source": ["# Título\n", PROSA]}]}
-        ruta = self.escribir("nb.ipynb", json.dumps(nb))
-        m = self.s.medir(ruta)
-        self.assertGreater(m["fraccion_paginas_codigo"], 0)
-
-    def test_un_archivo_que_no_existe_lo_dice(self):
-        with self.assertRaises(FileNotFoundError):
-            self.s.medir(os.path.join(self.tmp, "fantasma.pdf"))
-
-    def test_estima_el_tamano_y_el_coste(self):
-        m = self.s.medir(self.escribir("largo.md", PROSA * 400))
-        self.assertGreater(m["fragmentos_estimados"], 0)
-        self.assertIn(m["tamano"], ("corto", "normal", "largo", "enorme"))
-
-
-class PruebaRecomendacion(unittest.TestCase):
-
-    def setUp(self):
-        self.s = SondeoLibro()
-
-    def base(self, **kw):
-        m = {"paginas": 300, "fraccion_paginas_matematicas": 0.0,
-             "fraccion_paginas_codigo": 0.0, "imagenes_por_pagina": 0.1,
-             "tiene_indice": True, "idioma": "es", "escaneado": False,
-             "fragmentos_estimados": 200, "horas_estimadas_local": 2.0}
-        m.update(kw)
-        return m
-
-    def test_un_escaneado_se_bloquea(self):
-        """ Sin texto no hay nada que extraer, y ningún modelo lo arregla. """
-        r = self.s.recomendar(self.base(escaneado=True))
-        self.assertFalse(r["se_puede_extraer"])
-        self.assertTrue(any("OCR" in b for b in r["bloqueos"]))
-
-    def test_mucha_matematica_pide_latex(self):
-        r = self.s.recomendar(self.base(fraccion_paginas_matematicas=0.4))
-        self.assertTrue(r["ajustes_extraccion"]["pedir_latex"])
-
-    def test_mucho_codigo_pide_el_lenguaje(self):
-        r = self.s.recomendar(self.base(fraccion_paginas_codigo=0.25))
-        self.assertTrue(r["ajustes_extraccion"]["pedir_lenguaje_codigo"])
-
-    def test_un_libro_muy_matematico_usa_fragmentos_mas_cortos(self):
-        """ Cortar una derivación por la mitad da afirmaciones que no se sostienen. """
-        normal = self.s.recomendar(self.base())["ajustes_extraccion"]["max_chunk_tokens"]
-        mates = self.s.recomendar(
-            self.base(fraccion_paginas_matematicas=0.5))["ajustes_extraccion"]["max_chunk_tokens"]
-        self.assertLess(mates, normal)
-
-    def test_un_libro_enorme_avisa_de_partirlo(self):
-        r = self.s.recomendar(self.base(paginas=1200))
-        self.assertTrue(any("pártelo" in a for a in r["avisos"]))
-
-    def test_un_libro_corto_no_merece_la_ficha_de_siete_pasos(self):
-        r = self.s.recomendar(self.base(paginas=40))
-        self.assertEqual(r["flujo_recomendado"], "plantilla_libro")
-
-    def test_un_libro_normal_si_la_merece(self):
-        self.assertEqual(self.s.recomendar(self.base())["flujo_recomendado"],
-                         "plantilla_ficha_libro")
-
-    def test_sin_indice_avisa(self):
-        r = self.s.recomendar(self.base(tiene_indice=False))
-        self.assertTrue(any("Sin índice" in a for a in r["avisos"]))
-
-    def test_estima_el_coste_en_los_dos_sitios(self):
-        c = self.s.recomendar(self.base())["coste"]
-        self.assertGreater(c["horas_en_local"], 0)
-        self.assertGreater(c["minutos_en_dos_T4"], 0)
-        self.assertLess(c["minutos_en_dos_T4"] / 60, c["horas_en_local"],
-                        "dos T4 tienen que salir más rápido que el equipo local")
+# Los detectores, la medición por página, medir archivos y la recomendación del sondeo: prig-biblioteca/src/sondeo.rs
 
 
 class PruebaExplorador(unittest.TestCase):

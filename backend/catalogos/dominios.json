@@ -1,0 +1,379 @@
+{
+ "DOMAINS": {
+  "math": {
+   "name": "Matemáticas",
+   "icon": "fa-square-root-variable",
+   "keywords": [
+    "álgebra",
+    "cálculo",
+    "derivada",
+    "integral",
+    "matriz",
+    "vector",
+    "probabilidad",
+    "estadística",
+    "teorema",
+    "demostración",
+    "norma",
+    "autovalor",
+    "gradiente",
+    "optimización convexa",
+    "serie",
+    "límite",
+    "matemáticas",
+    "análisis matemático",
+    "geometría",
+    "topología",
+    "ecuación diferencial",
+    "mathematics",
+    "math",
+    "calculus",
+    "algebra",
+    "linear algebra",
+    "derivative",
+    "integral",
+    "matrix",
+    "probability",
+    "statistics",
+    "theorem",
+    "proof",
+    "eigenvalue",
+    "convex optimization",
+    "analysis",
+    "geometry",
+    "topology",
+    "differential equation",
+    "discrete mathematics",
+    "number theory"
+   ]
+  },
+  "physics": {
+   "name": "Física",
+   "icon": "fa-atom",
+   "keywords": [
+    "física",
+    "energía",
+    "fuerza",
+    "onda",
+    "campo",
+    "partícula",
+    "termodinámica",
+    "entropía",
+    "mecánica",
+    "cuántica",
+    "señal",
+    "frecuencia",
+    "conservación",
+    "hamiltoniano",
+    "lagrangiano",
+    "relatividad",
+    "electromagnetismo",
+    "óptica",
+    "physics",
+    "energy",
+    "force",
+    "wave",
+    "particle",
+    "thermodynamics",
+    "entropy",
+    "mechanics",
+    "quantum",
+    "signal",
+    "frequency",
+    "hamiltonian",
+    "lagrangian",
+    "relativity",
+    "electromagnetism",
+    "optics",
+    "statistical mechanics"
+   ]
+  },
+  "cpp": {
+   "name": "C++",
+   "icon": "fa-code",
+   "keywords": [
+    "puntero",
+    "referencia",
+    "plantilla",
+    "template",
+    "stl",
+    "raii",
+    "constructor",
+    "destructor",
+    "memoria",
+    "stack",
+    "heap",
+    "sobrecarga",
+    "compilador",
+    "cabecera",
+    "c++",
+    "cpp",
+    "pointer",
+    "reference",
+    "smart pointer",
+    "move semantics",
+    "modern c++",
+    "metaprogramming",
+    "compiler",
+    "header",
+    "standard library",
+    "overload",
+    "concurrency",
+    "undefined behavior"
+   ]
+  },
+  "python": {
+   "name": "Python",
+   "icon": "fa-brands fa-python",
+   "keywords": [
+    "lista",
+    "diccionario",
+    "comprensión",
+    "generador",
+    "decorador",
+    "numpy",
+    "pandas",
+    "iterador",
+    "contexto",
+    "excepción",
+    "módulo",
+    "python",
+    "dict",
+    "list comprehension",
+    "generator",
+    "decorator",
+    "iterator",
+    "context manager",
+    "exception",
+    "module",
+    "package",
+    "asyncio",
+    "type hint",
+    "dataclass",
+    "matplotlib",
+    "scipy",
+    "fluent python",
+    "pythonic"
+   ]
+  },
+  "machine_learning": {
+   "name": "Machine Learning",
+   "icon": "fa-diagram-project",
+   "keywords": [
+    "regresión",
+    "clasificación",
+    "sobreajuste",
+    "validación cruzada",
+    "característica",
+    "entrenamiento",
+    "supervisado",
+    "clustering",
+    "árbol de decisión",
+    "svm",
+    "métrica",
+    "sesgo",
+    "varianza",
+    "aprendizaje automático",
+    "aprendizaje máquina",
+    "no supervisado",
+    "machine learning",
+    "statistical learning",
+    "pattern recognition",
+    "regression",
+    "classification",
+    "overfitting",
+    "cross validation",
+    "feature",
+    "supervised",
+    "unsupervised",
+    "decision tree",
+    "random forest",
+    "gradient boosting",
+    "bias",
+    "variance",
+    "data mining",
+    "predictive",
+    "scikit"
+   ]
+  },
+  "deep_learning": {
+   "name": "Deep Learning",
+   "icon": "fa-brain",
+   "keywords": [
+    "red neuronal",
+    "redes neuronales",
+    "capa oculta",
+    "activación",
+    "backpropagation",
+    "retropropagación",
+    "tensor",
+    "perceptron",
+    "convolución",
+    "transformer",
+    "atención",
+    "embedding",
+    "dropout",
+    "optimizador",
+    "época",
+    "lote",
+    "gradiente descendente",
+    "aprendizaje profundo",
+    "deep learning",
+    "neural network",
+    "neural networks",
+    "deep neural",
+    "hidden layer",
+    "activation",
+    "convolutional",
+    "cnn",
+    "rnn",
+    "lstm",
+    "attention",
+    "self-attention",
+    "pytorch",
+    "tensorflow",
+    "keras",
+    "fine-tuning",
+    "large language model",
+    "generative",
+    "diffusion"
+   ]
+  }
+ },
+ "DOMAIN_EDGES": [
+  [
+   "math",
+   "physics"
+  ],
+  [
+   "math",
+   "machine_learning"
+  ],
+  [
+   "math",
+   "deep_learning"
+  ],
+  [
+   "physics",
+   "deep_learning"
+  ],
+  [
+   "python",
+   "machine_learning"
+  ],
+  [
+   "python",
+   "deep_learning"
+  ],
+  [
+   "cpp",
+   "deep_learning"
+  ],
+  [
+   "machine_learning",
+   "deep_learning"
+  ]
+ ],
+ "KNOWN_BRIDGES": {
+  "gradiente": [
+   "math",
+   "deep_learning"
+  ],
+  "derivada": [
+   "math",
+   "deep_learning"
+  ],
+  "regla de la cadena": [
+   "math",
+   "deep_learning"
+  ],
+  "matriz": [
+   "math",
+   "machine_learning",
+   "deep_learning"
+  ],
+  "producto escalar": [
+   "math",
+   "physics",
+   "deep_learning"
+  ],
+  "convolución": [
+   "math",
+   "physics",
+   "deep_learning"
+  ],
+  "entropía": [
+   "physics",
+   "machine_learning",
+   "deep_learning"
+  ],
+  "distribución de probabilidad": [
+   "math",
+   "machine_learning"
+  ],
+  "optimización": [
+   "math",
+   "machine_learning",
+   "deep_learning"
+  ],
+  "descenso de gradiente": [
+   "math",
+   "machine_learning",
+   "deep_learning"
+  ],
+  "vector": [
+   "math",
+   "physics",
+   "deep_learning"
+  ],
+  "tensor": [
+   "math",
+   "physics",
+   "deep_learning"
+  ],
+  "norma": [
+   "math",
+   "machine_learning"
+  ],
+  "autovalor": [
+   "math",
+   "machine_learning"
+  ],
+  "transformada de fourier": [
+   "math",
+   "physics",
+   "deep_learning"
+  ],
+  "complejidad algorítmica": [
+   "cpp",
+   "python",
+   "machine_learning"
+  ],
+  "memoria": [
+   "cpp",
+   "python"
+  ],
+  "array": [
+   "cpp",
+   "python",
+   "deep_learning"
+  ],
+  "paralelismo": [
+   "cpp",
+   "python",
+   "deep_learning"
+  ],
+  "regularización": [
+   "math",
+   "machine_learning",
+   "deep_learning"
+  ]
+ },
+ "CODE_LANGUAGES": [
+  "python",
+  "cpp",
+  "pseudocode",
+  "math",
+  "none"
+ ]
+}

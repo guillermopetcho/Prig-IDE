@@ -50,6 +50,14 @@ pub fn flujo_de_texto<F>(trabajo: F) -> Response
 where
     F: FnOnce(&Cancelar, &mut dyn FnMut(String)) + Send + 'static,
 {
+    flujo_con_tipo("text/plain; charset=utf-8", trabajo)
+}
+
+/// `flujo_de_texto` con otro tipo de contenido (p. ej. `application/x-ndjson`)
+pub fn flujo_con_tipo<F>(tipo: &'static str, trabajo: F) -> Response
+where
+    F: FnOnce(&Cancelar, &mut dyn FnMut(String)) + Send + 'static,
+{
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(256);
     let cancelar = Arc::new(Cancelar::default());
     struct AlSoltar(Arc<Cancelar>);
@@ -69,7 +77,7 @@ where
         trabajo(&cancelar, &mut enviar);
     });
     let flujo = futures_util::stream::unfold((rx, guarda), |(mut rx, g)| async move { rx.recv().await.map(|x| (x, (rx, g))) });
-    ([(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")], axum::body::Body::from_stream(flujo)).into_response()
+    ([(axum::http::header::CONTENT_TYPE, tipo)], axum::body::Body::from_stream(flujo)).into_response()
 }
 
 /// `POST /api/ai/cancel`: detiene todo lo que se esté generando (aquí y en el backend de Python)

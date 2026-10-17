@@ -160,7 +160,7 @@ fn titulo(meta: Option<&Valor>, nombre: &str) -> Valor {
 // =========================================================================== PDF
 
 /// `pdf_nativo.lector()`: PDFium cargado (lib/pdfium o `PRIG_PDFIUM`), o None
-fn pdfium(state: &AppState) -> bool {
+pub fn pdfium(state: &AppState) -> bool {
     static L: OnceLock<bool> = OnceLock::new();
     *L.get_or_init(|| {
         let ruta = std::env::var("PRIG_PDFIUM").ok().filter(|r| !r.is_empty()).unwrap_or_else(|| state.base_dir.join("lib/pdfium/libpdfium.so").to_string_lossy().to_string());

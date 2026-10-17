@@ -17,9 +17,6 @@ resultados peores:
 
 import os
 import sys
-import json
-import tempfile
-import shutil
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -205,45 +202,7 @@ class PruebaIndiceDesdeMarcadores(unittest.TestCase):
         self.assertEqual(len(e["chapters"]), 4)
 
 
-class PruebaPermisoDeLibros(unittest.TestCase):
-    """ El fallo que se veía como «Ruta no permitida» al preparar un libro del
-    Escritorio: el explorador navega la carpeta personal, pero el preparador
-    comprobaba contra el espacio de trabajo. """
-
-    def setUp(self):
-        import app
-        self.app = app
-        self.tmp = os.path.join(os.path.expanduser("~"), ".prig_pruebas_permiso")
-        os.makedirs(self.tmp, exist_ok=True)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def crear(self, nombre):
-        ruta = os.path.join(self.tmp, nombre)
-        with open(ruta, "w") as f:
-            f.write("contenido")
-        return ruta
-
-    def test_acepta_un_libro_de_la_carpeta_personal(self):
-        self.assertIsNone(self.app._libro_aceptable(self.crear("libro.pdf")))
-
-    def test_rechaza_lo_que_esta_fuera(self):
-        motivo = self.app._libro_aceptable("/etc/hostname")
-        self.assertIsNotNone(motivo)
-
-    def test_rechaza_lo_que_no_es_un_libro(self):
-        motivo = self.app._libro_aceptable(self.crear("programa.sh"))
-        self.assertIn("no es un libro", motivo)
-
-    def test_dice_que_pasa_cuando_el_archivo_ya_no_esta(self):
-        motivo = self.app._libro_aceptable(os.path.join(self.tmp, "fantasma.pdf"))
-        self.assertIn("ya no está", motivo)
-
-    def test_el_motivo_explica_qué_hacer(self):
-        """ «Ruta no permitida» no decía ni qué ruta ni qué hacer con ella. """
-        motivo = self.app._libro_aceptable(self.crear("cosa.sh"))
-        self.assertIn("se admiten", motivo)
+# Qué libros se aceptan en un trabajo: prig-server/tests/trabajos_tests.rs
 
 
 if __name__ == "__main__":
