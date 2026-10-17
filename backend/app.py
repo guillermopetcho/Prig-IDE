@@ -12,7 +12,7 @@ import threading
 import subprocess
 import requests as requests_lib
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,7 +38,7 @@ import agent_flows_v2
 from agent_flows_v2 import DynamicFlowEngine, plantillas_profesionales_sota, ROLES_V2
 from perfil_libro import PerfilLibro
 from explorador import Explorador
-from ide_servicios import ServiciosIDE, ErrorIDE
+from ide_servicios import ServiciosIDE
 import ollama_opciones
 from ollama_opciones import ErrorConfig
 from ollama_gestion import GestorModelos, ErrorGestion
@@ -53,7 +53,6 @@ from recursos.gestor import gestor as _gestor_recursos
 from recursos import calculadora as recursos_calc, ficha as recursos_ficha
 from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
-import perfiles_config
 from recursos import termico as recursos_termico
 from exercise_engine import ExerciseEngine
 from feature_flags import FeatureFlags
@@ -62,13 +61,9 @@ from exercise_store import ExerciseStore
 from guided_learning import GuidedLearningService
 from study_plan_engine import SeguimientoPath, SeguimientoRepository
 import kaggle_lector
-import kaggle_explorar
 import kaggle_colecciones
-import kaggle_pdf
 import inicio
 import github_lector
-import github_stats_widget
-from datetime import datetime
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -336,9 +331,6 @@ class AIInlinePromptRequest(BaseModel):
 class AISearchRequest(BaseModel):
     query: str
 
-class ModelPullRequest(BaseModel):
-    model: str = "qwen2.5-coder:7b"
-
 class WorkflowStep(BaseModel):
     id: Optional[str] = None
     name: Optional[str] = "Agente"
@@ -535,19 +527,6 @@ def guided_generate_stream(req: GuidedGenerateRequest):
 def guided_migrate():
     """ Trae los planes de estudio antiguos al sistema unificado. Idempotente. """
     return guided.migrate_legacy_plans()
-
-@app.get("/api/guided/{path_id}")
-def guided_get(path_id: str):
-    path = guided.get(path_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Ruta no encontrada")
-    return path.model_dump()
-
-@app.delete("/api/guided/{path_id}")
-def guided_delete(path_id: str):
-    if not guided.delete(path_id):
-        raise HTTPException(status_code=404, detail="Ruta no encontrada")
-    return {"status": "deleted", "id": path_id}
 
 # ==========================================
 # ENDPOINTS: BANDERAS, MÉTRICAS DE APRENDIZAJE Y SALUD DEL ENTORNO
@@ -999,68 +978,7 @@ def flujos_ejecucion(eid: str):
 # Perfiles de Configuración del Entorno (Apariencia, Movimiento, IA)
 # ======================================================================
 
-@app.get("/api/config/profiles")
-def obtener_perfiles_config():
-    """ Devuelve la lista persistente de perfiles de configuración y el perfil activo. """
-    return perfiles_config.cargar_perfiles()
-
-
-@app.post("/api/config/profiles")
-def guardar_perfiles_config(req: perfiles_config.PerfilGuardarRequest):
-    """ Guarda la lista de perfiles y el perfil activo en disco. """
-    exito = perfiles_config.guardar_perfiles(req.model_dump())
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración de perfiles en disco.")
-    return {"exito": True, "perfil_activo": req.perfil_activo}
-
-
-@app.get("/api/config/apariencia")
-def obtener_apariencia_config():
-    """ Devuelve la configuración de apariencia y temas guardada en disco. """
-    return perfiles_config.cargar_apariencia()
-
-
-@app.post("/api/config/apariencia")
-def guardar_apariencia_config(datos: Dict[str, Any]):
-    """ Guarda la configuración de apariencia y temas de forma persistente en disco. """
-    exito = perfiles_config.guardar_apariencia(datos)
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la apariencia en disco.")
-    return {"ok": True}
-
-
-@app.get("/api/config/motor_movimiento")
-def obtener_motor_movimiento_config():
-    """ Devuelve los parámetros del motor de movimiento guardados en disco. """
-    return perfiles_config.cargar_motor_movimiento()
-
-
-@app.post("/api/config/motor_movimiento")
-def guardar_motor_movimiento_config(datos: Dict[str, Any]):
-    """ Guarda los parámetros del motor de movimiento de forma persistente en disco. """
-    exito = perfiles_config.guardar_motor_movimiento(datos)
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la configuración del motor de movimiento en disco.")
-    return {"ok": True}
-
-
 # Las aplicaciones con audio, la fuente, el análisis y /ws/audio_reactivo: servidor de Rust (routes/escritorio.rs)
-
-
-@app.get("/api/config/accesibilidad")
-def obtener_accesibilidad_config():
-    """ Devuelve las opciones de accesibilidad guardadas en disco. """
-    return perfiles_config.cargar_accesibilidad()
-
-
-@app.post("/api/config/accesibilidad")
-def guardar_accesibilidad_config(datos: Dict[str, Any]):
-    """ Guarda las opciones de accesibilidad en disco. """
-    exito = perfiles_config.guardar_accesibilidad(datos)
-    if not exito:
-        raise HTTPException(status_code=500, detail="No se pudo guardar la accesibilidad en disco.")
-    return {"ok": True}
-
 
 # ======================================================================
 # Ficha de libro: analizar un libro entero con un flujo de agentes
@@ -1133,31 +1051,12 @@ def libro_analizar(req: FichaRequest):
 # Explorar carpetas y sondear libros antes de extraerlos
 # ======================================================================
 
-@app.get("/api/explorador/atajos")
-def explorador_atajos():
-    """ Dónde suele haber libros, para no empezar navegando desde la raíz """
-    return {"atajos": explorador.atajos()}
-
-
-@app.get("/api/explorador/buscar")
-def explorador_buscar(q: str = Query(...), desde: Optional[str] = None):
-    """ Buscar un libro por su nombre, para cuando no recuerdas dónde lo dejaste """
-    try:
-        return {"resultados": explorador.buscar(q, desde)}
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-
-
 # El sondeo de libros y preparar desde él: servidor de Rust (prig_biblioteca::sondeo, routes/trabajos.rs)
 
 
 # Kaggle: buscar notebooks de la comunidad y leerlos celda a celda con un modelo
 # (backend/kaggle_lector.py). Sustituye al catálogo fijo de seis notebooks y a la
 # «importación» que generaba una plantilla inventada en vez del notebook real.
-
-class KaggleCredencialesRequest(BaseModel):
-    texto: str
-
 
 class KaggleRefRequest(BaseModel):
     ref: str
@@ -1181,51 +1080,6 @@ def _kaggle(fn, *args, **kwargs):
         return fn(*args, **kwargs)
     except kaggle_lector.ErrorKaggle as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-class KaggleDatosRequest(BaseModel):
-    tipo: str                                  # "dataset" | "competicion"
-    ref: str
-    modelo: Optional[str] = None
-    regenerar: bool = False
-
-
-def _kaggle_ficha(tipo: str, ref: str):
-    if tipo == "dataset":
-        return _kaggle(kaggle_explorar.dataset, ref, file_mgr.base_dir)
-    if tipo == "competicion":
-        return _kaggle(kaggle_explorar.competicion, ref, file_mgr.base_dir)
-    raise HTTPException(status_code=400, detail="Tipo desconocido: dataset o competicion.")
-
-
-@app.get("/api/kaggle/datasets")
-def kaggle_datasets(q: str = "", orden: str = "populares", pagina: int = Query(default=1, ge=1, le=100), tipo_archivo: str = "",
-                    licencia: str = "", tamano: str = "", usuario: str = ""):
-    return _kaggle(kaggle_explorar.buscar_datasets, q, orden, pagina, tipo_archivo, licencia, tamano, usuario)
-
-
-@app.get("/api/kaggle/dataset")
-def kaggle_dataset(ref: str):
-    return _kaggle_ficha("dataset", ref)
-
-
-@app.post("/api/kaggle/descargar")
-def kaggle_descargar(req: KaggleDatosRequest):
-    """ Baja y descomprime los datos en kaggle_datos/<slug>/ del proyecto (NDJSON con el progreso) """
-    if req.tipo not in ("dataset", "competicion"):
-        raise HTTPException(status_code=400, detail="Tipo desconocido: dataset o competicion.")
-    cancelar = threading.Event()
-    with ai_engine._streams_lock:
-        ai_engine.__dict__.setdefault("_cancelables", set()).add(cancelar)
-
-    def trabajo(avisar):
-        try:
-            return kaggle_explorar.descargar(req.tipo, req.ref, file_mgr.base_dir, avisar, cancelar)
-        finally:
-            with ai_engine._streams_lock:
-                ai_engine._cancelables.discard(cancelar)
-    return _ndjson_en_hilo(trabajo)
-
 
 class KaggleColeccionRequest(BaseModel):
     nombre: Optional[str] = None
@@ -1264,32 +1118,6 @@ def kaggle_coleccion_editar(id_: str, req: KaggleColeccionRequest):
 def kaggle_coleccion_borrar(id_: str):
     return _kaggle(kaggle_colecciones.borrar, id_)
 
-
-def _ruta_pdf_segura(ruta: str) -> str:
-    raiz = os.path.realpath(os.path.join(file_mgr.base_dir, kaggle_pdf.CARPETA_PDF))
-    real = os.path.realpath(ruta)
-    if not real.startswith(raiz + os.sep) or not real.endswith(".pdf") or not os.path.isfile(real):
-        raise HTTPException(status_code=404, detail="Ese PDF no existe.")
-    return real
-
-
-@app.post("/api/kaggle/pdf/abrir")
-def kaggle_pdf_abrir(req: KaggleRefRequest):
-    """ Abre el PDF con el visor del sistema """
-    real = _ruta_pdf_segura(req.ref)
-    cmd = ["xdg-open", real] if sys.platform.startswith("linux") else (["open", real] if sys.platform == "darwin" else ["cmd", "/c", "start", "", real])
-    try:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    except FileNotFoundError:
-        raise HTTPException(status_code=400, detail="No hay un visor de PDF configurado en el sistema.")
-    return {"ok": True}
-
-
-@app.get("/api/kaggle/previa")
-def kaggle_previa(ruta: str):
-    return _kaggle(kaggle_explorar.vista_previa, ruta, file_mgr.base_dir)
-
-
 # Explicar los datos de un dataset o una competición: servidor de Rust (routes/profesor.rs)
 
 
@@ -1310,43 +1138,15 @@ class GithubRefRequest(BaseModel):
 class GithubTokenRequest(BaseModel):
     texto: str
 
-
-class GithubWidgetConfigRequest(BaseModel):
-    config: Dict[str, Any]
-
-
 class GithubWidgetPreviewRequest(BaseModel):
     config: Optional[Dict[str, Any]] = None
     extras: Optional[Dict[str, Any]] = None
-
-
-class GithubWidgetPublicarRequest(BaseModel):
-    config: Optional[Dict[str, Any]] = None
-    extras: Optional[Dict[str, Any]] = None
-
 
 def _github(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except github_lector.ErrorGitHub as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/api/github/estado")
-def github_estado():
-    return github_lector.estado()
-
-
-@app.get("/api/github/buscar")
-def github_buscar(q: str = "", lenguaje: str = "", orden: str = "estrellas", pagina: int = Query(default=1, ge=1, le=50),
-                  estrellas_min: int = Query(default=0, ge=0), tema: str = ""):
-    return _github(github_lector.buscar, q, lenguaje, orden, pagina, estrellas_min, tema)
-
-
-@app.get("/api/github/archivo")
-def github_archivo(ref: str, ruta: str):
-    return _github(github_lector.leer_archivo, ref, ruta)
-
 
 # Explicar un repositorio o un archivo y las preguntas: servidor de Rust (routes/profesor.rs)
 
@@ -1365,146 +1165,17 @@ def github_guardar(req: GithubRefRequest):
 def github_quitar(ref: str):
     return {"repos": github_lector.quitar(ref)}
 
-
-@app.post("/api/github/exportar")
-def github_exportar(req: GithubRefRequest):
-    """ nota="md": la explicación en Markdown; nota="pdf": el código explicado en PDF """
-    fn = github_lector.exportar_pdf if (req.nota or "pdf") == "pdf" else github_lector.exportar_markdown
-    return _github(fn, req.ref, file_mgr.base_dir)
-
-
-# WIDGET GITHUB PROFILE (github_stats_widget.py)
-@app.get("/api/github/widget/config")
-def github_widget_config():
-    cfg = github_stats_widget.leer_config()
-    token = (github_lector.token() or {}).get("token")
-    user_info = None
-    if token:
-        try:
-            r = requests_lib.get(f"{github_lector.API}/user", headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "Prig-IDE"
-            }, timeout=6)
-            if r.status_code == 200:
-                d = r.json()
-                user_info = {
-                    "login": d.get("login"),
-                    "name": d.get("name"),
-                    "avatar_url": d.get("avatar_url"),
-                    "html_url": d.get("html_url")
-                }
-        except Exception:
-            pass
-    return {
-        "config": cfg,
-        "tiene_token": bool(token),
-        "usuario": user_info,
-        "temas": {k: v["nombre"] for k, v in github_stats_widget.TEMAS.items()}
-    }
-
-
-@app.post("/api/github/widget/config")
-def github_widget_guardar_config(req: GithubWidgetConfigRequest):
-    cfg = github_stats_widget.guardar_config(req.config)
-    return {"ok": True, "config": cfg}
-
-
-@app.post("/api/github/widget/publicar")
-def github_widget_publicar(req: GithubWidgetPublicarRequest):
-    token = (github_lector.token() or {}).get("token")
-    if not token:
-        raise HTTPException(
-            status_code=400,
-            detail="No hay token de GitHub configurado. Conéctalo desde la barra lateral o Ajustes de GitHub."
-        )
-
-    cfg = github_stats_widget.leer_config()
-    if req.config:
-        cfg.update(req.config)
-        github_stats_widget.guardar_config(cfg)
-
-    almacen = globals().get("desafios_almacen")
-    prog = globals().get("progreso")
-
-    stats = github_stats_widget.recolectar_estadisticas(
-        progreso_mgr=prog,
-        almacen_desafios=almacen,
-        extras_cliente=req.extras
-    )
-
-    try:
-        res = github_stats_widget.sincronizar_con_github(token, stats, cfg)
-    except ValueError as e:
-        # el motivo (token sin permisos, sin conexión...) para el usuario: antes llegaba como un 500
-        raise HTTPException(status_code=400, detail=str(e))
-    if not res.get("ok"):
-        raise HTTPException(status_code=400, detail=res.get("mensaje", "Error al sincronizar con GitHub"))
-    return res
-
-
-@app.post("/api/kaggle/credenciales")
-def kaggle_credenciales(req: KaggleCredencialesRequest):
-    return _kaggle(kaggle_lector.guardar_credenciales, req.texto)
-
-
-@app.delete("/api/kaggle/credenciales")
-def kaggle_borrar_credenciales():
-    return kaggle_lector.borrar_credenciales()
-
-
-@app.get("/api/kaggle/notebook")
-def kaggle_notebook(ref: str, refrescar: bool = False):
-    nb = _kaggle(kaggle_lector.abrir, ref, refrescar)
-    vista = kaggle_lector.vista(nb)
-    vista["explicaciones"] = kaggle_lector.explicaciones(nb["ref"])
-    vista["datos"] = kaggle_explorar.datos_del_notebook(nb, file_mgr.base_dir)
-    try:
-        vista["resumen_datos"] = kaggle_explorar.obtener_contexto_datasets_notebook(nb, file_mgr.base_dir)
-    except Exception as e:
-        logger.warning(f"Error obteniendo resumen de datos de {ref}: {e}")
-        vista["resumen_datos"] = {"fuentes": [], "contexto_texto": ""}
-    return vista
-
-
-@app.get("/api/kaggle/lecturas")
-def kaggle_lecturas():
-    return {"lecturas": kaggle_lector.resumen_lecturas()}
-
-
 # Explicar un notebook (celda, guía, ruta de estudio, preguntas): servidor de Rust (routes/profesor.rs)
 
 
 class SegundaCarpetaRequest(BaseModel):
     path: Optional[str] = None
 
-@app.get("/api/workspace/segunda")
-def get_segunda_carpeta():
-    ruta = file_mgr.segunda_dir
-    return {"path": ruta, "name": (os.path.basename(ruta) or ruta) if ruta else None}
-
 # ===========================================================================
 # Opciones de IDE: ir a archivo, buscar en archivos, renombrar, problemas…
 # ===========================================================================
 
 ide = ServiciosIDE(file_mgr)
-
-
-def _ide(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ErrorIDE as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except OSError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/api/ide/archivos")
-def ide_archivos():
-    return ide.listar()
-
 
 class IdeBuscarRequest(BaseModel):
     consulta: str
@@ -1544,12 +1215,6 @@ class SaveProjectRequest(BaseModel):
 class RemoveProjectRequest(BaseModel):
     path: str
 
-
-@app.get("/api/workspace/directories")
-def workspace_directories(ruta: Optional[str] = Query(default=None)):
-    return _ide(ide.listar_directorios, ruta)
-
-
 # La pantalla completa la alterna la ventana de Rust (routes/escritorio.rs)
 
 
@@ -1584,11 +1249,6 @@ def api_shutdown():
     """ Endpoint para solicitar el apagado seguro de análisis y procesos desde el cliente """
     cleanup_all_processes()
     return {"status": "ok", "message": "Análisis y procesos apagados correctamente."}
-
-@app.post("/api/ai/reload")
-@app.get("/api/ai/reload")
-def reload_ollama():
-    return ai_engine.reload_ollama()
 
 @app.get("/api/ai/ollama/version-info")
 def get_ollama_version_info():
@@ -1829,20 +1489,6 @@ class AIConfigUpdateRequest(BaseModel):
 
 class ModelDeleteRequest(BaseModel):
     model: str
-
-@app.get("/api/ai/models/detailed")
-def get_detailed_models():
-    return ai_engine.get_detailed_models()
-
-@app.post("/api/ai/pull")
-def pull_model(req: ModelPullRequest):
-    def event_stream():
-        try:
-            for status_msg in ai_engine.pull_model(req.model):
-                yield status_msg
-        except Exception as e:
-            yield f"Error en el servidor backend: {str(e)}\n"
-    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="text/plain")
 
 @app.post("/api/ai/workflow/run")
 def run_workflow(req: WorkflowRequest):
@@ -2682,20 +2328,6 @@ def generate_seguimiento_path(req: SeguimientoGenerateRequest):
     except Exception as err:
         raise HTTPException(status_code=500, detail=f"Error al generar el seguimiento: {str(err)}")
 
-@app.get("/api/seguimiento/{seg_id}")
-def get_seguimiento(seg_id: str):
-    path_obj = seguimiento_repo.load(seg_id)
-    if not path_obj:
-        raise HTTPException(status_code=404, detail="Seguimiento no encontrado")
-    return path_obj.model_dump()
-
-@app.delete("/api/seguimiento/{seg_id}")
-def delete_seguimiento(seg_id: str):
-    success = seguimiento_repo.delete(seg_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Seguimiento no encontrado")
-    return {"status": "deleted", "id": seg_id}
-
 class SeguimientoExplainRequest(BaseModel):
     goal: str
     block: dict
@@ -2911,37 +2543,9 @@ def generate_seguimiento_notebook(seg_id: str):
         "message": f"Cuaderno Jupyter '{filename}' generado exitosamente."
     }
 
-class SeguimientoProgressRequest(BaseModel):
-    completed_blocks: List[str]
-
-@app.post("/api/seguimiento/{seg_id}/progress")
-def update_seguimiento_progress(seg_id: str, req: SeguimientoProgressRequest):
-    path_obj = seguimiento_repo.load(seg_id)
-    if not path_obj:
-        raise HTTPException(status_code=404, detail="Seguimiento no encontrado")
-
-    # Sellar la fecha real en que se marcó cada bloque: el mapa de calor lo necesita
-    # (antes toda la actividad histórica se acumulaba en el día de hoy).
-    now_iso = datetime.now().isoformat()
-    newly_completed = set(req.completed_blocks) - set(path_obj.completed_blocks)
-    for block_id in newly_completed:
-        path_obj.completion_dates[block_id] = now_iso
-    for block_id in set(path_obj.completed_blocks) - set(req.completed_blocks):
-        path_obj.completion_dates.pop(block_id, None)
-
-    path_obj.completed_blocks = req.completed_blocks
-    seguimiento_repo.save(path_obj)
-    dataset_mgr.build_and_save_dataset()
-    return path_obj.model_dump()
-
 # ==========================================
 # DATASET UNIFICADO DE APRENDIZAJE
 # ==========================================
-
-@app.get("/api/dataset/summary")
-def get_dataset_summary():
-    ds = dataset_mgr.build_and_save_dataset()
-    return ds.model_dump()
 
 # ==========================================
 # LANZADOR DE VENTANA NATIVA INDEPENDIENTE PARA NOTE
@@ -3322,7 +2926,7 @@ def descargas_limpiar():
 from desafios import ejecucion as des_ejec, fuentes as des_fuentes, tutor as des_tutor, catalogo_github as des_catalogo
 import progreso
 import gemini_motor
-from desafios.almacen import Almacen as AlmacenDesafios, ahora as desafios_ahora
+from desafios.almacen import Almacen as AlmacenDesafios
 from desafios.ejecucion import ErrorDesafio
 
 desafios_almacen = AlmacenDesafios()
@@ -3394,11 +2998,6 @@ class DesafioReplicarGitHubRequest(BaseModel):
     tema: Optional[str] = None
     nivel: Optional[str] = "intermedio"
     modelo: Optional[str] = None
-
-
-class DesafioPaginasRequest(BaseModel):
-    paginas: List[Dict[str, Any]]
-
 
 class DesafioEjecutarRequest(BaseModel):
     paginas: List[Dict[str, Any]]
@@ -3532,13 +3131,6 @@ class InicioPerfilRequest(BaseModel):
     mostrar_al_abrir: Optional[bool] = None
     favoritas: Optional[List[str]] = None
 
-
-@app.get("/api/progreso/historial")
-def progreso_historial(estado: Optional[str] = None, concepto: Optional[str] = None,
-                       fuente: Optional[str] = None, limite: int = Query(default=200, ge=1, le=500)):
-    return {"desafios": _desafio(progreso.historial, desafios_almacen, estado, concepto, fuente, limite)}
-
-
 @app.post("/api/progreso/analisis")
 def progreso_analisis(req: ProgresoAnalisisRequest):
     """ El modelo (local o Gemini) lee el avance medido y propone los próximos pasos """
@@ -3558,12 +3150,6 @@ def progreso_analisis(req: ProgresoAnalisisRequest):
             raise ErrorDesafio("El modelo no devolvió nada. Prueba otra vez o con otro modelo.")
         return progreso.guardar_analisis(texto, _modelo_desafios(req.modelo), len(filas))
     return _ndjson_en_hilo(trabajo)
-
-
-@app.get("/api/desafios")
-def desafios_lista():
-    return {"desafios": desafios_almacen.lista()}
-
 
 @app.get("/api/desafios/fuentes")
 def desafios_fuentes():
@@ -3700,26 +3286,6 @@ def desafios_crear(req: DesafioCrearRequest):
         return AlmacenDesafios.publico(d)
     return _ndjson_en_hilo(trabajo)
 
-
-@app.put("/api/desafios/{id_}/paginas")
-def desafios_guardar_paginas(id_: str, req: DesafioPaginasRequest):
-    """ Guardado automático del trabajo del alumno """
-    paginas = _desafio(des_ejec.validar_paginas, req.paginas)
-
-    def cambio(d):
-        solo_lectura = {p["nombre"]: p for p in d.get("paginas") or [] if p.get("solo_lectura")}
-        d["paginas_usuario"] = [solo_lectura.get(p["nombre"], {"nombre": p["nombre"], "contenido": p["contenido"],
-                                                               "descripcion": p.get("descripcion", "")}) for p in paginas]
-        AlmacenDesafios.empezar(d)
-    d = _desafio(desafios_almacen.modificar, id_, cambio)
-    return {"guardado": d["actualizado"], "estado": d["progreso"]["estado"]}
-
-
-@app.post("/api/desafios/{id_}/detener")
-def desafios_detener(id_: str):
-    return runner.cancel(f"desafio_{id_}")
-
-
 @app.post("/api/desafios/{id_}/razonamiento")
 def desafios_razonamiento(id_: str, req: DesafioModeloRequest):
     """ Caja de razonamiento: se genera una vez y se guarda (NDJSON) """
@@ -3782,22 +3348,6 @@ def desafios_pista(id_: str, req: DesafioPistaRequest):
     def trabajo(avisar):
         return {"texto": _consumir(des_tutor.pista(motor, nombre_modelo, d, req.nivel, paginas, d.get("ultima_comprobacion")), avisar)}
     return _ndjson_en_hilo(trabajo)
-
-
-@app.post("/api/desafios/{id_}/rendirse")
-def desafios_rendirse(id_: str):
-    """ Solución de referencia. Si aún no estaba resuelto, queda como rendido. """
-    def cambio(d):
-        p = d["progreso"]
-        if p.get("estado") != "resuelto":
-            p["estado"], p["rendido"] = "rendido", desafios_ahora()
-    d = _desafio(desafios_almacen.modificar, id_, cambio)
-    priv = d.get("privado") or {}
-    c = priv.get("comprobacion") or {}
-    pruebas = (c.get("archivos") if c.get("tipo") == "unittest" else c.get("ejemplos") if c.get("tipo") == "doctest"
-               else c.get("asserts") if c.get("tipo") == "asserts" else None)
-    return {"referencia": priv.get("referencia") or [], "pruebas": pruebas, "tipo": c.get("tipo"), "progreso": d["progreso"]}
-
 
 @app.post("/api/desafios/{id_}/reflexion")
 def desafios_reflexion(id_: str, req: DesafioModeloRequest):
@@ -3981,99 +3531,6 @@ def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
 # ----------------------------------------------------------------------------
 # YouTube Search Engine & Registered Keywords (Deep Learning, Machine Learning, Python, C++)
 # ----------------------------------------------------------------------------
-@app.get("/api/youtube/sugerencias")
-def youtube_sugerencias(
-    q: str = Query(..., description="Término o prefijo a autocompletar"),
-    limite: Optional[int] = Query(8, description="Cantidad máxima de sugerencias")
-):
-    """Devuelve sugerencias de autocompletado en tiempo real desde YouTube."""
-    import youtube_buscador
-    if not q or not q.strip():
-        return {"query": "", "sugerencias": []}
-    sugerencias = youtube_buscador.obtener_sugerencias_youtube(q.strip(), max_sugerencias=limite or 8)
-    return {"query": q.strip(), "sugerencias": sugerencias}
-
-
-def _lanzar_navegador_sistema(url: str) -> bool:
-    """ Lanza el navegador web del sistema en un proceso desacoplado en segundo plano. """
-    import shutil
-    import subprocess
-    env_browser = os.environ.get("BROWSER")
-    candidatos = []
-    if env_browser:
-        candidatos.extend(env_browser.split(":"))
-    candidatos.extend([
-        "google-chrome",
-        "google-chrome-stable",
-        "/opt/google/chrome/google-chrome",
-        "chromium",
-        "chromium-browser",
-        "firefox",
-        "sensible-browser",
-        "x-www-browser",
-        "gnome-www-browser",
-        "xdg-open",
-    ])
-    binario = None
-    for cand in candidatos:
-        cand = cand.strip()
-        if not cand:
-            continue
-        ruta = shutil.which(cand) or (cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None)
-        if ruta:
-            if "firefox" in os.path.basename(ruta).lower():
-                try:
-                    res = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=1.5)
-                    if "snap install firefox" in res.stderr or "snap install firefox" in res.stdout:
-                        continue
-                except Exception:
-                    continue
-            binario = ruta
-            break
-
-    if binario:
-        try:
-            subprocess.Popen(
-                [binario, url],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                start_new_session=True,
-                close_fds=True,
-            )
-            return True
-        except Exception as e:
-            logger.warning(f"Error lanzando binario {binario} para {url}: {e}")
-
-    try:
-        import webbrowser
-        return bool(webbrowser.open(url))
-    except Exception as e:
-        logger.error(f"Error fallback webbrowser para {url}: {e}")
-        return False
-
-
-@app.post("/api/youtube/abrir_externo")
-async def youtube_abrir_externo(request: Request):
-    """Abre un enlace de YouTube en el navegador web predeterminado del sistema (Chrome, Firefox, etc.) sin bloquear el servidor."""
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    url = data.get("url")
-    if not url:
-        raise HTTPException(status_code=400, detail="Falta el parámetro 'url'")
-    if not (url.startswith("https://www.youtube.com/") or url.startswith("https://youtube.com/") or url.startswith("https://youtu.be/") or url.startswith("https://www.youtube-nocookie.com/")):
-        raise HTTPException(status_code=400, detail="Solo se permite abrir enlaces oficiales de YouTube.")
-    try:
-        import anyio
-        exito = await anyio.to_thread.run_sync(_lanzar_navegador_sistema, url)
-        return {"ok": True, "abierto": exito, "url": url}
-    except Exception as e:
-        logger.error(f"Error abriendo navegador externo para {url}: {e}")
-        return {"ok": False, "error": str(e), "url": url}
-
-
 # ============================================================================
 # Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
 # ============================================================================
