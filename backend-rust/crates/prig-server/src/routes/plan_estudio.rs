@@ -20,7 +20,7 @@ use crate::routes::workspace::espacio_de_trabajo;
 use crate::routes::{detalle, json_py};
 use crate::state::AppState;
 
-const MODELO: &str = "qwen2.5-coder:7b";
+pub(crate) const MODELO: &str = "qwen2.5-coder:7b";
 
 fn error_500() -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
@@ -35,7 +35,7 @@ fn respuesta(r: Result<Result<Mapa, Response>, tokio::task::JoinError>) -> Respo
 }
 
 /// `generate_response` sin opciones, entero
-fn generar(state: &AppState, prompt: String, sistema: &str, modelo: &str) -> String {
+pub(crate) fn generar(state: &AppState, prompt: String, sistema: &str, modelo: &str) -> String {
     let p = prig_ia::generar::PedidoGenerar { prompt, modelo: modelo.into(), sistema: sistema.into(), gobernador: true, ..Default::default() };
     let mut r = String::new();
     let c = prig_ia::vivo::Cancelar::default();
@@ -72,12 +72,12 @@ fn paso_validador(avisos: &[String], prefijo: &str, bien: &str) -> Valor {
     }
 }
 
-fn libros(state: &AppState) -> Vec<Mapa> {
+pub(crate) fn libros(state: &AppState) -> Vec<Mapa> {
     let guardados = crate::routes::estante::guardados(state);
     prig_biblioteca::estante::Estante::por_defecto().listar(None, &guardados).unwrap_or_default()
 }
 
-fn biblioteca() -> PathBuf {
+pub(crate) fn biblioteca() -> PathBuf {
     PathBuf::from(prig_biblioteca::estante::Estante::por_defecto().raiz)
 }
 
@@ -113,6 +113,47 @@ pub async fn ver(State(state): State<AppState>, Ruta(id): Ruta<String>, Query(q)
     )
 }
 
+/// Las fuentes de la biblioteca que recibe el Knowledge Architect (las 20 primeras)
+pub(crate) fn fuentes_de(items: &[Mapa]) -> Valor {
+    Valor::Lista(
+        items
+            .iter()
+            .take(20)
+            .map(|i| {
+                let tipo = match i.get("category_id") {
+                    Some(v) if v.verdad() => v.clone(),
+                    _ => i.get("ext").cloned().unwrap_or(Valor::Nulo),
+                };
+                let temas = match i.get("metadata") {
+                    Some(Valor::Mapa(md)) if i.verdad("metadata") => md.get("topics").cloned().unwrap_or(Valor::Lista(Vec::new())),
+                    _ => Valor::Lista(Vec::new()),
+                };
+                Valor::Mapa(
+                    Mapa::new()
+                        .con("source_id", i.get("id").cloned().unwrap_or(Valor::Nulo))
+                        .con("title", i.get("title").cloned().unwrap_or(Valor::Nulo))
+                        .con("type", tipo)
+                        .con("topics", temas),
+                )
+            })
+            .collect(),
+    )
+}
+
+/// Los cuadernos y el código de la biblioteca, y el resumen que recibe el Notebook Manager (los 15 primeros)
+pub(crate) fn codigo_de(items: Vec<Mapa>) -> (Vec<Mapa>, Valor) {
+    let codigo: Vec<Mapa> = items
+        .into_iter()
+        .filter(|b| matches!(b.texto("category_id"), Some("code" | "notebooks")) || matches!(b.texto("ext"), Some("py" | "ipynb")))
+        .collect();
+    let resumen = codigo
+        .iter()
+        .take(15)
+        .map(|i| Valor::Mapa(Mapa::new().con("id", i.get("id").cloned().unwrap_or(Valor::Nulo)).con("filename", i.get("filename").cloned().unwrap_or(Valor::Nulo))))
+        .collect();
+    (codigo, Valor::Lista(resumen))
+}
+
 /// El cuerpo de los agentes: `plan_id` y `model`
 fn pedido_agente(b: &Bytes) -> Result<(String, String), Response> {
     let m = cuerpo::modelo(b)?;
@@ -123,7 +164,7 @@ fn pedido_agente(b: &Bytes) -> Result<(String, String), Response> {
     Ok((id.texto_py(), modelo.texto_py()))
 }
 
-const SISTEMA_1: &str = r#"Eres el AGENTE 1: KNOWLEDGE ARCHITECT.
+pub(crate) const SISTEMA_1: &str = r#"Eres el AGENTE 1: KNOWLEDGE ARCHITECT.
 Tu tarea es descomponer el objetivo del alumno en un mapa de conocimiento jerárquico
 (dominios -> temas -> conceptos) apoyándote en las fuentes de la biblioteca que recibes.
 
@@ -160,7 +201,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto ni markdown alrededor, co
   "relationships": [{"source_concept_id": "conc_01", "target_concept_id": "conc_02", "relation_type": "REQUIRES"}]
 }"#;
 
-const SISTEMA_2: &str = r#"Eres el AGENTE 2: PRACTICE & CURRICULUM ARCHITECT.
+pub(crate) const SISTEMA_2: &str = r#"Eres el AGENTE 2: PRACTICE & CURRICULUM ARCHITECT.
 Recibes un KNOWLEDGE_MAP y lo conviertes en un currículo práctico: módulos ordenados,
 cada uno con un objetivo, criterios de validación comprobables y tareas concretas.
 
@@ -187,7 +228,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin texto ni markdown alrededor, co
   "module_dependencies": [{"from_module_id": "mod_01", "to_module_id": "mod_02"}]
 }"#;
 
-const SISTEMA_3: &str = r#"Eres el AGENTE 3: NOTEBOOK & LEARNING MANAGER.
+pub(crate) const SISTEMA_3: &str = r#"Eres el AGENTE 3: NOTEBOOK & LEARNING MANAGER.
 Recibes un currículo práctico y el listado de cuadernos y código disponibles en la
 biblioteca, y planificas qué cuaderno ejecutable corresponde a cada módulo.
 
@@ -266,30 +307,10 @@ pub async fn agente1(State(state): State<AppState>, b: Bytes) -> Response {
             let Some(mut p) = cargar(&espacio, &id)? else { return Err(detalle(StatusCode::NOT_FOUND, "Plan no encontrado.")) };
             let items = libros(&state);
             let objetivo = p.valor("user_goal").texto_py();
-            let fuentes: Vec<Valor> = items
-                .iter()
-                .take(20)
-                .map(|i| {
-                    let tipo = match i.get("category_id") {
-                        Some(v) if v.verdad() => v.clone(),
-                        _ => i.get("ext").cloned().unwrap_or(Valor::Nulo),
-                    };
-                    let temas = match i.get("metadata") {
-                        Some(Valor::Mapa(md)) if i.verdad("metadata") => md.get("topics").cloned().unwrap_or(Valor::Lista(Vec::new())),
-                        _ => Valor::Lista(Vec::new()),
-                    };
-                    Valor::Mapa(
-                        Mapa::new()
-                            .con("source_id", i.get("id").cloned().unwrap_or(Valor::Nulo))
-                            .con("title", i.get("title").cloned().unwrap_or(Valor::Nulo))
-                            .con("type", tipo)
-                            .con("topics", temas),
-                    )
-                })
-                .collect();
+            let fuentes = fuentes_de(&items);
             let prompt = format!(
                 "Objetivo: '{objetivo}'\nFuentes disponibles en la biblioteca: {}",
-                prig_plataforma::json::escribir_linea(&Valor::Lista(fuentes))
+                prig_plataforma::json::escribir_linea(&fuentes)
             );
             let km = ejecutar_agente(&state, prompt, SISTEMA_1, &modelo, &planes::MAPA, "Agente 1 (Knowledge Architect)")?;
             let avisos = planes::avisos_mapa(&km);
@@ -385,27 +406,11 @@ pub async fn agente3(State(state): State<AppState>, b: Bytes) -> Response {
                 },
                 None => return Err(falta_paso_2()),
             };
-            let codigo: Vec<Mapa> = libros(&state)
-                .into_iter()
-                .filter(|b| {
-                    matches!(b.texto("category_id"), Some("code" | "notebooks")) || matches!(b.texto("ext"), Some("py" | "ipynb"))
-                })
-                .collect();
-            let resumen: Vec<Valor> = codigo
-                .iter()
-                .take(15)
-                .map(|i| {
-                    Valor::Mapa(
-                        Mapa::new()
-                            .con("id", i.get("id").cloned().unwrap_or(Valor::Nulo))
-                            .con("filename", i.get("filename").cloned().unwrap_or(Valor::Nulo)),
-                    )
-                })
-                .collect();
+            let (codigo, resumen) = codigo_de(libros(&state));
             let prompt = format!(
                 "CURRICULUM:\n{}\n\nCUADERNOS Y CÓDIGO DISPONIBLES EN LA BIBLIOTECA:\n{}",
                 prig_plataforma::json::escribir_linea(&Valor::Mapa(curr.clone())),
-                prig_plataforma::json::escribir_linea(&Valor::Lista(resumen))
+                prig_plataforma::json::escribir_linea(&resumen)
             );
             let mut ej = ejecutar_agente(&state, prompt, SISTEMA_3, &modelo, &planes::PLAN_EJECUTABLE, "Agente 3 (Notebook Manager)")?;
             let avisos = planes::avisos_ejecutable(&ej, &curr);

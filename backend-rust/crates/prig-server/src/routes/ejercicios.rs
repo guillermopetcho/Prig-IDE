@@ -29,7 +29,7 @@ fn error_500() -> Response {
 }
 
 /// `ExerciseStore._load()`: el dict de ejercicios (vacío si falta, está roto o no es un objeto)
-fn ejercicios(espacio: &Path) -> Mapa {
+pub(crate) fn ejercicios(espacio: &Path) -> Mapa {
     match prig_aprendizaje::desafios::leer_json(&espacio.join(".prig_dataset").join("exercises.json")) {
         Some(Valor::Mapa(m)) => m,
         _ => Mapa::new(),
@@ -40,7 +40,7 @@ fn texto_o(m: &Mapa, k: &str) -> Valor {
     m.get(k).cloned().unwrap_or(Valor::Texto(String::new()))
 }
 
-fn telemetria_activa() -> bool {
+pub(crate) fn telemetria_activa() -> bool {
     prig_plataforma::banderas::Banderas::new(PathBuf::from(prig_plataforma::py::expanduser("~/.prig_flags.json"))).activa("learning_telemetry")
 }
 
@@ -84,7 +84,7 @@ pub async fn recientes(State(state): State<AppState>, Query(q): Query<HashMap<St
     }
 }
 
-async fn uno(state: &AppState, id: String) -> (PathBuf, Option<Mapa>) {
+pub(crate) async fn uno(state: &AppState, id: String) -> (PathBuf, Option<Mapa>) {
     let espacio = espacio_de_trabajo(state).await;
     let e = tokio::task::spawn_blocking({
         let espacio = espacio.clone();
@@ -139,7 +139,7 @@ pub async fn solucion(State(state): State<AppState>, Ruta(id): Ruta<String>) -> 
 }
 
 /// `ExerciseEngine.grade_submission`: el código del alumno con los tests ocultos, en una sesión desechable
-fn corregir(state: &AppState, codigo: &str, tests: &str) -> Mapa {
+pub(crate) fn corregir(state: &AppState, codigo: &str, tests: &str) -> Mapa {
     if prig_plataforma::py::strip(codigo).is_empty() {
         return Mapa::new().con("passed", false).con("reason", "No enviaste código.").con("stdout", "").con("stderr", "");
     }
@@ -332,7 +332,7 @@ fn validar(state: &AppState, e: &Mapa) -> Option<Mapa> {
 }
 
 /// `ExerciseStore.save`: con su fecha, como mucho 500 (se van los más antiguos), escritura atómica
-fn guardar_ejercicio(espacio: &Path, e: &mut Mapa) -> std::io::Result<()> {
+pub(crate) fn guardar_ejercicio(espacio: &Path, e: &mut Mapa) -> std::io::Result<()> {
     if !e.contiene("created_at") {
         e.poner("created_at", prig_plataforma::py::ahora_iso());
     }
@@ -366,51 +366,68 @@ pub async fn generar(State(state): State<AppState>, b: Bytes) -> Response {
         let modelo = c.get("model").map(Valor::texto_py).unwrap_or_else(|| "qwen2.5-coder:7b".into());
         let nivel = c.get("level").map(Valor::texto_py).unwrap_or_else(|| "intermedio".into());
         let intentos = c.get("attempts").and_then(Valor::num).map(|n| n as i64).unwrap_or(3).clamp(1, 5);
-        let mut historia = Vec::new();
-        for n in 1..=intentos {
-            let mut e = match generar_uno(&state, &concepto, &modelo, &nivel) {
-                Ok(e) => e,
-                Err(err) => {
-                    historia.push(Valor::Mapa(Mapa::new().con("attempt", n).con("stage", "generation").con("error", err)));
-                    continue;
-                }
-            };
-            let v = validar(&state, &e)?;
-            historia.push(Valor::Mapa(Mapa::new().con("attempt", n).con("stage", "validation").con("valid", v.valor("valid").clone()).con("reason", v.valor("reason").clone())));
-            if v.verdad("valid") {
-                e.poner("validation", v);
-                e.poner("attempts_used", n);
-                if guardar_ejercicio(&espacio, &mut e).is_err() {
-                    tracing::warn!("No se pudieron guardar los ejercicios");
-                }
-                let id = e.valor("exercise_id").texto_py();
-                if telemetria_activa() {
-                    use prig_aprendizaje::telemetria as t;
-                    let r = t::abrir(&espacio).and_then(|cx| {
-                        t::registrar(&cx, &t::Evento { ejercicio: &id, concepto: &concepto, tipo: "generated", aprobado: None, intento: n, pistas: 0, stderr: "", segundos: 0.0 })
-                    });
-                    if let Err(e) = r {
-                        tracing::warn!("telemetría: {e}");
-                    }
-                }
-                let publico = Mapa::new()
-                    .con("exercise_id", id.as_str())
-                    .con("concept", texto_o(&e, "concept"))
-                    .con("title", texto_o(&e, "title"))
-                    .con("statement", texto_o(&e, "statement"))
-                    .con("function_name", texto_o(&e, "function_name"))
-                    .con("starter_code", texto_o(&e, "starter_code"))
-                    .con("attempts_used", n)
-                    .con("generation_history", Valor::Lista(historia));
-                return Some(json_py(StatusCode::OK, &Valor::Mapa(publico)));
-            }
-        }
-        Some(detalle(StatusCode::UNPROCESSABLE_ENTITY, format!("No se pudo generar un ejercicio verificable sobre '{concepto}'. Prueba otro modelo o reformula el concepto.")))
+        let (hecho, historia) = generar_verificado(&state, &concepto, &modelo, &nivel, intentos)?;
+        let Some(mut e) = hecho else {
+            return Some(detalle(StatusCode::UNPROCESSABLE_ENTITY, format!("No se pudo generar un ejercicio verificable sobre '{concepto}'. Prueba otro modelo o reformula el concepto.")));
+        };
+        guardar_y_anotar(&espacio, &mut e, &concepto);
+        let n = e.valor("attempts_used").clone();
+        let publico = Mapa::new()
+            .con("exercise_id", e.valor("exercise_id").clone())
+            .con("concept", texto_o(&e, "concept"))
+            .con("title", texto_o(&e, "title"))
+            .con("statement", texto_o(&e, "statement"))
+            .con("function_name", texto_o(&e, "function_name"))
+            .con("starter_code", texto_o(&e, "starter_code"))
+            .con("attempts_used", n)
+            .con("generation_history", Valor::Lista(historia));
+        Some(json_py(StatusCode::OK, &Valor::Mapa(publico)))
     })
     .await;
     match r {
         Ok(Some(r)) => r,
         _ => error_500(),
+    }
+}
+
+/// `ExerciseEngine.generate_validated`: genera hasta tener uno que supere la verificación (con `validation` y
+/// `attempts_used`), con la historia de los intentos. None si Python fallaría al validarlo (un campo que no es texto)
+pub(crate) fn generar_verificado(state: &AppState, concepto: &str, modelo: &str, nivel: &str, intentos: i64) -> Option<(Option<Mapa>, Vec<Valor>)> {
+    let mut historia = Vec::new();
+    for n in 1..=intentos {
+        let mut e = match generar_uno(state, concepto, modelo, nivel) {
+            Ok(e) => e,
+            Err(err) => {
+                historia.push(Valor::Mapa(Mapa::new().con("attempt", n).con("stage", "generation").con("error", err)));
+                continue;
+            }
+        };
+        let v = validar(state, &e)?;
+        historia.push(Valor::Mapa(Mapa::new().con("attempt", n).con("stage", "validation").con("valid", v.valor("valid").clone()).con("reason", v.valor("reason").clone())));
+        if v.verdad("valid") {
+            e.poner("validation", v);
+            e.poner("attempts_used", n);
+            return Some((Some(e), historia));
+        }
+    }
+    Some((None, historia))
+}
+
+/// `exercise_store.save(exercise)` y, con la telemetría activa, el evento «generated»
+pub(crate) fn guardar_y_anotar(espacio: &Path, e: &mut Mapa, concepto: &str) {
+    if guardar_ejercicio(espacio, e).is_err() {
+        tracing::warn!("No se pudieron guardar los ejercicios");
+    }
+    let id = e.valor("exercise_id").texto_py();
+    let n = e.get("attempts_used").and_then(Valor::num).map(|n| n as i64).unwrap_or(1);
+    if telemetria_activa() {
+        use prig_aprendizaje::telemetria as t;
+        let r = t::abrir(espacio).and_then(|cx| {
+            t::registrar(&cx, &t::Evento { ejercicio: &id, concepto, tipo: "generated", aprobado: None, intento: n, pistas: 0, stderr: "", segundos: 0.0 })
+        });
+        if let Err(e) = r {
+            tracing::warn!("telemetría: {e}");
+        }
     }
 }
 

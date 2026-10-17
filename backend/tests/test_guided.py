@@ -138,23 +138,5 @@ class TestAprendizajeGuiado(unittest.TestCase):
         self.assertEqual(done_event["path"]["goal"], "Meta Streaming")
 
 
-    def test_endpoint_generate_stream_empty_topics(self):
-        from fastapi.testclient import TestClient
-        from app import app
-        import json
-        client = TestClient(app)
-        res = client.post("/api/guided/generate/stream", json={
-            "goal": "Aprender Rust",
-            "topics": "   ",
-            "mode": "rapido"
-        })
-        self.assertEqual(res.status_code, 200)
-        first_line = res.iter_lines().__next__()
-        data = json.loads(first_line)
-        self.assertEqual(data.get("type"), "error")
-        self.assertIn("lista de temas", data.get("message", ""))
-
-
-
 if __name__ == "__main__":
     unittest.main()

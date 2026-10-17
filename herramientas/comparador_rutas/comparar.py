@@ -877,6 +877,35 @@ def ollama_falso() -> str:
                     cr = {"target_agent": "KNOWLEDGE_ARCHITECT", "action": m.group(1), "target": m.group(2), "reason": "Por " + firma} \
                         if m else {"firma": firma}
                     trozos = [json.dumps(cr, ensure_ascii=False)]
+                elif "AGENTE ORGANIZADOR DE TEMAS" in (d.get("system") or ""):
+                    # los arreglos de run_topic_organizer: sin título, temas sueltos, tipo raro, bloque que no es dict
+                    pedido = d.get("prompt") or ""
+                    bloques = [{"title": "Uno " + firma, "description": "d", "learning_objective": "lo", "validation_check": "vc",
+                                "topics": ["a", "b"], "type": "theory", "estimated_time": "1h"},
+                               {"topics": "suelto", "type": "raro"}, {"title": "", "topics": 5, "description": ""}]
+                    if "nodict" in pedido:
+                        bloques.append("x")
+                    org = {"goal": "otra", "blocks": bloques, "rationale": "Por " + firma}
+                    if "sinbloques" in pedido:
+                        org = {"rationale": "nada", "blocks": "x"}
+                    trozos = ["<think>ordeno</think>```json\n" + json.dumps(org, ensure_ascii=False), "\n```"]
+                    if "sinjson" in pedido:
+                        trozos = ["No sé ", "hacerlo."]
+                elif "GENERADOR DE QUIZZES" in (d.get("system") or ""):
+                    qz = {"block_title": "B " + firma, "questions": [{"id": 1, "question": "¿Qué?", "options": ["a", "b"],
+                                                                    "correct_index": 1, "explanation": "porque"}]}
+                    trozos = ["```json\n" + json.dumps(qz, ensure_ascii=False) + "\n```"]
+                    if "sinjson" in (d.get("prompt") or ""):
+                        trozos = ["sin ", "json"]
+                elif "EVALUADOR TÉCNICO DE PROGRAMACIÓN" in (d.get("system") or ""):
+                    rt = {"challenge_title": "Reto " + firma, "instructions": "Haz algo", "starter_code": "def f():\n    pass",
+                          "expected_output_hint": "1"}
+                    trozos = [json.dumps(rt, ensure_ascii=False)]
+                elif "REVISOR DE CÓDIGO TÉCNICO" in (d.get("system") or ""):
+                    rv = {"passed": False, "score": 40, "feedback": "Casi " + firma, "suggestions": ["Revisa"], "corrected_code": "x = 1"}
+                    trozos = ["```json\n" + json.dumps(rv, ensure_ascii=False) + "\n```"]
+                    if "sinjson" in (d.get("prompt") or ""):
+                        trozos = ["Está ", "bien."]
                 elif "ÚNICAMENTE un objeto JSON válido" in (d.get("system") or ""):
                     trozos = ['Aquí está:\n```json\n{"tema": "Prueba ' + firma + '", ', '"tags": ["a"]}\n```']
                 lineas = [({"message": {"role": "assistant", "content": t}} if chat else {"response": t}) | {"done": False}
@@ -1425,7 +1454,7 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/guided/no_existe", "metodo": "DELETE", "solo_rust": True},
         {"ruta": "/api/dataset/summary", "volatiles": ["created_at", "updated_at", "last_activity", "block_id"], "solo_rust": True},
         {"ruta": "/api/dataset/export", "volatiles": ["created_at", "updated_at", "last_activity", "block_id"], "solo_rust": True},
-        {"ruta": "/api/guided/seg_aaaa0006/progress", "metodo": "POST", "json": {"completed_blocks": ["b1", "b2", "b2"], "solo_rust": True},
+        {"ruta": "/api/guided/seg_aaaa0006/progress", "metodo": "POST", "json": {"completed_blocks": ["b1", "b2", "b2"]},
          "archivo": "{proyecto}/.prig_seguimientos/seg_aaaa0006.json", "restaurar": True, "archivo_json": True,
          "contenedores": ["completion_dates"], "solo_rust": True},
         {"ruta": "/api/seguimiento/seg_aaaa0006/progress", "metodo": "POST", "json": {"completed_blocks": []},
@@ -1866,6 +1895,64 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/banco/simbolos", "solo_rust": True},
         {"ruta": "/api/banco/ficha?nombre=saludar", "solo_rust": True},
         {"ruta": "/api/banco/grafo", "solo_rust": True},
+        # aprendizaje guiado con el modelo (tanda 42): las rutas nuevas se guardan con id al azar y se deshacen
+        *({"ruta": r, "metodo": "POST", **({"json": j} if j is not None else {}),
+           "carpetas": ["{proyecto}/.prig_seguimientos", "{proyecto}/notebooks_plan"],
+           "nombres_volatiles": True, "volatiles": ["id", "block_id", "created_at", "updated_at", "path_id"], "solo_rust": True} for r, j in [
+            ("/api/guided/generate", {"goal": "Aprender SQL", "topics": "joins, índices", "level": "Básico", "focus": "Teórico"}),
+            ("/api/guided/generate", {"goal": "Meta nodict", "topics": "a"}),
+            ("/api/guided/generate", {"goal": "Meta sinbloques", "topics": "a"}),
+            ("/api/guided/generate", {"goal": "Meta sinjson", "topics": "a"}),
+            ("/api/guided/generate", {"goal": "Sin temas", "topics": "   "}),
+            ("/api/guided/generate", {"goal": "Sin temas"}),
+            ("/api/guided/generate", {"topics": "a"}),
+            ("/api/guided/generate", {"goal": "Profundo", "mode": "profundo"}),
+            ("/api/guided/generate", {"goal": "Profundo", "topics": "propios", "mode": "profundo", "level": "Avanzado"}),
+            ("/api/guided/generate/stream", {"goal": "Aprender SQL", "topics": "joins"}),
+            ("/api/guided/generate/stream", {"goal": "Meta nodict", "topics": "a"}),
+            ("/api/guided/generate/stream", {"goal": "Sin temas", "topics": ""}),
+            ("/api/guided/generate/stream", {"goal": "Profundo", "mode": "profundo"}),
+            ("/api/guided/generate/stream", {"goal": 5}),
+            ("/api/seguimiento/generate", {"goal": "Aprender SQL", "topics": "joins"}),
+            ("/api/seguimiento/generate", {"goal": "Meta nodict", "topics": "a"}),
+            ("/api/seguimiento/generate", {"goal": "Sin temas"}),
+            ("/api/guided/migrate", None),
+        ]),
+        *({"ruta": r, "metodo": "POST", "json": j, "solo_rust": True} for r, j in [
+            ("/api/guided/explain", {"goal": "SQL", "block": {"title": "Joins", "topics": ["inner", "left"], "learning_objective": "Unir"}, "use_web": False}),
+            ("/api/seguimiento/explain", {"goal": "SQL", "block": {}, "use_web": False, "model": "qwen3:8b"}),
+            ("/api/guided/explain", {"goal": "SQL", "block": {"title": "Joins", "topics": [1, 2]}, "use_web": False}),
+            ("/api/guided/explain", {"goal": "SQL", "block": {"topics": "ab"}, "use_web": False}),
+            ("/api/guided/explain", {"goal": "SQL", "block": "x", "use_web": False}),
+            ("/api/guided/explain", {"block": {}, "use_web": False}),
+            ("/api/guided/quiz", {"goal": "SQL", "block": {"title": "Joins", "topics": ["inner"], "learning_objective": "Unir"}}),
+            ("/api/seguimiento/quiz", {"goal": "SQL", "block": {"title": "sinjson"}}),
+            ("/api/guided/quiz", {"goal": "SQL", "block": {"topics": [3]}}),
+            ("/api/guided/quiz", {"goal": "SQL"}),
+            ("/api/guided/verify-solution", {"goal": "SQL", "block": {"title": "Joins", "validation_check": "v"}, "user_code": "x = 1"}),
+            ("/api/seguimiento/verify-solution", {"goal": "SQL", "block": {}, "user_code": "sinjson"}),
+            ("/api/guided/verify-solution", {"goal": "SQL", "block": {}, "user_code": "x", "exercise_id": "no_existe"}),
+            ("/api/guided/verify-solution", {"goal": "SQL", "block": {}}),
+        ]),
+        *({"ruta": "/api/guided/verify-solution", "metodo": "POST", "restaurar_otro": "{proyecto}/.prig_dataset/learning.db",
+           "json": {"goal": "SQL", "block": {}, "user_code": codigo, "exercise_id": "ex_1"}, "solo_rust": True}
+          for codigo in ("def doble(x):\n    return x * 2\n", "def doble(x):\n    return x\n", "def doble(x)\n")),
+        *({"ruta": r, "metodo": "POST", "json": j, "archivo": "{proyecto}/.prig_dataset/exercises.json", "restaurar": True,
+           "archivo_json": True, "valores": True, "restaurar_otro": "{proyecto}/.prig_dataset/learning.db",
+           "volatiles": ["exercise_id", "created_at"], "solo_rust": True} for r, j in [
+            ("/api/guided/challenge", {"goal": "SQL", "block": {"title": "Doble", "topics": ["funciones"]}}),
+            ("/api/seguimiento/challenge", {"goal": "SQL", "block": {"title": "Doble roto"}}),
+            ("/api/guided/challenge", {"goal": "SQL", "block": {"topics": []}}),
+            ("/api/guided/challenge", {"goal": "SQL", "block": {"topics": "ab"}}),
+            ("/api/guided/challenge", {"block": {}}),
+        ]),
+        {"ruta": "/api/guided/seg_aaaa0006/generate-notebook", "metodo": "POST", "archivo": "{proyecto}/Ruta__lgebra_seg_aa.ipynb",
+         "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/seguimiento/seg_aaaa0001/generate-notebook", "metodo": "POST", "carpetas": ["{proyecto}"], "solo_rust": True},
+        {"ruta": "/api/seguimiento/seg_aaaa0002/generate-notebook", "metodo": "POST", "carpetas": ["{proyecto}"], "solo_rust": True},
+        {"ruta": "/api/guided/no_existe/generate-notebook", "metodo": "POST", "solo_rust": True},
+        {"ruta": "/api/guided/seg_aaaa0004/generate-notebook", "metodo": "POST", "solo_rust": True},
+        {"ruta": "/api/guided/seg_aaaa0003/generate-notebook", "metodo": "POST", "solo_rust": True},
     ]
     def sustituir(v):
         """ {home} y {proyecto} también dentro del cuerpo JSON (sin esto llegaban literales: rutas que no existen) """
@@ -1994,8 +2081,25 @@ def main():
             # otro archivo que cada lado tiene que ver igual (p. ej. la base de telemetría), sin compararlo
             otro = c.get("restaurar_otro", "").replace("{copia}", copia).replace("{home}", p["home"]).replace("{proyecto}", p["proyecto"])
             otro_original = open(otro, "rb").read() if otro and os.path.exists(otro) else None
+            # carpetas donde cada lado escribe archivos con nombre al azar: se comparan los nuevos y se deshacen
+            carpetas = [x.replace("{copia}", copia).replace("{home}", p["home"]).replace("{proyecto}", p["proyecto"])
+                        for x in c.get("carpetas", [])]
+            foto = lambda: {os.path.join(r, n): open(os.path.join(r, n), "rb").read()
+                            for d in carpetas for r, _, ns in os.walk(d) for n in ns}
+            antes = foto()
+
+            def deshacer():
+                ahora = foto()
+                for k, v in ahora.items():
+                    if k not in antes:
+                        os.remove(k)
+                    elif antes[k] != v:
+                        open(k, "wb").write(antes[k])
+                return {k: v for k, v in ahora.items() if antes.get(k) != v}
+
             a = pedir(f"http://127.0.0.1:{pp}", c)
             escrito_python = leer()
+            nuevos_python = deshacer() if carpetas else {}
             if c.get("restaurar"):
                 if original is None:
                     if os.path.exists(archivo):
@@ -2010,10 +2114,32 @@ def main():
                     open(otro, "wb").write(otro_original)
             b = pedir(f"http://127.0.0.1:{pr}", c)
             escrito_rust = leer()
+            nuevos_rust = deshacer() if carpetas else {}
+            if carpetas:
+                def contenido(k, v):
+                    nombre = "*" if c.get("nombres_volatiles") else os.path.relpath(k, p["proyecto"])
+                    try:
+                        return [nombre, normalizar(json.loads(v))]
+                    except Exception:
+                        return [nombre, v.decode(errors="replace")]
+                lado = lambda n: sorted((contenido(k, v) for k, v in n.items()), key=lambda x: json.dumps(x, ensure_ascii=False))
+                d = diferencia(lado(nuevos_python), lado(nuevos_rust))
+                if d:
+                    fallos += 1
+                    print(f"✗ {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  los archivos nuevos difieren: {d}")
+                    continue
             if c.get("archivo_json") and escrito_python is not None and escrito_rust is not None:
                 # un JSON o un JSONL (una línea por evento)
                 como_json = lambda b: [normalizar(json.loads(l)) for l in b.decode().splitlines() if l.strip()] \
                     if archivo.endswith(".jsonl") else normalizar(json.loads(b))
+                if c.get("valores"):
+                    # un diccionario con claves al azar (p. ej. los ejercicios por id): sus valores, en orden
+                    # solo los que no estaban (Python guarda los ejercicios en memoria: no ve los que escribió Rust antes)
+                    ya = set(json.loads(original)) if original else set()
+                    # y de esos, el último (en la memoria de Python siguen los de casos anteriores)
+                    como_json = lambda b: sorted((v for k, v in json.loads(b).items() if k not in ya),
+                                                 key=lambda x: str(x.get("created_at")))[-1:]
+                    como_json = (lambda f: lambda b: [normalizar(x) for x in f(b)])(como_json)
                 if c.get("claves"):
                     # solo esas claves del JSON escrito (el resto lo escribe cada lado a su manera)
                     filtro = lambda d: {k: d.get(k) for k in c["claves"]}
@@ -2026,7 +2152,7 @@ def main():
                 try:
                     detalle_json = diferencia(json.loads(escrito_python), json.loads(escrito_rust))
                 except Exception:
-                    detalle_json = f"{escrito_python[:200]!r} ≠ {escrito_rust[:200]!r}"
+                    detalle_json = f"{(escrito_python or b'')[:200]!r} ≠ {(escrito_rust or b'')[:200]!r}"
                 print(f"✗ {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  el archivo escrito difiere: {detalle_json}")
                 continue
             etiqueta = f"{c.get('metodo', 'GET'):4} {c['ruta'][:70]}"

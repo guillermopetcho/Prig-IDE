@@ -54,12 +54,9 @@ from recursos import calculadora as recursos_calc, ficha as recursos_ficha
 from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
 from recursos import termico as recursos_termico
-from exercise_engine import ExerciseEngine
 from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
-from exercise_store import ExerciseStore
 from guided_learning import GuidedLearningService
-from study_plan_engine import SeguimientoPath, SeguimientoRepository
 import kaggle_lector
 import kaggle_colecciones
 import inicio
@@ -106,7 +103,6 @@ book_service = BookService()
 knowledge_service = KnowledgeService(book_service.books_dir)
 
 # Todos los repositorios cuelgan del workspace activo (no de os.getcwd()).
-seguimiento_repo = SeguimientoRepository(file_mgr.base_dir)
 dataset_mgr = LearnerDatasetManager(file_mgr.base_dir)
 
 
@@ -170,10 +166,8 @@ bancos.guardia = _guardia_analista
 flow_store = FlowStore(file_mgr.base_dir)
 perfil_libro = PerfilLibro(knowledge_base)
 explorador = Explorador(file_mgr.base_dir)
-exercise_engine = ExerciseEngine(ai_engine, runner)
 flags = FeatureFlags()
 telemetry = LearningTelemetry(file_mgr.base_dir)
-exercise_store = ExerciseStore(file_mgr.base_dir)
 
 # Aprendizaje Guiado: sistema único de rutas. Sustituye a Recorrido y Seguimiento,
 # que hacían casi lo mismo con dos modelos, dos interfaces y dos almacenes.
@@ -256,11 +250,9 @@ def rebind_workspace(new_base_dir: str) -> None:
     Sin esto los objetos quedaban congelados en la carpeta que había al arrancar,
     de modo que los planes y seguimientos nuevos seguían guardándose en la antigua.
     """
-    global seguimiento_repo, dataset_mgr, telemetry, exercise_store, guided
-    seguimiento_repo = SeguimientoRepository(new_base_dir)
+    global dataset_mgr, telemetry, guided
     dataset_mgr = LearnerDatasetManager(new_base_dir)
     telemetry = LearningTelemetry(new_base_dir)
-    exercise_store = ExerciseStore(new_base_dir)
     guided = GuidedLearningService(new_base_dir, ai_engine, book_service)
     # el explorador de libros también deja navegar el espacio de trabajo: el abierto ahora, no el del arranque
     explorador.workspace = os.path.abspath(new_base_dir)
@@ -471,62 +463,8 @@ def referencias_guardar(req: ReferenciaAccionRequest):
 # ENDPOINTS: APRENDIZAJE GUIADO (rutas unificadas)
 # ==========================================
 
-class GuidedGenerateRequest(BaseModel):
-    goal: str
-    topics: str = ""
-    level: str = "Intermedio"
-    focus: str = "Práctico"
-    mode: str = "rapido"          # rapido | profundo
-    model: str = "qwen2.5-coder:7b"
-
-class GuidedProgressRequest(BaseModel):
-    completed_blocks: List[str]
-
-@app.post("/api/guided/generate")
-def guided_generate(req: GuidedGenerateRequest):
-    """ Una sola puerta de entrada; la diferencia es la profundidad del análisis """
-    try:
-        if req.mode == "profundo":
-            path = guided.generate_deep(req.goal, req.topics, level=req.level,
-                                        focus=req.focus, model=req.model)
-        else:
-            if not req.topics.strip():
-                raise HTTPException(status_code=400,
-                                    detail="El modo rápido necesita una lista de temas.")
-            path = guided.generate_fast(req.goal, req.topics, level=req.level,
-                                        focus=req.focus, model=req.model)
-    except HTTPException:
-        raise
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"No se pudo generar la ruta: {err}")
-    return path.model_dump()
-
-@app.post("/api/guided/generate/stream")
-def guided_generate_stream(req: GuidedGenerateRequest):
-    """ Emite en tiempo real las etapas, pensamientos del modelo y el resultado final en formato NDJSON """
-    def emit():
-        try:
-            if req.mode == "profundo":
-                gen = guided.generate_deep_stream(req.goal, req.topics, level=req.level,
-                                                   focus=req.focus, model=req.model)
-            else:
-                if not req.topics.strip():
-                    yield json.dumps({"type": "error", "message": "El modo rápido necesita una lista de temas."}, ensure_ascii=False) + "\n"
-                    return
-                gen = guided.generate_fast_stream(req.goal, req.topics, level=req.level,
-                                                   focus=req.focus, model=req.model)
-            for event in gen:
-                yield json.dumps(event, ensure_ascii=False) + "\n"
-        except Exception as err:
-            yield json.dumps({"type": "error", "message": str(err)}, ensure_ascii=False) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emit()), media_type="application/x-ndjson")
-
-# Detener (/api/guided/cancel, como /api/ai/cancel): servidor de Rust (routes/asistente.rs)
-@app.post("/api/guided/migrate")
-def guided_migrate():
-    """ Trae los planes de estudio antiguos al sistema unificado. Idempotente. """
-    return guided.migrate_legacy_plans()
+# Generar (rápido y profundo, con o sin flujo), migrar los planes antiguos y detener: servidor de Rust
+# (routes/guiado_ia.rs y routes/asistente.rs)
 
 # ==========================================
 # ENDPOINTS: BANDERAS, MÉTRICAS DE APRENDIZAJE Y SALUD DEL ENTORNO
@@ -2308,240 +2246,8 @@ def banco_borrar():
 # Plan de estudio de los tres agentes (/api/study-plan/*): en el servidor de Rust (routes/plan_estudio.rs y guiado.rs)
 
 
-class SeguimientoGenerateRequest(BaseModel):
-    goal: str
-    topics: str
-    level: str = "Intermedio"
-    focus: str = "Práctico"
-    model: str = "qwen2.5-coder:7b"
-
-@app.post("/api/seguimiento/generate")
-def generate_seguimiento_path(req: SeguimientoGenerateRequest):
-    """ OBSOLETO: usa /api/guided/generate. Se mantiene por compatibilidad. """
-    try:
-        raw_path = ai_engine.run_topic_organizer(req.goal, req.topics, level=req.level, focus=req.focus, model=req.model)
-        path_obj = SeguimientoPath.model_validate(raw_path)
-        path_obj.goal = req.goal
-        path_obj.topics_raw = req.topics
-        seguimiento_repo.save(path_obj)
-        return path_obj.model_dump()
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al generar el seguimiento: {str(err)}")
-
-class SeguimientoExplainRequest(BaseModel):
-    goal: str
-    block: dict
-    model: str = "qwen2.5-coder:7b"
-    use_web: bool = True
-
-@app.post("/api/guided/explain")
-@app.post("/api/seguimiento/explain")
-def explain_seguimiento_block(req: SeguimientoExplainRequest):
-    def generator():
-        try:
-            tema = f"{req.block.get('title', '')} {' '.join(req.block.get('topics', []))} {req.goal}"
-            for chunk in ai_engine.explain_seguimiento_block(req.goal, req.block, model=req.model, use_web=req.use_web,
-                                                             contexto_extra=_con_referencias(tema, "")[0]):
-                yield chunk
-        except Exception as e:
-            yield f"\n[Error: {str(e)}]"
-            
-    return StreamingResponse(_flujo_cancelable(generator()), media_type="text/plain")
-
-class SeguimientoQuizRequest(BaseModel):
-    goal: str
-    block: dict
-    model: str = "qwen2.5-coder:7b"
-
-@app.post("/api/guided/quiz")
-@app.post("/api/seguimiento/quiz")
-def generate_seguimiento_quiz(req: SeguimientoQuizRequest):
-    try:
-        quiz = ai_engine.generate_block_quiz(req.goal, req.block, model=req.model)
-        return quiz
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al generar quiz: {str(err)}")
-
-
-class SeguimientoChallengeRequest(BaseModel):
-    goal: str
-    block: dict
-    model: str = "qwen2.5-coder:7b"
-
-class SeguimientoVerifySolutionRequest(BaseModel):
-    goal: str
-    block: dict
-    user_code: str
-    model: str = "qwen2.5-coder:7b"
-    exercise_id: Optional[str] = None
-
-@app.post("/api/guided/challenge")
-@app.post("/api/seguimiento/challenge")
-def get_block_challenge(req: SeguimientoChallengeRequest):
-    """ Reto del bloque como ejercicio VERIFICADO.
-
-    Antes el reto era texto libre y la corrección se la pedíamos al modelo. Ahora se
-    genera con el mismo motor que el resto: tests ocultos y comprobación ejecutando.
-    Si el motor no logra uno válido, se cae al reto antiguo para no dejar al alumno
-    sin nada, avisando de que ese no se puede corregir automáticamente.
-    """
-    topics = ", ".join(req.block.get("topics", [])) or req.block.get("title", "")
-    concepto = f"{req.block.get('title', '')} ({topics})".strip()
-
-    try:
-        result = exercise_engine.generate_validated(concepto, model=req.model, attempts=3)
-    except Exception as err:
-        result = {"ok": False, "error": str(err)}
-
-    if result.get("ok"):
-        exercise = result["exercise"]
-        exercise_store.save(exercise)
-        if flags.is_enabled("learning_telemetry"):
-            telemetry.record(exercise["exercise_id"], concepto, "generated",
-                             attempt_num=exercise.get("attempts_used", 1))
-
-        public = ExerciseEngine.public_view(exercise)
-        return {
-            "verified": True,
-            "exercise_id": public["exercise_id"],
-            "challenge_title": public["title"],
-            "instructions": public["statement"],
-            "starter_code": public["starter_code"],
-            "function_name": public["function_name"],
-            "expected_output_hint": f"Debe definir {public['function_name']} y pasar los tests ocultos.",
-        }
-
-    # Reserva sin verificación automática
-    try:
-        challenge = ai_engine.generate_challenge_for_block(req.goal, req.block, model=req.model)
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al generar reto: {str(err)}")
-    challenge["verified"] = False
-    return challenge
-
-@app.post("/api/guided/verify-solution")
-@app.post("/api/seguimiento/verify-solution")
-def verify_solution(req: SeguimientoVerifySolutionRequest):
-    """ Corrige el reto. Si viene de un ejercicio verificado, EJECUTA el código contra
-    sus tests; preguntarle al modelo si el código está bien daba falsos aprobados. """
-    if req.exercise_id:
-        exercise = exercise_store.get(req.exercise_id)
-        if exercise:
-            veredicto = exercise_engine.grade_submission(exercise, req.user_code)
-
-            if flags.is_enabled("learning_telemetry"):
-                intento = telemetry.attempt_number(req.exercise_id)
-                telemetry.record(req.exercise_id, exercise.get("concept", ""), "submission",
-                                 passed=veredicto["passed"], attempt_num=intento,
-                                 stderr=veredicto.get("stderr", ""), elapsed=veredicto.get("elapsed", 0))
-
-            return {
-                "verified_by_execution": True,
-                "passed": veredicto["passed"],
-                "score": 100 if veredicto["passed"] else 0,
-                "feedback": veredicto["reason"],
-                "stdout": veredicto.get("stdout", ""),
-                "stderr": veredicto.get("stderr", ""),
-                "suggestions": [],
-            }
-
-    # Reto antiguo sin tests: solo queda la valoración del modelo, y se dice.
-    try:
-        res = ai_engine.verify_user_code_solution(req.goal, req.block, req.user_code, model=req.model)
-        res["verified_by_execution"] = False
-        return res
-    except Exception as err:
-        raise HTTPException(status_code=500, detail=f"Error al verificar solución: {str(err)}")
-
-@app.post("/api/guided/{seg_id}/generate-notebook")
-@app.post("/api/seguimiento/{seg_id}/generate-notebook")
-def generate_seguimiento_notebook(seg_id: str):
-    path_obj = seguimiento_repo.load(seg_id)
-    if not path_obj:
-        raise HTTPException(status_code=404, detail="Seguimiento no encontrado")
-
-    cells = []
-    cells.append({
-        "cell_type": "markdown",
-        "metadata": {},
-        "source": [
-            f"# 📓 Cuaderno de Aprendizaje: {path_obj.goal}\n",
-            f"**Generado automáticamente por Prig IDE** | Total de Bloques: {len(path_obj.blocks)}\n\n",
-            "---\n"
-        ]
-    })
-
-    for i, b in enumerate(path_obj.blocks, start=1):
-        cells.append({
-            "cell_type": "markdown",
-            "metadata": {},
-            "source": [
-                f"## Bloque {i}: {b.title}\n",
-                f"**Descripción:** {b.description}\n\n",
-                f"🎯 **Objetivo:** {b.learning_objective}\n\n",
-                f"⚡ **Hito de Validación:** {b.validation_check}\n\n",
-                f"📌 **Temas:** {', '.join(b.topics)}\n"
-            ]
-        })
-
-        cells.append({
-            "cell_type": "code",
-            "execution_count": None,
-            "metadata": {},
-            "outputs": [],
-            "source": [
-                f"# ==========================================\n",
-                f"# BLOQUE {i}: {b.title.upper()}\n",
-                f"# ==========================================\n\n",
-                f"print('=== Ejecutando Bloque {i}: {b.title} ===')\n"
-            ]
-        })
-
-        cells.append({
-            "cell_type": "code",
-            "execution_count": None,
-            "metadata": {},
-            "outputs": [],
-            "source": [
-                f"# 🎯 RETO PRÁCTICO PARA BLOQUE {i}\n",
-                f"# Hito: {b.validation_check}\n\n",
-                f"def resolver_reto_bloque_{i}():\n",
-                f"    # TODO: Escribe tu solución de código aquí\n",
-                f"    pass\n\n",
-                f"resolver_reto_bloque_{i}()\n"
-            ]
-        })
-
-    notebook_dict = {
-        "cells": cells,
-        "metadata": {
-            "kernelspec": {
-                "display_name": "Python 3 (ipykernel)",
-                "language": "python",
-                "name": "python3"
-            },
-            "language_info": {
-                "name": "python",
-                "version": "3.10"
-            }
-        },
-        "nbformat": 4,
-        "nbformat_minor": 4
-    }
-
-    safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', path_obj.goal[:30])
-    filename = f"Ruta_{safe_title}_{seg_id[:6]}.ipynb"
-    file_path = os.path.join(file_mgr.base_dir, filename)
-
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(notebook_dict, f, indent=2, ensure_ascii=False)
-
-    return {
-        "status": "ok",
-        "file_path": file_path,
-        "filename": filename,
-        "message": f"Cuaderno Jupyter '{filename}' generado exitosamente."
-    }
+# Seguimiento: generar, la clase, el quiz, el reto verificado, corregirlo y el cuaderno: servidor de Rust
+# (routes/guiado_ia.rs)
 
 # ==========================================
 # DATASET UNIFICADO DE APRENDIZAJE

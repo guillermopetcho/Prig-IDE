@@ -14,6 +14,7 @@ pub mod exportar;
 pub mod files;
 pub mod ia;
 pub mod guiado;
+pub mod guiado_ia;
 pub mod plan_estudio;
 pub mod navegar;
 pub mod ide;
