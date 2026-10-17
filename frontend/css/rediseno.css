@@ -867,9 +867,10 @@ body.wa-arrastrando, body.wa-arrastrando * { cursor: grabbing !important; user-s
     background: var(--bg-panel, #252526);
     border-bottom: 1px solid var(--border-color, #2b2b2b);
     border-top: 2px solid transparent;
-    overflow: hidden;
+    overflow: visible;
     flex-shrink: 0;
     position: relative;
+    z-index: 5;
 }
 
 .editor-col-tabs {
@@ -1656,3 +1657,204 @@ body.editor-transparente .editor-panel-razonamiento {
     background: rgba(0, 0, 0, 0) !important;
     background-color: rgba(0, 0, 0, 0) !important;
 }
+
+/* ============================================================
+   ESTILOS PARA VISTA PREVIA MARKDOWN & PENSAMIENTO DEL PROYECTO
+   ============================================================ */
+#markdown-view-container {
+    background: var(--bg-panel, #181825);
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 24px 32px;
+}
+
+body.editor-transparente #markdown-view-container {
+    background: rgba(30, 30, 30, var(--editor-bg-alpha, 0)) !important;
+}
+
+.prig-markdown-rendered-body h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent-purple, #cba6f7);
+    border-bottom: 1px solid rgba(203, 166, 247, 0.25);
+    padding-bottom: 8px;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+.prig-markdown-rendered-body h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent-blue, #89b4fa);
+    border-bottom: 1px solid rgba(137, 180, 250, 0.2);
+    padding-bottom: 6px;
+    margin-top: 20px;
+    margin-bottom: 14px;
+}
+
+.prig-markdown-rendered-body h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #94e2d5;
+    margin-top: 18px;
+    margin-bottom: 10px;
+}
+
+.prig-markdown-rendered-body h4,
+.prig-markdown-rendered-body h5,
+.prig-markdown-rendered-body h6 {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #f9e2af;
+    margin-top: 14px;
+    margin-bottom: 8px;
+}
+
+.prig-markdown-rendered-body p {
+    margin-bottom: 14px;
+    line-height: 1.75;
+}
+
+.prig-markdown-rendered-body ul,
+.prig-markdown-rendered-body ol {
+    margin-bottom: 14px;
+    padding-left: 24px;
+}
+
+.prig-markdown-rendered-body li {
+    margin-bottom: 6px;
+    line-height: 1.6;
+}
+
+.prig-markdown-rendered-body blockquote {
+    border-left: 3.5px solid var(--accent-purple, #cba6f7);
+    background: rgba(203, 166, 247, 0.08);
+    padding: 10px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    color: #cdd6f4;
+    font-style: italic;
+}
+
+.prig-markdown-rendered-body code {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f38ba8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+}
+
+.prig-markdown-rendered-body pre {
+    background: #11111b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.prig-markdown-rendered-body pre code {
+    background: transparent;
+    color: #a6e3a1;
+    padding: 0;
+    font-size: 12.5px;
+    border-radius: 0;
+}
+
+.prig-markdown-rendered-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+}
+
+.prig-markdown-rendered-body th,
+.prig-markdown-rendered-body td {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.prig-markdown-rendered-body th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 700;
+    color: #89b4fa;
+}
+
+.prig-markdown-rendered-body hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 24px 0;
+}
+
+.prig-md-btn-editar:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    color: #fff !important;
+}
+
+/* Indicador de archivo leído */
+.indicador-archivo-leido {
+    animation: fadeInReadTag 0.3s ease;
+}
+
+@keyframes fadeInReadTag {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   CUADRADITO CENTRAL DEL ARCHIVO ACTIVO EN CADA DIVISIÓN
+   ============================================================ */
+.editor-col-centro-archivo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(17, 17, 27, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(137, 180, 250, 0.35);
+    border-radius: 6px;
+    padding: 2px 12px;
+    height: 25px;
+    box-sizing: border-box;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #f8fafc;
+    font-family: 'Fira Code', monospace;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    z-index: 20;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    max-width: 65%;
+    transition: all 0.2s ease;
+}
+
+.editor-col-centro-archivo:hover {
+    border-color: var(--accent-blue, #89b4fa);
+    background: rgba(30, 30, 46, 0.98);
+    box-shadow: 0 0 10px rgba(137, 180, 250, 0.35);
+}
+
+.editor-col.activa .editor-col-centro-archivo {
+    border-color: rgba(137, 180, 250, 0.6);
+    box-shadow: 0 0 8px rgba(137, 180, 250, 0.25);
+}
+
+.editor-col-centro-nombre {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.editor-transparente .editor-col-centro-archivo {
+    background: rgba(17, 17, 27, 0.70) !important;
+    border-color: rgba(137, 180, 250, 0.28) !important;
+}
+

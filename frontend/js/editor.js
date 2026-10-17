@@ -1044,6 +1044,8 @@ class EditorManager {
         if (window.IDE && typeof window.IDE.pintarEstado === 'function') {
             window.IDE.pintarEstado();
         }
+        // Refrescar badges de nombre de archivo (para actualizar cuál está activo)
+        this.renderBadgesBarra();
     }
 
     /** Refresca el layout de todos los editores activos */
@@ -1251,6 +1253,8 @@ class EditorManager {
         const ext = (name || '').split('.').pop().toLowerCase();
         const lang = this.getLanguageForExt(ext);
         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'].includes(ext);
+        const isPensamiento = (name && name.toUpperCase().includes('PENSAMIENTO')) || (path && path.toUpperCase().includes('PENSAMIENTO'));
+        const isMarkdown = ext === 'md' || ext === 'markdown' || isPensamiento;
 
         if (!this.openTabs.has(path)) {
             let model = null;
@@ -1269,7 +1273,10 @@ class EditorManager {
                 notebookData,
                 savedContent: content,
                 isImage,
-                imageUrl: `/api/file/raw?path=${encodeURIComponent(path)}`
+                imageUrl: `/api/file/raw?path=${encodeURIComponent(path)}`,
+                isMarkdown,
+                isPensamiento,
+                viewMode: isMarkdown ? 'markdown' : (isNotebook ? 'notebook' : 'source')
             };
             this.openTabs.set(path, tab);
 
@@ -1277,6 +1284,9 @@ class EditorManager {
                 model.onDidChangeContent(() => {
                     this.checkAutoComment(tab.path);
                     this.onContentChanged(tab.path);
+                    if (tab.isMarkdown && tab.viewMode === 'markdown') {
+                        this.renderMarkdownView(tab.path);
+                    }
                 });
             }
         } else {
@@ -1286,6 +1296,12 @@ class EditorManager {
             }
             tab.savedContent = content;
             tab.notebookData = notebookData;
+            tab.isMarkdown = isMarkdown;
+            tab.isPensamiento = isPensamiento;
+        }
+
+        if (typeof window !== 'undefined' && window.notificarArchivoLeido) {
+            window.notificarArchivoLeido(name || path);
         }
 
         const destCol = targetCol !== null ? targetCol : this.activeCol;
@@ -1356,8 +1372,9 @@ class EditorManager {
         if (ed && tabData.model) {
             ed.setModel(tabData.model);
         }
+        this.actualizarCentroArchivo(colIndex);
 
-        // Si la columna es 0 y es un cuaderno o imagen, manejar contenedores visuales
+        // Si la columna es 0 y es un cuaderno, imagen o markdown, manejar contenedores visuales
         if (colIndex === 0) {
             const monacoContainer = document.getElementById('monaco-editor-container');
             const notebookContainer = document.getElementById('notebook-view-container');
@@ -1371,11 +1388,22 @@ class EditorManager {
                     monacoContainer.parentElement.appendChild(imageContainer);
                 }
             }
+            let markdownContainer = document.getElementById('markdown-view-container');
+            if (!markdownContainer) {
+                markdownContainer = document.createElement('div');
+                markdownContainer.id = 'markdown-view-container';
+                markdownContainer.className = 'prig-markdown-container';
+                markdownContainer.style.cssText = 'display:none; flex:1; min-height:0; overflow-y:auto; padding:24px 32px; background:var(--bg-panel, #181825); color:var(--text-main, #cdd6f4);';
+                if (monacoContainer && monacoContainer.parentElement) {
+                    monacoContainer.parentElement.appendChild(markdownContainer);
+                }
+            }
 
             if (tabData.isImage) {
                 if (viewModeBar) viewModeBar.style.display = 'none';
                 if (monacoContainer) monacoContainer.style.display = 'none';
                 if (notebookContainer) notebookContainer.style.display = 'none';
+                if (markdownContainer) markdownContainer.style.display = 'none';
                 imageContainer.style.display = 'flex';
                 imageContainer.innerHTML = `
                     <div style="text-align:center; max-width:90%; max-height:85%;">
@@ -1387,17 +1415,50 @@ class EditorManager {
                 `;
             } else if (tabData.isNotebook && tabData.notebookData) {
                 if (imageContainer) imageContainer.style.display = 'none';
-                if (viewModeBar) viewModeBar.style.display = 'flex';
-                if (monacoContainer) monacoContainer.style.display = 'none';
-                if (notebookContainer) {
-                    notebookContainer.style.display = 'flex';
-                    if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+                if (markdownContainer) markdownContainer.style.display = 'none';
+                if (viewModeBar) {
+                    viewModeBar.style.display = 'flex';
+                    viewModeBar.innerHTML = `
+                        <button id="btn-view-notebook" class="view-toggle-btn ${tabData.viewMode === 'source' ? '' : 'active'}" onclick="window.editorMgr && window.editorMgr.showNotebookView();"><i class="fa-solid fa-book-bookmark"></i> Vista Cuaderno Jupyter</button>
+                        <button id="btn-view-source" class="view-toggle-btn ${tabData.viewMode === 'source' ? 'active' : ''}" onclick="window.editorMgr && window.editorMgr.showSourceEditor();"><i class="fa-solid fa-code"></i> Código Fuente Raw</button>
+                    `;
+                }
+                if (tabData.viewMode === 'source') {
+                    if (monacoContainer) monacoContainer.style.display = 'block';
+                    if (notebookContainer) notebookContainer.style.display = 'none';
+                } else {
+                    if (monacoContainer) monacoContainer.style.display = 'none';
+                    if (notebookContainer) {
+                        notebookContainer.style.display = 'flex';
+                        if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+                    }
+                }
+            } else if (tabData.isMarkdown) {
+                if (imageContainer) imageContainer.style.display = 'none';
+                if (notebookContainer) notebookContainer.style.display = 'none';
+                if (viewModeBar) {
+                    viewModeBar.style.display = 'flex';
+                    viewModeBar.innerHTML = `
+                        <button id="btn-view-markdown" class="view-toggle-btn ${tabData.viewMode === 'source' ? '' : 'active'}" onclick="window.editorMgr && window.editorMgr.showMarkdownView();"><i class="fa-solid fa-file-lines"></i> Vista Markdown</button>
+                        <button id="btn-view-source-md" class="view-toggle-btn ${tabData.viewMode === 'source' ? 'active' : ''}" onclick="window.editorMgr && window.editorMgr.showSourceEditor();"><i class="fa-solid fa-code"></i> Código Fuente Raw</button>
+                    `;
+                }
+                if (tabData.viewMode === 'source') {
+                    if (monacoContainer) monacoContainer.style.display = 'block';
+                    if (markdownContainer) markdownContainer.style.display = 'none';
+                } else {
+                    if (monacoContainer) monacoContainer.style.display = 'none';
+                    if (markdownContainer) {
+                        markdownContainer.style.display = 'block';
+                        this.renderMarkdownView(path);
+                    }
                 }
             } else {
                 if (imageContainer) imageContainer.style.display = 'none';
+                if (notebookContainer) notebookContainer.style.display = 'none';
+                if (markdownContainer) markdownContainer.style.display = 'none';
                 if (viewModeBar) viewModeBar.style.display = 'none';
                 if (monacoContainer) monacoContainer.style.display = 'block';
-                if (notebookContainer) notebookContainer.style.display = 'none';
             }
         }
 
@@ -1408,20 +1469,128 @@ class EditorManager {
     }
 
     showSourceEditor() {
-        document.getElementById('monaco-editor-container').style.display = 'block';
-        document.getElementById('notebook-view-container').style.display = 'none';
-        document.getElementById('btn-view-notebook').className = 'view-toggle-btn';
-        document.getElementById('btn-view-source').className = 'view-toggle-btn active';
+        const tabData = this.openTabs.get(this.activePath);
+        if (tabData) tabData.viewMode = 'source';
+        const monacoContainer = document.getElementById('monaco-editor-container');
+        const notebookContainer = document.getElementById('notebook-view-container');
+        const markdownContainer = document.getElementById('markdown-view-container');
+        if (monacoContainer) monacoContainer.style.display = 'block';
+        if (notebookContainer) notebookContainer.style.display = 'none';
+        if (markdownContainer) markdownContainer.style.display = 'none';
+
+        const btnNb = document.getElementById('btn-view-notebook');
+        const btnSrc = document.getElementById('btn-view-source');
+        const btnMd = document.getElementById('btn-view-markdown');
+        const btnSrcMd = document.getElementById('btn-view-source-md');
+        if (btnNb) btnNb.className = 'view-toggle-btn';
+        if (btnSrc) btnSrc.className = 'view-toggle-btn active';
+        if (btnMd) btnMd.className = 'view-toggle-btn';
+        if (btnSrcMd) btnSrcMd.className = 'view-toggle-btn active';
+
+        if (this.panes[0] && this.panes[0].editor && typeof this.panes[0].editor.layout === 'function') {
+            this.panes[0].editor.layout();
+        }
     }
 
     showNotebookView() {
         const tabData = this.openTabs.get(this.activePath);
         if (tabData && tabData.notebookData) {
-            document.getElementById('monaco-editor-container').style.display = 'none';
-            document.getElementById('notebook-view-container').style.display = 'flex';
-            document.getElementById('btn-view-notebook').className = 'view-toggle-btn active';
-            document.getElementById('btn-view-source').className = 'view-toggle-btn';
+            tabData.viewMode = 'notebook';
+            const monacoContainer = document.getElementById('monaco-editor-container');
+            const notebookContainer = document.getElementById('notebook-view-container');
+            const markdownContainer = document.getElementById('markdown-view-container');
+            if (monacoContainer) monacoContainer.style.display = 'none';
+            if (markdownContainer) markdownContainer.style.display = 'none';
+            if (notebookContainer) {
+                notebookContainer.style.display = 'flex';
+                if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+            }
+            const btnNb = document.getElementById('btn-view-notebook');
+            const btnSrc = document.getElementById('btn-view-source');
+            if (btnNb) btnNb.className = 'view-toggle-btn active';
+            if (btnSrc) btnSrc.className = 'view-toggle-btn';
         }
+    }
+
+    showMarkdownView() {
+        const tabData = this.openTabs.get(this.activePath);
+        if (!tabData) return;
+        tabData.viewMode = 'markdown';
+        const monacoContainer = document.getElementById('monaco-editor-container');
+        const notebookContainer = document.getElementById('notebook-view-container');
+        const markdownContainer = document.getElementById('markdown-view-container');
+        if (monacoContainer) monacoContainer.style.display = 'none';
+        if (notebookContainer) notebookContainer.style.display = 'none';
+        if (markdownContainer) {
+            markdownContainer.style.display = 'block';
+            this.renderMarkdownView(this.activePath);
+        }
+
+        const btnMd = document.getElementById('btn-view-markdown');
+        const btnSrcMd = document.getElementById('btn-view-source-md');
+        if (btnMd) btnMd.className = 'view-toggle-btn active';
+        if (btnSrcMd) btnSrcMd.className = 'view-toggle-btn';
+    }
+
+    renderMarkdownView(path) {
+        const tabData = this.openTabs.get(path);
+        if (!tabData) return;
+        let markdownContainer = document.getElementById('markdown-view-container');
+        if (!markdownContainer) {
+            const monacoContainer = document.getElementById('monaco-editor-container');
+            markdownContainer = document.createElement('div');
+            markdownContainer.id = 'markdown-view-container';
+            markdownContainer.className = 'prig-markdown-container';
+            markdownContainer.style.cssText = 'display:block; flex:1; min-height:0; overflow-y:auto; padding:24px 32px; background:var(--bg-panel, #181825); color:var(--text-main, #cdd6f4);';
+            if (monacoContainer && monacoContainer.parentElement) {
+                monacoContainer.parentElement.appendChild(markdownContainer);
+            }
+        }
+
+        const rawContent = (tabData.model && typeof tabData.model.getValue === 'function')
+            ? tabData.model.getValue()
+            : (tabData.savedContent || '');
+
+        let htmlContent = '';
+        if (window.marked && typeof window.marked.parse === 'function') {
+            try {
+                htmlContent = window.marked.parse(rawContent);
+            } catch (err) {
+                console.error('Error parseando markdown:', err);
+                htmlContent = `<pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml ? this.escapeHtml(rawContent) : rawContent}</pre>`;
+            }
+        } else {
+            htmlContent = `<pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml ? this.escapeHtml(rawContent) : rawContent}</pre>`;
+        }
+
+        const isPensamiento = tabData.isPensamiento || (tabData.name && tabData.name.toUpperCase().includes('PENSAMIENTO'));
+
+        markdownContainer.innerHTML = `
+            <div class="prig-markdown-document ${isPensamiento ? 'es-pensamiento-proyecto' : ''}" style="max-width: 960px; margin: 0 auto; width: 100%;">
+                <div class="prig-markdown-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px; margin-bottom: 22px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="${isPensamiento ? 'fa-solid fa-brain' : 'fa-solid fa-file-lines'}" style="color: ${isPensamiento ? 'var(--accent-purple, #cba6f7)' : 'var(--accent-blue, #89b4fa)'}; font-size: 20px;"></i>
+                        <div>
+                            <div style="font-weight: 800; font-size: 15px; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                                ${this.escapeHtml ? this.escapeHtml(tabData.name) : tabData.name}
+                                ${isPensamiento ? '<span style="background: rgba(203, 166, 247, 0.2); color: #cba6f7; border: 1px solid rgba(203, 166, 247, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">Pensamiento del Proyecto</span>' : '<span style="background: rgba(137, 180, 250, 0.15); color: #89b4fa; border: 1px solid rgba(137, 180, 250, 0.3); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">Markdown</span>'}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted, #a6adc8); font-family: 'Fira Code', monospace; margin-top: 2px;">
+                                ${this.escapeHtml ? this.escapeHtml(path) : path}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="prig-md-btn-editar" onclick="window.editorMgr && window.editorMgr.showSourceEditor();" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #cdd6f4; border-radius: 6px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                            <i class="fa-solid fa-pen-to-square"></i> Editar Código Fuente
+                        </button>
+                    </div>
+                </div>
+                <div class="prig-markdown-rendered-body" style="font-size: 13.5px; line-height: 1.75; color: var(--text-main, #cdd6f4);">
+                    ${htmlContent}
+                </div>
+            </div>
+        `;
     }
 
     /** Cierra una pestaña en la columna activa (compatibilidad) */
@@ -1693,6 +1862,15 @@ class EditorManager {
         if (panelRaz && sinArchivos) panelRaz.style.display = 'none';
         else if (panelRaz && !panelRaz.classList.contains('oculto')) panelRaz.style.display = 'flex';
 
+        if (sinArchivos) {
+            for (let i = 0; i < 3; i++) {
+                const c = document.getElementById(`editor-col-centro-${i}`);
+                if (c) c.style.display = 'none';
+            }
+            const barra = document.getElementById('editor-col-badges-barra');
+            if (barra) { barra.innerHTML = ''; barra.style.display = 'none'; }
+        }
+
         if (vacio && !vacio.dataset.conectado) {
             vacio.dataset.conectado = '1';
             vacio.addEventListener('click', (e) => {
@@ -1792,6 +1970,141 @@ class EditorManager {
 
             container.appendChild(tabEl);
         });
+
+        // Actualizar el cuadradito central con el nombre completo del archivo activo de esta división
+        this.actualizarCentroArchivo(colIndex);
+    }
+
+    /**
+     * Actualiza los badges de archivo activo en la barra superior del editor.
+     * Se llama cuando cambia la pestaña activa en cualquier columna.
+     */
+    actualizarCentroArchivo(colIndex) {
+        // Ocultar badges embebidos en los headers de columna (ya no se usan)
+        for (let i = 0; i < 3; i++) {
+            const el = document.getElementById(`editor-col-centro-${i}`);
+            if (el) el.style.display = 'none';
+        }
+        // Redibujar todos los badges en la barra superior
+        this.renderBadgesBarra();
+    }
+
+    /**
+     * Renderiza los badges de archivo activo en #editor-col-badges-barra.
+     * Muestra uno por cada columna/división visible con archivo activo.
+     * Estilo idéntico al indicador verde de "archivo leído".
+     */
+    renderBadgesBarra() {
+        const barra = document.getElementById('editor-col-badges-barra');
+        if (!barra) return;
+
+        barra.innerHTML = '';
+        let totalBadges = 0;
+
+        for (let i = 0; i < this.numColumns; i++) {
+            const pane = this.panes ? this.panes[i] : null;
+            if (!pane || !pane.activePath || !this.openTabs || !this.openTabs.has(pane.activePath)) continue;
+
+            const tab = this.openTabs.get(pane.activePath);
+            if (!tab) continue;
+
+            const nombreCompleto = tab.name || pane.activePath.split('/').pop() || 'Archivo';
+            const iconInfo = this.getFileIconInfo(nombreCompleto, tab);
+            const esActivo = (i === this.activeCol);
+
+            // Separador entre badges cuando hay más de una columna
+            if (totalBadges > 0) {
+                const sep = document.createElement('span');
+                sep.style.cssText = 'color: rgba(255,255,255,0.15); font-size: 14px; user-select:none; flex-shrink:0;';
+                sep.textContent = '|';
+                barra.appendChild(sep);
+            }
+
+            const badge = document.createElement('span');
+            badge.className = 'editor-col-badge-nombre' + (esActivo ? ' activo' : '');
+            badge.dataset.col = String(i);
+            badge.style.cssText = [
+                'display: inline-flex',
+                'align-items: center',
+                'gap: 5px',
+                'font-size: 11px',
+                'font-family: \'Fira Code\', monospace',
+                'border-radius: 5px',
+                'padding: 2px 8px',
+                'cursor: pointer',
+                'transition: all 0.2s ease',
+                'max-width: 240px',
+                'min-width: 0',
+                'flex-shrink: 1',
+                esActivo
+                    ? 'color: #a6e3a1; background: rgba(166,227,161,0.15); border: 1px solid rgba(166,227,161,0.35);'
+                    : 'color: #89b4fa; background: rgba(137,180,250,0.10); border: 1px solid rgba(137,180,250,0.22);'
+            ].join(';');
+
+            badge.innerHTML = `
+                <i class="${iconInfo.icon}" style="color:${iconInfo.color}; font-size:10px; flex-shrink:0;"></i>
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${this.escapeHtml(nombreCompleto)}">${this.escapeHtml(nombreCompleto)}</span>
+            `;
+            badge.title = `División ${i + 1} — ${nombreCompleto}\n${pane.activePath}\n(Clic para enfocar)`;
+
+            const capturedI = i;
+            const capturedPath = pane.activePath;
+            badge.onclick = (e) => {
+                e.stopPropagation();
+                this.setActivePane(capturedI);
+                const p = this.panes[capturedI];
+                if (p && p.editor) p.editor.focus();
+                if (capturedPath && navigator.clipboard) {
+                    navigator.clipboard.writeText(capturedPath).then(() => {
+                        if (window.layoutMgr && window.layoutMgr.mensajeEstado) {
+                            window.layoutMgr.mensajeEstado(`📋 Ruta copiada: ${nombreCompleto}`, 1800);
+                        }
+                    }).catch(() => {});
+                }
+            };
+
+            barra.appendChild(badge);
+            totalBadges++;
+        }
+
+        barra.style.display = totalBadges > 0 ? 'flex' : 'none';
+    }
+
+    /** Obtiene información del icono y color para el archivo activo */
+    getFileIconInfo(filename, tab = null) {
+        if (tab && tab.isNotebook) return { icon: 'fa-solid fa-book-bookmark', color: 'var(--accent-yellow, #f9e2af)' };
+        if (tab && tab.isImage) return { icon: 'fa-solid fa-image', color: 'var(--accent-blue, #89b4fa)' };
+        if ((tab && tab.isMarkdown) || filename.toLowerCase().endsWith('.md')) {
+            if (filename.toLowerCase().includes('pensamiento')) {
+                return { icon: 'fa-solid fa-brain', color: 'var(--accent-purple, #cba6f7)' };
+            }
+            return { icon: 'fa-solid fa-file-lines', color: 'var(--accent-blue, #89b4fa)' };
+        }
+        const ext = filename.split('.').pop().toLowerCase();
+        switch (ext) {
+            case 'rs': return { icon: 'fa-solid fa-gear', color: '#f38ba8' };
+            case 'py': return { icon: 'fa-brands fa-python', color: '#a6e3a1' };
+            case 'js': case 'mjs': case 'cjs': return { icon: 'fa-brands fa-js', color: '#f9e2af' };
+            case 'ts': return { icon: 'fa-solid fa-code', color: '#89b4fa' };
+            case 'html': return { icon: 'fa-brands fa-html5', color: '#fab387' };
+            case 'css': return { icon: 'fa-brands fa-css3-alt', color: '#89dceb' };
+            case 'json': return { icon: 'fa-solid fa-code', color: '#fab387' };
+            case 'sql': return { icon: 'fa-solid fa-database', color: '#cba6f7' };
+            case 'sh': case 'bash': return { icon: 'fa-solid fa-terminal', color: '#a6e3a1' };
+            case 'toml': case 'yaml': case 'yml': return { icon: 'fa-solid fa-sliders', color: '#f9e2af' };
+            default: return { icon: 'fa-solid fa-file-code', color: 'var(--accent-blue, #89b4fa)' };
+        }
+    }
+
+    /** Escapa caracteres HTML para prevenir inyección de código */
+    escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     /** ¿La pestaña tiene cambios sin guardar? */
@@ -2277,5 +2590,30 @@ document.addEventListener('DOMContentLoaded', () => {
             window.alternarQwenEditor(window.isQwenEditorActivo());
         }
     }, 150);
+});
+
+/**
+ * Notifica en la barra del editor qué archivo fue leído por el modelo / editor
+ */
+window.notificarArchivoLeido = function (pathOrName) {
+    if (!pathOrName) return;
+    const nombre = String(pathOrName).split('/').pop();
+    const ind = document.getElementById('indicador-archivo-leido');
+    const txt = document.getElementById('indicador-archivo-leido-nombre');
+    const btnCerebro = document.getElementById('btn-cerebro-dialogo');
+    if (ind && txt && nombre) {
+        txt.textContent = `${nombre}`;
+        ind.title = `Archivo leído: ${pathOrName}`;
+        ind.style.display = 'inline-flex';
+    }
+    if (btnCerebro && nombre) {
+        btnCerebro.title = `Cerebro IA (Último leído: ${nombre})`;
+    }
+};
+
+window.addEventListener('prig:archivo-abierto', (e) => {
+    if (e.detail && e.detail.path) {
+        window.notificarArchivoLeido(e.detail.path);
+    }
 });
 

@@ -219,7 +219,7 @@ class FileTreeManager {
             
             const safePath = (item.path || '').replace(/\\/g, '/').replace(/'/g, "\\'");
             const safeName = (item.name || '').replace(/'/g, "\\'");
-            const dirAiBtn = item.is_dir ? `<button title="Ejecutar pensamiento del personaje en archivo" class="btn-pensamiento-carpeta" style="background: var(--accent-blue); color: #111; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.ejecutarPensamientoPersonajeEnArchivo('${safePath}', '${safeName}', this);"><i class="fa-solid fa-brain"></i></button>` : '';
+            const dirAiBtn = item.is_dir ? `<button title="Analizar con IA" class="btn-pensamiento-carpeta" style="background: var(--accent-blue); color: #111; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.ejecutarPensamientoPersonajeEnArchivo('${safePath}', '${safeName}', this);"><i class="fa-solid fa-brain"></i></button>` : '';
             const dirPdfBtn = item.is_dir ? `<button title="Exportar Notebooks y Código a PDF" style="background: #e74c3c; color: #ffffff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; margin-left: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.pdfExporterMgr.openModal('${safePath}', '${safeName}');"><i class="fa-solid fa-file-pdf"></i></button>` : '';
 
             el.innerHTML = `<i class="${icon}"></i> <span class="tree-item-name"></span> ${notebookTag} ${dirAiBtn} ${dirPdfBtn}`;
@@ -804,12 +804,12 @@ class FileTreeManager {
 window.fileTreeMgr = new FileTreeManager();
 
 /**
- * Ejecuta todo el pensamiento y razonamiento del personaje del proyecto sobre una carpeta o workspace,
- * escribiéndolo en un archivo PENSAMIENTO_DEL_PROYECTO.md y abriéndolo directamente en el editor.
+ * Analiza con IA y ejecuta todo el razonamiento del personaje del proyecto sobre una carpeta o workspace,
+ * escribiéndolo en un archivo PENSAMIENTO_DEL_PROYECTO.md y abriéndolo directamente en vista Markdown.
  */
 window.ejecutarPensamientoPersonajeEnArchivo = async function(carpetaPath, carpetaNombre, btnEl = null) {
     const nombre = carpetaNombre || 'Proyecto';
-    const notifMsg = `🧠 El personaje del proyecto está analizando "${nombre}" y ejecutando su pensamiento...`;
+    const notifMsg = `🧠 Analizando con IA "${nombre}"...`;
     
     if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
         window.layoutMgr.mensajeEstado(notifMsg, 6000);
@@ -849,19 +849,22 @@ window.ejecutarPensamientoPersonajeEnArchivo = async function(carpetaPath, carpe
             await window.fileTreeMgr.loadTree();
         }
 
-        // Abrir el archivo directamente en el editor de código
+        // Abrir el archivo directamente en el editor en modo Markdown
         if (data.archivo && window.editorMgr && typeof window.editorMgr.openFileByPath === 'function') {
             await window.editorMgr.openFileByPath(data.archivo, data.nombre || 'PENSAMIENTO_DEL_PROYECTO.md');
+            if (typeof window.editorMgr.showMarkdownView === 'function') {
+                window.editorMgr.showMarkdownView();
+            }
         }
 
-        const exitoMsg = `✅ Pensamiento de "${data.personaje || 'Personaje'}" ejecutado en ${data.nombre || 'PENSAMIENTO_DEL_PROYECTO.md'}`;
+        const exitoMsg = `✅ Análisis con IA completado en ${data.nombre || 'PENSAMIENTO_DEL_PROYECTO.md'}`;
         if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
             window.layoutMgr.mensajeEstado(exitoMsg, 4500);
         } else {
             console.log(exitoMsg);
         }
     } catch (err) {
-        console.error('Error al ejecutar pensamiento del personaje en archivo:', err);
+        console.error('Error al analizar con IA en archivo:', err);
         const errDesc = `Error: ${err.message || 'No se pudo completar el análisis'}`;
         if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
             window.layoutMgr.mensajeEstado(errDesc, 4000);
