@@ -22,6 +22,7 @@ pub mod ia;
 pub mod guiado;
 pub mod guiado_ia;
 pub mod hub;
+pub mod aprendizaje_grafo;
 pub mod plan_estudio;
 pub mod navegar;
 pub mod ide;

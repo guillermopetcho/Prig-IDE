@@ -2,6 +2,7 @@
 
 pub mod desafios;
 pub mod dataset;
+pub mod grafo;
 pub mod planes;
 pub mod progreso;
 pub mod telemetria;

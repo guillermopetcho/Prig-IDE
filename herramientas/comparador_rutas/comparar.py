@@ -153,7 +153,8 @@ def copia_de_prig(tmp: str) -> str:
     if os.path.isdir(os.path.join(RAIZ, ".prig_dataset")):
         shutil.copytree(os.path.join(RAIZ, ".prig_dataset"), os.path.join(copia, ".prig_dataset"))
     for nombre in os.listdir(RAIZ):
-        if nombre not in ("backend", ".prig_dataset", ".git", "__pycache__"):
+        # el progreso del grafo de aprendizaje y sus ejercicios se escriben en la carpeta de Prig: no se enlazan
+        if nombre not in ("backend", ".prig_dataset", ".git", "__pycache__", ".prig_aprendizaje_progreso.json", "aprendizaje"):
             os.symlink(os.path.join(RAIZ, nombre), os.path.join(copia, nombre))
     return copia
 
@@ -660,6 +661,55 @@ def clave_carpeta_hub(url: str) -> str:
 _HUB_REEMPLAZOS = [[r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?", "FECHA"], [r"\b[0-9a-f]{40}\b", "COMMIT"],
                    [r"\b\d{4}-\d{2}-\d{2}\b", "DIA"]]
 
+
+
+def casos_grafo(copia: str) -> list:
+    """ El grafo de aprendizaje, que ya atiende solo el servidor de Rust (PRIG_COMPARAR_RETIRADAS=1 los compara) """
+    return [{**c, "solo_rust": True} for c in _casos_grafo(copia)]
+
+
+def _casos_grafo(copia: str) -> list:
+    """ El grafo de aprendizaje: su progreso vive en la carpeta de Prig (la carpeta de trabajo de los dos servidores) """
+    progreso = os.path.join(copia, ".prig_aprendizaje_progreso.json")
+    with open(os.path.join(RAIZ, "backend-rust", "crates", "prig-aprendizaje", "datos", "grafo_nodos.json"), encoding="utf-8") as f:
+        nodos = json.load(f)["nodos"]
+    n1 = nodos[0]["id"]
+    escribir = lambda texto: lambda: open(progreso, "w", encoding="utf-8").write(texto)
+    borrar = lambda: os.path.exists(progreso) and os.remove(progreso)
+    P = {"archivo": "{copia}/.prig_aprendizaje_progreso.json", "restaurar": True, "archivo_json": True,
+         "volatiles": ["fecha", "tiempo_ms", "fecha_completado"], "reemplazos": [[r"/[^\s\"']*?/tmp\w{8}\.py", "TMP.py"]]}
+    G = lambda ruta, **x: {"ruta": f"/api/aprendizaje/{ruta}", **P, **x}
+    E = lambda nodo, j, **x: {"ruta": f"/api/aprendizaje/nodo/{nodo}/ejecutar", "metodo": "POST", "json": j, **P, **x}
+    M = lambda nodo, j, **x: {"ruta": f"/api/aprendizaje/nodo/{nodo}/progreso", "metodo": "POST", "json": j, **P, **x}
+    malo = "def analizar_tipos(datos): return {'inmutables': 0, 'mutables': 0, 'cadenas': []}"
+    lecturas = lambda: [G("grafo"), G("estadisticas"), G(f"nodo/{n1}"), G(f"nodo/{nodos[-1]['id']}")]
+    return [
+        G("grafo", antes=borrar), G("grafo?nivel=JUNIOR"), G("grafo?nivel=todos"), G("grafo?nivel="), G("grafo?nivel=nada"),
+        G(f"nodo/{n1}"), G("nodo/nada"), G("estadisticas"),
+        G("buscar"), G("buscar?q=python"), G("buscar?q=transformers%20atencion&limite=2"),
+        G("buscar?q=titanic%20pandas&limite=-1"), G("buscar?limite=x"), G("buscar?q=%20%20&limite=0"), G("buscar?q=ZZZ"),
+        G("buscar?q=%C3%91and%C3%BA%20DATOS%20o"), G("buscar?limite=-2"),
+        *(E(n["id"], {"codigo": "", "usar_solucion": True}) for n in nodos),
+        E(n1, {"codigo": malo}), E(n1, {"codigo": None}), E(n1, {}), E(n1, {"usar_solucion": "x"}), E("nada", {}),
+        E(n1, {"codigo": "print('hola')\nimport sys\nsys.stderr.write('ñ\\r\\nx')\nsys.exit(3)"}),
+        E(n1, {"codigo": "while True:\n    pass"}),
+        E(n1, {"codigo": nodos[0]["tarea_prerespondida"]["solucion_referencia"]}),
+        E(nodos[1]["id"], {"codigo": nodos[1]["tarea_prerespondida"]["solucion_referencia"] + "\nprint('listo')"}),
+        *lecturas(),
+        M(n1, {"completado": False}), M("otro-cualquiera", {}), M(n1, {"completado": "no"}), M(n1, {"completado": [1]}),
+        M(nodos[2]["id"], {"completado": 1}), {**M(n1, {}), "json": None},
+        *lecturas(),
+        {"ruta": f"/api/aprendizaje/nodo/{n1}/abrir_en_editor", "metodo": "POST", "carpetas": ["{copia}/aprendizaje"]},
+        {"ruta": "/api/aprendizaje/nodo/nada/abrir_en_editor", "metodo": "POST", "carpetas": ["{copia}/aprendizaje"]},
+        # un progreso que no es lo esperado: los errores de Python como {"ok": false, "error"}
+        *(c for texto in ["[1]", "\"texto\"", "3", "{roto", json.dumps({n1: 3}), json.dumps({n1: {"intentos": "a"}}),
+                          json.dumps({n1: {"intentos": None}}), json.dumps({n1: {"intentos": 2.5, "completado": 1}}),
+                          json.dumps({"zzz": [], n1: {"completado": True}}), json.dumps([n1])]
+          for c in [{**x, "archivo_json": texto != "{roto"} for x in [G("grafo", antes=escribir(texto)), G("estadisticas", antes=escribir(texto)),
+                    G(f"nodo/{n1}", antes=escribir(texto)), M(n1, {}, antes=escribir(texto)),
+                    E(n1, {"usar_solucion": True}, antes=escribir(texto)), E(n1, {"codigo": malo}, antes=escribir(texto))]]),
+        G("grafo", antes=borrar),
+    ]
 
 def casos_hub(tmp: str, home: str) -> list:
     """ Prig Hub, que ya atiende solo el servidor de Rust (PRIG_COMPARAR_RETIRADAS=1 los compara con el backend viejo) """
@@ -2794,6 +2844,7 @@ def main():
                                       p.get("desafio2", "des_0000000000"))
             if not args.vacio:
                 casos += casos_hub(tmp, p["home"])
+                casos += casos_grafo(copia)
         if args.solo:
             solo = set(args.solo.split(","))
             casos = [c for c in casos if c["ruta"].split("?")[0] in solo]

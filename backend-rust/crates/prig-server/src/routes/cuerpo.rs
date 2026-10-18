@@ -75,6 +75,8 @@ pub fn dict(cuerpo: &Bytes) -> Result<Mapa, Response> {
 pub fn modelo(cuerpo: &Bytes) -> Result<Mapa, Response> {
     match json(cuerpo)? {
         Valor::Mapa(m) => Ok(m),
+        // FastAPI toma un `null` como un cuerpo que falta
+        Valor::Nulo => Err(respuesta(vec![Error { tipo: "missing", loc: loc(&["body"]), msg: "Field required".into(), entrada: Valor::Nulo, ctx: None }])),
         otro => Err(respuesta(vec![Error {
             tipo: "model_attributes_type",
             loc: loc(&["body"]),
