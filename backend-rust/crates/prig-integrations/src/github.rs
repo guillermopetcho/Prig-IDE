@@ -74,7 +74,7 @@ fn ahora_s() -> String {
 // ---------------------------------------------------------------------------------------------- token
 
 /// `token()`: (token, origen)
-fn token() -> Result<Option<(String, String)>, Fallo> {
+pub fn token() -> Result<Option<(String, String)>, Fallo> {
     let g = match leer_json(&ruta_token()) {
         Some(Valor::Mapa(m)) => m,
         Some(v) if v.verdad() => return Err(Fallo::Interno),

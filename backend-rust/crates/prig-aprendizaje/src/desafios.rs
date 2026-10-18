@@ -293,6 +293,12 @@ pub fn modificar(base: &Path, id: &str, cambio: impl FnOnce(&mut Mapa) -> Result
     Ok(d)
 }
 
+/// `Almacen.guardar(d)`: con el cerrojo, id, creado y progreso por defecto, `actualizado` y la poda
+pub fn guardar(base: &Path, d: &mut Mapa) -> Result<(), ErrorObtener> {
+    let _c = Cerrojo::tomar(base).map_err(|e| ErrorObtener::Otro(e.to_string()))?;
+    guardar_sin_cerrojo(&base.join("desafios"), d)
+}
+
 /// `Almacen.borrar(id)` (después de comprobar que existe con `obtener`, como la ruta)
 pub fn borrar(base: &Path, id: &str) -> Result<bool, ErrorObtener> {
     let _c = Cerrojo::tomar(base).map_err(|e| ErrorObtener::Otro(e.to_string()))?;

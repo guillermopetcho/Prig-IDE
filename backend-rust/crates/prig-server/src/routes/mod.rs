@@ -8,6 +8,8 @@ pub mod conocimiento;
 pub mod cuerpo;
 pub mod desafios;
 pub mod desafios_tutor;
+pub mod desafios_crear;
+pub mod desafios_fuentes;
 pub mod ejercicios;
 pub mod escritorio;
 pub mod estante;

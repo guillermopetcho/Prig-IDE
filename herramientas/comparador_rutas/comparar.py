@@ -229,6 +229,68 @@ def sembrar_desafios(home: str):
             json.dump(x, f, ensure_ascii=False, indent=1)
 
 
+def sembrar_fuentes(home: str):
+    """ La caché de las fuentes de desafíos de internet (Exercism, TheAlgorithms, Project Euler): nada sale a la red """
+    import hashlib
+    cache = os.path.join(home, ".prig_desafios", "cache")
+    os.makedirs(cache, exist_ok=True)
+
+    def poner(url, texto):
+        with open(os.path.join(cache, hashlib.sha1(url.encode()).hexdigest() + ".txt"), "w", encoding="utf-8") as f:
+            f.write(texto)
+    no = "\x00404"
+    ex = "https://raw.githubusercontent.com/exercism/python/main"
+    poner(ex + "/config.json", json.dumps({"exercises": {
+        "concept": [{"slug": "lists", "name": "Card Games", "concepts": ["lists"], "prerequisites": ["basics"], "status": "active"},
+                    {"slug": "viejo", "name": "Viejo", "status": "deprecated"}],
+        "practice": [{"slug": "hello-world", "name": "Hello World", "difficulty": 1},
+                     {"slug": "two-fer", "name": "Two Fer", "practices": ["string-formatting"], "prerequisites": ["strings", "function-arguments", "a", "b"], "difficulty": 1},
+                     {"slug": "binary-search", "name": "Binary Search", "practices": [], "prerequisites": ["lists", "loops"], "difficulty": 4},
+                     {"slug": "sin-pruebas", "name": "Sin pruebas", "difficulty": 7}]}}))
+    tf = ex + "/exercises/practice/two-fer"
+    poner(tf + "/.meta/config.json", json.dumps({"authors": ["ana"], "contributors": ["bo"], "files": {
+        "solution": ["two_fer.py"], "test": ["two_fer_test.py"], "example": [".meta/example.py"]}}))
+    poner(tf + "/two_fer.py", "def two_fer(name):\n    pass\n")
+    poner(tf + "/two_fer_test.py", "import unittest\nfrom two_fer import two_fer\n\n\nclass TwoFerTest(unittest.TestCase):\n"
+          "    def test_nombre(self):\n        self.assertEqual(two_fer(\"Alice\"), \"One for Alice, one for me.\")\n\n"
+          "    def test_tu(self):\n        self.assertEqual(two_fer(\"you\"), \"One for you, one for me.\")\n")
+    poner(tf + "/.meta/example.py", "def two_fer(name=\"you\"):\n    return f\"One for {name}, one for me.\"\n")
+    poner(tf + "/.docs/introduction.md", no)
+    poner(tf + "/.docs/instructions.md", "# Two Fer\n\nDi algo.\n\n~~~~exercism/note\nNota uno\nNota dos\n~~~~\n")
+    poner(tf + "/.docs/instructions.append.md", no)
+    poner(tf + "/.docs/hints.md", "## Pista\n\n~~~~exercism/tip\nUsa f-strings\n~~~~")
+    poner(ex + "/exercises/practice/sin-pruebas/.meta/config.json", json.dumps({"files": {"solution": ["x.py"]}}))
+    poner("https://raw.githubusercontent.com/exercism/cpp/main/config.json", json.dumps({"exercises": {"practice": [
+        {"slug": "leap", "name": "Leap", "practices": ["conditionals"], "difficulty": 2},
+        {"slug": "binary-search", "name": "Binary Search", "practices": ["binary-search"], "difficulty": 6}]}}))
+    ta = "https://raw.githubusercontent.com/TheAlgorithms/Python/master"
+    poner(ta + "/DIRECTORY.md", "# Lista\n\n## [Searches](searches/)\n  * [Binary Search](searches/binary_search.py)\n"
+          "  * [Jump Search](https://github.com/TheAlgorithms/Python/blob/master/searches/jump_search.py)\n  * Sorts Extra\n"
+          "    * [Bubble Sort](searches/bubble_sort.py)\n  * [Init](searches/__init__.py)\n  * [Test](searches/tests/test_x.py)\n"
+          "## [Machine Learning](machine_learning)\n  * [Knn](machine_learning/knn.py)\n"
+          "## [Maths](maths)\n  * [Numpy Uso](maths/numpy_uso.py)\n  * [Sin Ejemplos](maths/sin_ejemplos.py)\n")
+    poner(ta + "/searches/binary_search.py", '"""Binary search."""\nfrom __future__ import annotations\n\nimport bisect\n\nLIMITE = 100\n'
+          'DOBLE = LIMITE * 2\n\n\ndef _ayuda(x):\n    return x\n\n\ndef es_ordenada(lista: list[int]) -> bool:\n    """\n'
+          '    >>> es_ordenada([1, 2])\n    True\n    """\n    return lista == sorted(lista)\n\n\n'
+          'def binary_search(lista: list[int], objetivo: int) -> int:\n    """\n    Busca objetivo en una lista ordenada.\n\n'
+          '    >>> binary_search([1, 2, 3], 2)\n    1\n    >>> binary_search([1, 2, 3], 5)\n    -1\n    >>> binary_search([], 1)\n    -1\n    """\n'
+          '    if not es_ordenada(lista):\n        raise ValueError("desordenada")\n    i = bisect.bisect_left(lista, objetivo)\n'
+          '    if i < len(lista) and lista[i] == objetivo:\n        return i\n    return -1\n\n\ndef main():\n    """\n    >>> 1\n    1\n    """\n')
+    poner(ta + "/maths/numpy_uso.py", 'import numpy as np\n\n\ndef f():\n    """\n    >>> f()\n    1\n    """\n    return 1\n')
+    poner(ta + "/maths/sin_ejemplos.py", "def f():\n    return 1\n")
+    tc = "https://raw.githubusercontent.com/TheAlgorithms/C-Plus-Plus/master"
+    poner(tc + "/DIRECTORY.md", "## [Search](https://github.com/TheAlgorithms/C-Plus-Plus/blob/master/search)\n"
+          "  * [Binary Search](https://github.com/TheAlgorithms/C-Plus-Plus/blob/master/search/binary_search.cpp)\n"
+          "## [Docs](docs)\n  * [X](docs/x.cpp)\n")
+    poner(tc + "/search/binary_search.cpp", "#include <vector>\nint buscar(const std::vector<int>& v, int x) { return -1; }\nint main() { return 0; }\n")
+    poner("https://projecteuler.net/minimal=problems;csv", "ID,Title,Published,Solved By\n1,Multiples of 3 or 5,Fri 5th Oct 2001,1000000\n"
+          "2,Even Fibonacci Numbers,Fri 19th Oct 2001,800000\n3,Largest Prime Factor,x,50000\n"
+          '4,"Largest Palindrome Product, again",x,10000\nx,Malo,x,1\n5,Sin resueltos,x,\n')
+    poner("https://projecteuler.net/minimal=1", '<p>If we list all the <b>natural numbers</b> below 10 that are multiples of 3 or 5, we get 3, 5, 6 and 9.</p>\n'
+          '<p>Find the sum <var>x</var><sup>2</sup> &amp; <a href="about">more</a>.</p><img src="/images/x.png" alt="">')
+    poner("https://projecteuler.net/minimal=2", "")
+
+
 def sembrar_buscador(home: str):
     """ Dos modelos seguidos y una revisión de actualizaciones reciente (sin red no se puede llegar a ellos) """
     import time
@@ -928,6 +990,48 @@ def ollama_falso() -> str:
                     trozos = ["```json\n" + json.dumps(rv, ensure_ascii=False) + "\n```"]
                     if "sinjson" in (d.get("prompt") or ""):
                         trozos = ["Está ", "bien."]
+                elif "CREADOR DE DESAFÍOS DE PROGRAMACIÓN" in (d.get("system") or "") or "EXPERTO EN EDUCACIÓN DE PROGRAMACIÓN" in (d.get("system") or ""):
+                    import re
+                    sistema, pedido = d.get("system") or "", d.get("prompt") or ""
+                    m = re.search(r"(?:Tema a practicar|Tema/Contexto): (.*)", pedido)
+                    tema = m.group(1) if m else ""
+                    if "C++" in sistema.split("\n")[0]:
+                        des = {"titulo": "Doble C++ " + firma, "enunciado": "markdown en español: Devuelve el doble", "nivel": "avanzado",
+                               "conceptos": ["funciones"],
+                               "paginas": [{"nombre": "sol.h", "contenido": "int doble(int x);"},
+                                           {"nombre": "sol", "descripcion": "a completar", "contenido": "#include \"sol.h\"\nint doble(int x) {\n    return 2 * x;\n}\n"}],
+                               "referencia": [{"nombre": "sol.h", "contenido": "int doble(int x);"},
+                                              {"nombre": "sol.cpp", "contenido": "#include \"sol.h\"\nint doble(int x) {\n    return 2 * x;\n}\n"}],
+                               "pruebas": ["REQUIRE(doble(2) == 4);", "doble(0) == 0", "REQUIRE(doble(-1) == -2)"]}
+                        if "CREADOR" in sistema:
+                            des["paginas"][1]["contenido"] = "#include \"sol.h\"\nint doble(int x) {\n    // TODO\n    return 0;\n}\n"
+                    else:
+                        completo = "def doble(x):\n    \"\"\"El doble.\"\"\"\n    return 2 * x\n\n\nif __name__ == \"__main__\":\n    print(doble(2))\n"
+                        des = {"titulo": "Doble " + firma, "enunciado": "Enunciado: Devuelve el doble", "nivel": "Intermedio",
+                               "conceptos": ["funciones", 3],
+                               "paginas": [{"name": "doble", "descripcion": "la función", "contenido": "```python\ndef doble(x):\n    // TODO: implementar\n```"}],
+                               "reference": [{"nombre": "otro.py", "contenido": "def doble(x):\n    return 2 * x"}],
+                               "tests": ["from modulo import doble\nassert doble(2) == 4", "from doble import doble\nassert doble(0) == 0",
+                                         "from math import fabs\nfrom doble import doble\nassert fabs(doble(-1)) == 2", "from doble import doble\nassert doble(3) == 6"]}
+                        if "EXPERTO" in sistema:
+                            des["paginas"][0]["contenido"] = completo
+                            des["reference"][0]["contenido"] = completo
+                        if "roto" in tema:
+                            des["reference"][0]["contenido"] = "def doble(x) return 2 * x"
+                        if "pruebarota" in tema:
+                            des["tests"][1] = "assert doble(0) =="
+                        if "pocas" in tema:
+                            des["tests"] = des["tests"][:1]
+                        if "resuelta" in tema:
+                            des["paginas"][0]["contenido"] = "def doble(x):\n    # el doble de x, bien explicado\n    return 2 * x"
+                            des["reference"][0]["contenido"] = des["paginas"][0]["contenido"]
+                        if "vacias" in tema:
+                            des["tests"] = "assert True\n\nassert 1\n\n  \n\nassert 2"
+                    trozos = ["```json\n" + json.dumps(des, ensure_ascii=False), "\n```"]
+                    if "reintento" in tema and "El intento anterior" not in pedido:
+                        trozos = ["esto no ", "es json"]
+                elif "con 3 a 6 términos cortos en INGLÉS" in (d.get("system") or ""):
+                    trozos = ['{"terminos": ["Binary Search", "fibonacci ' + firma + '", 7]}']
                 elif "ÚNICAMENTE un objeto JSON válido" in (d.get("system") or ""):
                     trozos = ['Aquí está:\n```json\n{"tema": "Prueba ' + firma + '", ', '"tags": ["a"]}\n```']
                 lineas = [({"message": {"role": "assistant", "content": t}} if chat else {"response": t}) | {"done": False}
@@ -2031,6 +2135,70 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/guided/no_existe/generate-notebook", "metodo": "POST", "solo_rust": True},
         {"ruta": "/api/guided/seg_aaaa0004/generate-notebook", "metodo": "POST", "solo_rust": True},
         {"ruta": "/api/guided/seg_aaaa0003/generate-notebook", "metodo": "POST", "solo_rust": True},
+        # crear, importar y replicar desafíos, y las fuentes de internet (tanda 44): cada caso deshace lo que escribe
+        {"ruta": "/api/desafios/fuentes", "solo_rust": True},
+        *({"ruta": "/api/desafios/github/catalogo" + q, "solo_rust": True} for q in ("", "?lenguaje=cpp", "?lenguaje=todos&categoria=senior_avanzado",
+                                                                  "?q=%C3%A1rboles%20binarios", "?q=exercism%20python", "?categoria=nada")),
+        *({"ruta": "/api/desafios/github/ejercicios" + q, "carpetas": ["{home}/.prig_github"], "solo_rust": True} for q in (
+            "?ref=ana/Repo", "?ref=ana/Repo&ruta=src/", "?ref=exercism/python", "?ref=Exercism/Python&ruta=exercises/practice/leap",
+            "?ref=nadie/nada", "")),
+        *({"ruta": "/api/desafios/internet/buscar" + q, "solo_rust": True} for q in (
+            "?tema=b%C3%BAsqueda%20binaria", "?tema=listas&lenguaje=python&nivel=principiante", "?tema=two%20fer&lenguaje=cpp",
+            "?tema=fibonacci&fuentes=projecteuler,nada", "?tema=multiples%20primos&fuentes=projecteuler", "?tema=zzzqqq",
+            "?tema=zzzqqq&ayuda_modelo=true", "?tema=zzzqqq&ayuda_modelo=quizas", "?tema=", "", "?tema=bubble%20sort&fuentes=thealgorithms")),
+        *({"ruta": r, "metodo": "POST", "json": j, "carpetas": ["{home}/.prig_desafios/desafios", "{home}/.prig_github"],
+           "nombres_volatiles": True, "volatiles": ["id"], "restaurar_otro": "{proyecto}/.prig_dataset/learning.db",
+           "solo_rust": True} for r, j in [
+            ("/api/desafios/internet/importar", {"fuente": "exercism", "ref": "practice/two-fer", "ruta_id": "seg_aaaa0006", "bloque_id": "b1", "tema": "saludos"}),
+            ("/api/desafios/internet/importar", {"fuente": "exercism", "ref": "practice/sin-pruebas"}),
+            ("/api/desafios/internet/importar", {"fuente": "exercism", "ref": "mal/ref"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "searches/binary_search.py", "lenguaje": None}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "searches/binary_search.py", "funcion": "es_ordenada"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "searches/binary_search.py", "funcion": "nada"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "maths/numpy_uso.py"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "maths/sin_ejemplos.py"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms", "ref": "../x.py"}),
+            ("/api/desafios/internet/importar", {"fuente": "thealgorithms_cpp", "ref": "search/binary_search.cpp", "lenguaje": None}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "1", "lenguaje": "cpp", "ruta_id": "seg_aaaa0006"}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "1"}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "2"}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "abc"}),
+            ("/api/desafios/internet/importar", {"fuente": "nada", "ref": "x"}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "1", "ruta_id": "seg_nada"}),
+            ("/api/desafios/internet/importar", {"fuente": "projecteuler", "ref": "1", "ruta_id": "seg_aaaa0006", "bloque_id": "zz"}),
+            ("/api/desafios/internet/importar", {"ref": "x"}),
+            ("/api/desafios/crear", {"tema": "doble"}),
+            ("/api/desafios/crear", {"tema": "  reintento doble  ", "nivel": "senior"}),
+            ("/api/desafios/crear", {"tema": "roto"}),
+            ("/api/desafios/crear", {"tema": "pruebarota"}),
+            ("/api/desafios/crear", {"tema": "pocas"}),
+            ("/api/desafios/crear", {"tema": "resuelta"}),
+            ("/api/desafios/crear", {"tema": "vacias"}),
+            ("/api/desafios/crear", {"tema": "   "}),
+            ("/api/desafios/crear", {"conversacion": [{"rol": "usuario", "texto": "quiero practicar el doble"}, {"rol": "tutor"}]}),
+            ("/api/desafios/crear", {"ruta_id": "seg_aaaa0006", "bloque_id": "b1", "nivel": "raro"}),
+            ("/api/desafios/crear", {"ruta_id": "seg_aaaa0006", "tema": "doble"}),
+            ("/api/desafios/crear", {"ruta_id": "seg_nada"}),
+            ("/api/desafios/crear", {"basado_en": "des_aaaaaaaaa7", "ajuste": "mas_dificil"}),
+            ("/api/desafios/crear", {"basado_en": "des_aaaaaaaaa1", "ajuste": "mas_facil", "tema": "doble"}),
+            ("/api/desafios/crear", {"basado_en": "des_0000000000"}),
+            ("/api/desafios/crear", {"tema": "doble", "modelo": "gemini:flash"}),
+            ("/api/desafios/crear", {"tema": "doble", "lenguaje": "cpp"}),
+            ("/api/desafios/crear", {"tema": 5}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo", "ruta": "src/main.py"}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo", "ruta": "cuaderno.ipynb", "tema": "reintento",
+                                               "contenido": json.dumps({"cells": [{"cell_type": "markdown", "source": ["# Doble"]},
+                                                                                  {"cell_type": "code", "source": "def doble(x): ..."}]})}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo", "ruta": "src/sol.cpp", "lenguaje": None, "contenido": "int doble(int);", "nivel": None}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo", "ruta": "src/x.py", "contenido": "x", "tema": "roto"}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo", "ruta": "nada/x.py", "contenido": "   "}),
+            ("/api/desafios/github/replicar", {"ref": "ana/Repo"}),
+            ("/api/youtube/crear-desafio", {"video_id": "v1", "titulo_video": "Curso", "objetivo_titulo": "Doble", "conceptos": ["funciones"],
+                                            "objetivo_id": "o1"}),
+            ("/api/youtube/crear-desafio", {"video_id": "v2", "titulo_video": "Clase", "objetivo_titulo": None, "lenguaje": None, "nivel": None,
+                                            "objetivo_descripcion": None, "conceptos": []}),
+            ("/api/youtube/crear-desafio", {"video_id": "v2"}),
+        ]),
     ]
     def sustituir(v):
         """ {home} y {proyecto} también dentro del cuerpo JSON (sin esto llegaban literales: rutas que no existen) """
@@ -2085,6 +2253,7 @@ def main():
         if not args.vacio:
             sembrar_integraciones(p["home"])
             sembrar_desafios(p["home"])
+            sembrar_fuentes(p["home"])
             sembrar_ejercicios(p["proyecto"])
             sembrar_guiado(p["proyecto"])
             sembrar_biblioteca(p["home"])

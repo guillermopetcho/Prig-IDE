@@ -12,7 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "blocking"] }
 http-body-util = "0.1"
 bytes = "1.6"
 futures-util = "0.3"
@@ -36,4 +36,7 @@ prig-documentos = { path = "../prig-documentos" }
 syntect = { version = "5.3", default-features = false, features = ["default-fancy"] }
 two-face = { version = "0.4.5", default-features = false, features = ["syntect-fancy"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
+# Las fuentes de desafíos de internet: la caché por sha1 de la URL y el índice CSV de Project Euler
+sha1_smol = "1"
+csv = "1"
 

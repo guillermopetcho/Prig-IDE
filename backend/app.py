@@ -2618,7 +2618,7 @@ def descargas_limpiar():
 # Desafíos: enunciado, caja de razonamiento, páginas de código y pruebas ocultas
 # ===========================================================================
 
-from desafios import ejecucion as des_ejec, fuentes as des_fuentes, tutor as des_tutor, catalogo_github as des_catalogo
+from desafios import ejecucion as des_ejec, tutor as des_tutor
 import progreso
 import gemini_motor
 from desafios.almacen import Almacen as AlmacenDesafios
@@ -2663,37 +2663,6 @@ def _consumir(generador, avisar):
         return fin.value
 
 
-class DesafioCrearRequest(BaseModel):
-    tema: str = ""
-    nivel: str = "intermedio"
-    lenguaje: str = "python"
-    modelo: Optional[str] = None
-    conversacion: List[Dict[str, str]] = []
-    ruta_id: Optional[str] = None
-    bloque_id: Optional[str] = None
-    basado_en: Optional[str] = None
-    ajuste: Optional[str] = None          # parecido | mas_dificil | mas_facil
-
-
-class DesafioImportarRequest(BaseModel):
-    fuente: str
-    ref: str
-    funcion: Optional[str] = None
-    lenguaje: Optional[str] = "python"
-    tema: Optional[str] = None
-    ruta_id: Optional[str] = None
-    bloque_id: Optional[str] = None
-
-
-class DesafioReplicarGitHubRequest(BaseModel):
-    ref: str
-    ruta: str
-    contenido: Optional[str] = None
-    lenguaje: Optional[str] = "python"
-    tema: Optional[str] = None
-    nivel: Optional[str] = "intermedio"
-    modelo: Optional[str] = None
-
 class DesafioEjecutarRequest(BaseModel):
     paginas: List[Dict[str, Any]]
     pagina: str
@@ -2717,40 +2686,11 @@ class YouTubeAnalisisRequest(BaseModel):
     modelo: Optional[str] = None
 
 
-class YouTubeCrearDesafioRequest(BaseModel):
-    video_id: str
-    titulo_video: str
-    objetivo_id: Optional[str] = None
-    objetivo_titulo: Optional[str] = ""
-    objetivo_descripcion: Optional[str] = ""
-    conceptos: Optional[List[str]] = None
-    nivel: Optional[str] = "intermedio"
-    lenguaje: Optional[str] = "python"
-    modelo: Optional[str] = None
-
-
 class YouTubeTraducirRequest(BaseModel):
     texto: str
     de: Optional[str] = "auto"
     a: Optional[str] = "es"
     modelo: Optional[str] = None
-
-
-def _contexto_bloque(ruta_id: Optional[str], bloque_id: Optional[str]) -> Dict[str, Any]:
-
-    if not ruta_id:
-        return {}
-    ruta = guided.get(ruta_id)
-    if not ruta:
-        raise HTTPException(status_code=404, detail="Ruta de aprendizaje no encontrada")
-    bloque = next((b for b in ruta.blocks if b.block_id == bloque_id), None) if bloque_id else None
-    if bloque_id and not bloque:
-        raise HTTPException(status_code=404, detail="Bloque no encontrado en la ruta")
-    info = {"ruta_id": ruta.id, "meta": ruta.goal}
-    if bloque:
-        info.update(bloque_id=bloque.block_id, bloque=bloque.title, temas=bloque.topics,
-                    objetivo=bloque.learning_objective, validacion=bloque.validation_check)
-    return info
 
 
 def _registrar_telemetria(d: Dict[str, Any], evento: str, **extra):
@@ -2802,139 +2742,8 @@ def progreso_analisis(req: ProgresoAnalisisRequest):
         return progreso.guardar_analisis(texto, _modelo_desafios(req.modelo), len(filas))
     return _ndjson_en_hilo(trabajo)
 
-@app.get("/api/desafios/fuentes")
-def desafios_fuentes():
-    return {"fuentes": [{"id": f.ID, "nombre": f.NOMBRE, "licencia": f.LICENCIA} for f in des_fuentes.FUENTES.values()],
-            "no_incluidas": "LeetCode, HackerRank y Codewars no permiten copiar su contenido."}
-
-
-@app.get("/api/desafios/github/catalogo")
-def desafios_github_catalogo(lenguaje: Optional[str] = None, categoria: Optional[str] = None,
-                             q: Optional[str] = None):
-    return {
-        "categorias": des_catalogo.CATEGORIAS,
-        "repositorios": des_catalogo.listar_repositorios(lenguaje=lenguaje, categoria=categoria, busqueda=q)
-    }
-
-
-@app.get("/api/desafios/github/ejercicios")
-def desafios_github_ejercicios(ref: str, ruta: Optional[str] = ""):
-    return _github(des_catalogo.listar_ejercicios_repo, ref, ruta or "")
-
-
-@app.post("/api/desafios/github/replicar")
-def desafios_github_replicar(req: DesafioReplicarGitHubRequest):
-    """ Replica cualquier archivo o ejercicio de GitHub en un desafío interactivo y evaluable de Prig (NDJSON). """
-    modelo = _modelo_desafios(req.modelo, "codigo")
-    motor, nombre_modelo = _motor_desafios(modelo)
-    lenguaje = req.lenguaje or ("cpp" if req.ruta.endswith((".cpp", ".cc", ".cxx", ".h", ".hpp")) else "python")
-
-    def trabajo(avisar):
-        contenido = req.contenido
-        if not contenido:
-            avisar({"tipo": "progreso", "mensaje": f"Descargando archivo desde GitHub ({req.ref}/{req.ruta})…"})
-            contenido = des_catalogo.descargar_contenido_archivo(req.ref, req.ruta)
-            if not contenido:
-                try:
-                    info_archivo = _github(github_lector.leer_archivo, req.ref, req.ruta)
-                    contenido = info_archivo.get("contenido") or ""
-                except Exception:
-                    contenido = ""
-
-        if not (contenido or "").strip():
-            raise des_tutor.ErrorDesafio(
-                f"No se pudo obtener el contenido del archivo '{req.ruta}' de '{req.ref}'. "
-                "Verifica que el archivo exista y que haya conexión con GitHub."
-            )
-
-        if req.ruta.lower().endswith((".ipynb", ".json")):
-            avisar({"tipo": "progreso", "mensaje": "Extrayendo celdas de teoría y código del cuaderno Jupyter…"})
-            contenido = des_tutor.extraer_contenido_cuaderno(contenido)
-
-        d = des_tutor.replicar_desde_github(
-            motor, runner, nombre_modelo, req.ref, req.ruta, contenido,
-            lenguaje=lenguaje, tema=req.tema or "", nivel=req.nivel or "intermedio",
-            avisar=avisar
-        )
-        d = desafios_almacen.guardar(d)
-        _registrar_telemetria(d, "replicated_from_github", attempt_num=len(d.get("intentos_creacion") or [1]))
-        return AlmacenDesafios.publico(d)
-
-    return _ndjson_en_hilo(trabajo)
-
-
-@app.get("/api/desafios/internet/buscar")
-def desafios_buscar(tema: str, nivel: Optional[str] = None, fuentes: Optional[str] = None,
-                    modelo: Optional[str] = None, ayuda_modelo: bool = False,
-                    lenguaje: Optional[str] = None):
-    """ Desafíos de internet sobre un tema. Con ayuda_modelo, si no hay nada, el modelo
-    propone términos en inglés y se vuelve a buscar. """
-    lista = [f for f in (fuentes or "").split(",") if f] or None
-    r = _desafio(des_fuentes.buscar, tema, nivel, lista, lenguaje=lenguaje)
-    if not r["resultados"] and ayuda_modelo and tema.strip():
-        motor, nombre = _motor_desafios(modelo)
-        extra = des_tutor.palabras_clave(motor, nombre, tema)
-        if extra:
-            r = _desafio(des_fuentes.buscar, tema, nivel, lista, extra, lenguaje=lenguaje)
-            r["terminos_del_modelo"] = extra
-    return r
-
-
-@app.post("/api/desafios/internet/importar")
-def desafios_importar(req: DesafioImportarRequest):
-    d = _desafio(des_fuentes.importar, req.fuente, req.ref, runner, req.funcion, req.lenguaje)
-    d["origen"].update({k: v for k, v in _contexto_bloque(req.ruta_id, req.bloque_id).items()})
-    if req.tema:
-        d["origen"]["tema"] = req.tema
-    if req.lenguaje:
-        d["lenguaje"] = req.lenguaje
-        d["origen"]["lenguaje"] = req.lenguaje
-    d = desafios_almacen.guardar(d)
-    _registrar_telemetria(d, "generated")
-    return AlmacenDesafios.publico(d)
-
-
-@app.post("/api/desafios/crear")
-def desafios_crear(req: DesafioCrearRequest):
-    """ El modelo crea el desafío; solo se entrega si se comprueba ejecutándolo (NDJSON) """
-    modelo = _modelo_desafios(req.modelo, "codigo")
-    motor, nombre_modelo = _motor_desafios(modelo)
-    bloque = _contexto_bloque(req.ruta_id, req.bloque_id)
-    partes, tema, nivel = [], req.tema.strip(), req.nivel
-    if bloque:
-        partes.append(f"Ruta de aprendizaje: {bloque.get('meta')}")
-        if bloque.get("bloque"):
-            partes.append(f"Bloque: {bloque['bloque']}. Temas: {', '.join(bloque.get('temas') or [])}. "
-                          f"Objetivo: {bloque.get('objetivo') or ''}. Cómo se comprueba que lo aprendió: {bloque.get('validacion') or ''}")
-            tema = tema or f"{bloque['bloque']} ({', '.join(bloque.get('temas') or [])})"
-    if req.conversacion:
-        partes.append("Conversación con el alumno sobre qué quiere practicar:\n" + des_tutor.conversacion_como_contexto(req.conversacion))
-    if req.basado_en:
-        previo = _desafio(desafios_almacen.obtener, req.basado_en)
-        tema = tema or ", ".join(previo.get("conceptos") or []) or previo.get("titulo", "")
-        orden = {"mas_dificil": "más difícil", "mas_facil": "más fácil"}.get(req.ajuste or "", "parecido en dificultad")
-        partes.append(f"El alumno acaba de trabajar el desafío «{previo.get('titulo')}» (nivel {previo.get('nivel')}). "
-                      f"Crea uno DISTINTO sobre los mismos conceptos, {orden}.")
-        if req.ajuste in ("mas_dificil", "mas_facil") and previo.get("nivel") in des_tutor.NIVELES:
-            i = des_tutor.NIVELES.index(previo["nivel"]) + (1 if req.ajuste == "mas_dificil" else -1)
-            nivel = des_tutor.NIVELES[max(0, min(len(des_tutor.NIVELES) - 1, i))]
-        else:
-            nivel = previo.get("nivel") or nivel
-
-    def trabajo(avisar):
-        d = des_tutor.crear(motor, runner, nombre_modelo, tema, nivel, "\n\n".join(partes), avisar=avisar, lenguaje=req.lenguaje)
-        nube = gemini_motor.es_gemini(modelo)
-        d["lenguaje"] = req.lenguaje
-        d["origen"] = {"tipo": "plan" if bloque else "modelo",
-                       "nombre": ("Plan de estudios" if bloque else "Modelo") + (" · Google Gemini" if nube else ""),
-                       "modelo": modelo, "motor": "gemini" if nube else "ollama", "tema": tema,
-                       "lenguaje": req.lenguaje, **bloque}
-        if req.basado_en:
-            d["origen"]["basado_en"] = req.basado_en
-        d = desafios_almacen.guardar(d)
-        _registrar_telemetria(d, "generated", attempt_num=len(d.get("intentos_creacion") or [1]))
-        return AlmacenDesafios.publico(d)
-    return _ndjson_en_hilo(trabajo)
+# Las fuentes de internet, buscar e importar, el catálogo de GitHub, crear y replicar desafíos (y crear uno desde un
+# video de YouTube): servidor de Rust (routes/desafios_fuentes.rs y routes/desafios_crear.rs)
 
 
 # La caja de razonamiento, el plan, las pistas, la reflexión, traducir, el chat, analizar una propuesta y
@@ -2942,47 +2751,6 @@ def desafios_crear(req: DesafioCrearRequest):
 
 
 # Analizar un video y traducir un fragmento: servidor de Rust (routes/profesor.rs)
-
-
-@app.post("/api/youtube/crear-desafio")
-def youtube_crear_desafio(req: YouTubeCrearDesafioRequest):
-    """ Crea un desafío de programación didáctico a partir de un objetivo o tema del video (NDJSON) """
-    modelo = _modelo_desafios(req.modelo, "codigo")
-    motor, nombre_modelo = _motor_desafios(modelo)
-
-    tema = req.objetivo_titulo or req.titulo_video
-    conceptos_str = ", ".join(req.conceptos or []) if req.conceptos else "conceptos vistos en la clase"
-    contexto = (
-        f"El alumno está estudiando el curso de YouTube: «{req.titulo_video}» en Prig IDE.\n"
-        f"Objetivo de aprendizaje a dominar: «{tema}».\n"
-        f"Detalles didácticos: {req.objetivo_descripcion or 'Demostrar dominio práctico resolviendo el problema'}.\n"
-        f"Conceptos clave: {conceptos_str}.\n"
-        f"Crea un desafío didáctico e interactivo en {req.lenguaje or 'python'} con pruebas unitarias que verifiquen "
-        f"estos conceptos específicos y un esqueleto limpio con comentarios TODO."
-    )
-
-    def trabajo(avisar):
-        d = des_tutor.crear(
-            motor, runner, nombre_modelo, tema, req.nivel or "intermedio",
-            contexto, avisar=avisar, lenguaje=req.lenguaje or "python"
-        )
-        nube = gemini_motor.es_gemini(modelo)
-        d["lenguaje"] = req.lenguaje or "python"
-        d["origen"] = {
-            "tipo": "youtube",
-            "nombre": f"YouTube · {req.titulo_video}" + (" · Google Gemini" if nube else ""),
-            "modelo": modelo,
-            "motor": "gemini" if nube else "ollama",
-            "video_id": req.video_id,
-            "tema": tema,
-            "objetivo_id": req.objetivo_id,
-            "lenguaje": req.lenguaje or "python"
-        }
-        d = desafios_almacen.guardar(d)
-        _registrar_telemetria(d, "generated", attempt_num=len(d.get("intentos_creacion") or [1]))
-        return AlmacenDesafios.publico(d)
-
-    return _ndjson_en_hilo(trabajo)
 
 
 # ----------------------------------------------------------------------------

@@ -234,17 +234,17 @@ fn separar_pasos(texto: &str) -> Vec<Mapa> {
 
 // =========================================================================== lo común de las rutas
 
-const TEXTO_OPC: Tipo = Tipo::Opcional(&Tipo::Texto);
+pub(crate) const TEXTO_OPC: Tipo = Tipo::Opcional(&Tipo::Texto);
 const PAGINAS: Tipo = Tipo::Lista(&Tipo::Dict(&Tipo::Cualquiera));
 const MENSAJES: Tipo = Tipo::Lista(&Tipo::Dict(&Tipo::Texto));
 
-fn pedido(b: &Bytes, campos: &[(&str, &Tipo, bool)]) -> Result<Mapa, Response> {
+pub(crate) fn pedido(b: &Bytes, campos: &[(&str, &Tipo, bool)]) -> Result<Mapa, Response> {
     let m = cuerpo::modelo(b)?;
     cuerpo::tipados(&m, campos)
 }
 
 /// `req.modelo` (None si no vino o vino null)
-fn opcional(c: &Mapa, k: &str) -> Option<String> {
+pub(crate) fn opcional(c: &Mapa, k: &str) -> Option<String> {
     c.get(k).filter(|v| !v.es_nulo()).map(Valor::texto_py)
 }
 
@@ -259,7 +259,7 @@ async fn obtener(id: String) -> Result<Mapa, Response> {
 }
 
 /// `_motor_desafios`: Gemini sin conectar es un 400
-fn motor(modelo: Option<&str>, rol: Option<&str>) -> Result<(Motor, String), Response> {
+pub(crate) fn motor(modelo: Option<&str>, rol: Option<&str>) -> Result<(Motor, String), Response> {
     tutor::motor_desafios(modelo, rol).map_err(|e| detalle(StatusCode::BAD_REQUEST, e))
 }
 

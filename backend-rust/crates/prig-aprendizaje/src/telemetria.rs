@@ -302,6 +302,20 @@ pub fn registrar_envio(espacio: &Path, d: &Mapa, aprobado: bool, pistas: i64, st
     Ok(())
 }
 
+/// `_registrar_telemetria(d, evento, attempt_num=intento)` de app.py para lo que no es un envío («generated»,
+/// «replicated_from_github»): sin aprobado, pistas ni tiempo
+pub fn registrar_evento(espacio: &Path, d: &Mapa, tipo: &str, intento: i64) -> rusqlite::Result<()> {
+    let conceptos: Vec<String> = match d.get("conceptos") {
+        Some(Valor::Lista(l)) => l.iter().filter_map(|v| if let Valor::Texto(t) = v { Some(t.clone()) } else { None }).collect(),
+        _ => Vec::new(),
+    };
+    let concepto = if conceptos.is_empty() { d.texto("titulo").unwrap_or_default().to_string() } else { conceptos.join(", ") };
+    let id = d.texto("id").unwrap_or_default().to_string();
+    let c = abrir(espacio)?;
+    registrar(&c, &Evento { ejercicio: &id, concepto: &concepto, tipo, aprobado: None, intento, pistas: 0, stderr: "", segundos: 0.0 })?;
+    Ok(())
+}
+
 /// `recientes(n)`: los últimos ejercicios en los que se trabajó, uno por ejercicio (para Inicio). Vacío si la base
 /// no se puede leer.
 pub fn recientes(espacio: &Path, n: i64) -> Vec<Mapa> {
