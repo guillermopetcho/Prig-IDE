@@ -354,26 +354,32 @@ pub fn tipados_con_errores(m: &Mapa, campos: &[(&str, &prig_plataforma::modelo::
             }
             continue;
         };
-        match prig_plataforma::modelo::validar_tipo(t, v.clone(), k) {
+        match prig_plataforma::modelo::validar_tipo_todos(t, v.clone(), k) {
             Ok(x) => salida.poner(*k, x),
-            Err(f) => {
-                // dentro de una lista o un dict: la ubicación y la entrada son las del elemento que falla
-                let mut ubicacion = vec![Valor::Texto("body".into())];
-                let mut entrada = v.clone();
-                for (i, parte) in f.donde.split('.').enumerate() {
-                    if i > 0 {
-                        entrada = match &entrada {
-                            Valor::Lista(l) => parte.parse::<usize>().ok().and_then(|n| l.get(n).cloned()).unwrap_or(Valor::Nulo),
-                            Valor::Mapa(m) => m.get(parte).cloned().unwrap_or(Valor::Nulo),
-                            _ => Valor::Nulo,
-                        };
+            Err(fallos) => {
+                for f in fallos {
+                    // dentro de una lista, un dict o un modelo: la ubicación y la entrada son las del elemento que
+                    // falla (la del que contiene el campo, si lo que falta es el campo)
+                    let falta = f.tipo == "missing";
+                    let partes: Vec<&str> = f.donde.split('.').collect();
+                    let mut ubicacion = vec![Valor::Texto("body".into())];
+                    let mut entrada = v.clone();
+                    for (i, parte) in partes.iter().enumerate() {
+                        if i > 0 && !(falta && i == partes.len() - 1) {
+                            entrada = match &entrada {
+                                Valor::Lista(l) => parte.parse::<usize>().ok().and_then(|n| l.get(n).cloned()).unwrap_or(Valor::Nulo),
+                                Valor::Mapa(m) => m.get(*parte).cloned().unwrap_or(Valor::Nulo),
+                                _ => Valor::Nulo,
+                            };
+                        }
+                        ubicacion.push(match parte.parse::<i128>() {
+                            Ok(n) if i > 0 => Valor::Entero(n),
+                            _ => Valor::Texto((*parte).into()),
+                        });
                     }
-                    ubicacion.push(match parte.parse::<i128>() {
-                        Ok(n) if i > 0 => Valor::Entero(n),
-                        _ => Valor::Texto(parte.into()),
-                    });
+                    let msg = if falta { "Field required" } else { mensaje(f.tipo) };
+                    errores.push(Error { tipo: f.tipo, loc: ubicacion, msg: msg.into(), entrada, ctx: None })
                 }
-                errores.push(Error { tipo: f.tipo, loc: ubicacion, msg: mensaje(f.tipo).into(), entrada, ctx: None })
             }
         }
     }

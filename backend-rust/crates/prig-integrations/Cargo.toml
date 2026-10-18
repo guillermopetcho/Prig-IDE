@@ -22,3 +22,5 @@ prig-documentos = { path = "../prig-documentos" }
 sha1 = "0.10"
 prig-aprendizaje = { path = "../prig-aprendizaje" }
 base64 = "0.22"
+yaml-rust = "0.4"
+unicode-normalization = "0.1"

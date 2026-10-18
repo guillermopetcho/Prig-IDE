@@ -1,5 +1,6 @@
 pub mod github;
 pub mod github_widget;
+pub mod hub;
 pub mod kaggle;
 pub mod kaggle_datos;
 pub mod kaggle_pdf;

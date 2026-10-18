@@ -48,7 +48,6 @@ from recursos import termico as recursos_termico
 from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
 from guided_learning import GuidedLearningService
-import inicio
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -1586,19 +1585,7 @@ def descargas_limpiar():
 # Desafíos: enunciado, caja de razonamiento, páginas de código y pruebas ocultas
 # ===========================================================================
 
-from desafios import ejecucion as des_ejec
 import gemini_motor
-from desafios.almacen import Almacen as AlmacenDesafios
-from desafios.ejecucion import ErrorDesafio
-
-desafios_almacen = AlmacenDesafios()
-
-
-def _desafio(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except ErrorDesafio as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
@@ -1611,78 +1598,11 @@ def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
     return tutor
 
 
-def _motor_desafios(modelo: Optional[str], rol: Optional[str] = None):
-    """ (motor, nombre del modelo): Ollama en local o Gemini en la nube si el nombre empieza por «gemini:» """
-    nombre = _modelo_desafios(modelo, rol)
-    if gemini_motor.es_gemini(nombre):
-        if not gemini_motor.clave_actual()[0]:
-            raise HTTPException(status_code=400, detail="Gemini no está conectado: conéctalo o elige un modelo local.")
-        return gemini_motor.MotorGemini(ai_engine._extract_and_parse_json), nombre[len(gemini_motor.PREFIJO):]
-    return ai_engine, nombre
-
-
-def _consumir(generador, avisar):
-    """ Reenvía los eventos de un generador del tutor y devuelve su valor final """
-    try:
-        while True:
-            avisar(next(generador))
-    except StopIteration as fin:
-        return fin.value
-
-
-class DesafioEjecutarRequest(BaseModel):
-    paginas: List[Dict[str, Any]]
-    pagina: str
-
-
-class DesafioPasosRequest(BaseModel):
-    pasos_vistos: int
-
-
-class YouTubeAnalisisRequest(BaseModel):
-    video_id: str
-    titulo: str
-    canal: Optional[str] = "YouTube"
-    duracion: Optional[str] = ""
-    descripcion: Optional[str] = ""
-    categoria: Optional[str] = ""
-    nivel: Optional[str] = "intermedio"
-    texto_usuario: Optional[str] = ""
-    notas_usuario: Optional[str] = ""
-    modo: Optional[str] = "ambos"  # "resumen" | "objetivos" | "ambos"
-    modelo: Optional[str] = None
-
-
-class YouTubeTraducirRequest(BaseModel):
-    texto: str
-    de: Optional[str] = "auto"
-    a: Optional[str] = "es"
-    modelo: Optional[str] = None
-
-
-def _registrar_telemetria(d: Dict[str, Any], evento: str, **extra):
-    if not flags.is_enabled("learning_telemetry"):
-        return
-    try:
-        concepto = ", ".join(d.get("conceptos") or []) or d.get("titulo", "")
-        if evento == "submission":
-            extra["attempt_num"] = telemetry.attempt_number(d["id"])
-        telemetry.record(d["id"], concepto, evento, **extra)
-    except Exception as e:
-        print(f"⚠️ Telemetría de desafíos: {e}")
-
-
 # Gemini (estado, clave, modelos): los sirve el servidor de Rust (routes/ia.rs; prig_ia::gemini)
 
 
 # Inicio, su perfil y el estado de la máquina (/api/system/stats, /api/system/health): servidor de Rust
 # (routes/inicio.rs)
-class InicioPerfilRequest(BaseModel):
-    nombre: Optional[str] = None
-    objetivo: Optional[str] = None
-    nivel: Optional[str] = None
-    mostrar_al_abrir: Optional[bool] = None
-    favoritas: Optional[List[str]] = None
 
 # Analizar el avance con el modelo (POST /api/progreso/analisis): servidor de Rust (routes/desafios_tutor.rs)
 
@@ -1700,15 +1620,7 @@ class InicioPerfilRequest(BaseModel):
 # ----------------------------------------------------------------------------
 # YouTube Search Engine & Registered Keywords (Deep Learning, Machine Learning, Python, C++)
 # ----------------------------------------------------------------------------
-# ============================================================================
-# Prig Hub: tu aprendizaje en texto plano, versionado en git (backend/hub, docs/prig-hub.md)
-# ============================================================================
-from hub.api import crear_router as _hub_router  # noqa: E402
-
-app.include_router(_hub_router(
-    runner=runner, motor=_motor_desafios, consumir=_consumir, ndjson=_ndjson_en_hilo, desafios=desafios_almacen,
-    telemetria=_registrar_telemetria, publico=AlmacenDesafios.publico, validar_desafio=des_ejec.validar_desafio,
-    autor=lambda: inicio.perfil().get("nombre") or ""))
+# Prig Hub (tu aprendizaje en texto plano, versionado en git): servidor de Rust (routes/hub.rs, docs/prig-hub.md)
 
 # ============================================================================
 # API DIRECTOR NARRATIVO Y DE AGENTES ASCII (Modelos 7B / Ollama / Local)

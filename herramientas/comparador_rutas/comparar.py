@@ -188,7 +188,7 @@ def preparar(tmp: str) -> dict:
     env = os.environ.copy()
     env.update({
         "HOME": home, "PRIG_SIN_LIMPIAR_HUERFANOS": "1", "PRIG_ENERGIA_SIN_PKEXEC": "1",
-        "PRIG_DESAFIOS_DIR": os.path.join(home, ".prig_desafios"),
+        "PRIG_DESAFIOS_DIR": os.path.join(home, ".prig_desafios"), "PRIG_HUB_GIT_LOCAL": "1",
         "HTTP_PROXY": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9", "NO_PROXY": "127.0.0.1,localhost",
         "RUST_LOG": "warn",
         # El motor suave nunca toca el Ollama de Prig de verdad (lib/ es un enlace a la carpeta real)
@@ -575,6 +575,200 @@ for _c in CASOS_FLUJOS:
     _c["solo_rust"] = True
 
 
+# =========================================================================== Prig Hub (tanda 48)
+
+def _git_fijo(carpeta, *args):
+    entorno = {**os.environ, "GIT_AUTHOR_NAME": "Ana", "GIT_AUTHOR_EMAIL": "ana@x", "GIT_COMMITTER_NAME": "Ana",
+               "GIT_COMMITTER_EMAIL": "ana@x", "GIT_AUTHOR_DATE": "2026-01-01T00:00:00", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00"}
+    return subprocess.run(["git", *args], cwd=carpeta, env=entorno, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _escribir_arbol(base, archivos):
+    for ruta, texto in archivos.items():
+        destino = os.path.join(base, ruta)
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        with open(destino, "w", encoding="utf-8") as f:
+            f.write(texto)
+
+
+def sembrar_hub(tmp: str) -> str:
+    """ Un pack de Prig Hub de otra persona en un repositorio git local (para seguirlo, ver novedades y aplicarlas) """
+    remoto = os.path.join(tmp, "remoto_hub")
+    _escribir_arbol(remoto, {
+        "prig.yaml": "formato: 1\ntipo: pack\ntitulo: Pack de ML de Ana\ndescripcion: 'Recursos para aprender ML: lo básico'\n"
+                     "autor:\n  nombre: Ana\n  github: ana\nidioma: es\nnivel: Intermedio\netiquetas: [ml, Python, ML]\n"
+                     "version: 1.2.0\nlicencia:\n  contenido: CC-BY-4.0\n  codigo: MIT\nenlaces:\n  - https://github.com/ana\n"
+                     "  - no es enlace\ncampo_futuro: x\n",
+        "personas.yaml": "- url: https://www.youtube.com/@Ana\n  titulo: Canal de Ana\n- https://github.com/bob\n- titulo: sin url\n",
+        "recursos.yaml": "# lo que recomiendo\n- url: https://www.coursera.org/learn/machine-learning?utm_source=x\n  titulo: ML de Andrew Ng\n"
+                         "  etiquetas: ML, Curso intro\n  nivel: Principiante\n  minutos: 600\n  nota: El clásico\n"
+                         "- url: https://youtu.be/aircAruvnKk?si=xyz\n  titulo: Redes neuronales\n  tipo: video\n  id: redes-3b1b\n"
+                         "- url: https://www.kaggle.com/learn/python\n  tipo: raro\n- url: https://github.com/ana\n  titulo: Ana en recursos\n"
+                         "- url: https://youtu.be/aircAruvnKk\n  titulo: el mismo sin id\n- url: ftp://x\n"
+                         "- url: https://arxiv.org/pdf/1706.03762v5.pdf\n  minutos: 0\n  imagen: https://img/x.png\n  id: Mal Id\n"
+                         "- url: https://www.coursera.org/learn/machine-learning\n  titulo: repetido\n- 42\n",
+        "rutas/empezar.md": "---\ntitulo: Empezar con ML\ndescripcion: Primeros pasos\nnivel: principiante\netiquetas: [ml]\n---\n\n"
+                            "Una introducción.\n\n1. [Curso de Andrew](https://www.coursera.org/learn/machine-learning) — lo primero\n"
+                            "   con más texto\n\n2. [La suma](desafio:suma)\n- [Enlace roto](notalink)\n- Paso sin enlace\n"
+                            "* [Desafío que no existe](desafio:nada)\n\nTexto final.\n",
+        "rutas/Mal_Nombre.md": "- [x](https://example.com/a)\n",
+        "rutas/sin-cabecera.md": "- [x](https://example.com/a)\n",
+        "rutas/cabecera-rota.md": "---\ntitulo: [roto\n---\n\nnada\n",
+        "desafios/suma/desafio.md": "---\ntitulo: Sumar dos números\nnivel: principiante\netiquetas: [python, basico]\nminutos: 10\n---\n\n"
+                                    "Escribe `sumar(a, b)`.\n",
+        "desafios/suma/inicio/sol.py": "def sumar(a, b):\n    pass\n",
+        "desafios/suma/solucion/sol.py": "def sumar(a, b):\n    return a + b\n",
+        "desafios/suma/pruebas/test_sol.py": "import unittest\nfrom sol import sumar\n\n\nclass T(unittest.TestCase):\n"
+                                             "    def test_uno(self):\n        self.assertEqual(sumar(2, 3), 5)\n\n"
+                                             "    def test_dos(self):\n        self.assertEqual(sumar(-1, 1), 0)\n",
+        "desafios/incompleto/desafio.md": "Sin cabecera.\n",
+        "desafios/incompleto/inicio/x.py": "x = 1\n",
+        "desafios/incompleto/inicio/mal-nombre.py": "y = 2\n",
+        "desafios/Mayus/desafio.md": "x\n",
+        "LICENSE.md": "MIT\n",
+    })
+    _git_fijo(remoto, "init", "-q", "-b", "main")
+    _git_fijo(remoto, "add", "-A")
+    _git_fijo(remoto, "commit", "-q", "-m", "Primera versión")
+    return remoto
+
+
+def cambiar_hub(remoto: str):
+    """ Una versión nueva del pack: un recurso más, una persona menos, otra solución y otra versión """
+    _escribir_arbol(remoto, {
+        "personas.yaml": "- url: https://www.youtube.com/@Ana\n  titulo: Canal de Ana (nuevo)\n",
+        "recursos.yaml": "- url: https://www.coursera.org/learn/machine-learning\n  titulo: ML de Andrew Ng\n  nivel: principiante\n"
+                         "- url: https://www.fast.ai/\n  titulo: fast.ai\n",
+        "desafios/suma/solucion/sol.py": "def sumar(a, b):\n    return b + a\n",
+        "desafios/resta/desafio.md": "---\ntitulo: Restar\n---\nResta.\n",
+        "desafios/resta/inicio/sol.py": "def restar(a, b):\n    pass\n",
+    })
+    with open(os.path.join(remoto, "prig.yaml"), encoding="utf-8") as f:
+        texto = f.read().replace("version: 1.2.0", "version: 1.3.0")
+    with open(os.path.join(remoto, "prig.yaml"), "w", encoding="utf-8") as f:
+        f.write(texto)
+    _git_fijo(remoto, "add", "-A")
+    _git_fijo(remoto, "commit", "-q", "-m", "Versión 1.3")
+
+
+def clave_carpeta_hub(url: str) -> str:
+    u = re.sub(r"^https?://", "", url.strip().lower()).removesuffix(".git").strip("/")
+    u = re.sub(r"^(www\.)", "", u)
+    return re.sub(r"[^a-z0-9._\-]+", "__", u)[:150]
+
+
+_HUB_REEMPLAZOS = [[r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?", "FECHA"], [r"\b[0-9a-f]{40}\b", "COMMIT"],
+                   [r"\b\d{4}-\d{2}-\d{2}\b", "DIA"]]
+
+
+def casos_hub(tmp: str, home: str) -> list:
+    """ Prig Hub, que ya atiende solo el servidor de Rust (PRIG_COMPARAR_RETIRADAS=1 los compara con el backend viejo) """
+    return [{**c, "solo_rust": True} for c in _casos_hub(tmp, home)]
+
+
+def _casos_hub(tmp: str, home: str) -> list:
+    """ Prig Hub: cada caso compara la respuesta y cómo queda la carpeta del Hub (sin .git, con su historial) """
+    remoto = os.path.join(tmp, "remoto_hub")
+    clave = clave_carpeta_hub(remoto)
+    sigo = f"sigo:{clave}"
+    hub = os.path.join(home, ".prig_hub")
+    H = {"arboles": [hub], "reemplazos": _HUB_REEMPLAZOS}
+    D = {"arboles": [hub, os.path.join(home, ".prig_desafios")], "reemplazos": _HUB_REEMPLAZOS}
+    P = lambda ruta, j, **x: {"ruta": f"/api/hub/{ruta}", "metodo": "POST", "json": j, **H, **x}
+    G = lambda ruta, **x: {"ruta": f"/api/hub/{ruta}", **H, **x}
+    pack = "prig-machine-learning-basico"
+    yt = "https://youtu.be/dQw4w9WgXcQ"
+    commit_nuevo = lambda: _git_fijo(remoto, "rev-parse", "HEAD")
+    return [
+        G("estado"), G("repos"), G("todo"), G("repos"),
+        *(P("analizar", j) for j in [
+            {"texto": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30"}, {"texto": "ana"}, {"texto": "@bob"}, {"texto": "no es enlace"},
+            {"texto": "github.com/ana"}, {"texto": "https://kaggle.com/code/ana/eda?utm_source=x&b=2&a=1#frag"}, {"texto": ""},
+            {}, {"texto": 3}, {"texto": "https://github.com/ana/prig-ml/blob/main/a/b.py"}, {"texto": "https://huggingface.co/datasets/a/b/c"},
+            {"texto": "www.platzi.com/cursos/python/"}, {"texto": "https://exercism.org/tracks/python/exercises/two-fer"},
+            {"texto": "https://x.com/ana"}, {"texto": "https://hf.co/bert-base"}, {"texto": "https://m.youtube.com/shorts/abcdefgh12"},
+            {"texto": "https://www.edx.org/learn/python/harvard-cs50"}, {"texto": "https://gitlab.com/ana/Prig-Cosas.git"},
+            {"texto": "https://ejemplo.com"}, {"texto": "https://ejemplo.com/a/b?z=1&utm_medium=x&fbclid=3"}, {"texto": "http://localhost:8000/x"},
+        ]),
+        P("agregar", {"url": yt, "titulo": "Video uno", "etiquetas": ["Machine Learning", "ñandú", ""], "nivel": "intermedio",
+                      "minutos": 12, "nota": " una nota "}),
+        P("agregar", {"url": yt + "?t=3"}),
+        P("agregar", {"url": "https://github.com/bob"}),
+        P("agregar", {"url": "https://arxiv.org/abs/1706.03762v5", "titulo": "Attention", "tipo": "ARTICULO", "nivel": "experto", "minutos": 0}),
+        P("agregar", {"url": "https://www.coursera.org/learn/ml", "titulo": "Curso: «ML» de: Ng", "tipo": "persona"}),
+        P("agregar", {"url": "x"}), P("agregar", {"url": "https://a.com/b", "tipo": "raro"}), P("agregar", {"titulo": "sin url"}),
+        P("agregar", {"url": "https://a.com/b", "minutos": "x", "etiquetas": "no lista"}),
+        P("agregar", {"url": "https://a.com/b", "destino": "otro"}),
+        P("editar", {"clave": "youtube:video:dQw4w9WgXcQ", "cambios": {"titulo": "Nuevo título", "minutos": "30", "etiquetas": "a, b c", "nota": None}}),
+        P("editar", {"clave": "arxiv:articulo:1706.03762", "cambios": {"minutos": "x", "nivel": "avanzado"}}),
+        P("editar", {"clave": "nada", "cambios": {}}), P("editar", {"clave": "x"}),
+        P("quitar", {"clave": "github:persona:bob"}), P("quitar", {"clave": "github:persona:bob"}),
+        P("manifiesto", {"destino": "prig", "cambios": {"titulo": "Mi perfil", "descripcion": "Hola: mundo", "nivel": "avanzado",
+                                                        "etiquetas": ["IA", "Rust"], "autor": "Ana", "enlaces": ["https://github.com/ana", "youtube.com/@ana"],
+                                                        "idioma": None, "otro": 1}}),
+        P("manifiesto", {"destino": "propio:prig", "cambios": {"enlaces": ["no"]}}),
+        P("manifiesto", {"destino": "prig-nada", "cambios": {}}),
+        P("packs", {"titulo": "Machine Learning básico", "descripcion": "d", "etiquetas": ["ML", "Python avanzado"], "nivel": "principiante"}),
+        P("packs", {"titulo": "Machine Learning básico"}), P("packs", {"titulo": "Prig-Rust Total", "nivel": "x"}),
+        P("packs", {"titulo": "  "}), P("packs", {}),
+        P("agregar", {"url": yt, "destino": pack, "titulo": "En el pack"}),
+        P("rutas", {"destino": pack, "titulo": "Empezar", "descripcion": "x", "nivel": "principiante", "etiquetas": ["a"],
+                    "introduccion": "Intro", "pasos": [{"titulo": "Ver [video]", "destino": yt, "nota": "primero"},
+                                                       {"titulo": "Desafío", "destino": "desafio:suma"}, {"destino": "  "}]}),
+        P("rutas", {"destino": pack, "titulo": "Empezar", "pasos": [{"destino": yt}]}),
+        P("rutas", {"destino": pack, "titulo": "Mala", "pasos": [{"titulo": "x", "destino": "nada"}]}),
+        P("rutas", {"destino": pack, "titulo": "Vacía", "pasos": [{"destino": ""}]}),
+        P("rutas", {"destino": pack, "titulo": "Id malo", "id": "Mal Id", "pasos": [{"destino": yt}]}),
+        P("rutas", {"destino": pack, "titulo": "x"}), P("rutas", {"destino": pack, "titulo": "", "pasos": []}),
+        P("rutas", {"destino": pack, "titulo": "x", "pasos": [{"titulo": 3}]}),
+        P("copiar", {"origen": "propio:prig", "clave": "arxiv:articulo:1706.03762", "destino": pack}),
+        P("copiar", {"origen": "propio:prig", "clave": "nada", "destino": pack}),
+        G("repo?origen=propio:" + pack), G("repo?origen=propio:nada"), G("repo?origen=sigo:x"), G("repo?origen=x"), G("repo"),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_aaaaaaaaa1"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_aaaaaaaaa3"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_aaaaaaaaa2"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_aaaaaaaaa5"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_aaaaaaaaa9"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "des_0000000000"}),
+        P("desafio/exportar", {"destino": pack, "id_desafio": "nada"}),
+        G("desafios_locales"), G("recursos_locales"),
+        P("sincronizar_local", {"destino": "Prig-Rust-Total", "categorias_youtube": ["ML", "dl"], "desafios_ids": ["des_aaaaaaaaa7"]}),
+        P("sincronizar_local", {"destino": "Prig-Rust-Total", "categorias_youtube": ["todas"], "incluir_desafios": False}),
+        P("sincronizar_local", {"destino": "prig-no-esta"}),
+        P("seguir", {"url": "prig-ml"}),
+        P("seguir", {"url": remoto}), P("seguir", {"url": remoto}),
+        P("seguir", {"url": "ana/prig-ml"}), P("seguir", {"url": "-x"}), P("seguir", {"url": "git@github.com:ana/prig.git"}),
+        G(f"desafio?origen={sigo}&id=suma"), G(f"desafio?origen={sigo}&id=nada"), G("desafio"), G(f"desafio?origen={sigo}&id=incompleto"),
+        {**P("desafio/importar", {"origen": sigo, "id": "suma"})},
+        {**P("desafio/importar", {"origen": sigo, "id": "suma", "confirmado": True}), **D, "volatiles": ["id", "creado", "actualizado"]},
+        P("desafio/importar", {"origen": sigo, "id": "incompleto", "confirmado": True}),
+        P("progreso", {"clave": "youtube:video:dQw4w9WgXcQ", "estado": "terminado", "origen": "propio:prig", "version": "1"}),
+        P("progreso", {"clave": "redes-3b1b", "estado": "en_curso"}),
+        P("progreso", {"clave": "x", "estado": "raro"}), P("progreso", {"clave": "", "estado": "terminado"}),
+        P("progreso", {"clave": "github:persona:bob", "estado": "quitar"}),
+        G("todo"), G("repos"),
+        P("novedades", {"clave": clave}),
+        {**P("novedades", {"clave": clave}), "antes": lambda: cambiar_hub(remoto)},
+        P("aplicar", {"clave": clave, "commit": "0" * 40}),
+        P("descartar", {"clave": clave}), P("descartar", {"clave": "nada"}),
+        P("novedades", {"clave": clave}),
+        {**P("aplicar", {"clave": clave, "commit": "x"}), "json": lambda: {"clave": clave, "commit": commit_nuevo()}},
+        P("novedades", {"clave": clave}), P("novedades", {"clave": "Mal"}), P("novedades", {"clave": "otro"}),
+        G(f"repo?origen={sigo}"),
+        P("rutas/borrar", {"destino": pack, "id": "empezar"}), P("rutas/borrar", {"destino": pack, "id": "empezar"}),
+        P("rutas/borrar", {"destino": pack, "id": "Mal"}),
+        P("ajustes", {"publicar_resumen": True}), P("ajustes", {}), P("ajustes", {"publicar_resumen": "x"}),
+        P("publicar", {"destino": "prig"}),
+        P("seguir", {"url": "prig-ml"}),
+        P("preguntar", {"origen": sigo, "mensajes": [{"rol": "usuario", "texto": "¿Qué recomiendas?"}, {"rol": "tutor"}]}),
+        P("preguntar", {"origen": sigo, "mensajes": []}), P("preguntar", {"origen": "x", "mensajes": [{"rol": "usuario", "texto": "a"}]}),
+        P("dejar", {"clave": clave}), P("dejar", {"clave": clave}), P("dejar", {"clave": ".x"}),
+        G("todo"), G("estado"),
+        *({"ruta": f"/api/hub/descubrir{q}"} for q in ["", "?q=ml", "?q=prig-ml", "?q=ana/Repo", "?q=https://github.com/ana/Repo.git",
+                                                         "?q=malo", "?q=limite", "?tipo=perfil&pagina=2", "?pagina=x", "?q=Prig"]),
+    ]
+
+
 def sembrar_guiado(proyecto: str):
     """ Seguimientos y planes de estudio en el proyecto de prueba """
     seg = os.path.join(proyecto, ".prig_seguimientos")
@@ -915,8 +1109,11 @@ def github_falso() -> str:
             auth = self.headers.get("Authorization") or ""
             if ruta == "/user":
                 ok = auth in ("Bearer github_pat_bueno_de_prueba_000", "Bearer github_pat_falso_para_pruebas_000000")
-                return self.responder(200 if ok else 401, {"login": "ana", "name": "Ana", "avatar_url": "https://a/ana.png",
+                return self.responder(200 if ok else 401, {"login": "ana", "id": 7, "name": "Ana", "avatar_url": "https://a/ana.png",
                                                            "html_url": "https://github.com/ana"})
+            if ruta.startswith("/raw/") and ruta.endswith("/HEAD/prig.yaml"):
+                return self.responder(200, b"formato: 1\ntipo: perfil\n", "text/plain") if ruta == "/raw/ana/prig/HEAD/prig.yaml" \
+                    else self.responder(404, b"", "text/plain")
             if ruta == "/repos/ana/ana":
                 return self.responder(200, {"full_name": "ana/ana"})
             if ruta == "/repos/ana/ana/contents/README.md":
@@ -1361,13 +1558,13 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/progreso/historial?concepto=%C3%A1rboles%20binarios", "solo_rust": True},
         {"ruta": "/api/progreso/historial?concepto=prueba%20des_aaaaaaaaa3", "solo_rust": True},
         {"ruta": "/api/progreso/historial?limite=600", "solo_rust": True},
-        {"ruta": "/api/github/guardados"},
+        {"ruta": "/api/github/guardados", "solo_rust": True},
         {"ruta": "/api/github/estado", "solo_rust": True},
         {"ruta": "/api/kaggle/estado", "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones", "solo_rust": True},
-        {"ruta": "/api/kaggle/colecciones/col_1"},
-        {"ruta": "/api/kaggle/colecciones/col_3"},
-        {"ruta": "/api/kaggle/colecciones/no_existe"},
+        {"ruta": "/api/kaggle/colecciones/col_1", "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/col_3", "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/no_existe", "solo_rust": True},
         {"ruta": "/api/kaggle/mis_datos", "solo_rust": True},
         {"ruta": "/api/kaggle/previa?ruta={proyecto}/kaggle_datos/titanic/train.csv", "solo_rust": True},
         {"ruta": "/api/kaggle/previa?ruta={proyecto}/kaggle_datos/titanic/datos.tsv", "solo_rust": True},
@@ -1443,9 +1640,9 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=datos/grande.csv", "solo_rust": True},
         {"ruta": "/api/github/archivo?ref=ana/Repo&ruta=no.py", "solo_rust": True},
         {"ruta": "/api/github/archivo?ref=ana/Repo", "solo_rust": True},
-        {"ruta": "/api/github/guardados", "metodo": "POST", "json": {"ref": "ana/repo", "nota": "  ver luego "}, "archivo": "{home}/.prig_github/guardados.json", "restaurar": True, "archivo_json": True, "volatiles": ["guardado"]},
-        {"ruta": "/api/github/guardados?ref=ANA/REPO", "metodo": "DELETE", "archivo": "{home}/.prig_github/guardados.json", "restaurar": True, "archivo_json": True},
-        {"ruta": "/api/github/guardados", "metodo": "DELETE"},
+        {"ruta": "/api/github/guardados", "metodo": "POST", "json": {"ref": "ana/repo", "nota": "  ver luego "}, "archivo": "{home}/.prig_github/guardados.json", "restaurar": True, "archivo_json": True, "volatiles": ["guardado"], "solo_rust": True},
+        {"ruta": "/api/github/guardados?ref=ANA/REPO", "metodo": "DELETE", "archivo": "{home}/.prig_github/guardados.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
+        {"ruta": "/api/github/guardados", "metodo": "DELETE", "solo_rust": True},
         {"ruta": "/api/github/token", "metodo": "POST", "json": {"texto": " github_pat_bueno_de_prueba_000 "}, "archivo": "{home}/.prig_github.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
         {"ruta": "/api/github/token", "metodo": "POST", "json": {"texto": "github_pat_malo_de_prueba_0000"}, "archivo": "{home}/.prig_github.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
         {"ruta": "/api/github/token", "metodo": "POST", "json": {"texto": "corto"}, "archivo": "{home}/.prig_github.json", "restaurar": True, "archivo_json": True, "solo_rust": True},
@@ -1507,12 +1704,12 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         {"ruta": "/api/kaggle/colecciones", "metodo": "POST", "json": {"nombre": "   "}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones", "metodo": "POST", "json": {"nombre": "Otra", "color": "rojo"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones", "metodo": "POST", "json": {"nombre": 5}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
-        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {"nombre": "Titanic 2", "descripcion": "x", "color": "#89b4fa"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
-        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {"nombre": "Visión"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
-        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
-        {"ruta": "/api/kaggle/colecciones/nope", "metodo": "PATCH", "json": {"nombre": "x"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
-        {"ruta": "/api/kaggle/colecciones/col_2", "metodo": "DELETE", "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
-        {"ruta": "/api/kaggle/colecciones/nope", "metodo": "DELETE", "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"]},
+        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {"nombre": "Titanic 2", "descripcion": "x", "color": "#89b4fa"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {"nombre": "Visión"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/col_1", "metodo": "PATCH", "json": {}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/nope", "metodo": "PATCH", "json": {"nombre": "x"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/col_2", "metodo": "DELETE", "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
+        {"ruta": "/api/kaggle/colecciones/nope", "metodo": "DELETE", "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones/col_3/items", "metodo": "POST", "json": {"tipo": "notebook", "ref": "ana/nb-uno", "datos": {"titulo": "Uno", "votos": 3, "otro": 1}}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones/col_1/items", "metodo": "POST", "json": {"tipo": "notebook", "ref": "a/titanic", "datos": {"autor": "Ana", "titulo": None}}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
         {"ruta": "/api/kaggle/colecciones/col_3/items", "metodo": "POST", "json": {"tipo": "competicion", "ref": "https://www.kaggle.com/competitions/titanic/data"}, "archivo": "{home}/.prig_kaggle/colecciones.json", "restaurar": True, "archivo_json": True, "volatiles": ["id", "creada", "actualizada", "anadido"], "solo_rust": True},
@@ -2449,6 +2646,61 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
     return casos
 
 
+def describir_arboles(arboles, previos):
+    """ Cómo quedan unas carpetas: el texto de cada archivo (sin .git, con fechas y commits normalizados) y, de cada
+    repositorio git, sus mensajes, autores y el árbol de HEAD (que no depende de la hora) """
+    salida = {}
+    for raiz in arboles:
+        for d, subs, ns in os.walk(raiz):
+            if ".git" in subs:
+                subs.remove(".git")
+                log = subprocess.run(["git", "log", "--format=%s|%an|%ae"], cwd=d, capture_output=True, text=True).stdout
+                arbol = subprocess.run(["git", "rev-parse", "HEAD^{tree}"], cwd=d, capture_output=True, text=True).stdout.strip()
+                salida[os.path.relpath(d, raiz) + "/.git"] = [log.splitlines(), arbol]
+            for n in ns:
+                ruta = os.path.join(d, n)
+                rel = os.path.relpath(ruta, raiz)
+                try:
+                    texto = open(ruta, "rb").read().decode("utf-8", "replace")
+                except OSError as e:
+                    texto = f"<{e}>"
+                for patron, sustituto in _HUB_REEMPLAZOS:
+                    texto = re.sub(patron, sustituto, texto)
+                texto = re.sub(r'"ts": [0-9.e+-]+', '"ts": TS', texto)
+                if raiz.endswith(".prig_desafios") and n.endswith(".json") and rel not in previos:
+                    rel = "desafios/NUEVO.json"
+                    texto = re.sub(r"des_[0-9a-f]{10}", "des_NUEVO", texto)
+                salida[os.path.join(os.path.basename(raiz), rel)] = texto
+    return salida
+
+
+def con_arboles(c, base_py, base_rs, tmp):
+    """ Python y Rust desde el mismo estado de las carpetas: se compara la respuesta y cómo quedan; se sigue desde
+    lo que dejó Rust """
+    arboles = c["arboles"]
+    copia = os.path.join(tmp, "arboles_copia")
+    shutil.rmtree(copia, ignore_errors=True)
+    os.makedirs(copia)
+    for i, a in enumerate(arboles):
+        if os.path.exists(a):
+            shutil.copytree(a, os.path.join(copia, str(i)), symlinks=True)
+    previos = {os.path.relpath(os.path.join(d, n), a) for a in arboles for d, _, ns in os.walk(a) for n in ns}
+    a = pedir(base_py, c)
+    vista_py = describir_arboles(arboles, previos)
+    for i, x in enumerate(arboles):
+        shutil.rmtree(x, ignore_errors=True)
+        if os.path.exists(os.path.join(copia, str(i))):
+            shutil.copytree(os.path.join(copia, str(i)), x, symlinks=True)
+    b = pedir(base_rs, c)
+    vista_rs = describir_arboles(arboles, previos)
+    if list(sorted(vista_py)) != list(sorted(vista_rs)):
+        return a, b, f"archivos {sorted(set(vista_py) ^ set(vista_rs))[:6]}"
+    for k in sorted(vista_py):
+        if vista_py[k] != vista_rs[k]:
+            return a, b, f"{k}: {diferencia(vista_py[k], vista_rs[k])}"
+    return a, b, ""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--casos", help="JSON con [{ruta, metodo, json}]; {proyecto} se sustituye")
@@ -2493,6 +2745,7 @@ def main():
             sembrar_buscador(p["home"])
             sembrar_exportar(p["proyecto"])
             sembrar_kb(p["home"])
+            sembrar_hub(tmp)
         if args.desafios:
             destino = os.path.join(p["home"], ".prig_desafios", "desafios")
             shutil.copytree(args.desafios, destino, dirs_exist_ok=True)
@@ -2539,6 +2792,8 @@ def main():
         else:
             casos = casos_por_defecto(p["proyecto"], p["home"], p.get("desafio", "des_0000000000"),
                                       p.get("desafio2", "des_0000000000"))
+            if not args.vacio:
+                casos += casos_hub(tmp, p["home"])
         if args.solo:
             solo = set(args.solo.split(","))
             casos = [c for c in casos if c["ruta"].split("?")[0] in solo]
@@ -2551,6 +2806,27 @@ def main():
             CONTENEDORES_CASO.clear()
             CONTENEDORES_CASO.update(c.get("contenedores", []))
             REEMPLAZOS_CASO[:] = c.get("reemplazos", [])
+            if c.get("antes"):
+                c["antes"]()
+            if callable(c.get("json")):
+                c = {**c, "json": c["json"]()}
+            if c.get("arboles") and not (c.get("solo_rust") and not os.environ.get("PRIG_COMPARAR_RETIRADAS")):
+                a, b, d = con_arboles(c, f"http://127.0.0.1:{pp}", f"http://127.0.0.1:{pr}", tmp)
+                etiqueta = f"{c.get('metodo', 'GET'):4} {c['ruta'][:70]}"
+                if os.environ.get("PRIG_COMPARADOR_VER") and os.environ["PRIG_COMPARADOR_VER"] in c["ruta"]:
+                    print("  PYTHON:", str(a[1][1])[:600]); print("  RUST:  ", str(b[1][1])[:600])
+                if d:
+                    fallos += 1
+                    print(f"✗ {etiqueta}  las carpetas difieren: {d}")
+                elif a[0] != b[0]:
+                    fallos += 1
+                    print(f"✗ {etiqueta}  estado {a[0]} (Python) ≠ {b[0]} (Rust)  {str(a[1])[:150]} | {str(b[1])[:150]}")
+                elif a[1][0] != b[1][0] or diferencia(a[1][1], b[1][1]):
+                    fallos += 1
+                    print(f"✗ {etiqueta}  {diferencia(a[1][1], b[1][1]) if a[1][0] == b[1][0] else str(a[1])[:200] + ' ≠ ' + str(b[1])[:200]}")
+                else:
+                    print(f"✓ {etiqueta}  {a[0]}")
+                continue
             if c.get("solo_rust") and not os.environ.get("PRIG_COMPARAR_RETIRADAS"):
                 b = pedir(f"http://127.0.0.1:{pr}", c)
                 print(f"· {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  solo en Rust ({b[0]}): no hay con qué comparar")

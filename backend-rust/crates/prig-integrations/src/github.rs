@@ -21,18 +21,18 @@ fn entorno(v: &str) -> Option<String> {
     std::env::var(v).ok().filter(|x| !x.is_empty())
 }
 
-fn api() -> String {
+pub fn api() -> String {
     entorno("PRIG_GITHUB_API").unwrap_or_else(|| "https://api.github.com".into())
 }
-fn raw() -> String {
+pub fn raw() -> String {
     entorno("PRIG_GITHUB_RAW").unwrap_or_else(|| "https://raw.githubusercontent.com".into())
 }
 fn codeload() -> String {
     entorno("PRIG_GITHUB_CODELOAD").unwrap_or_else(|| "https://codeload.github.com".into())
 }
 
-const UA: &str = "Prig-IDE (lector de repositorios; uso educativo local)";
-const ACCEPT: &str = "application/vnd.github+json";
+pub const UA: &str = "Prig-IDE (lector de repositorios; uso educativo local)";
+pub const ACCEPT: &str = "application/vnd.github+json";
 const MAX_ARCHIVO: f64 = 400_000.0;
 pub const CARPETA_REPOS: &str = "github_repos";
 pub const CARPETA_EXPORT: &str = "github_explicaciones";
@@ -153,7 +153,7 @@ pub fn borrar_token() -> Result<Mapa, Fallo> {
 // ---------------------------------------------------------------------------------------------- API
 
 /// `_api(ruta, params)`: la API con los mensajes de Prig para cada estado
-fn llamar(ruta: &str, params: &[(&str, String)]) -> Result<Valor, Fallo> {
+pub fn llamar(ruta: &str, params: &[(&str, String)]) -> Result<Valor, Fallo> {
     let r = get(&format!("{}/{ruta}", api()), params, true, None)?;
     let estado = r.status().as_u16();
     let cab = |k: &str| r.headers().get(k).and_then(|v| v.to_str().ok()).map(String::from);

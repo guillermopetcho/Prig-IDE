@@ -21,6 +21,7 @@ pub mod flujos_motor;
 pub mod ia;
 pub mod guiado;
 pub mod guiado_ia;
+pub mod hub;
 pub mod plan_estudio;
 pub mod navegar;
 pub mod ide;

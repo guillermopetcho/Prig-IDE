@@ -72,6 +72,51 @@ fn entero_de_texto(t: &str) -> Option<i128> {
 }
 
 pub fn validar_tipo(t: &Tipo, v: Valor, donde: &str) -> Result<Valor, Fallo> {
+    validar_tipo_todos(t, v, donde).map_err(|mut l| l.swap_remove(0))
+}
+
+/// Como `validar_tipo`, con todos los errores (pydantic sigue con los demás elementos y campos tras el primero)
+pub fn validar_tipo_todos(t: &Tipo, v: Valor, donde: &str) -> Result<Valor, Vec<Fallo>> {
+    let uno = |r: Result<Valor, Fallo>| r.map_err(|f| vec![f]);
+    match t {
+        Tipo::Opcional(interno) => match v {
+            Valor::Nulo => Ok(Valor::Nulo),
+            otro => validar_tipo_todos(interno, otro, donde),
+        },
+        Tipo::Lista(interno) => match v {
+            Valor::Lista(l) => {
+                let mut salida = Vec::with_capacity(l.len());
+                let mut fallos = Vec::new();
+                for (i, x) in l.into_iter().enumerate() {
+                    match validar_tipo_todos(interno, x, &format!("{donde}.{i}")) {
+                        Ok(x) => salida.push(x),
+                        Err(f) => fallos.extend(f),
+                    }
+                }
+                if fallos.is_empty() { Ok(Valor::Lista(salida)) } else { Err(fallos) }
+            }
+            _ => Err(vec![fallo("list_type", donde)]),
+        },
+        Tipo::Dict(interno) => match v {
+            Valor::Mapa(m) => {
+                let mut salida = Mapa::new();
+                let mut fallos = Vec::new();
+                for (k, x) in m.iter() {
+                    match validar_tipo_todos(interno, x.clone(), &format!("{donde}.{k}")) {
+                        Ok(x) => salida.poner(k.clone(), x),
+                        Err(f) => fallos.extend(f),
+                    }
+                }
+                if fallos.is_empty() { Ok(Valor::Mapa(salida)) } else { Err(fallos) }
+            }
+            _ => Err(vec![fallo("dict_type", donde)]),
+        },
+        Tipo::Modelo(m) => validar_en(m, v, donde).map(Valor::Mapa),
+        _ => uno(validar_simple(t, v, donde)),
+    }
+}
+
+fn validar_simple(t: &Tipo, v: Valor, donde: &str) -> Result<Valor, Fallo> {
     match t {
         Tipo::Cualquiera => Ok(v),
         Tipo::Texto => match v {
@@ -120,57 +165,36 @@ pub fn validar_tipo(t: &Tipo, v: Valor, donde: &str) -> Result<Valor, Fallo> {
             Valor::Texto(ref s) if valores.contains(&s.as_str()) => Ok(v),
             _ => Err(fallo("enum", donde)),
         },
-        Tipo::Opcional(interno) => match v {
-            Valor::Nulo => Ok(Valor::Nulo),
-            otro => validar_tipo(interno, otro, donde),
-        },
-        Tipo::Lista(interno) => match v {
-            Valor::Lista(l) => {
-                let mut salida = Vec::with_capacity(l.len());
-                for (i, x) in l.into_iter().enumerate() {
-                    salida.push(validar_tipo(interno, x, &format!("{donde}.{i}"))?);
-                }
-                Ok(Valor::Lista(salida))
-            }
-            _ => Err(fallo("list_type", donde)),
-        },
-        Tipo::Dict(interno) => match v {
-            Valor::Mapa(m) => {
-                let mut salida = Mapa::new();
-                for (k, x) in m.iter() {
-                    salida.poner(k.clone(), validar_tipo(interno, x.clone(), &format!("{donde}.{k}"))?);
-                }
-                Ok(Valor::Mapa(salida))
-            }
-            _ => Err(fallo("dict_type", donde)),
-        },
-        Tipo::Modelo(m) => validar_en(m, v, donde).map(Valor::Mapa),
+        _ => unreachable!(),
     }
 }
 
-fn validar_en(m: &Modelo, v: Valor, donde: &str) -> Result<Mapa, Fallo> {
+fn validar_en(m: &Modelo, v: Valor, donde: &str) -> Result<Mapa, Vec<Fallo>> {
     let v = match m.antes {
         Some(f) => f(v),
         None => v,
     };
-    let Valor::Mapa(entrada) = v else { return Err(fallo("model_type", donde)) };
+    let Valor::Mapa(entrada) = v else { return Err(vec![fallo("model_type", donde)]) };
     let mut salida = Mapa::new();
+    let mut fallos = Vec::new();
     for c in m.campos {
         let lugar = if donde.is_empty() { c.nombre.to_string() } else { format!("{donde}.{}", c.nombre) };
-        let valor = match (entrada.get(c.nombre), &c.defecto) {
-            (Some(x), _) => validar_tipo(&c.tipo, x.clone(), &lugar)?,
+        match (entrada.get(c.nombre), &c.defecto) {
+            (Some(x), _) => match validar_tipo_todos(&c.tipo, x.clone(), &lugar) {
+                Ok(valor) => salida.poner(c.nombre, valor),
+                Err(f) => fallos.extend(f),
+            },
             // un valor por defecto no se valida (pydantic no lo hace)
-            (None, Defecto::Valor(f)) => f(),
-            (None, Defecto::No) => return Err(fallo("missing", &lugar)),
-        };
-        salida.poner(c.nombre, valor);
+            (None, Defecto::Valor(f)) => salida.poner(c.nombre, f()),
+            (None, Defecto::No) => fallos.push(fallo("missing", &lugar)),
+        }
     }
-    Ok(salida)
+    if fallos.is_empty() { Ok(salida) } else { Err(fallos) }
 }
 
-/// `Modelo.model_validate(v).model_dump()`
+/// `Modelo.model_validate(v).model_dump()`: el primer error, si hay
 pub fn validar(m: &Modelo, v: Valor) -> Result<Mapa, Fallo> {
-    validar_en(m, v, "")
+    validar_en(m, v, "").map_err(|mut l| l.swap_remove(0))
 }
 
 // ---------------------------------------------------------------------------------------------- ayudas de los modelos
