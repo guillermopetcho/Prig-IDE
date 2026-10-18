@@ -15,6 +15,8 @@ pub mod escritorio;
 pub mod estante;
 pub mod exportar;
 pub mod files;
+pub mod flujos;
+pub mod flujos_motor;
 pub mod ia;
 pub mod guiado;
 pub mod guiado_ia;

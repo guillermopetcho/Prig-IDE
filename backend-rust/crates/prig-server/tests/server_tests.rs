@@ -253,7 +253,7 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
     for (metodo, uri) in [
         ("POST", "/api/descargas"),
         ("POST", "/api/books/import"),
-        ("DELETE", "/api/flujos/x"),
+        ("POST", "/api/progreso/analisis"),
         ("POST", "/api/modelos/embeddings/probar"),
         ("POST", "/api/run"),
         ("POST", "/api/workspace"),

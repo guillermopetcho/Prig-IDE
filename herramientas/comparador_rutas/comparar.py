@@ -94,7 +94,14 @@ SIN_RESALTADO = [False]
 RESALTADO = re.compile(r'<div class="highlight" style="[^"]*"><pre style="line-height: 125%;"><span></span>.*?</pre></div>\n', re.S)
 
 
+# Reemplazos del caso en curso (patrón, sustituto) en cada texto: medidas dentro de un texto (p. ej. «Tiempo: 0.02s»)
+REEMPLAZOS_CASO = []
+
+
 def normalizar(v):
+    if isinstance(v, str) and REEMPLAZOS_CASO:
+        for patron, sustituto in REEMPLAZOS_CASO:
+            v = re.sub(patron, sustituto, v)
     if isinstance(v, dict):
         return {k: (type(x).__name__ if k in VOLATILES or k in VOLATILES_CASO
                     else {kk: type(xx).__name__ for kk, xx in x.items()} if k in CONTENEDORES_CASO and isinstance(x, dict)
@@ -373,6 +380,125 @@ def sembrar_ejercicios(proyecto: str):
              "ex_3": {**ej(3, "funciones", "2026-10-02T10:00:00"), "attempts_used": 2}}
     with open(os.path.join(d, "exercises.json"), "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=2, ensure_ascii=False)
+
+
+def sembrar_flujos(proyecto: str):
+    """ Dos flujos guardados y dos ejecuciones en el historial (Python los carga al arrancar) """
+    d = os.path.join(proyecto, ".prig_dataset")
+    os.makedirs(d, exist_ok=True)
+    paso = lambda pid, rol, prompt, **extra: {"id": pid, "nombre": pid.upper(), "rol": rol, "modelo": "qwen2.5-coder:7b",
+                                              "prompt": prompt, **extra}
+    flujos = {
+        "flujo_a": {"id": "flujo_a", "nombre": "Extraer y revisar", "descripcion": "", "ambito": "libre",
+                    "pasos": [paso("a", "extraer", "ZZJSON {entrada}"),
+                              paso("b", "criticar", "ZZAPRUEBA {paso:a}", si_falla={"volver_a": "a"})],
+                    "creado": "2026-10-01T10:00:00", "actualizado": "2026-10-02T10:00:00"},
+        "flujo_b": {"id": "flujo_b", "nombre": "Uno", "descripcion": "d", "ambito": "ficha",
+                    "pasos": [paso("x", "redactar", "Escribe {entrada}")],
+                    "creado": "2026-10-01T09:00:00", "actualizado": "2026-10-03T10:00:00"},
+    }
+    with open(os.path.join(d, "flujos.json"), "w", encoding="utf-8") as f:
+        json.dump(flujos, f, ensure_ascii=False, indent=1)
+    historial = [{"id": "eje_2", "flujo_id": "flujo_a", "flujo_nombre": "Extraer y revisar", "cuando": "2026-10-02T11:00:00",
+                  "entrada": "hola", "segundos": 3.5, "pasos": [{"id": "a", "prompt": "p", "salida": "s"}, {"id": "b"}]},
+                 {"id": "eje_1", "flujo_id": "flujo_b", "flujo_nombre": "Uno", "cuando": "2026-10-01T11:00:00",
+                  "entrada": "x", "segundos": 1, "pasos": []}]
+    with open(os.path.join(d, "flujos_historial.json"), "w", encoding="utf-8") as f:
+        json.dump(historial, f, ensure_ascii=False, indent=1)
+
+
+def _paso_flujo(pid, rol, prompt, **extra):
+    return {"id": pid, "nombre": pid.upper(), "rol": rol, "modelo": "qwen2.5-coder:7b", "prompt": prompt, **extra}
+
+
+_FLUJO_V1 = {"nombre": "Revisión", "titulo": "Tema",
+             "pasos": [_paso_flujo("a", "extraer", "ZZJSON {entrada}"),
+                       _paso_flujo("b", "criticar", "ZZRECHAZA revisa {paso:a}", si_falla={"volver_a": "a", "max_vueltas": 1}),
+                       _paso_flujo("c", "redactar", "Escribe sobre {titulo} con {anterior} y {paso:b}", temperatura="0.7", max_tokens=300)]}
+_FLUJO_V1_B = {"nombre": "Otro", "pasos": [_paso_flujo("a", "extraer", "ZZNOJSON {entrada}", formato="json"),
+                                          _paso_flujo("b", "razonar", "Con {contexto} y {paso:a}"),
+                                          _paso_flujo("d", "corregir", "Corrige {paso:b}: {critica}"),
+                                          _paso_flujo("c", "verificar", "ZZRECHAZA {anterior}", si_falla={"volver_a": "d"}),
+                                          _paso_flujo("e", "redactar", "Fin {paso:c}", temperatura=None)]}
+_GRAFO = {"nombre": "Grafo", "nodos": [
+    {"id": "gen", "nombre": "Generar", "rol": "programador", "prompt": "ZZCODIGO {entrada}"},
+    {"id": "tool", "tipo": "tool"},
+    {"id": "critic", "rol": "critico", "prompt": "ZZRECHAZA {paso:gen}", "loop": {"target": "gen", "max_iterations": 1}},
+    {"id": "router", "tipo": "router", "rol": "router", "prompt": "ZZROUTER {datos:critic} {nada}", "system_prompt": "  propio  "},
+    {"id": "otro", "prompt": "no llega"},
+    {"id": "fin", "prompt": "Final {paso:critic} {critica}", "temperature": 0.1, "think": False, "routing_rules": [
+        {"condition": "default", "target": "nadie"}]}]}
+CASOS_FLUJOS = [
+    {"ruta": "/api/flujos/catalogo", "reemplazos": [[r"hay [0-9.]+ GB disponibles", "hay X GB disponibles"]]},
+    {"ruta": "/api/flujos"},
+    {"ruta": "/api/flujos/v2/plantillas"},
+    *({"ruta": "/api/flujos/historial" + q} for q in ("", "?limite=1", "?flujo_id=flujo_b", "?limite=-1", "?limite=x", "?flujo_id=")),
+    {"ruta": "/api/flujos/ejecucion/eje_2"},
+    {"ruta": "/api/flujos/ejecucion/nada"},
+    *({"ruta": "/api/flujos/validar", "metodo": "POST", "json": j} for j in [
+        _FLUJO_V1, _FLUJO_V1_B, {"nombre": " ", "pasos": []},
+        {"nombre": "x", "pasos": [{}, {"id": "a", "rol": "nada", "prompt": "{anterior} {paso:z} {critica}"}, {"id": "a", "si_falla": {"volver_a": "q"}},
+                                  *[_paso_flujo(f"p{i}", "redactar", "x") for i in range(11)]]},
+        {"pasos": []}, {"nombre": "x", "pasos": "no"}, {"nombre": "x", "pasos": [1]}, {"nombre": 3},
+    ]),
+    *({"ruta": "/api/flujos/descargar", "metodo": "POST", "json": j} for j in [
+        {"modelo": "qwen2.5-coder:7b"}, {"modelo": "roto"}, {"modelo": "noexiste"}, {"modelo": "viejo"}, {"modelo": "qwen3:8b"},
+        {"modelo": "mal nombre!"}, {"modelo": "ana/modelo:q4"}, {},
+    ]),
+    *({"ruta": "/api/flujos/ejecutar", "metodo": "POST", "json": j, "volatiles": ["comenzado", "segundos_acumulados", "segundos_totales"],
+       "reemplazos": [[r"Tiempo: [0-9.]+s", "Tiempo: Xs"]]} for j in [
+        {"flujo": _FLUJO_V1, "entrada": "la derivada", "guardar_historial": False},
+        {"flujo": _FLUJO_V1_B, "entrada": "gradiente", "consulta_contexto": "gradiente", "guardar_historial": False},
+        {"flujo": {"nombre": "Malo", "pasos": [{"id": "a"}]}, "guardar_historial": False},
+        {"flujo": _GRAFO, "entrada": "suma"},
+        {"flujo": {"id": "sota_x", "pasos": [{"id": "uno", "prompt": "ZZERROR", "si_falla": {"volver_a": "uno", "max_vueltas": 1}},
+                                            {"id": "dos", "next_node": "tres", "temperatura": "abc"}]}},
+        {"flujo": {"es_v2": True, "nodos": [{"id": "a", "tipo": "tool", "codigo": "print('{entrada}')"},
+                                            {"id": "b", "tipo": "tool", "herramienta": "python_sandbox", "next_node": "c"}]}, "entrada": "hola"},
+        {"flujo": {"nodo_inicial": "x", "nodos": [{"nombre": "sin id"}]}},
+        {"flujo": {"es_v2": True}},
+        {"flujo_id": "nada"},
+        {"flujo": {}, "flujo_id": None},
+        {"flujo": "no"},
+    ]),
+    {"ruta": "/api/flujos/ejecutar", "metodo": "POST", "json": {"flujo_id": "flujo_a", "entrada": "límites"}, "carpetas": ["{proyecto}/.prig_dataset"],
+     "volatiles": ["comenzado", "ejecucion", "id"]},
+    *({"ruta": "/api/ai/workflow/run", "metodo": "POST", "json": j, "volatiles": ["segundos_acumulados", "segundos_totales"],
+       "reemplazos": [[r"Tiempo: [0-9.]+s", "Tiempo: Xs"]]} for j in [
+        {"initial_input": "hola ñ", "steps": [{"name": "Uno ñ", "prompt": "Haz algo"}, {"role": "reviewer", "model": "m2", "temperature": None,
+                                                                                    "system_prompt": "  "}, {"role": "nada", "system_prompt": " propio "}]},
+        {"initial_input": "x", "steps": [{"prompt": "ZZCODIGO"}, {"tipo": "tool"}, {"prompt": "ZZRECHAZA", "loop": {"target": "step_1", "max_iterations": 1}}]},
+        {"initial_input": "x", "nodos": [{"id": "n1", "prompt": "ZZJSON {entrada}"}]},
+        {"initial_input": "x", "nodos": [{"prompt": "sin id"}]},
+        {"initial_input": "x", "grafo": {"nodos": [{"id": "g", "prompt": "{entrada}"}], "variables_iniciales": {"v": [1]}}},
+        {"initial_input": "x", "steps": []},
+        {"steps": []},
+        {"initial_input": "x", "steps": [{"temperature": "caliente"}]},
+    ]),
+    *({"ruta": "/api/libros/ficha", "metodo": "POST", "json": j,
+       "restaurar_otro": ["{home}/.prig_books/.index/knowledge.db", "{proyecto}/.prig_dataset/flujos_historial.json"], "volatiles": ["comenzado", "construida", "id", "cuando"]} for j in [
+        {"source_id": "bk_dl", "flujo": {"nombre": "Corto", "pasos": [_paso_flujo("identidad", "extraer", "ZZJSON {libro:titulo} {libro:datos}"),
+                                                                       _paso_flujo("lagunas", "redactar", "Qué falta en {libro:conceptos}")]}},
+        {"source_id": "bk_math", "flujo_id": "flujo_b"},
+        {"source_id": "nada"},
+        {"flujo": {}},
+    ]),
+    {"ruta": "/api/flujos", "metodo": "POST", "json": {"id": "flujo_nuevo", "nombre": "Nuevo", "pasos": [_paso_flujo("a", "redactar", "Hola {entrada}")],
+                                                       "extra": 1}, "carpetas": ["{proyecto}/.prig_dataset"]},
+    # desde aquí Python tiene en memoria lo que guardó antes: el archivo se restaura entre los dos lados y no se compara
+    *({"ruta": "/api/flujos", "metodo": "POST", "json": j, "restaurar_otro": "{proyecto}/.prig_dataset/flujos.json"} for j in [
+        {"id": "flujo_a", "nombre": "Cambiado", "descripcion": "otra", "ambito": "ficha", "pasos": [_paso_flujo("a", "redactar", "Hola")]},
+        {"nombre": "Malo", "pasos": []},
+        {"pasos": []},
+    ]),
+    {"ruta": "/api/flujos", "metodo": "POST", "json": {"nombre": "Sin id", "pasos": [_paso_flujo("a", "redactar", "x")]},
+     "restaurar_otro": "{proyecto}/.prig_dataset/flujos.json", "volatiles": ["id"]},
+    {"ruta": "/api/flujos/flujo_b", "metodo": "DELETE", "restaurar_otro": "{proyecto}/.prig_dataset/flujos.json"},
+    {"ruta": "/api/flujos/nada", "metodo": "DELETE"},
+]
+# retiradas de Python en la tanda 45 (antes, 58 de 58 iguales)
+for _c in CASOS_FLUJOS:
+    _c["solo_rust"] = True
 
 
 def sembrar_guiado(proyecto: str):
@@ -1034,6 +1160,23 @@ def ollama_falso() -> str:
                     trozos = ['{"terminos": ["Binary Search", "fibonacci ' + firma + '", 7]}']
                 elif "ÚNICAMENTE un objeto JSON válido" in (d.get("system") or ""):
                     trozos = ['Aquí está:\n```json\n{"tema": "Prueba ' + firma + '", ', '"tags": ["a"]}\n```']
+                # los flujos de agentes: marcas en el prompt (o en los mensajes del chat) eligen la respuesta
+                todo = (d.get("prompt") or "") + " ".join(str(m.get("content", "")) for m in d.get("messages") or [])
+                if "ZZRECHAZA" in todo:
+                    trozos = ['{"aprobado": false, "score": 0.3, "motivo": "flojo ' + firma + '", "problemas": [{"donde": "x", "que": "falta", '
+                              '"arreglo": "añade"}, "suelto"], "incorrectas": [{"afirmacion": "a", "fallo": "f"}], "sugerencias_mejora": ["mejor"]}']
+                elif "ZZAPRUEBA" in todo:
+                    trozos = ['<think>miro</think>{"aprobado": true, "score": 0.95, "problemas": []}']
+                elif "ZZROUTER" in todo:
+                    trozos = ['{"decision": " fin ", "razon": "por ' + firma + '"}']
+                elif "ZZCODIGO" in todo:
+                    trozos = ["Aquí:\n```python\nprint(6 * 7)\n", "```"]
+                elif "ZZERROR" in todo:
+                    trozos = ["Traceback: Error: algo ", firma]
+                elif "ZZJSON" in todo:
+                    trozos = ['Aquí va: {"dato": "' + firma + '", "lista": [1, 2.5, "}"]} fin']
+                elif "ZZNOJSON" in todo:
+                    trozos = ["sin json ", firma]
                 lineas = [({"message": {"role": "assistant", "content": t}} if chat else {"response": t}) | {"done": False}
                           for t in trozos]
                 lineas.append({"done": True, "done_reason": "stop", "eval_count": 2, **({"message": {"role": "assistant", "content": ""}} if chat else {"response": ""})})
@@ -2199,6 +2342,9 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
                                             "objetivo_descripcion": None, "conceptos": []}),
             ("/api/youtube/crear-desafio", {"video_id": "v2"}),
         ]),
+        # los flujos de agentes, la ficha de un libro con un flujo y el workflow del editor (tanda 45). Python guarda
+        # los flujos y el historial en memoria: primero lo que lee, después lo que escribe
+        *CASOS_FLUJOS,
     ]
     def sustituir(v):
         """ {home} y {proyecto} también dentro del cuerpo JSON (sin esto llegaban literales: rutas que no existen) """
@@ -2256,6 +2402,7 @@ def main():
             sembrar_fuentes(p["home"])
             sembrar_ejercicios(p["proyecto"])
             sembrar_guiado(p["proyecto"])
+            sembrar_flujos(p["proyecto"])
             sembrar_biblioteca(p["home"])
             sembrar_kaggle_datos(p["proyecto"], p["home"])
             sembrar_buscador(p["home"])
@@ -2318,6 +2465,7 @@ def main():
             SIN_RESALTADO[0] = bool(c.get("sin_resaltado"))
             CONTENEDORES_CASO.clear()
             CONTENEDORES_CASO.update(c.get("contenedores", []))
+            REEMPLAZOS_CASO[:] = c.get("reemplazos", [])
             if c.get("solo_rust") and not os.environ.get("PRIG_COMPARAR_RETIRADAS"):
                 b = pedir(f"http://127.0.0.1:{pr}", c)
                 print(f"· {c.get('metodo', 'GET'):4} {c['ruta'][:70]}  solo en Rust ({b[0]}): no hay con qué comparar")
@@ -2326,8 +2474,10 @@ def main():
             leer = lambda: open(archivo, "rb").read() if archivo and os.path.exists(archivo) else None
             original = leer() if c.get("restaurar") else None
             # otro archivo que cada lado tiene que ver igual (p. ej. la base de telemetría), sin compararlo
-            otro = c.get("restaurar_otro", "").replace("{copia}", copia).replace("{home}", p["home"]).replace("{proyecto}", p["proyecto"])
-            otro_original = open(otro, "rb").read() if otro and os.path.exists(otro) else None
+            otros = c.get("restaurar_otro") or []
+            otros = [x.replace("{copia}", copia).replace("{home}", p["home"]).replace("{proyecto}", p["proyecto"])
+                     for x in ([otros] if isinstance(otros, str) else otros)]
+            originales_otros = {x: open(x, "rb").read() if os.path.exists(x) else None for x in otros}
             # carpetas donde cada lado escribe archivos con nombre al azar: se comparan los nuevos y se deshacen
             carpetas = [x.replace("{copia}", copia).replace("{home}", p["home"]).replace("{proyecto}", p["proyecto"])
                         for x in c.get("carpetas", [])]
@@ -2353,7 +2503,7 @@ def main():
                         os.remove(archivo)
                 else:
                     open(archivo, "wb").write(original)
-            if otro:
+            for otro, otro_original in originales_otros.items():
                 if otro_original is None:
                     if os.path.exists(otro):
                         os.remove(otro)

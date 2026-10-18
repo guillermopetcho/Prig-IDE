@@ -50,6 +50,16 @@ pub fn catalogo() -> &'static Mapa {
     })
 }
 
+/// El catálogo por partes: los modelos que generan (`agent_flows.MODELOS`) y los de embeddings
+/// (`MODELOS_EMBEDDING`), cada uno tal cual
+pub fn catalogo_partes() -> &'static (Mapa, Mapa) {
+    static C: OnceLock<(Mapa, Mapa)> = OnceLock::new();
+    C.get_or_init(|| {
+        let Ok(Valor::Mapa(c)) = prig_recursos::json::leer(include_str!("catalogo_modelos.json")) else { return Default::default() };
+        (c.mapa("modelos").cloned().unwrap_or_default(), c.mapa("embedding").cloned().unwrap_or_default())
+    })
+}
+
 /// La versión y la plataforma del Python de Prig (lo que daba `platform` en el backend), para la radiografía. No
 /// entran en la huella.
 fn python_de_prig(raiz: &Path) -> &'static (String, String) {

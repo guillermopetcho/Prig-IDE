@@ -343,6 +343,15 @@ pub fn contexto_destilado(pregunta: &str, presupuesto: i64) -> Option<Mapa> {
     if ctx.verdad("vacio") { None } else { Some(ctx) }
 }
 
+/// `context_assembler.ensamblar(consulta, presupuesto_tokens=…)` de los flujos: el texto, o "" si no hay nada o falla
+pub fn contexto_texto(pregunta: &str, presupuesto: i64) -> String {
+    let Ok(kb) = BaseKb::por_defecto() else { return String::new() };
+    match Ensamblador::new(&kb, &embeber_consulta).ensamblar(pregunta, presupuesto, None, "intermedio", true) {
+        Ok(c) if !c.verdad("vacio") => c.valor("texto").texto_py(),
+        _ => String::new(),
+    }
+}
+
 /// Que el índice semántico sirva para descartar: lo usa `Indice` por dentro (se exporta para las pruebas)
 pub fn indice_de(kb: &BaseKb) -> Indice<'_> {
     Indice { kb, embeber: &embeber_consulta }

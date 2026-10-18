@@ -24,7 +24,7 @@ logger = logging.getLogger("prig")
 from file_manager import FileManager
 from runner import CodeRunner
 from ai_engine import AIEngine
-from ai_engine.ai_engine_class import explicar_error_motor, fijar_cancelacion
+from ai_engine.ai_engine_class import fijar_cancelacion
 from book_service import BookService
 import librerias_service
 from knowledge_service import KnowledgeService
@@ -33,10 +33,6 @@ from knowledge_context import ContextAssembler
 from contexto_modelo import CompiladorContexto
 from indice_semantico import IndiceSemantico
 import agent_flows
-from agent_flows import FlowEngine, FlowStore
-import agent_flows_v2
-from agent_flows_v2 import DynamicFlowEngine, plantillas_profesionales_sota, ROLES_V2
-from perfil_libro import PerfilLibro
 from explorador import Explorador
 from ide_servicios import ServiciosIDE
 import ollama_opciones
@@ -50,7 +46,6 @@ import buscador_modelos
 from buscador_modelos import ErrorBuscador
 from descargas_modelos import Descargas
 from recursos.gestor import gestor as _gestor_recursos
-from recursos import calculadora as recursos_calc, ficha as recursos_ficha
 from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
 from recursos import termico as recursos_termico
@@ -163,8 +158,6 @@ def _guardia_analista() -> Optional[str]:
 
 
 bancos.guardia = _guardia_analista
-flow_store = FlowStore(file_mgr.base_dir)
-perfil_libro = PerfilLibro(knowledge_base)
 explorador = Explorador(file_mgr.base_dir)
 flags = FeatureFlags()
 telemetry = LearningTelemetry(file_mgr.base_dir)
@@ -175,7 +168,6 @@ guided = GuidedLearningService(file_mgr.base_dir, ai_engine, book_service)
 
 _tracked_child_processes: List[subprocess.Popen] = []
 _tracked_lock = threading.Lock()
-_active_flow_engine: Optional[FlowEngine] = None
 
 def cleanup_all_processes() -> None:
     """ Detiene de forma garantizada todos los análisis en curso y procesos hijos del programa """
@@ -191,13 +183,7 @@ def cleanup_all_processes() -> None:
     except Exception:
         pass
 
-    # 2. Apagar flujos de agentes en curso
-    global _active_flow_engine
-    if _active_flow_engine is not None:
-        try:
-            _active_flow_engine.detener()
-        except Exception:
-            pass
+    # 2. Los flujos de agentes los ejecuta el servidor de Rust (routes/flujos.rs)
 
     # 3. Detener indexación en segundo plano
     try:
@@ -323,25 +309,7 @@ class AIInlinePromptRequest(BaseModel):
 class AISearchRequest(BaseModel):
     query: str
 
-class WorkflowStep(BaseModel):
-    id: Optional[str] = None
-    name: Optional[str] = "Agente"
-    model: str = "qwen2.5-coder:7b"
-    role: str = "programmer"
-    prompt: str = ""
-    temperature: Optional[float] = 0.3
-    system_prompt: Optional[str] = ""
-    tipo: Optional[str] = "agent"
-    loop: Optional[Dict[str, Any]] = None
-    routing_rules: Optional[List[Dict[str, Any]]] = None
-    herramienta: Optional[str] = None
-    next_node: Optional[str] = None
 
-class WorkflowRequest(BaseModel):
-    initial_input: str
-    steps: Optional[List[WorkflowStep]] = []
-    nodos: Optional[List[Dict[str, Any]]] = None
-    grafo: Optional[Dict[str, Any]] = None
 
 class BookImportRequest(BaseModel):
     path: str
@@ -507,229 +475,8 @@ class FlagUpdateRequest(BaseModel):
 # Flujos de agentes
 # ======================================================================
 
-class FlujoGuardar(BaseModel):
-    id: Optional[str] = None
-    nombre: str
-    descripcion: str = ""
-    ambito: str = "libre"
-    pasos: List[Dict[str, Any]] = []
-
-
-class FlujoEjecutar(BaseModel):
-    flujo: Optional[Dict[str, Any]] = None   # un flujo sin guardar
-    flujo_id: Optional[str] = None           # o uno guardado
-    entrada: str = ""
-    consulta_contexto: str = ""              # con qué buscar en la biblioteca
-    guardar_historial: bool = True
-
-
-def _motor_flujos() -> FlowEngine:
-    global _active_flow_engine
-    try:
-        num_ctx = int(ai_engine.config.get("num_ctx", 4096))
-    except (TypeError, ValueError):
-        num_ctx = 4096
-    _active_flow_engine = FlowEngine(
-        ai_engine, context_assembler, num_ctx=num_ctx,
-        gobernador=recursos_termico.gobernador())
-    return _active_flow_engine
-
-
-_active_flow_engine_v2 = None
-
-def _motor_flujos_v2() -> DynamicFlowEngine:
-    global _active_flow_engine_v2
-    try:
-        num_ctx = int(ai_engine.config.get("num_ctx", 8192))
-    except (TypeError, ValueError):
-        num_ctx = 8192
-    _active_flow_engine_v2 = DynamicFlowEngine(
-        ai_engine,
-        gobernador=recursos_termico.gobernador(),
-        num_ctx=num_ctx
-    )
-    return _active_flow_engine_v2
-
-
-def _veredictos_flujos():
-    """ Veredicto de la calculadora para cada modelo, en el uso "flujos".
-
-    Antes se comparaba el tamaño del archivo con la VRAM menos un margen fijo: daba
-    "cabe" a modelos que en realidad se repartían con la CPU (la caché y el búfer
-    también ocupan) y "no cabe" a un MoE que va a 22 tok/s repartido.
-    """
-    try:
-        g = recursos_gestor()
-        maq = g.maquina()
-        instalados = {f["nombre"]: f for f in g.fichas_instaladas()}
-    except Exception:
-        maq, instalados = None, {}
-
-    def calcular(nombre: str, info: Dict[str, Any]) -> Dict[str, Any]:
-        if info.get("embedding"):
-            return {"cabe": True, "veredicto": "embeddings",
-                    "etiqueta": "Embeddings en CPU", "motivo": "Se ejecuta en la CPU."}
-        if maq is None:
-            margen = agent_flows.VRAM_TIPICA_GB - 0.6
-            return {"cabe": (info.get("vram_gb") or 0) <= margen, "veredicto": None}
-        try:
-            f = instalados.get(nombre) or recursos_ficha.desde_catalogo(nombre, info)
-            r = recursos_calc.recomendar(f, maq, "flujos", "equilibrado")
-        except Exception as e:
-            return {"cabe": False, "veredicto": None, "motivo": str(e)}
-        return {"cabe": r["veredicto"] in ("entero", "ajustando"),
-                "util": r["veredicto"] in ("entero", "ajustando", "parcial", "solo_cpu"),
-                "veredicto": r["veredicto"], "etiqueta": r["etiqueta"],
-                "tok_s": r["estimacion"].get("tok_s"), "motivo": r["motivo"],
-                "estimado": bool(f.get("estimada"))}
-    return calcular
-
-
-@app.get("/api/flujos/catalogo")
-def flujos_catalogo():
-    """ Modelos, roles y variables: lo que la interfaz necesita para montar un flujo.
-
-    Los modelos se cruzan con los que tienes descargados para no ofrecerte en el
-    desplegable uno que no está y que solo daría un error a mitad de la ejecución.
-    """
-    try:
-        detalle = ai_engine.get_detailed_models().get("models", [])
-    except Exception:
-        detalle = []
-    tamanos = {m["name"]: m.get("size_gb") or 0 for m in detalle}
-    version = _version_ollama()
-    instalados = set(tamanos)
-    veredicto = _veredictos_flujos()
-
-    catalogo = []
-    for nombre, info in {**agent_flows.MODELOS,
-                         **{k: {**v, "embedding": True}
-                            for k, v in agent_flows.MODELOS_EMBEDDING.items()}}.items():
-        # Si lo tienes descargado manda su tamaño real, no el estimado del catálogo
-        vram = (tamanos.get(nombre) or tamanos.get(f"{nombre}:latest")
-                or info["vram_gb"])
-        # Ollama guarda los modelos con la etiqueta puesta: "qwen3:8b" se instala
-        # así, pero "phi4-mini" aparece como "phi4-mini:latest". Comparar a secas
-        # marcaba como no instalado algo que sí estaba.
-        instalado = nombre in instalados or f"{nombre}:latest" in instalados
-        # Un modelo que tu Ollama no puede descargar tiene que verse ANTES de
-        # pulsar: el registro responde con un error que no dice qué versión tienes.
-        minima = agent_flows.ollama_necesario(nombre)
-        bloqueado = bool(minima and not agent_flows.version_suficiente(version, minima))
-        catalogo.append({**info, "modelo": nombre, "vram_gb": round(vram, 1),
-                         "instalado": instalado,
-                         **veredicto(nombre if not instalado or nombre in instalados
-                                     else f"{nombre}:latest", info),
-                         "piensa": info.get("piensa", "no"),
-                         "ollama_minimo": minima,
-                         "necesita_actualizar": bloqueado})
-
-    # Los que tienes y no están en el catálogo también sirven, pero su tamaño hay
-    # que mirarlo: darlo por bueno ofrecería como válido un 32B de 18 GB en una
-    # tarjeta de 6, y el flujo moriría a mitad del segundo paso.
-    #
-    # Ollama guarda "bge-m3" como "bge-m3:latest": sin quitar ese sufijo, el
-    # catálogo enseñaba la misma cosa dos veces, una marcada como instalada y
-    # otra no.
-    del_catalogo = set(agent_flows.MODELOS) | set(agent_flows.MODELOS_EMBEDDING)
-    del_catalogo |= {f"{n}:latest" for n in del_catalogo}
-    for nombre in sorted(instalados - del_catalogo):
-        vram = tamanos.get(nombre) or 0
-        v = veredicto(nombre, {"vram_gb": vram})
-        catalogo.append({"modelo": nombre, "instalado": True, **v,
-                         "vram_gb": round(vram, 1), "familia": "otro", "razona": 0,
-                         "fuerte_en": [],
-                         "nota": "No está en el catálogo de Prig. " + v.get("motivo", "")})
-    catalogo.sort(key=lambda m: (bool(m.get("embedding")),
-                                 m.get("necesita_actualizar", False),
-                                 not m["instalado"], not m["cabe"],
-                                 -m.get("razona", 0)))
-
-    bloqueados = sorted({m["modelo"].split(":")[0] for m in catalogo
-                         if m.get("necesita_actualizar")})
-    return {
-        "ollama": version,
-        "ollama_bloquea": bloqueados,
-        "modelos": catalogo,
-        "roles": [{"id": k, **{x: v[x] for x in ("nombre", "icono", "formato",
-                                                 "temperatura", "ayuda")}}
-                  for k, v in agent_flows.ROLES.items()],
-        "variables": agent_flows.VARIABLES,
-        "variables_libro": agent_flows.VARIABLES_LIBRO,
-        "vram_gb": agent_flows.VRAM_TIPICA_GB,
-        "max_pasos": agent_flows.MAX_PASOS,
-    }
-
-
-class DescargaRequest(BaseModel):
-    modelo: str
-
-
-@app.post("/api/flujos/descargar")
-def flujos_descargar(req: DescargaRequest):
-    """ Descarga un modelo desde el propio panel de flujos.
-
-    Solo se admiten los del catálogo: es lo que evita que un nombre mal escrito se
-    convierta en una descarga de veinte gigas que no era la que se quería.
-    """
-    ai_engine.try_autostart_ollama()
-    minima = agent_flows.ollama_necesario(req.modelo)
-    version = _version_ollama()
-    if minima and not agent_flows.version_suficiente(version, minima):
-        raise HTTPException(
-            status_code=400,
-            detail=f"'{req.modelo}' necesita Ollama {minima} o posterior y tienes la "
-                   f"{version}. Actualiza con:  "
-                   f"curl -fsSL https://ollama.com/install.sh | sh")
-
-    conocidos = set(agent_flows.MODELOS) | set(agent_flows.MODELOS_EMBEDDING)
-    conocidos |= {f"{n}:latest" for n in conocidos}
-    conocidos |= {n.replace(":latest", "") for n in conocidos}
-    es_valido_personalizado = bool(re.match(r"^[a-zA-Z0-9_\.\-]+(/[a-zA-Z0-9_\.\-]+)?(:[a-zA-Z0-9_\.\-]+)?$", req.modelo))
-    if req.modelo not in conocidos and not es_valido_personalizado:
-        raise HTTPException(
-            status_code=400,
-            detail=f"'{req.modelo}' no tiene un formato de modelo válido de Ollama.")
-
-    info = (agent_flows.MODELOS.get(req.modelo)
-            or agent_flows.MODELOS_EMBEDDING.get(req.modelo) or {})
-
-    def emitir():
-        yield json.dumps({"tipo": "inicio", "modelo": req.modelo,
-                          "gb": info.get("vram_gb"),
-                          "ollama": _version_ollama()}, ensure_ascii=False) + "\n"
-        fallo = None
-        try:
-            for linea in ai_engine.pull_model(req.modelo):
-                texto = linea.strip()
-                # pull_model informa de los errores como una línea más de texto.
-                # Sin mirarlas, una descarga fallida terminaba anunciando éxito.
-                if texto.lower().startswith(("error", "error en descarga")):
-                    fallo = texto
-                    break
-                yield json.dumps({"tipo": "avance", "texto": texto},
-                                 ensure_ascii=False) + "\n"
-        except Exception as err:
-            fallo = str(err)
-
-        if fallo:
-            yield json.dumps({"tipo": "error", "mensaje": _explicar_fallo(fallo, req.modelo)},
-                             ensure_ascii=False) + "\n"
-            return
-
-        # Que Ollama diga que terminó no basta: se comprueba que el modelo está.
-        try:
-            instalados = {m["name"] for m in ai_engine.get_detailed_models().get("models", [])}
-        except Exception:
-            instalados = set()
-        if req.modelo not in instalados and f"{req.modelo}:latest" not in instalados:
-            yield json.dumps({"tipo": "error", "mensaje":
-                              f"La descarga terminó pero '{req.modelo}' no aparece "
-                              f"instalado. Inténtalo de nuevo."}, ensure_ascii=False) + "\n"
-            return
-        yield json.dumps({"tipo": "fin", "modelo": req.modelo}) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
+# Los flujos, su catálogo y su historial, la ficha de un libro con un flujo y el workflow del editor: servidor de
+# Rust (routes/flujos.rs y routes/flujos_motor.rs)
 
 
 def _version_ollama() -> str:
@@ -765,151 +512,6 @@ def _version_ollama() -> str:
     return "?"
 
 
-def _explicar_fallo(mensaje: str, modelo: str) -> str:
-    """ Traduce el error de Ollama a algo con lo que se pueda hacer algo.
-
-    El 412 es el caso importante y el más opaco: significa que tu Ollama es
-    anterior al modelo que pides. Los modelos nuevos necesitan una versión nueva,
-    y el mensaje original no dice cuál tienes.
-    """
-    motor = explicar_error_motor(mensaje)
-    if motor:
-        return motor
-    if "412" in mensaje or "newer version" in mensaje.lower():
-        return (f"Tu Ollama ({_version_ollama()}) es anterior a '{modelo}' y no puede "
-                f"descargarlo. Actualízalo y vuelve a intentarlo:\n"
-                f"    curl -fsSL https://ollama.com/install.sh | sh\n"
-                f"En Linux eso conserva los modelos que ya tienes.")
-    if "no space" in mensaje.lower() or "espacio" in mensaje.lower():
-        return f"No hay espacio en disco para '{modelo}'. {mensaje}"
-    if "connection" in mensaje.lower() or "refused" in mensaje.lower():
-        return "Ollama no responde. Arráncalo con 'ollama serve' y reinténtalo."
-    return mensaje
-
-
-@app.get("/api/flujos")
-def flujos_listar():
-    guardados = flow_store.listar()
-    sugerido = _modelo_que_razona()
-    base = ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-    plantillas_v1 = agent_flows.plantillas(base, sugerido)
-    plantillas_v2 = agent_flows_v2.plantillas_profesionales_sota(base, sugerido)
-    return {"flujos": guardados,
-            "plantillas": plantillas_v2 + plantillas_v1,
-            "plantillas_sota": plantillas_v2,
-            "modelo_base": base, "modelo_razona": sugerido}
-
-
-@app.get("/api/flujos/v2/plantillas")
-def flujos_v2_plantillas():
-    sugerido = _modelo_que_razona()
-    base = ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-    return {
-        "plantillas": agent_flows_v2.plantillas_profesionales_sota(base, sugerido),
-        "roles": agent_flows_v2.ROLES_V2,
-        "modelo_base": base,
-        "modelo_razona": sugerido
-    }
-
-
-def _modelo_que_razona() -> str:
-    """ El mejor modelo de razonamiento que tengas descargado, si hay alguno """
-    try:
-        instalados = {m["name"] for m in ai_engine.get_detailed_models().get("models", [])}
-    except Exception:
-        return ""
-    candidatos = [(info.get("razona", 0), nombre)
-                  for nombre, info in agent_flows.MODELOS.items()
-                  if nombre in instalados and "criticar" in info.get("fuerte_en", [])
-                  and info["vram_gb"] <= agent_flows.VRAM_TIPICA_GB - 0.6]
-    return max(candidatos)[1] if candidatos else ""
-
-
-@app.post("/api/flujos/validar")
-def flujos_validar(req: FlujoGuardar):
-    flujo = req.model_dump()
-    return {"problemas": agent_flows.validar_flujo(flujo),
-            "plan": agent_flows.plan_de_modelos(flujo)}
-
-
-@app.post("/api/flujos")
-def flujos_guardar(req: FlujoGuardar):
-    flujo = req.model_dump()
-    problemas = agent_flows.validar_flujo(flujo)
-    if problemas:
-        raise HTTPException(status_code=400, detail="; ".join(problemas))
-    return flow_store.guardar(flujo)
-
-
-@app.delete("/api/flujos/{flujo_id}")
-def flujos_borrar(flujo_id: str):
-    if not flow_store.borrar(flujo_id):
-        raise HTTPException(status_code=404, detail="Ese flujo no existe")
-    return {"borrado": flujo_id}
-
-
-@app.post("/api/flujos/ejecutar")
-def flujos_ejecutar(req: FlujoEjecutar):
-    """ Ejecuta el flujo emitiendo cada paso según va ocurriendo.
-    Soporta automáticamente grafos v2 dinámicos y recursivos con sandbox, o flujos clásicos v1.
-    """
-    flujo = req.flujo or flow_store.obtener(req.flujo_id or "")
-    if not flujo:
-        raise HTTPException(status_code=404, detail="No se encontró el flujo")
-
-    # Detectar si es un grafo dinámico / recursivo v2
-    es_v2 = bool(flujo.get("nodos") or flujo.get("nodo_inicial") or flujo.get("es_v2") or str(flujo.get("id", "")).startswith("sota_"))
-
-    if es_v2:
-        motor_v2 = _motor_flujos_v2()
-        def emitir_v2():
-            try:
-                for evento in motor_v2.ejecutar_grafo(flujo, entrada_inicial=req.entrada):
-                    yield json.dumps(evento, ensure_ascii=False) + "\n"
-            except Exception as err:
-                yield json.dumps({"tipo": "error", "mensaje": str(err)}, ensure_ascii=False) + "\n"
-        return StreamingResponse(_flujo_cancelable(emitir_v2()), media_type="application/x-ndjson")
-
-    motor = _motor_flujos()
-
-    def emitir():
-        registro, segundos = [], 0.0
-        try:
-            for evento in motor.ejecutar(flujo, entrada=req.entrada,
-                                         consulta_contexto=req.consulta_contexto):
-                if evento.get("tipo") == "fin":
-                    registro = evento.get("registro", [])
-                    segundos = evento.get("segundos", 0)
-                    evento = {k: v for k, v in evento.items() if k != "registro"}
-                yield json.dumps(evento, ensure_ascii=False) + "\n"
-        except Exception as err:
-            yield json.dumps({"tipo": "error", "mensaje": str(err)},
-                             ensure_ascii=False) + "\n"
-            return
-        if req.guardar_historial and registro:
-            eid = flow_store.anotar_ejecucion(flujo, req.entrada, registro, segundos)
-            yield json.dumps({"tipo": "guardado", "ejecucion": eid}) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
-
-
-@app.get("/api/flujos/historial")
-def flujos_historial(flujo_id: Optional[str] = None, limite: int = 20):
-    return {"ejecuciones": flow_store.historial(flujo_id, limite)}
-
-
-@app.get("/api/flujos/ejecucion/{eid}")
-def flujos_ejecucion(eid: str):
-    """ Una ejecución con el prompt exacto que recibió cada agente.
-
-    Es lo que permite arreglar un flujo que da malos resultados: sin ver qué leyó
-    cada paso, ajustar los prompts es adivinar cuál de los cinco lo estropeó.
-    """
-    ejecucion = flow_store.ejecucion(eid)
-    if not ejecucion:
-        raise HTTPException(status_code=404, detail="Esa ejecución ya no está guardada")
-    return ejecucion
-
 
 # ======================================================================
 # Perfiles de Configuración del Entorno (Apariencia, Movimiento, IA)
@@ -921,64 +523,10 @@ def flujos_ejecucion(eid: str):
 # Ficha de libro: analizar un libro entero con un flujo de agentes
 # ======================================================================
 
-class FichaRequest(BaseModel):
-    source_id: str
-    flujo: Optional[Dict[str, Any]] = None   # si no, la plantilla de ficha
-    flujo_id: Optional[str] = None
 
 
 # Los libros analizables, la ficha guardada y lo que leería el flujo: servidor de Rust (routes/kb.rs)
 
-
-@app.post("/api/libros/ficha")
-def libro_analizar(req: FichaRequest):
-    """ Corre el flujo sobre un libro y guarda la ficha que produce.
-
-    La ficha se monta EN CÓDIGO juntando lo que devolvió cada paso, no pidiéndole a
-    un octavo agente que reúna los siete anteriores: no cabrían en la ventana y
-    podría reescribir datos que ya estaban bien.
-    """
-    variables = perfil_libro.variables(req.source_id)
-    if not variables:
-        raise HTTPException(status_code=404,
-                            detail="Ese libro no está importado en la base de conocimiento")
-
-    flujo = req.flujo or flow_store.obtener(req.flujo_id or "")
-    if not flujo:
-        base = ai_engine.config.get("agent1_model", "qwen2.5-coder:7b")
-        flujo = next(f for f in agent_flows.plantillas(base, _modelo_que_razona())
-                     if f["id"] == "plantilla_ficha_libro")
-
-    motor = _motor_flujos()
-    titulo = variables.get("libro:titulo", req.source_id)
-
-    def emitir():
-        salidas, datos, registro, modelos, segundos = {}, {}, [], [], 0.0
-        try:
-            for evento in motor.ejecutar(flujo, entrada=titulo,
-                                         consulta_contexto=titulo, extra=variables):
-                if evento.get("tipo") == "fin":
-                    salidas = evento.get("salidas", {})
-                    datos = evento.get("datos", {})
-                    registro = evento.get("registro", [])
-                    modelos = evento.get("modelos", [])
-                    segundos = evento.get("segundos", 0)
-                    evento = {k: v for k, v in evento.items() if k != "registro"}
-                yield json.dumps(evento, ensure_ascii=False) + "\n"
-        except Exception as err:
-            yield json.dumps({"tipo": "error", "mensaje": str(err)}, ensure_ascii=False) + "\n"
-            return
-
-        # Lo que devolvió cada paso en JSON manda; si un paso no dio JSON válido se
-        # guarda su texto, que es mejor que perderlo.
-        piezas = {pid: datos.get(pid, salidas.get(pid)) for pid in salidas}
-        ficha = perfil_libro.montar_ficha(req.source_id, piezas, modelos)
-        perfil_libro.guardar(req.source_id, ficha)
-        if registro:
-            flow_store.anotar_ejecucion(flujo, f"ficha de {titulo}", registro, segundos)
-        yield json.dumps({"tipo": "ficha", "ficha": ficha}, ensure_ascii=False) + "\n"
-
-    return StreamingResponse(_flujo_cancelable(emitir()), media_type="application/x-ndjson")
 
 
 # El material para un ejercicio y el contexto para el plan: servidor de Rust (prig_biblioteca::perfil)
@@ -1427,63 +975,6 @@ class AIConfigUpdateRequest(BaseModel):
 class ModelDeleteRequest(BaseModel):
     model: str
 
-@app.post("/api/ai/workflow/run")
-def run_workflow(req: WorkflowRequest):
-    def event_stream():
-        # Detectar si el workflow usa características v2 (bucles, tipos de nodo, router o grafo)
-        es_v2 = bool(req.grafo or req.nodos or any((s.loop or (s.tipo and s.tipo != "agent") or s.herramienta) for s in (req.steps or [])))
-        
-        if es_v2:
-            if req.grafo:
-                grafo = req.grafo
-            elif req.nodos:
-                grafo = {"nodos": req.nodos, "nodo_inicial": req.nodos[0].get("id", "step_1")}
-            else:
-                nodos = []
-                for idx, s in enumerate(req.steps or []):
-                    sid = s.id or f"step_{idx+1}"
-                    next_id = (s.next_node or (f"step_{idx+2}" if idx + 1 < len(req.steps) else None))
-                    nodos.append({
-                        "id": sid,
-                        "nombre": s.name or f"Agente {idx+1}",
-                        "tipo": s.tipo or "agent",
-                        "rol": s.role or "programmer",
-                        "modelo": s.model,
-                        "prompt": s.prompt,
-                        "temperature": s.temperature,
-                        "system_prompt": s.system_prompt,
-                        "loop": s.loop,
-                        "routing_rules": s.routing_rules,
-                        "herramienta": s.herramienta,
-                        "next_node": next_id
-                    })
-                grafo = {"nodos": nodos, "nodo_inicial": nodos[0]["id"] if nodos else None}
-            
-            motor_v2 = _motor_flujos_v2()
-            for evento in motor_v2.ejecutar_grafo(grafo, entrada_inicial=req.initial_input):
-                yield json.dumps(evento, ensure_ascii=False) + "\n"
-            return
-
-        # Modo secuencial clásico si no hay bucles ni herramientas complejas
-        current_context = req.initial_input
-        for idx, step in enumerate(req.steps or []):
-            yield json.dumps({"step": idx, "status": "running", "model": step.model, "name": step.name}) + "\n"
-            
-            prompt = f"{step.prompt}\n\nContexto / Input Anterior:\n{current_context}"
-            result = ai_engine.run_workflow_step(
-                prompt=prompt, 
-                model=step.model, 
-                role=step.role,
-                temperature=step.temperature,
-                custom_sys_prompt=step.system_prompt
-            )
-            
-            current_context = result
-            yield json.dumps({"step": idx, "status": "completed", "result": result, "name": step.name}) + "\n"
-            
-        yield json.dumps({"status": "finished", "final_result": current_context}) + "\n"
-        
-    return StreamingResponse(_flujo_cancelable(event_stream()), media_type="application/x-ndjson")
 
 class AIInlineCompleteRequest(BaseModel):
     code_prefix: str
