@@ -6,11 +6,9 @@ sustituyen, así los tests no tocan la biblioteca del usuario.
 """
 
 import os
-import re
 import sys
 import tempfile
 import unittest
-from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -124,23 +122,7 @@ class PruebaEndpoints(unittest.TestCase):
         cls.app = main_app
         cls.client = TestClient(main_app.app)
 
-    def test_guardar_en_biblioteca_e_indexar(self):
-        importados = []
-
-        def importar(ruta, categoria):
-            with open(ruta, "rb") as f:
-                importados.append((os.path.basename(ruta), categoria, f.read(5)))
-            return {"path": "/tmp/x.pdf", "category": categoria.upper(), "filename": os.path.basename(ruta)}
-        with mock.patch.object(self.app, "_descargar_pdf", return_value=b"%PDF-1.4 x"), \
-                mock.patch.object(self.app.book_service, "import_file", importar), \
-                mock.patch.object(self.app.knowledge_service, "index_single", return_value={"status": "INGESTED", "chunks_count": 7}):
-            r = self.client.post("/api/referencias/guardar", json={"id": "arxiv_1706_03762"}).json()
-        nombre, categoria, cabecera = importados[0]
-        self.assertEqual(categoria, "papers")
-        self.assertEqual(cabecera, b"%PDF-")
-        self.assertTrue(nombre.startswith("Vaswani et al 2017 - Attention Is All You Need") and nombre.endswith(".pdf"))
-        self.assertTrue(r["indexed"])
-        self.assertEqual(r["chunks_count"], 7)
+    # Guardar el PDF de una referencia en la biblioteca: servidor de Rust (routes/referencias.rs, con su prueba)
 
     def test_chats_de_las_secciones_reciben_las_referencias(self):
         prompt, refs = self.app._con_referencias("resumen de random forest", "PREGUNTA")

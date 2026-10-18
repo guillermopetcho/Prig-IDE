@@ -187,23 +187,7 @@ pub async fn importar(State(state): State<AppState>, b: Bytes) -> Response {
     };
     let r = tokio::task::spawn_blocking(move || {
         let categoria = c.get("category").filter(|v| !v.es_nulo()).map(Valor::texto_py);
-        let mut res = Estante::por_defecto().importar(&c.valor("path").texto_py(), categoria.as_deref());
-        if res.contiene("error") {
-            return res;
-        }
-        let ruta = res.valor("path").texto_py();
-        let tipo = res.get("category").map(Valor::texto_py).unwrap_or_else(|| "book".into()).to_lowercase();
-        match crate::routes::conocimiento::servicio(&state).and_then(|k| k.indexar_uno(&ruta, &tipo)) {
-            Ok((estado, n)) => {
-                res.poner("indexed", estado == "INGESTED" || estado == "ALREADY_EXISTS");
-                res.poner("chunks_count", n as i64);
-            }
-            Err(e) => {
-                res.poner("indexed", false);
-                res.poner("index_error", e);
-            }
-        }
-        res
+        importar_e_indexar(&state, &c.valor("path").texto_py(), categoria.as_deref())
     })
     .await;
     match r {
@@ -211,4 +195,25 @@ pub async fn importar(State(state): State<AppState>, b: Bytes) -> Response {
         Ok(m) => json_py(StatusCode::OK, &Valor::Mapa(m)),
         Err(_) => error_500(),
     }
+}
+
+/// `book_service.import_file` + `knowledge_service.index_single`: el resultado, o `{"error"}`
+pub fn importar_e_indexar(state: &AppState, origen: &str, categoria: Option<&str>) -> Mapa {
+    let mut res = Estante::por_defecto().importar(origen, categoria);
+    if res.contiene("error") {
+        return res;
+    }
+    let ruta = res.valor("path").texto_py();
+    let tipo = res.get("category").map(Valor::texto_py).unwrap_or_else(|| "book".into()).to_lowercase();
+    match crate::routes::conocimiento::servicio(state).and_then(|k| k.indexar_uno(&ruta, &tipo)) {
+        Ok((estado, n)) => {
+            res.poner("indexed", estado == "INGESTED" || estado == "ALREADY_EXISTS");
+            res.poner("chunks_count", n as i64);
+        }
+        Err(e) => {
+            res.poner("indexed", false);
+            res.poner("index_error", e);
+        }
+    }
+    res
 }

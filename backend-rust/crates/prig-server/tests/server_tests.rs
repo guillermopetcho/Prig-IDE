@@ -252,8 +252,8 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
     // Antes 405: Rust tenía la ruta con otro método y no la pasaba a Python
     for (metodo, uri) in [
         ("POST", "/api/descargas"),
-        ("POST", "/api/referencias/guardar"),
-        ("POST", "/api/progreso/analisis"),
+        ("POST", "/api/aprendizaje/nodo/x/ejecutar"),
+        ("POST", "/api/aprendizaje/nodo/x/progreso"),
         ("POST", "/api/llm/director_decision"),
         ("POST", "/api/app/shutdown"),
         ("POST", "/api/workspace"),

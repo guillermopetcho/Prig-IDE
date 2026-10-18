@@ -1,6 +1,6 @@
 //! Referencias de ML (`prig_biblioteca::referencias_ml`): el catálogo, el detalle, las relacionadas con un texto, el
-//! PDF servido desde Prig (solo URLs del catálogo verificado) y abrirla en el navegador. Guardar el PDF en la
-//! biblioteca sigue en Python, con la indexación de libros.
+//! PDF servido desde Prig (solo URLs del catálogo verificado), abrirla en el navegador y guardar su PDF en la
+//! biblioteca (indexado, para que el tutor lo cite por página).
 
 use std::collections::HashMap;
 
@@ -172,4 +172,72 @@ pub async fn abrir(State(state): State<AppState>, b: Bytes) -> Response {
     let url = r.get("url").map(Valor::texto_py).unwrap_or_default();
     let abierto = prig_integrations::youtube::abrir_en_navegador(&url);
     ok(Mapa::new().con("ok", abierto).con("url", url))
+}
+
+/// El nombre del PDF guardado: «Apellido [et al] año - título», sin signos raros, hasta 150 caracteres
+fn nombre_de(r: &Mapa) -> String {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let autores: Vec<String> = r.lista("autores").unwrap_or(&[]).iter().map(Valor::texto_py).collect();
+    let quien = match autores.first() {
+        Some(a) => a.split_whitespace().last().unwrap_or("").to_string() + if autores.len() > 1 { " et al" } else { "" },
+        None => "Referencia".to_string(),
+    };
+    let anio = r.get("anio").filter(|v| v.verdad()).map(Valor::texto_py).unwrap_or_default();
+    let crudo = format!("{quien} {anio} - {}", r.valor("titulo").texto_py());
+    let limpio = RE.get_or_init(|| regex::Regex::new(r"[^\w\s.,-]").unwrap()).replace_all(&crudo, "");
+    prig_plataforma::py::strip(&limpio).chars().take(150).collect::<String>() + ".pdf"
+}
+
+/// `POST /api/referencias/guardar` (`id`): descarga el PDF a la biblioteca (libros o papers) y lo indexa
+pub async fn guardar(State(state): State<AppState>, b: Bytes) -> Response {
+    let c = match cuerpo::modelo(&b).and_then(|m| cuerpo::tipados(&m, &[("id", &Tipo::Texto, true)])) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let r = match o_404(&state.base_dir, &c.valor("id").texto_py()) {
+        Ok(r) => r,
+        Err(e) => return e,
+    };
+    let Some(url) = rml::pdf_de(&r) else {
+        return detalle(StatusCode::BAD_REQUEST, "Esta referencia no tiene PDF directo para guardar.");
+    };
+    let hecho = tokio::task::spawn_blocking(move || -> Result<Mapa, Response> {
+        let datos = descargar_pdf(&url)?;
+        let marca = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let carpeta = std::env::temp_dir().join(format!("prig_ref_{}_{marca}", std::process::id()));
+        let interno = |e: std::io::Error| detalle(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+        std::fs::create_dir_all(&carpeta).map_err(interno)?;
+        let origen = carpeta.join(nombre_de(&r));
+        let res = std::fs::write(&origen, &datos).map(|_| {
+            let categoria = if r.texto("tipo") == Some("libro") { "books" } else { "papers" };
+            crate::routes::estante::importar_e_indexar(&state, &origen.to_string_lossy(), Some(categoria))
+        });
+        let _ = std::fs::remove_dir_all(&carpeta);
+        res.map_err(interno)
+    })
+    .await;
+    match hecho {
+        Ok(Ok(m)) if m.contiene("error") => detalle(StatusCode::BAD_REQUEST, m.valor("error").texto_py()),
+        Ok(Ok(m)) => ok(m),
+        Ok(Err(r)) => r,
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
+    }
+}
+
+#[cfg(test)]
+mod pruebas {
+    use super::*;
+
+    #[test]
+    fn nombre_del_pdf_guardado() {
+        let r = Mapa::new()
+            .con("autores", Valor::Lista(vec![Valor::from("Ashish Vaswani"), Valor::from("Noam Shazeer")]))
+            .con("anio", 2017)
+            .con("titulo", "Attention Is All You Need: ¿sí? <x>");
+        assert_eq!(nombre_de(&r), "Vaswani et al 2017 - Attention Is All You Need sí x.pdf");
+        let r = Mapa::new().con("titulo", "Sin autores").con("anio", Valor::Nulo);
+        assert_eq!(nombre_de(&r), "Referencia  - Sin autores.pdf");
+        let r = Mapa::new().con("autores", Valor::Lista(vec![Valor::from("Bishop")])).con("titulo", "x".repeat(300));
+        assert_eq!(nombre_de(&r).chars().count(), 154);
+    }
 }

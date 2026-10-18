@@ -539,6 +539,17 @@ CASOS_EJECUTAR = [
     ]),
 ]
 
+_ANALISIS = {"archivo": "{home}/.prig_desafios/analisis.json", "restaurar": True, "archivo_json": True, "volatiles": ["fecha"]}
+CASOS_TANDA47 = [
+    *({"ruta": "/api/referencias/guardar", "metodo": "POST", "json": j} for j in [
+        {}, {"id": 3}, {"id": "nada"}, {"id": "a_course_in_machine_learning"}, {"id": "the_elements_of_statistical_learning_2nd_ed"},
+    ]),
+    *({"ruta": "/api/progreso/analisis", "metodo": "POST", "json": j, **_ANALISIS} for j in [
+        {"modelo": "qwen2.5-coder:7b"}, {"modelo": "qwen2.5-coder:7b", "regenerar": True}, {"regenerar": "x"}, {"modelo": 3},
+        {"modelo": "gemini:gemini-2.5-flash", "regenerar": True}, {"modelo": "ZZERROR", "regenerar": True},
+    ]),
+]
+
 _EMB = {"archivo": "{home}/.prig_modelos.json", "archivo_json": True}
 CASOS_EMBEDDINGS = [
     {"ruta": "/api/modelos/embeddings"},
@@ -556,8 +567,8 @@ CASOS_EMBEDDINGS = [
     {"ruta": "/api/modelos/embeddings", "solo_rust": True},
 ]
 
-# Retiradas de Python tras dar lo mismo (tanda 46): solo Rust
-for _c in [*CASOS_OLLAMA_ACT, *CASOS_EMBEDDINGS, *CASOS_EJECUTAR]:
+# Retiradas de Python tras dar lo mismo (tandas 46 y 47): solo Rust
+for _c in [*CASOS_OLLAMA_ACT, *CASOS_EMBEDDINGS, *CASOS_EJECUTAR, *CASOS_TANDA47]:
     _c["solo_rust"] = True
 
 for _c in CASOS_FLUJOS:
@@ -2417,6 +2428,7 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         *CASOS_OLLAMA_ACT,
         *CASOS_EMBEDDINGS,
         *CASOS_EJECUTAR,
+        *CASOS_TANDA47,
     ]
     def sustituir(v):
         """ {home} y {proyecto} también dentro del cuerpo JSON (sin esto llegaban literales: rutas que no existen) """

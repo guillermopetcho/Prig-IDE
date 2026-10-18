@@ -5,7 +5,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import queue
-import shutil
 import signal
 import logging
 import threading
@@ -49,7 +48,6 @@ from recursos import termico as recursos_termico
 from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
 from guided_learning import GuidedLearningService
-import kaggle_lector
 import inicio
 
 @asynccontextmanager
@@ -314,74 +312,8 @@ class AISearchRequest(BaseModel):
 # ==========================================
 import referencias_ml  # noqa: E402
 
-MAX_PDF_REFERENCIA = 80 * 1024 * 1024
-
-
-# Las referencias (listar, detalle, relacionadas, pdf, abrir) son del servidor de Rust (routes/referencias.rs);
-# guardar el PDF en la biblioteca sigue aquí, con la indexación de libros.
-class ReferenciaAccionRequest(BaseModel):
-    id: str
-
-
-def _referencia_o_404(ref_id: str) -> Dict[str, Any]:
-    r = referencias_ml.referencia(ref_id)
-    if not r:
-        raise HTTPException(status_code=404, detail=f"No existe la referencia «{ref_id}»")
-    return r
-
-
-def _pdf_de_referencia(r: Dict[str, Any]) -> Optional[str]:
-    """ El PDF de una referencia: el enlace directo al PDF, o la página si ya es un PDF """
-    if r.get("url_pdf"):
-        return r["url_pdf"]
-    return r["url"] if r["url"].lower().split("?")[0].endswith(".pdf") else None
-
-
-def _descargar_pdf(url: str) -> bytes:
-    """ Solo URLs del catálogo verificado (nunca una URL que mande el cliente) """
-    import urllib.request
-    peticion = urllib.request.Request(url, headers={"User-Agent": referencias_ml.AGENTE, "Accept": "application/pdf,*/*"})
-    with urllib.request.urlopen(peticion, timeout=60) as resp:
-        datos = resp.read(MAX_PDF_REFERENCIA + 1)
-    if len(datos) > MAX_PDF_REFERENCIA:
-        raise HTTPException(status_code=413, detail="El PDF supera 80 MB: ábrelo en el navegador.")
-    if datos[:5] != b"%PDF-":
-        raise HTTPException(status_code=502, detail="El enlace no devolvió un PDF: ábrelo en el navegador.")
-    return datos
-
-
-@app.post("/api/referencias/guardar")
-def referencias_guardar(req: ReferenciaAccionRequest):
-    """ Descarga el PDF a la biblioteca local (libros o papers) y lo indexa, para que el tutor lo lea y
-    lo cite por página con «Mi biblioteca» """
-    r = _referencia_o_404(req.id)
-    url = _pdf_de_referencia(r)
-    if not url:
-        raise HTTPException(status_code=400, detail="Esta referencia no tiene PDF directo para guardar.")
-    datos = _descargar_pdf(url)
-    autores = r.get("autores") or []
-    quien = (autores[0].split()[-1] + (" et al" if len(autores) > 1 else "")) if autores else "Referencia"
-    nombre = re.sub(r"[^\w\s.,-]", "", f"{quien} {r.get('anio') or ''} - {r['titulo']}", flags=re.UNICODE).strip()[:150] + ".pdf"
-    import tempfile
-    carpeta = tempfile.mkdtemp(prefix="prig_ref_")
-    origen = os.path.join(carpeta, nombre)
-    try:
-        with open(origen, "wb") as f:
-            f.write(datos)
-        categoria = "books" if r.get("tipo") == "libro" else "papers"
-        res = book_service.import_file(origen, categoria)
-    finally:
-        shutil.rmtree(carpeta, ignore_errors=True)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    try:
-        ingest = knowledge_service.index_single(res["path"], res.get("category", "book").lower())
-        res["indexed"] = ingest.get("status") in ("INGESTED", "ALREADY_EXISTS")
-        res["chunks_count"] = ingest.get("chunks_count", 0)
-    except Exception as err:
-        res["indexed"] = False
-        res["index_error"] = str(err)
-    return res
+# Las referencias (listar, detalle, relacionadas, pdf, abrir y guardar el PDF en la biblioteca, indexado): servidor
+# de Rust (routes/referencias.rs)
 
 
 # ==========================================
@@ -1654,8 +1586,7 @@ def descargas_limpiar():
 # Desafíos: enunciado, caja de razonamiento, páginas de código y pruebas ocultas
 # ===========================================================================
 
-from desafios import ejecucion as des_ejec, tutor as des_tutor
-import progreso
+from desafios import ejecucion as des_ejec
 import gemini_motor
 from desafios.almacen import Almacen as AlmacenDesafios
 from desafios.ejecucion import ErrorDesafio
@@ -1744,11 +1675,6 @@ def _registrar_telemetria(d: Dict[str, Any], evento: str, **extra):
 # Gemini (estado, clave, modelos): los sirve el servidor de Rust (routes/ia.rs; prig_ia::gemini)
 
 
-class ProgresoAnalisisRequest(BaseModel):
-    modelo: Optional[str] = None
-    regenerar: bool = False
-
-
 # Inicio, su perfil y el estado de la máquina (/api/system/stats, /api/system/health): servidor de Rust
 # (routes/inicio.rs)
 class InicioPerfilRequest(BaseModel):
@@ -1758,25 +1684,7 @@ class InicioPerfilRequest(BaseModel):
     mostrar_al_abrir: Optional[bool] = None
     favoritas: Optional[List[str]] = None
 
-@app.post("/api/progreso/analisis")
-def progreso_analisis(req: ProgresoAnalisisRequest):
-    """ El modelo (local o Gemini) lee el avance medido y propone los próximos pasos """
-    guardado = progreso.analisis_guardado()
-    filas = progreso.historial(desafios_almacen, limite=progreso.MAX_HISTORIAL)
-    if guardado and not req.regenerar and guardado.get("desafios") == len(filas):
-        return _ndjson_en_hilo(lambda avisar: guardado)
-    if not filas:
-        raise HTTPException(status_code=409, detail="Todavía no hay desafíos que analizar: empieza uno en la sección Desafíos.")
-    motor, nombre_modelo = _motor_desafios(req.modelo)
-    r = progreso.resumen(desafios_almacen, guided, telemetry, dataset_mgr, kaggle=kaggle_lector)
-    contexto = progreso.contexto_para_modelo(r, filas)
-
-    def trabajo(avisar):
-        texto = _consumir(des_tutor.analisis_progreso(motor, nombre_modelo, contexto), avisar)
-        if not texto.strip():
-            raise ErrorDesafio("El modelo no devolvió nada. Prueba otra vez o con otro modelo.")
-        return progreso.guardar_analisis(texto, _modelo_desafios(req.modelo), len(filas))
-    return _ndjson_en_hilo(trabajo)
+# Analizar el avance con el modelo (POST /api/progreso/analisis): servidor de Rust (routes/desafios_tutor.rs)
 
 # Las fuentes de internet, buscar e importar, el catálogo de GitHub, crear y replicar desafíos (y crear uno desde un
 # video de YouTube): servidor de Rust (routes/desafios_fuentes.rs y routes/desafios_crear.rs)

@@ -6,6 +6,7 @@ use crate::desafios::{self, clave};
 use crate::{dataset, planes, telemetria};
 use prig_plataforma::valor::{redondear, Mapa, Valor};
 use std::path::Path;
+use std::sync::OnceLock;
 
 // ---------------------------------------------------------------------------------------------- fechas
 
@@ -537,6 +538,134 @@ impl DesdePares for Mapa {
         }
         m
     }
+}
+
+
+// ---------------------------------------------------------------------------------------------- el análisis del modelo
+
+/// `MAX_HISTORIAL`: cuántos desafíos lee el análisis
+pub const MAX_HISTORIAL: i64 = 500;
+
+fn st(v: &Valor) -> String {
+    v.texto_py()
+}
+
+fn sub<'a>(m: &'a Mapa, k: &str) -> &'a Mapa {
+    static VACIO: OnceLock<Mapa> = OnceLock::new();
+    match m.get(k) {
+        Some(Valor::Mapa(x)) => x,
+        _ => VACIO.get_or_init(Mapa::new),
+    }
+}
+
+fn lista_de<'a>(m: &'a Mapa, k: &str) -> &'a [Valor] {
+    m.lista(k).unwrap_or(&[])
+}
+
+fn mapas(l: &[Valor]) -> impl Iterator<Item = &Mapa> {
+    l.iter().filter_map(|v| match v {
+        Valor::Mapa(m) => Some(m),
+        _ => None,
+    })
+}
+
+fn cuenta(m: &Mapa, k: &str) -> String {
+    m.get(k).map(st).unwrap_or_else(|| "0".into())
+}
+
+/// `contexto_para_modelo`: el avance en texto compacto, solo hechos medidos
+pub fn contexto_para_modelo(r: &Mapa, filas: &[Mapa], maximo: usize) -> String {
+    let d = sub(r, "desafios");
+    let pe = sub(d, "por_estado");
+    let ra = sub(r, "racha");
+    let mut l = vec![
+        format!(
+            "Desafíos: {} en total, {} resueltos ({} sin pistas), {} vistos con solución, {} a medias.",
+            st(d.valor("total")),
+            cuenta(pe, "resuelto"),
+            st(d.valor("resueltos_sin_pistas")),
+            cuenta(pe, "rendido"),
+            cuenta(pe, "en_curso")
+        ),
+        format!("Usó la caja de razonamiento en {} y escribió su plan en {}.", st(d.valor("con_razonamiento")), st(d.valor("con_plan"))),
+        format!("Racha actual: {} días; mejor racha: {}; días activos: {}.", st(ra.valor("actual")), st(ra.valor("mejor")), st(ra.valor("dias_activos"))),
+    ];
+    if d.valor("media_intentos").verdad() {
+        l.push(format!("Media de intentos hasta resolver: {}.", st(d.valor("media_intentos"))));
+    }
+    let conceptos = lista_de(r, "conceptos");
+    if !conceptos.is_empty() {
+        l.push("Dominio por concepto (0-100, vistos/resueltos/pistas):".into());
+        for c in mapas(conceptos).take(15) {
+            let rendidos = if c.valor("rendidos").verdad() { format!(", {} con solución", st(c.valor("rendidos"))) } else { String::new() };
+            l.push(format!(
+                "  - {}: {} ({}/{}/{}{rendidos})",
+                st(c.valor("concepto")),
+                st(c.valor("dominio")),
+                st(c.valor("vistos")),
+                st(c.valor("resueltos")),
+                st(c.valor("pistas"))
+            ));
+        }
+    }
+    for ruta in mapas(lista_de(r, "rutas")).take(3) {
+        let pendientes: Vec<String> = mapas(lista_de(ruta, "bloques")).filter(|b| !b.valor("completado").verdad()).map(|b| st(b.valor("titulo"))).take(4).collect();
+        let p = if pendientes.is_empty() { "ninguno".to_string() } else { pendientes.join(", ") };
+        l.push(format!("Ruta «{}»: {}/{} bloques; pendientes: {p}.", st(ruta.valor("meta")), st(ruta.valor("completados")), st(ruta.valor("total"))));
+    }
+    for k in mapas(lista_de(r, "kaggle")).take(5) {
+        l.push(format!("Notebook de Kaggle «{}»: leídas {} de {} celdas con el profesor.", st(k.valor("titulo")), st(k.valor("leidas")), st(k.valor("total"))));
+    }
+    l.push("Últimos desafíos:".into());
+    for f in filas.iter().take(maximo) {
+        let creado = f.valor("creado");
+        let fecha = if creado.verdad() { st(creado).chars().take(10).collect() } else { String::new() };
+        let mejor = sub(f, "mejor");
+        let conceptos = lista_de(f, "conceptos");
+        let cs = if conceptos.is_empty() { String::new() } else { format!(", conceptos: {}", conceptos.iter().take(3).map(st).collect::<Vec<_>>().join(", ")) };
+        l.push(format!(
+            "  - {fecha} «{}» ({}, {}): {}, {} intentos, {} pistas, mejor {}/{}{cs}",
+            st(f.valor("titulo")),
+            st(f.valor("nivel")),
+            st(f.valor("fuente")),
+            st(f.valor("estado")),
+            st(f.valor("intentos")),
+            st(f.valor("pistas")),
+            st(mejor.valor("pasados")),
+            st(mejor.valor("total"))
+        ));
+    }
+    l.join("\n")
+}
+
+/// `temas_sugeridos`: los temas del bloque ```json {"temas": [...]}``` del análisis (hasta 6, de 80 caracteres)
+pub fn temas_sugeridos(texto: &str) -> Vec<String> {
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"(?s)```json\s*(\{.*?\})\s*```").unwrap());
+    let Some(m) = re.captures(texto) else { return Vec::new() };
+    match prig_plataforma::json::leer(&m[1]) {
+        Ok(Valor::Mapa(d)) => match d.get("temas") {
+            Some(Valor::Lista(t)) => t.iter().take(6).map(|x| st(x).chars().take(80).collect()).collect(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
+}
+
+/// `guardar_analisis`: `analisis.json` (indent 1, escrito de una vez)
+pub fn guardar_analisis(base: &Path, texto: &str, modelo: &str, desafios: usize) -> Result<Mapa, String> {
+    let datos = Mapa::new()
+        .con("texto", texto)
+        .con("modelo", modelo)
+        .con("desafios", desafios as i64)
+        .con("fecha", crate::desafios::ahora())
+        .con("temas", Valor::Lista(temas_sugeridos(texto).into_iter().map(Valor::Texto).collect()));
+    std::fs::create_dir_all(base).map_err(|e| e.to_string())?;
+    let ruta = base.join("analisis.json");
+    let tmp = base.join("analisis.json.tmp");
+    std::fs::write(&tmp, prig_plataforma::json::escribir(&Valor::Mapa(datos.clone()), 1)).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &ruta).map_err(|e| e.to_string())?;
+    Ok(datos)
 }
 
 #[cfg(test)]

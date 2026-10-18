@@ -181,6 +181,7 @@ pub fn create_app(state: AppState) -> Router {
         .route("/referencias/relacionadas", propia(get(routes::referencias::relacionadas)))
         .route("/referencias/pdf", propia(get(routes::referencias::pdf)))
         .route("/referencias/abrir", propia(post(routes::referencias::abrir)))
+        .route("/referencias/guardar", propia(post(routes::referencias::guardar)))
         .route("/audio/aplicaciones", propia(get(routes::escritorio::aplicaciones)))
         .route("/audio/seleccionar_fuente", propia(post(routes::escritorio::seleccionar_fuente)))
         .route("/audio/datos_actuales", propia(get(routes::escritorio::datos_actuales)))
@@ -341,7 +342,7 @@ pub fn create_app(state: AppState) -> Router {
         .route("/exercise/:exercise_id/hint", propia(post(routes::ejercicios::pista)))
         .route("/exercise/:exercise_id", propia(get(routes::ejercicios::ver)))
         .route("/exercise/:exercise_id/solution", propia(get(routes::ejercicios::solucion)))
-        .route("/progreso/analisis", propia(get(routes::desafios::progreso_analisis)))
+        .route("/progreso/analisis", propia(get(routes::desafios::progreso_analisis).post(routes::desafios_tutor::progreso_analisis)))
         .route("/progreso/historial", propia(get(routes::desafios::progreso_historial)))
         .route("/progreso/resumen", propia(get(routes::desafios::progreso_resumen)))
         .route(

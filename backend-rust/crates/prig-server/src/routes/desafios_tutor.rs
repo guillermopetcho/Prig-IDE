@@ -847,3 +847,77 @@ mod tests {
         assert_eq!(paginas_texto(&[Valor::Mapa(Mapa::new())], 9).unwrap_err(), "'nombre'");
     }
 }
+
+// =========================================================================== el análisis del avance
+
+const SISTEMA_ANALISIS: &str = r#"Eres el tutor que revisa el AVANCE de un alumno de programación en Python.
+
+Te dan datos MEDIDOS (desafíos resueltos ejecutando pruebas, intentos, pistas, dominio por
+concepto, bloques del plan). Analízalos sin inventar nada: si algo no está en los datos, no lo
+digas. Habla en español, en segunda persona, directo y sin halagos vacíos.
+
+Escribe estas secciones con encabezados «## »:
+## Dónde estás
+Dos o tres frases con lo que los datos muestran (volumen, constancia, qué ya resuelve solo).
+## Lo que se te resiste
+Los conceptos con menor dominio y POR QUÉ lo parecen (muchas pistas, rendirse, varios intentos).
+## Cómo estás aprendiendo
+Hábitos que se ven en los datos: si usa la caja de razonamiento, si escribe el plan antes de
+programar, si reintenta o se rinde. Di qué hábito le conviene cambiar y por qué.
+## Plan para las próximas tres sesiones
+Tres puntos, uno por sesión: `- **tema concreto** — qué hacer y por qué ese tema ahora`.
+## Cómo sabrás que avanzaste
+Una señal observable y comprobable (por ejemplo: resolver X sin pistas).
+
+Termina con un bloque ```json {"temas": ["tema 1", "tema 2", "tema 3"]} ``` con los temas del
+plan, tal como los pondrías en el buscador de desafíos. Nada de código en el resto del texto."#;
+
+/// `POST /api/progreso/analisis` (`modelo`, `regenerar`): el modelo lee el avance medido y propone los próximos
+/// pasos; si ya hay uno de los mismos desafíos y no se pide regenerar, ese
+pub async fn progreso_analisis(State(state): State<AppState>, b: Bytes) -> Response {
+    let c = match pedido(&b, &[("modelo", &TEXTO_OPC, false), ("regenerar", &Tipo::Booleano, false)]) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let base = carpeta_base();
+    let (guardado, filas) = {
+        let base = base.clone();
+        match tokio::task::spawn_blocking(move || {
+            let g = d::leer_json(&base.join("analisis.json")).filter(|g| matches!(g, Valor::Mapa(_)));
+            (g, d::historial(&base.join("desafios"), None, None, None, prig_aprendizaje::progreso::MAX_HISTORIAL))
+        })
+        .await
+        {
+            Ok((g, Ok(f))) => (g, f),
+            _ => return error_500(),
+        }
+    };
+    if let Some(Valor::Mapa(g)) = &guardado {
+        if !c.verdad("regenerar") && g.num("desafios") == Some(filas.len() as f64) {
+            let g = Valor::Mapa(g.clone());
+            return ndjson_trabajo(move |_, _| Ok(g));
+        }
+    }
+    if filas.is_empty() {
+        return detalle(StatusCode::CONFLICT, "Todavía no hay desafíos que analizar: empieza uno en la sección Desafíos.");
+    }
+    let pedido_modelo = opcional(&c, "modelo");
+    let (m, nombre) = match motor(pedido_modelo.as_deref(), None) {
+        Ok(x) => x,
+        Err(r) => return r,
+    };
+    let espacio = crate::routes::workspace::espacio_de_trabajo(&state).await;
+    let raiz = state.base_dir.clone();
+    ndjson_trabajo(move |cancelar, avisar| {
+        let lecturas = prig_integrations::kaggle::resumen_lecturas().unwrap_or_default();
+        let r = prig_aprendizaje::progreso::resumen(&base.join("desafios"), Some(&espacio), 120, lecturas).map_err(|_| "No se pudo leer el progreso.".to_string())?;
+        let contexto = prig_aprendizaje::progreso::contexto_para_modelo(&r, &filas, 25);
+        let prompt = format!("DATOS DEL ALUMNO:\n{}\n\nAnaliza su avance.", corta(&contexto, 12000));
+        let texto = tutor::flujo(&raiz, &m, &nombre, &prompt, SISTEMA_ANALISIS, 0.3, true, cancelar, avisar)?;
+        if py::strip(&texto).is_empty() {
+            return Err("El modelo no devolvió nada. Prueba otra vez o con otro modelo.".into());
+        }
+        let modelo = tutor::modelo_desafios(pedido_modelo.as_deref(), None);
+        Ok(Valor::Mapa(prig_aprendizaje::progreso::guardar_analisis(&base, &texto, &modelo, filas.len())?))
+    })
+}
