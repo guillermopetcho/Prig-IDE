@@ -22,7 +22,6 @@ import shutil
 import sys
 import tempfile
 import threading
-import time
 import unittest
 from unittest import mock
 
@@ -31,7 +30,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import requests
 
 import buscador_modelos as bm
-import descargas_modelos as dm
 from buscador_modelos import ErrorBuscador
 
 DATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datos_buscador")
@@ -711,118 +709,5 @@ class PruebaSeguimiento(unittest.TestCase):
 
 
 # ===========================================================================
-class PruebaDescargas(unittest.TestCase):
-
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="prig_descargas_")
-        self.terminadas = []
-        self.comprobacion = {"descargable": True, "bytes": 1000}
-        self.d = dm.Descargas(lambda: "http://ollama.falso", lambda: self.tmp,
-                              al_terminar=self.terminadas.append, comprobar=lambda ref: dict(self.comprobacion))
-        self.disco = mock.patch.object(dm.shutil, "disk_usage", return_value=mock.Mock(free=10**12))
-        self.disco.start()
-
-    def tearDown(self):
-        self.disco.stop()
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def esperar(self, id_, estados=("completado", "error", "cancelado"), limite=5):
-        fin = time.time() + limite
-        while time.time() < fin:
-            item = next(i for i in self.d.lista() if i["id"] == id_)
-            if item["estado"] in estados:
-                return item
-            time.sleep(0.02)
-        self.fail(f"La descarga no llegó a {estados}: {item}")
-
-    def test_descarga_completa_con_progreso_por_capas(self):
-        lineas = [{"status": "pulling manifest"},
-                  {"status": "pulling abc", "digest": "sha256:abc", "total": 900, "completed": 300},
-                  {"status": "pulling def", "digest": "sha256:def", "total": 100, "completed": 100},
-                  {"status": "pulling abc", "digest": "sha256:abc", "total": 900, "completed": 900},
-                  {"status": "verifying sha256 digest"}, {"status": "writing manifest"}, {"status": "success"}]
-        with mock.patch.object(dm.requests, "post", return_value=Respuesta(200, lineas=lineas)) as post:
-            item = self.esperar(self.d.encolar("hf.co/a/b:Q4_K_M", "Mi modelo")["id"])
-        self.assertEqual(post.call_args.kwargs["json"], {"model": "hf.co/a/b:Q4_K_M", "stream": True})
-        self.assertEqual(post.call_args.args[0], "http://ollama.falso/api/pull")
-        self.assertEqual(item["estado"], "completado")
-        self.assertEqual((item["completado"], item["total"], item["porcentaje"]), (1000, 1000, 100.0))
-        self.assertEqual((item["fuente"], item["titulo"]), ("huggingface", "Mi modelo"))
-        self.assertEqual([t["ref"] for t in self.terminadas], ["hf.co/a/b:Q4_K_M"])
-
-    def test_no_descargable_ni_siquiera_llama_a_ollama(self):
-        self.comprobacion = {"descargable": False, "motivo": "Requiere iniciar sesión o aceptar una licencia."}
-        with mock.patch.object(dm.requests, "post") as post:
-            item = self.esperar(self.d.encolar("hf.co/google/gemma:Q4_0")["id"])
-        post.assert_not_called()
-        self.assertEqual(item["estado"], "error")
-        self.assertIn("licencia", item["error"])
-
-    def test_sin_espacio_en_disco(self):
-        self.comprobacion = {"descargable": True, "bytes": 50 * 10**9}
-        with mock.patch.object(dm.shutil, "disk_usage", return_value=mock.Mock(free=20 * 10**9)), \
-                mock.patch.object(dm.requests, "post") as post:
-            item = self.esperar(self.d.encolar("qwen3:30b")["id"])
-        post.assert_not_called()
-        self.assertIn("No hay espacio", item["error"])
-
-    def test_errores_de_ollama_traducidos(self):
-        with mock.patch.object(dm.requests, "post", return_value=Respuesta(200, lineas=[
-                {"status": "pulling manifest"}, {"error": "pull model manifest: 412: requires a newer version of Ollama"}])):
-            item = self.esperar(self.d.encolar("qwen3.8:27b")["id"])
-        self.assertIn("más nueva", item["error"])
-        with mock.patch.object(dm.requests, "post", return_value=Respuesta(500, {"error": "file does not exist"})):
-            item = self.esperar(self.d.encolar("qwen3:99b")["id"])
-        self.assertIn("no existe", item["error"])
-        with mock.patch.object(dm.requests, "post", return_value=Respuesta(200, lineas=[{"status": "pulling manifest"}])):
-            item = self.esperar(self.d.encolar("qwen3:4b")["id"])
-        self.assertIn("sin confirmación", item["error"])
-
-    def test_explicar_error(self):
-        self.assertIn("conexión", dm.explicar_error("HTTPConnectionPool: Max retries exceeded"))
-        self.assertIn("licencia", dm.explicar_error("", 401))
-        self.assertIn("espacio", dm.explicar_error("write: no space left on device"))
-        self.assertEqual(dm.explicar_error("otra cosa"), "otra cosa")
-
-    def test_cancelar_duplicados_y_reintentar(self):
-        seguir = threading.Event()
-
-        def lineas_lentas():
-            yield json.dumps({"status": "pulling abc", "digest": "abc", "total": 1000, "completed": 10}).encode()
-            seguir.wait(5)
-            yield json.dumps({"status": "pulling abc", "digest": "abc", "total": 1000, "completed": 20}).encode()
-            yield json.dumps({"status": "success"}).encode()
-
-        resp = Respuesta(200)
-        resp.iter_lines = lineas_lentas
-        with mock.patch.object(dm.requests, "post", return_value=resp):
-            a = self.d.encolar("qwen3:8b")
-            repetida = self.d.encolar("qwen3:8b")
-            self.assertEqual(repetida["id"], a["id"])                          # no se duplica
-            json.dumps(repetida)                                               # la API la devuelve tal cual
-            self.assertFalse([k for k in repetida if k.startswith("_")])
-            b = self.d.encolar("gemma3:4b")
-            self.esperar(a["id"], ("descargando",))
-            self.assertEqual(self.d.cancelar(b["id"])["estado"], "cancelado")  # en cola: al momento
-            self.d.cancelar(a["id"])
-            seguir.set()
-            self.assertEqual(self.esperar(a["id"])["estado"], "cancelado")
-        self.assertEqual(self.esperar(b["id"])["estado"], "cancelado")
-        with mock.patch.object(dm.requests, "post", return_value=Respuesta(200, lineas=[{"status": "success"}])):
-            nuevo = self.d.reintentar(a["id"])
-            self.assertNotEqual(nuevo["id"], a["id"])
-            self.assertEqual(self.esperar(nuevo["id"])["estado"], "completado")
-        json.dumps(self.d.lista()), json.dumps(self.d.cancelar(a["id"])), json.dumps(self.d.reintentar(nuevo["id"]))
-        self.assertEqual(self.d.limpiar_terminadas(), 3)
-        self.assertEqual(self.d.lista(), [])
-        with self.assertRaises(ErrorBuscador):
-            self.d.cancelar(999)
-
-    def test_ref_no_valida_no_entra_en_la_cola(self):
-        with self.assertRaises(ErrorBuscador):
-            self.d.encolar("qwen3; rm -rf /")
-        self.assertEqual(self.d.lista(), [])
-
-
 if __name__ == "__main__":
     unittest.main()

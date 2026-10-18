@@ -130,9 +130,8 @@ class PruebaMensaje(unittest.TestCase):
         self.assertIsNone(aec.explicar_error_motor("model requires more system memory"))
         self.assertIsNone(aec.explicar_error_motor(None))
 
-    def test_en_la_cola_de_descargas_y_en_la_prueba_de_recursos(self):
-        import descargas_modelos
-        self.assertEqual(descargas_modelos.explicar_error(self.ERROR_REAL), aec.MENSAJE_RUNTIME_INCOMPLETO)
+    def test_en_la_prueba_de_recursos(self):
+        # (la cola de descargas, ya en Rust, lo prueba en prig_ia::descargas)
         # La prueba de recursos explica el error del motor igual: un motor que falla con el error real
         # devuelve el mensaje explicado (sin GPU, sin Ollama y con un almacén temporal)
         from recursos import calibracion

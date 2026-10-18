@@ -71,6 +71,12 @@ def pedir(base: str, caso: dict):
             estado, cuerpo, tipo = r.status, r.read(), r.headers.get("Content-Type", "")
     except urllib.error.HTTPError as e:
         estado, cuerpo, tipo = e.code, e.read(), e.headers.get("Content-Type", "")
+    if "event-stream" in tipo:
+        # eventos del servidor (`data: {...}`): se comparan como JSON
+        try:
+            return estado, ("json", [normalizar(json.loads(l[6:])) for l in cuerpo.decode().splitlines() if l.startswith("data: ")])
+        except ValueError:
+            pass
     if "ndjson" in tipo:
         # una línea JSON por evento: se comparan como JSON (así valen los volátiles)
         try:
@@ -666,6 +672,82 @@ _HUB_REEMPLAZOS = [[r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?", "FECHA"], [r
 def casos_grafo(copia: str) -> list:
     """ El grafo de aprendizaje, que ya atiende solo el servidor de Rust (PRIG_COMPARAR_RETIRADAS=1 los compara) """
     return [{**c, "solo_rust": True} for c in _casos_grafo(copia)]
+
+
+def casos_descargas() -> list:
+    """ La cola de descargas de modelos y la inspección de un repositorio entero de Hugging Face (sin red: lo que se
+    valida antes de descargar), que ya atiende solo el servidor de Rust """
+    return [{**c, "solo_rust": True} for c in _casos_descargas()]
+
+
+def _casos_descargas() -> list:
+    D = lambda ruta, **x: {"ruta": f"/api/descargas{ruta}", **x}
+    H = lambda q: {"ruta": f"/api/buscador/hf/inspeccionar_completo{q}"}
+    return [
+        D(""), D("/terminadas", metodo="DELETE"),
+        D("", metodo="POST", json={}), D("", metodo="POST", json={"ref": 5, "titulo": 3}), D("", metodo="POST", json=None),
+        D("", metodo="POST", json=[]), D("", metodo="POST", json={"ref": ""}), D("", metodo="POST", json={"ref": "a b c!"}),
+        D("/x/cancelar", metodo="POST"), D("/9/cancelar", metodo="POST"), D("/-1/reintentar", metodo="POST"),
+        D("/1.5/reintentar", metodo="POST"), D("/0/reintentar", metodo="POST"),
+        D(""), D("/terminadas", metodo="DELETE"),
+        H(""), H("?repo="), H("?repo_id="), H("?repo=a%20b"), H("?repo=&repo_id=hf.co/sin-barra"),
+        H("?repo=https://huggingface.co/x/y/z&variante=Q4"),
+    ]
+
+
+def casos_director(tmp: str) -> list:
+    """ El director de LLM del personaje (sin Ollama: su evaluación propia sobre el árbol del archivo), su memoria
+    comprimida y la bitácora de pensamiento de una carpeta, que ya atiende solo el servidor de Rust """
+    return [{**c, "solo_rust": True} for c in _casos_director(tmp)]
+
+
+def _casos_director(tmp: str) -> list:
+    pensar = os.path.join(tmp, "pensar")
+
+    def preparar_pensar():
+        if os.path.isdir(pensar):
+            return
+        for ruta, texto in {"a.py": "import os\n\ndef f(x: int, y: Dict[str, Any] = None) -> 'Res':\n    if not x:\n        return 0\n    for i in y:\n        pass\n    return x\n\nclass K(Base, metaclass=M):\n    async def g(self):\n        await h()\n",
+                            "b.js": "export default function hola() { return 1 }\n", "sub/c.rs": "fn main() {}\n", "sub/roto.py": "def (:\n",
+                            ".oculto/x.py": "x = 1\n", "node_modules/y.js": "y\n", "d.txt": "texto\r\notro\n", ".z.py": "z\n",
+                            "PENSAMIENTO_DEL_PROYECTO.md": "viejo\n", "sub/vacio.py": ""}.items():
+            os.makedirs(os.path.dirname(os.path.join(pensar, ruta)), exist_ok=True)
+            open(os.path.join(pensar, ruta), "w").write(texto)
+    MEM = {"archivo": "{copia}/.prig_dataset/cerebro_memoria_comprimida.json", "restaurar": True, "archivo_json": True,
+           "volatiles": ["timestamp", "tono", "ultima_actualizacion"]}
+    D = lambda j, **x: {"ruta": "/api/llm/director_decision", "metodo": "POST", "json": j, **MEM, **x}
+    S = lambda j, **x: {"ruta": "/api/llm/director_stream", "metodo": "POST", "json": j, **MEM, **x}
+    Q = lambda j: {"ruta": "/api/llm/preguntar_cerebro", "metodo": "POST", "json": j, **MEM}
+    P = lambda j, **x: {"ruta": "/api/llm/ejecutar_pensamiento_proyecto", "metodo": "POST", "json": j, **MEM, "carpetas": [pensar],
+                        "reemplazos": [[r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", "FECHA"]], **x}
+    memoria = {"ruta": "/api/llm/memoria_archivos", **MEM}
+    py = ("import os\nfrom typing import List\n\n\ndef procesar(datos: List[int], n=3) -> int:\n    total = 0\n"
+          "    for d in datos:\n        if d and n or not d:\n            total += d\n    try:\n        x = 1\n    except ValueError:\n"
+          "        raise\n    return total\n\n\nclass Caja(object):\n    def abrir(self):\n        pass\n\nvalor = procesar([1])\n")
+    ctx = lambda linea, **x: {"contexto": {"codigo_completo": py, "archivo_actual": "proc.py", "lenguaje": "python", "linea_cursor": linea, **x}}
+    js = "import x from 'y';\nconst suma = (a, b) => a + b;\nclass Caja extends Base {\n  try { await f() } catch (e) {}\n}\nwhile (true) {}\n"
+    return [
+        memoria,
+        D({}), D({"tema_id": "tema_dragon_sanctuary"}), D({"tema_id": "tema_x_de_prueba", "contexto": {"codigo_reciente": "x = 1"}}),
+        *(D(ctx(n)) for n in (1, 5, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 99, 0, -3)),
+        D(ctx(3, total_lineas=50)), D(ctx(True)), D(ctx(2, codigo_completo="def roto(:\n    pass\n")),
+        D({"contexto": {"codigo_completo": js, "archivo_actual": "web/app.js", "lenguaje": "javascript", "linea_cursor": 2}}),
+        D({"contexto": {"codigo_completo": js, "archivo_actual": "web/app.js", "lenguaje": "JavaScript", "linea_cursor": 4}}),
+        D({"contexto": {"codigo_completo": js, "lenguaje": "rust", "linea_cursor": 6, "total_lineas": "8"}}),
+        D({"contexto": {"codigo_completo": 12345, "linea_cursor": 1}}), D({"contexto": {"codigo_completo": "", "codigo_reciente": None}}),
+        D(ctx("3")), D({"contexto": {"linea_cursor": "abc"}}), D({"contexto": {"linea_cursor": [1]}}), D({"contexto": {"linea_cursor": " 4 "}}),
+        D({"contexto": 5}), D({"tema_id": 3}), D(None), D([]), D({"modelo": 1, "endpoint": []}),
+        D({"endpoint": "http://127.0.0.1:9/", "modelo": "otro:1b", **ctx(5)}),
+        S({}), S(ctx(10)), S({"tema_id": "tema_x"}), S({"contexto": 1}),
+        memoria,
+        Q({"pregunta": ""}), Q({"pregunta": "¿Qué hace procesar y Caja?"}), Q({"pregunta": "hola " * 30}), Q({}), Q({"pregunta": 3}),
+        {**P({"carpeta": pensar}), "antes": preparar_pensar}, P({"carpeta": pensar, "tema_id": "tema_retro_arcade"}),
+        P({"carpeta": os.path.join(pensar, "a.py"), "tema_id": None}), P({"carpeta": os.path.join(pensar, "nueva", "sub")}),
+        P({"carpeta": "  " + os.path.join(pensar, "sub") + "  ", "tema_id": "no_existe"}), P({"carpeta": 5}),
+        memoria,
+        {"ruta": "/api/llm/limpiar_memoria_cerebro", "metodo": "POST", **MEM}, memoria,
+        Q({"pregunta": "procesar"}),
+    ]
 
 
 def _casos_grafo(copia: str) -> list:
@@ -2845,6 +2927,8 @@ def main():
             if not args.vacio:
                 casos += casos_hub(tmp, p["home"])
                 casos += casos_grafo(copia)
+                casos += casos_descargas()
+                casos += casos_director(tmp)
         if args.solo:
             solo = set(args.solo.split(","))
             casos = [c for c in casos if c["ruta"].split("?")[0] in solo]
@@ -2930,7 +3014,7 @@ def main():
                     try:
                         return [nombre, normalizar(json.loads(v))]
                     except Exception:
-                        return [nombre, v.decode(errors="replace")]
+                        return [nombre, normalizar(v.decode(errors="replace"))]
                 lado = lambda n: sorted((contenido(k, v) for k, v in n.items()), key=lambda x: json.dumps(x, ensure_ascii=False))
                 d = diferencia(lado(nuevos_python), lado(nuevos_rust))
                 if d:

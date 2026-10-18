@@ -113,30 +113,19 @@ pub async fn leer(State(state): State<AppState>, Query(q): Query<HashMap<String,
     bloque(move || o_400(archivos::leer(&ruta, &base, &raices))).await
 }
 
-/// `POST /api/file` (`path`, `content`). La memoria del director (Python, en desarrollo) sigue enterándose.
+/// `POST /api/file` (`path`, `content`). La memoria del director (`director.rs`) anota lo guardado.
 pub async fn escribir(State(state): State<AppState>, b: Bytes) -> Response {
     let c = match campos(&b, &[("path", &Tipo::Texto, true), ("content", &Tipo::Texto, true)]) {
         Ok(c) => c,
         Err(r) => return r,
     };
     let (base, raices) = espacio_y_raices(&state).await;
-    let fallback = state.fallback_url.clone();
+    let prig = state.base_dir.clone();
     bloque(move || {
         let (ruta, contenido) = (texto(&c, "path"), texto(&c, "content"));
         let r = archivos::escribir(&ruta, &contenido, &base, &raices);
         if !r.contiene("error") {
-            std::thread::spawn(move || {
-                let cuerpo = Mapa::new().con("path", ruta).con("content", contenido);
-                let _ = reqwest::blocking::Client::builder()
-                    .timeout(std::time::Duration::from_secs(10))
-                    .build()
-                    .and_then(|cl| {
-                        cl.post(format!("{fallback}/api/interno/archivo-guardado"))
-                            .header("Content-Type", "application/json")
-                            .body(prig_plataforma::json::escribir_compacto(&Valor::Mapa(cuerpo)))
-                            .send()
-                    });
-            });
+            std::thread::spawn(move || crate::routes::director::archivo_guardado(&prig, &ruta, &contenido));
         }
         o_400(r)
     })

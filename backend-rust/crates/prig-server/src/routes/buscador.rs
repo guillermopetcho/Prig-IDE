@@ -1,6 +1,6 @@
 //! El buscador de modelos (`/api/buscador/*`): buscar en Ollama, Hugging Face y ModelScope, las variantes comprobadas,
 //! cómo iría una en esta máquina, las novedades, lo instalado con versión nueva y los modelos seguidos
-//! (`prig_modelos::explorar`). Inspeccionar un repositorio entero de Hugging Face sigue en Python con las descargas.
+//! (`prig_modelos::explorar`). Inspeccionar un repositorio entero de Hugging Face está con las descargas (`descargas.rs`).
 
 use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ fn error_500() -> Response {
 }
 
 /// `_buscador`: ErrorBuscador → 400; sin red → 503
-fn de_error(e: ErrorB) -> Response {
+pub(crate) fn de_error(e: ErrorB) -> Response {
     if x::es_del_buscador(&e) {
         return detalle(StatusCode::BAD_REQUEST, x::texto_error(&e));
     }

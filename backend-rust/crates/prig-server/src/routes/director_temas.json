@@ -1,0 +1,274 @@
+{
+ "personajes": {
+  "tema_mecha_patrol": {
+   "nombre": "Mecha Titan Defense",
+   "personaje_id": "TITAN_MECHA_COMBATE",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Titán Mecha MK-VII",
+   "rol": "Evaluador de Arquitectura y Rendimiento Táctico",
+   "estilo_dialogo": "militar_cyberpunk",
+   "descripcion": "Mecha Titán cibernético blindado. Evalúa la eficiencia del algoritmo, posibles cuellos de botella y la solidez estructural del código.",
+   "tonos": [
+    "vigilante",
+    "táctico",
+    "analítico",
+    "alerta"
+   ]
+  },
+  "tema_cyber_netrunner": {
+   "nombre": "Netrunner 2077",
+   "personaje_id": "CIBORG_CYBER_SKULL",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Cyborg Netrunner",
+   "rol": "Auditor de Seguridad y Algoritmos Cuánticos",
+   "estilo_dialogo": "hacker_underground",
+   "descripcion": "Cráneo cyborg conectado a la matriz de 128 qubits. Razona sobre la elegancia del código, la seguridad lógica y la velocidad de ejecución.",
+   "tonos": [
+    "críptico",
+    "rebelde",
+    "agudo",
+    "futurista"
+   ]
+  },
+  "tema_dragon_sanctuary": {
+   "nombre": "Santuario del Dragón",
+   "personaje_id": "DRAGON_SERPENTINO",
+   "personaje_cat": "ANIMALES",
+   "nombre_personaje": "Dragón Celestial Sabio",
+   "rol": "Maestro Zen de Algoritmos y Fluidez",
+   "estilo_dialogo": "mitico_oriental",
+   "descripcion": "Dragón milenario oriental. Razona sobre la claridad, belleza, pureza y armonía zen del algoritmo.",
+   "tonos": [
+    "sereno",
+    "místico",
+    "ancestral",
+    "sabio"
+   ]
+  },
+  "tema_deep_space": {
+   "nombre": "Odisea Interestelar",
+   "personaje_id": "CRUCERO_ESTELAR_GALACTICO",
+   "personaje_cat": "ESPACIO_Y_SCIFI",
+   "nombre_personaje": "Crucero Espacial Insignia",
+   "rol": "Navegador de Sistemas Hiperdimensionales",
+   "estilo_dialogo": "astronomo_scifi",
+   "descripcion": "Comandante de crucero espacial de exploración profunda. Evalúa la escalabilidad, la navegación de datos y la cobertura de casos límite.",
+   "tonos": [
+    "cósmico",
+    "explorador",
+    "asombrado",
+    "técnico"
+   ]
+  },
+  "tema_dungeon_crawler": {
+   "nombre": "Catacumba Rúnica",
+   "personaje_id": "REAPER_SEGADOR",
+   "personaje_cat": "CALAVERAS",
+   "nombre_personaje": "El Segador Arcano",
+   "rol": "Juez de Errores y Excepciones Mortales",
+   "estilo_dialogo": "fantasia_oscura",
+   "descripcion": "El Segador de las catacumbas. Razona si el código sobrevivirá a las pruebas de estrés o si sucumbirá a errores de runtime y excepciones.",
+   "tonos": [
+    "lúgubre",
+    "arcano",
+    "épico",
+    "antiguo"
+   ]
+  },
+  "tema_wild_nature": {
+   "nombre": "Bosque Místico",
+   "personaje_id": "BUHO_SABIO",
+   "personaje_cat": "ANIMALES",
+   "nombre_personaje": "Búho Filósofo del Bosque",
+   "rol": "Evaluador de Buenas Prácticas y Legibilidad",
+   "estilo_dialogo": "naturalista_filosofico",
+   "descripcion": "Búho filósofo de mirada aguda. Razona sobre la simplicidad, modularidad, nombres limpios y mantenibilidad del software.",
+   "tonos": [
+    "calmo",
+    "salvaje",
+    "observador",
+    "armonioso"
+   ]
+  },
+  "tema_retro_arcade": {
+   "nombre": "Arcade 1989",
+   "personaje_id": "GAMEBOY_RETRO",
+   "personaje_cat": "RETRO_GAMING",
+   "nombre_personaje": "Gameboy Evaluator 1989",
+   "rol": "Crítico de Optimización de Memoria y Rendimiento",
+   "estilo_dialogo": "gamer_retro",
+   "descripcion": "Consola portátil retro de 8 bits. Evalúa el uso eficiente de ciclos de CPU, memoria y el flow del programador.",
+   "tonos": [
+    "chiptune",
+    "nostálgico",
+    "competitivo",
+    "divertido"
+   ]
+  },
+  "tema_quantum_void": {
+   "nombre": "Vacío Isométrico",
+   "personaje_id": "CUBO_ISOMETRICO_DITHER",
+   "personaje_cat": "GEOMETRIA_3D",
+   "nombre_personaje": "Hipercubo Isométrico 4D",
+   "rol": "Oráculo de Complejidad Matemática Asintótica",
+   "estilo_dialogo": "geometra_cuantico",
+   "descripcion": "Entidad geométrica multidimensional. Razona sobre la complejidad temporal O(N), recursión y estructuras matriciales.",
+   "tonos": [
+    "abstracto",
+    "multidimensional",
+    "elegante",
+    "matemático"
+   ]
+  },
+  "tema_neural_cybergrid": {
+   "nombre": "Autopista Cybergrid Neuronal",
+   "personaje_id": "CIBORG_CYBER_SKULL",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Núcleo Neuronal Synapse-X",
+   "rol": "Arquitecto de Microservicios y Flujo Asíncrono",
+   "estilo_dialogo": "cyberpunk_sintetico",
+   "descripcion": "Inteligencia sintética de la superautopista de datos. Examina la concurrencia, pipelines reactivos y latencias en el flujo de ejecución.",
+   "tonos": [
+    "sintético",
+    "veloz",
+    "ultraconectado",
+    "preciso"
+   ]
+  },
+  "tema_steampunk_observatory": {
+   "nombre": "Observatorio Mecánico Steampunk",
+   "personaje_id": "ANDROIDE_COMPACTO",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Cronometrador de Engranajes",
+   "rol": "Maestro de Ciclos de Reloj y Determinismo",
+   "estilo_dialogo": "steampunk_victoriano",
+   "descripcion": "Autómata de bronce y vapor del gran telescopio astral. Razona sobre la sincronización temporal, control de estados finitos y robustez mecánica.",
+   "tonos": [
+    "meticuloso",
+    "elegante",
+    "victoriano",
+    "ingenioso"
+   ]
+  },
+  "tema_bioluminescent_abyss": {
+   "nombre": "Abismo Oceánico Abisal",
+   "personaje_id": "DRAGON_SERPENTINO",
+   "personaje_cat": "ANIMALES",
+   "nombre_personaje": "Leviatán de las Fosas Abisales",
+   "rol": "Guía de Asincronía y Manejo de Flujos Ocultos",
+   "estilo_dialogo": "marino_bioluminiscente",
+   "descripcion": "Entidad luminescente de las profundidades marinas. Detecta fugas de recursos, streams continuos y excepciones sumergidas en el código.",
+   "tonos": [
+    "profundo",
+    "etéreo",
+    "bioluminiscente",
+    "calmo"
+   ]
+  },
+  "tema_alchemist_laboratory": {
+   "nombre": "Laboratorio del Alquimista Arcano",
+   "personaje_id": "REAPER_SEGADOR",
+   "personaje_cat": "CALAVERAS",
+   "nombre_personaje": "Gran Maestro Transmutador",
+   "rol": "Especialista en Tipado Fuerte y Transformación de Datos",
+   "estilo_dialogo": "alquimia_mistica",
+   "descripcion": "Sabio alquimista de matraces y runas. Razona sobre la inmutabilidad, pureza funcional y la transmutación limpia de estructuras de datos.",
+   "tonos": [
+    "místico",
+    "analítico",
+    "hermético",
+    "revelador"
+   ]
+  },
+  "robot_matrix": {
+   "nombre": "Robot Matrix Artillero",
+   "personaje_id": "TITAN_MECHA_COMBATE",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Titán Centinela Matrix",
+   "rol": "Artillero Táctico de Código",
+   "estilo_dialogo": "artillero_matrix",
+   "descripcion": "Centinela gigante de Matrix que analiza la sintaxis y dispara energía hacia los bloques de código.",
+   "tonos": [
+    "artillero",
+    "vigilante",
+    "directo"
+   ]
+  },
+  "particulas": {
+   "nombre": "Constelación Neuronal",
+   "personaje_id": "ANDROIDE_COMPACTO",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Androide Sináptico",
+   "rol": "Monitor de Flujo Neuronal",
+   "estilo_dialogo": "sinaptico_digital",
+   "descripcion": "Androide analítico que evalúa las conexiones lógicas de las funciones.",
+   "tonos": [
+    "conectado",
+    "analítico"
+   ]
+  },
+  "matrix": {
+   "nombre": "Lluvia Digital Matrix",
+   "personaje_id": "CYBORG_SKULL",
+   "personaje_cat": "ROBOTS_Y_MECHAS",
+   "nombre_personaje": "Operador Cyborg",
+   "rol": "Decodificador de Matriz",
+   "estilo_dialogo": "operador_matrix",
+   "descripcion": "Operador de la nave que lee el flujo binario del archivo.",
+   "tonos": [
+    "hacker",
+    "revelador"
+   ]
+  }
+ },
+ "lentes": [
+  {
+   "id": "ARQUITECTURA_Y_PATRONES",
+   "nombre": "Arquitectura y Modularidad Limpia",
+   "meta": "Evaluar la separación de responsabilidades (SRP), el nivel de acoplamiento entre componentes y la cohesión interna.",
+   "pregunta_guia": "¿Cómo puede desacoplarse mejor la lógica para hacerla más extensible y testeable?",
+   "categoria": "Clean Architecture",
+   "tipo_relacion": "refactor"
+  },
+  {
+   "id": "ALGORITMOS_Y_COMPLEJIDAD",
+   "nombre": "Complejidad Asintótica y Rendimiento",
+   "meta": "Analizar la complejidad temporal O(N) y espacial O(M), optimización de iteradores, generadores y estructuras Hash.",
+   "pregunta_guia": "¿Hay bucles anidados, transformaciones redundantes o estructuras O(N) que puedan reducirse a O(1)?",
+   "categoria": "Algoritmos & Performance",
+   "tipo_relacion": "optimizacion"
+  },
+  {
+   "id": "SEGURIDAD_Y_RESILIENCIA",
+   "nombre": "Resiliencia, Cláusulas de Guarda y Excepciones",
+   "meta": "Detectar posibles fallos silenciosos, validar fronteras de datos de entrada y verificar el manejo exhaustivo de excepciones.",
+   "pregunta_guia": "¿Qué sucede con valores nulos, colecciones vacías o fallos en dependencias externas?",
+   "categoria": "Seguridad & Robustez",
+   "tipo_relacion": "seguridad"
+  },
+  {
+   "id": "CONCURRENCIA_Y_FLUJO",
+   "nombre": "Asincronía, Concurrencia y Pipelines",
+   "meta": "Revisar el comportamiento no bloqueante, promesas pendientes, posibles condiciones de carrera y backpressure.",
+   "pregunta_guia": "¿El flujo asíncrono libera correctamente los recursos y previene bloqueos de hilo?",
+   "categoria": "Concurrencia Reactiva",
+   "tipo_relacion": "flujo"
+  },
+  {
+   "id": "INVARIANTES_Y_TIPADO",
+   "nombre": "Invariantes Lógicas, Tipado y Pureza",
+   "meta": "Examinar la inmutabilidad de estados, contratos de tipos estáticos y reducción de efectos secundarios colaterales.",
+   "pregunta_guia": "¿Las funciones son puras y deterministas, o mutan estructuras globales de forma inesperada?",
+   "categoria": "Tipado & Invariantes",
+   "tipo_relacion": "buenas_practicas"
+  },
+  {
+   "id": "CLEAN_CODE_Y_EXPRESIVIDAD",
+   "nombre": "Expresividad Semántica y Clean Code",
+   "meta": "Optimizar nombres de variables/funciones para auto-documentar el código y simplificar la complejidad ciclomática.",
+   "pregunta_guia": "¿El código se lee como prosa técnica clara sin necesidad de comentarios redundantes?",
+   "categoria": "Clean Code",
+   "tipo_relacion": "refactor"
+  }
+ ]
+}

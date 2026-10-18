@@ -583,7 +583,7 @@ pub async fn descargar(b: Bytes) -> Response {
 }
 
 /// La carpeta de modelos del servidor de Ollama (`OLLAMA_MODELS`), si la fija su entorno
-fn carpeta_servidor(raiz: &Path) -> Option<String> {
+pub(crate) fn carpeta_servidor(raiz: &Path) -> Option<String> {
     let estado = crate::routes::recursos::estado_servidor_publico(raiz);
     estado.mapa("entorno").and_then(|e| e.get("OLLAMA_MODELS")).filter(|v| !v.es_nulo()).map(Valor::texto_py)
 }

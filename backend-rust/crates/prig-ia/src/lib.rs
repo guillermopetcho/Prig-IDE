@@ -2,6 +2,8 @@
 
 pub mod json_modelo;
 pub mod generar;
+pub mod descargas;
+pub mod descargas_hf;
 pub mod gemini;
 pub mod gestor;
 pub mod moe;

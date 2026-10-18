@@ -38,9 +38,6 @@ from herramientas_chat import Herramientas, ETIQUETAS as ETIQUETAS_HERRAMIENTAS
 import banco_proyecto
 import memoria_consulta
 import lectura_unidades
-import buscador_modelos
-from buscador_modelos import ErrorBuscador
-from descargas_modelos import Descargas
 from recursos.gestor import gestor as _gestor_recursos
 from recursos import calibracion as recursos_cal, servidor as recursos_srv
 from recursos.almacen import almacen as recursos_almacen
@@ -1385,23 +1382,8 @@ def _gpu_ocupada() -> bool:
         return bool(ai_engine._active_streams)
 
 
-class ArchivoGuardadoRequest(BaseModel):
-    path: str
-    content: str
-
-
-@app.post("/api/interno/archivo-guardado")
-def interno_archivo_guardado(req: ArchivoGuardadoRequest):
-    """ El servidor de Rust guarda los archivos del editor y avisa aquí: la memoria del director (llm_director, en
-    desarrollo) anota lo leído """
-    try:
-        from llm_director import director_llm
-        ext = os.path.splitext(req.path)[1].lower()
-        lenguaje = "python" if ext == ".py" else ("javascript" if ext in (".js", ".jsx") else ("typescript" if ext in (".ts", ".tsx") else ("html" if ext == ".html" else ("css" if ext == ".css" else ("c_cpp" if ext in (".c", ".cpp", ".h") else ("rust" if ext == ".rs" else "text"))))))
-        director_llm.memoria.registrar_lectura_archivo(archivo=req.path, codigo=req.content, lenguaje=lenguaje)
-    except Exception as e:
-        logger.debug("Error registrando memoria AST al guardar archivo: %s", e)
-    return {"ok": True}
+# Guardar un archivo del editor lo atiende el servidor de Rust, que también avisa a la memoria del director
+# (routes/director.rs)
 
 
 def _firma_config():
@@ -1505,81 +1487,8 @@ def _carpeta_modelos_servidor() -> Optional[str]:
 # Buscador de modelos (Ollama, Hugging Face, ModelScope) y cola de descargas
 # ===========================================================================
 
-def _buscador(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except ErrorBuscador as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except requests_lib.RequestException as e:
-        raise HTTPException(status_code=503, detail=f"Sin conexión con la plataforma: {e}")
-
-
-def _al_terminar_descarga(item):
-    try:
-        recursos_gestor().olvidar_fichas()
-    except Exception:
-        pass
-    try:
-        seguimiento.marcar_actualizado(item["ref"])
-    except Exception:
-        pass
-
-
-descargas = Descargas(lambda: ai_engine.base_url.rstrip("/"),
-                      lambda: _carpeta_modelos_servidor() or gestor_modelos.carpeta_modelos(),
-                      al_terminar=_al_terminar_descarga,
-                      workspace_dir_fn=lambda: file_mgr.base_dir)
-seguimiento = buscador_modelos.Seguimiento()
-
-
-# El buscador de modelos (/api/buscador/*) lo atiende el servidor de Rust (prig_modelos::explorar); aquí queda el
-# seguimiento para que una descarga terminada lo marque al día
-
-
-class DescargaModeloRequest(BaseModel):
-    ref: str
-    titulo: Optional[str] = None
-    tipo: Optional[str] = "ollama"
-    variante: Optional[str] = None
-    destino: Optional[str] = None
-
-
-@app.post("/api/descargas")
-def descargas_encolar(req: DescargaModeloRequest):
-    return _buscador(descargas.encolar, req.ref, req.titulo, tipo=req.tipo or "ollama",
-                     variante=req.variante, destino=req.destino)
-
-
-@app.get("/api/buscador/hf/inspeccionar_completo")
-def buscador_hf_inspeccionar_completo(repo: Optional[str] = None, repo_id: Optional[str] = None, variante: Optional[str] = None):
-    """Inspecciona los archivos de configuración y pesos de un repositorio de Hugging Face
-    para preparar una descarga y respaldo completo contra borrado."""
-    ident = repo or repo_id
-    if not ident:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="Falta el identificador del repositorio ('repo' o 'repo_id').")
-    from descargas_hf_completo import inspeccionar_modelo_hf
-    return _buscador(inspeccionar_modelo_hf, ident, variante=variante)
-
-
-@app.get("/api/descargas")
-def descargas_lista():
-    return {"descargas": descargas.lista()}
-
-
-@app.post("/api/descargas/{id_}/cancelar")
-def descargas_cancelar(id_: int):
-    return _buscador(descargas.cancelar, id_)
-
-
-@app.post("/api/descargas/{id_}/reintentar")
-def descargas_reintentar(id_: int):
-    return _buscador(descargas.reintentar, id_)
-
-
-@app.delete("/api/descargas/terminadas")
-def descargas_limpiar():
-    return {"borradas": descargas.limpiar_terminadas()}
+# La cola de descargas de modelos (/api/descargas*) y la copia completa de un repositorio de Hugging Face
+# (/api/buscador/hf/inspeccionar_completo): servidor de Rust (routes/descargas.rs, prig_ia::descargas y descargas_hf)
 
 # ===========================================================================
 # Desafíos: enunciado, caja de razonamiento, páginas de código y pruebas ocultas
@@ -1622,129 +1531,8 @@ def _modelo_desafios(modelo: Optional[str], rol: Optional[str] = None) -> str:
 # ----------------------------------------------------------------------------
 # Prig Hub (tu aprendizaje en texto plano, versionado en git): servidor de Rust (routes/hub.rs, docs/prig-hub.md)
 
-# ============================================================================
-# API DIRECTOR NARRATIVO Y DE AGENTES ASCII (Modelos 7B / Ollama / Local)
-# ============================================================================
-from llm_director import director_llm
-
-class LLMDirectorRequest(BaseModel):
-    tema_id: str = "tema_mecha_patrol"
-    contexto: Dict[str, Any] = {}
-    modelo: Optional[str] = None
-    endpoint: Optional[str] = None
-
-@app.post("/api/llm/director_decision")
-def obtener_decision_director(req: LLMDirectorRequest):
-    """
-    Retorna directivas de movimiento, animaciones y diálogos de fondo
-    generados por un modelo 7B o motor procedural.
-    """
-    try:
-        decision = director_llm.consultar_director(
-            tema_id=req.tema_id,
-            contexto_editor=req.contexto,
-            modelo_personalizado=req.modelo,
-            endpoint_personalizado=req.endpoint
-        )
-        return {"ok": True, "data": decision}
-    except Exception as e:
-        logger.error(f"Error en director LLM: {e}")
-        return {"ok": False, "error": str(e)}
-
-@app.post("/api/llm/director_stream")
-def obtener_decision_director_stream(req: LLMDirectorRequest):
-    """
-    Emite tokens progresivos en streaming (Server-Sent Events) con latencia < 150ms
-    y entrega la decisión completa estructurada al finalizar.
-    """
-    try:
-        gen = director_llm.consultar_director_stream(
-            tema_id=req.tema_id,
-            contexto_editor=req.contexto,
-            modelo_personalizado=req.modelo,
-            endpoint_personalizado=req.endpoint
-        )
-        return StreamingResponse(gen, media_type="text/event-stream")
-    except Exception as e:
-        logger.error(f"Error en streaming del director LLM: {e}")
-        return {"ok": False, "error": str(e)}
-
-class PreguntaCerebroRequest(BaseModel):
-    pregunta: str
-    modelo: Optional[str] = None
-    endpoint: Optional[str] = None
-
-@app.get("/api/llm/memoria_archivos")
-def obtener_memoria_archivos():
-    """
-    Retorna la lista de archivos leídos y comprimidos semánticamente (TC-AST)
-    junto con las estadísticas de ahorro de tokens.
-    """
-    try:
-        archivos = director_llm.memoria.obtener_resumen_memoria()
-        stats = director_llm.memoria.obtener_estadisticas_tokens()
-        return {
-            "ok": True,
-            "archivos": archivos,
-            "stats": stats,
-            "historial_preguntas": director_llm.memoria.historial_preguntas
-        }
-    except Exception as e:
-        logger.error(f"Error obteniendo memoria de archivos: {e}")
-        return {"ok": False, "error": str(e)}
-
-@app.post("/api/llm/preguntar_cerebro")
-def preguntar_cerebro_memoria(req: PreguntaCerebroRequest):
-    """
-    Responde preguntas sobre los archivos leídos utilizando únicamente
-    la memoria semántica comprimida (ahorrando ~90% tokens).
-    """
-    try:
-        res = director_llm.memoria.preguntar_al_cerebro(
-            pregunta=req.pregunta,
-            director_instancia=director_llm,
-            modelo=req.modelo,
-            endpoint=req.endpoint
-        )
-        return res
-    except Exception as e:
-        logger.error(f"Error consultando al cerebro: {e}")
-        return {"ok": False, "error": str(e)}
-
-@app.post("/api/llm/limpiar_memoria_cerebro")
-def limpiar_memoria_cerebro():
-    """Limpia el almacén de memoria comprimida"""
-    try:
-        director_llm.memoria.archivos_memorizados.clear()
-        director_llm.memoria.historial_preguntas.clear()
-        director_llm.memoria._guardar_memoria()
-        return {"ok": True, "mensaje": "Memoria del cerebro reiniciada"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-class EjecutarPensamientoProyectoRequest(BaseModel):
-    carpeta: Optional[str] = ""
-    tema_id: Optional[str] = "tema_mecha_patrol"
-    modelo: Optional[str] = None
-    endpoint: Optional[str] = None
-
-@app.post("/api/llm/ejecutar_pensamiento_proyecto")
-def ejecutar_pensamiento_proyecto_endpoint(req: EjecutarPensamientoProyectoRequest):
-    """
-    Ejecuta el razonamiento y pensamiento del personaje temático sobre la carpeta
-    o proyecto y lo materializa en un archivo markdown estructurado en el disco.
-    """
-    try:
-        res = director_llm.ejecutar_pensamiento_en_archivo(
-            carpeta=req.carpeta,
-            tema_id=req.tema_id or "tema_mecha_patrol",
-            modelo_personalizado=req.modelo,
-            endpoint_personalizado=req.endpoint
-        )
-        return res
-    except Exception as e:
-        logger.error(f"Error ejecutando pensamiento del proyecto: {e}", exc_info=True)
-        return {"ok": False, "error": str(e)}
+# El director de LLM del personaje ASCII (/api/llm/*: decisión, flujo, memoria comprimida, preguntas y bitácora de
+# pensamiento): servidor de Rust (routes/director.rs y director_ast.rs)
 
 
 # El motor de aprendizaje por grafo de nodos (/api/aprendizaje/*): servidor de Rust (routes/aprendizaje_grafo.rs,
