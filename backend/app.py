@@ -31,13 +31,10 @@ from knowledge_service import KnowledgeService
 from knowledge_base import KnowledgeBase
 from knowledge_context import ContextAssembler
 from contexto_modelo import CompiladorContexto
-from indice_semantico import IndiceSemantico
 import agent_flows
 from explorador import Explorador
 from ide_servicios import ServiciosIDE
-import ollama_opciones
-from ollama_opciones import ErrorConfig
-from ollama_gestion import GestorModelos, ErrorGestion
+from ollama_gestion import GestorModelos
 from herramientas_chat import Herramientas, ETIQUETAS as ETIQUETAS_HERRAMIENTAS
 import banco_proyecto
 import memoria_consulta
@@ -53,9 +50,7 @@ from feature_flags import FeatureFlags
 from learning_telemetry import LearningTelemetry
 from guided_learning import GuidedLearningService
 import kaggle_lector
-import kaggle_colecciones
 import inicio
-import github_lector
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -104,7 +99,6 @@ dataset_mgr = LearnerDatasetManager(file_mgr.base_dir)
 knowledge_base = KnowledgeBase()
 compilador_contexto = CompiladorContexto(knowledge_base)
 context_assembler = ContextAssembler(knowledge_base, compilador_contexto)
-indice_semantico = IndiceSemantico(knowledge_base)
 
 
 def _gpu_libre_para_banco() -> bool:
@@ -257,20 +251,6 @@ class FileCreateRequest(BaseModel):
     path: str
     is_dir: bool = False
 
-class CodeRunRequest(BaseModel):
-    path: str
-    run_id: Optional[str] = None
-
-class RunCancelRequest(BaseModel):
-    run_id: str
-
-class CellRunRequest(BaseModel):
-    code: str
-    path: Optional[str] = None
-
-class SessionResetRequest(BaseModel):
-    path: Optional[str] = None
-
 class AIChatRequest(BaseModel):
     prompt: str
     model: str = "qwen2.5-coder:7b"
@@ -311,30 +291,8 @@ class AISearchRequest(BaseModel):
 
 
 
-class BookImportRequest(BaseModel):
-    path: str
-    category: Optional[str] = None
-
-# La lista, leer, la ficha de IA, los recortes, el lector de PDF y las citas de los libros: servidor de Rust
-# (routes/estante.rs y routes/libros.rs). Importar sigue aquí, con la indexación del conocimiento.
-
-@app.post("/api/books/import")
-def import_book(req: BookImportRequest):
-    res = book_service.import_file(req.path, req.category)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-
-    # Importar e indexar son el mismo acto: si se separan, la biblioteca y el
-    # catálogo se desincronizan y el tutor deja de "ver" lo que el usuario añadió.
-    try:
-        ingest = knowledge_service.index_single(res["path"], res.get("category", "book").lower())
-        res["indexed"] = ingest.get("status") in ("INGESTED", "ALREADY_EXISTS")
-        res["chunks_count"] = ingest.get("chunks_count", 0)
-    except Exception as err:
-        res["indexed"] = False
-        res["index_error"] = str(err)
-
-    return res
+# La lista, leer, la ficha de IA, los recortes, el lector de PDF, las citas e importar (con su indexación) los
+# libros: servidor de Rust (routes/estante.rs y routes/libros.rs).
 
 
 # =========================================================================
@@ -479,37 +437,6 @@ class FlagUpdateRequest(BaseModel):
 # Rust (routes/flujos.rs y routes/flujos_motor.rs)
 
 
-def _version_ollama() -> str:
-    # 1. Intentar consultar el servicio activo en ejecución
-    active_ver = None
-    try:
-        import requests as _rq
-        res = _rq.get(f"{ai_engine.base_url}/api/version", timeout=3)
-        if res.status_code == 200:
-            active_ver = res.json().get("version")
-    except Exception:
-        pass
-
-    # 2. Consultar el mejor binario instalado en el sistema/Prig
-    best = None
-    try:
-        best = ai_engine.get_best_ollama_binary()
-    except Exception:
-        pass
-    best_ver = best[1] if best and best[1] != "0.0.0" else None
-
-    # Si hay versión activa y binario disponible:
-    if active_ver and best_ver:
-        if hasattr(ai_engine, "_version_ge") and ai_engine._version_ge(best_ver, active_ver):
-            return best_ver
-        return active_ver
-
-    if active_ver:
-        return active_ver
-    if best_ver:
-        return best_ver
-
-    return "?"
 
 
 
@@ -539,116 +466,7 @@ def _version_ollama() -> str:
 # El sondeo de libros y preparar desde él: servidor de Rust (prig_biblioteca::sondeo, routes/trabajos.rs)
 
 
-# Kaggle: buscar notebooks de la comunidad y leerlos celda a celda con un modelo
-# (backend/kaggle_lector.py). Sustituye al catálogo fijo de seis notebooks y a la
-# «importación» que generaba una plantilla inventada en vez del notebook real.
-
-class KaggleRefRequest(BaseModel):
-    ref: str
-    modelo: Optional[str] = None
-    regenerar: bool = False
-    incluir_datos: Optional[bool] = True
-
-
-class KaggleExplicarRequest(KaggleRefRequest):
-    indice: int
-    nivel: str = "intermedio"
-
-
-class KagglePreguntarRequest(KaggleRefRequest):
-    indice: Optional[int] = None
-    mensajes: List[Dict[str, str]]
-
-
-def _kaggle(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except kaggle_lector.ErrorKaggle as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-class KaggleColeccionRequest(BaseModel):
-    nombre: Optional[str] = None
-    descripcion: Optional[str] = None
-    color: Optional[str] = None
-
-
-class KaggleItemRequest(BaseModel):
-    tipo: str
-    ref: str
-    datos: Optional[Dict[str, Any]] = None
-    nota: Optional[str] = None
-
-
-class KagglePdfRequest(BaseModel):
-    ref: Optional[str] = None                  # un notebook…
-    coleccion: Optional[str] = None            # …o todos los de una colección
-    nivel: Optional[str] = None
-    solo_explicadas: bool = False
-    guia: bool = True
-    salidas: bool = True
-    chat: Optional[List[Dict[str, str]]] = None
-
-
-@app.get("/api/kaggle/colecciones/{id_}")
-def kaggle_coleccion(id_: str):
-    return _kaggle(kaggle_colecciones.obtener, id_)
-
-
-@app.patch("/api/kaggle/colecciones/{id_}")
-def kaggle_coleccion_editar(id_: str, req: KaggleColeccionRequest):
-    return _kaggle(kaggle_colecciones.editar, id_, req.nombre, req.descripcion, req.color)
-
-
-@app.delete("/api/kaggle/colecciones/{id_}")
-def kaggle_coleccion_borrar(id_: str):
-    return _kaggle(kaggle_colecciones.borrar, id_)
-
-# Explicar los datos de un dataset o una competición: servidor de Rust (routes/profesor.rs)
-
-
-# ==========================================
-# GITHUB: buscar repositorios y leerlos con el profesor (github_lector.py)
-# ==========================================
-
-class GithubRefRequest(BaseModel):
-    ref: str
-    ruta: Optional[str] = None
-    nivel: str = "intermedio"
-    modelo: Optional[str] = None
-    regenerar: bool = False
-    nota: Optional[str] = None
-    mensajes: Optional[List[Dict[str, str]]] = None
-
-
-class GithubTokenRequest(BaseModel):
-    texto: str
-
-class GithubWidgetPreviewRequest(BaseModel):
-    config: Optional[Dict[str, Any]] = None
-    extras: Optional[Dict[str, Any]] = None
-
-def _github(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except github_lector.ErrorGitHub as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-# Explicar un repositorio o un archivo y las preguntas: servidor de Rust (routes/profesor.rs)
-
-
-@app.get("/api/github/guardados")
-def github_guardados():
-    return {"repos": github_lector.guardados()}
-
-
-@app.post("/api/github/guardados")
-def github_guardar(req: GithubRefRequest):
-    return {"repos": _github(github_lector.guardar, req.ref, req.nota or "")}
-
-
-@app.delete("/api/github/guardados")
-def github_quitar(ref: str):
-    return {"repos": github_lector.quitar(ref)}
+# Kaggle y GitHub (buscar, leer, colecciones, guardados): servidor de Rust (routes/integraciones.rs, routes/desafios.rs)
 
 # Explicar un notebook (celda, guía, ruta de estudio, preguntas): servidor de Rust (routes/profesor.rs)
 
@@ -709,25 +527,7 @@ def _exec_timeout() -> int:
     except (TypeError, ValueError):
         return 25
 
-@app.post("/api/run")
-def run_code(req: CodeRunRequest):
-    return runner.run_file(req.path, timeout=_exec_timeout(), run_id=req.run_id)
-
-@app.post("/api/run/cancel")
-def cancel_run(req: RunCancelRequest):
-    """ Detiene una ejecución en curso. El cliente envía su propio run_id al lanzar,
-    porque /api/run no responde hasta que el proceso termina. """
-    return runner.cancel(req.run_id)
-
-@app.post("/api/notebook/cell/run")
-def run_cell(req: CellRunRequest):
-    cwd = os.path.dirname(req.path) if req.path else file_mgr.base_dir
-    # session_id = ruta del cuaderno: cada cuaderno conserva su propio espacio de nombres
-    return runner.run_cell_code(req.code, cwd, session_id=req.path, timeout=_exec_timeout())
-
-@app.post("/api/notebook/session/reset")
-def reset_notebook_session(req: SessionResetRequest):
-    return runner.reset_session(req.path)
+# Ejecutar archivos y celdas de cuaderno, cancelar y reiniciar la sesión: servidor de Rust (routes/ejecutar.rs)
 
 @app.post("/api/app/shutdown")
 def api_shutdown():
@@ -735,218 +535,7 @@ def api_shutdown():
     cleanup_all_processes()
     return {"status": "ok", "message": "Análisis y procesos apagados correctamente."}
 
-@app.get("/api/ai/ollama/version-info")
-def get_ollama_version_info():
-    """ Devuelve versión actual de Ollama y comprueba si hay nueva versión en los servidores oficiales """
-    current = _version_ollama()
-    latest = None
-    try:
-        import requests as _rq
-        r = _rq.get("https://api.github.com/repos/ollama/ollama/releases/latest",
-                    headers={"User-Agent": "Prig-IDE"}, timeout=5)
-        if r.status_code == 200:
-            latest = r.json().get("tag_name", "").lstrip("v")
-    except Exception:
-        pass
-
-    has_update = False
-    if current != "?" and latest:
-        has_update = not agent_flows.version_suficiente(current, latest)
-
-    return {
-        "current_version": current,
-        "latest_version": latest or "desconocida",
-        "has_update": has_update,
-        "command": "curl -fsSL https://ollama.com/install.sh | sh"
-    }
-
-@app.post("/api/ai/ollama/update")
-def update_ollama_stream():
-    """ Descarga e instala la última versión oficial de Ollama directamente en Prig """
-    import platform
-    import tempfile
-    import tarfile
-    import time
-
-    def emit():
-        yield json.dumps({"stage": "inicio", "porcentaje": 5, "mensaje": "Iniciando proceso de actualización de Ollama..."}) + "\n"
-
-        system = platform.system()
-        if system != "Linux":
-            yield json.dumps({
-                "stage": "error",
-                "mensaje": f"La actualización automática directa está optimizada para Linux (detectado: {system}).",
-                "comando_manual": "curl -fsSL https://ollama.com/install.sh | sh"
-            }) + "\n"
-            return
-
-        arch_raw = platform.machine().lower()
-        if arch_raw in ("x86_64", "amd64"):
-            arch = "amd64"
-        elif arch_raw in ("aarch64", "arm64"):
-            arch = "arm64"
-        else:
-            yield json.dumps({
-                "stage": "error",
-                "mensaje": f"Arquitectura del procesador no soportada para descarga directa: {arch_raw}.",
-                "comando_manual": "curl -fsSL https://ollama.com/install.sh | sh"
-            }) + "\n"
-            return
-
-        prig_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        download_url = f"https://github.com/ollama/ollama/releases/latest/download/ollama-linux-{arch}.tar.zst"
-        fallback_url = f"https://ollama.com/download/ollama-linux-{arch}.tar.zst"
-        legacy_tgz_url = f"https://ollama.com/download/ollama-linux-{arch}.tgz"
-
-        yield json.dumps({"stage": "info", "porcentaje": 15, "mensaje": f"Conectando con servidores oficiales de Ollama (Linux {arch})..."}) + "\n"
-
-        temp_tar = None
-        try:
-            import requests as _rq
-            req_stream = None
-            for url in (download_url, fallback_url, legacy_tgz_url):
-                try:
-                    r = _rq.get(url, stream=True, timeout=15, headers={"User-Agent": "Prig-IDE"})
-                    if r.status_code == 200:
-                        req_stream = r
-                        break
-                except Exception:
-                    continue
-
-            if not req_stream:
-                yield json.dumps({
-                    "stage": "error",
-                    "mensaje": "No se pudo conectar a los servidores de descarga de Ollama. Usa el botón de terminal oficial de abajo.",
-                    "comando_manual": "curl -fsSL https://ollama.com/install.sh | sh"
-                }) + "\n"
-                return
-
-            total_len = req_stream.headers.get("Content-Length")
-            total_bytes = int(total_len) if total_len and total_len.isdigit() else 0
-            downloaded = 0
-
-            suffix = ".tar.zst" if ".zst" in req_stream.url else ".tgz"
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-                temp_tar = f.name
-                last_pct = -1
-                for chunk in req_stream.iter_content(chunk_size=1024 * 256):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_bytes > 0:
-                            pct = 15 + int((downloaded / total_bytes) * 65)
-                            if pct != last_pct and pct % 5 == 0:
-                                last_pct = pct
-                                mb_down = round(downloaded / (1024 * 1024), 1)
-                                mb_tot = round(total_bytes / (1024 * 1024), 1)
-                                yield json.dumps({
-                                    "stage": "descarga",
-                                    "porcentaje": pct,
-                                    "mensaje": f"Descargando paquete oficial ({mb_down} MB / {mb_tot} MB - {pct}%)..."
-                                }) + "\n"
-
-            yield json.dumps({"stage": "extraccion", "porcentaje": 85, "mensaje": "Desempaquetando binarios y bibliotecas en Prig..."}) + "\n"
-
-            # Extraer sobre prig_root
-            if temp_tar.endswith(".zst"):
-                res = subprocess.run(["tar", "--zstd", "-xf", temp_tar, "-C", prig_root], capture_output=True, text=True)
-                if res.returncode != 0:
-                    subprocess.run(f"zstd -d -c '{temp_tar}' | tar -xf - -C '{prig_root}'", shell=True, check=True)
-            else:
-                with tarfile.open(temp_tar, "r:gz") as tar:
-                    for member in tar.getmembers():
-                        if member.name.startswith("/") or ".." in member.name:
-                            continue
-                        tar.extract(member, path=prig_root)
-
-            ollama_bin = os.path.join(prig_root, "bin", "ollama")
-            if os.path.exists(ollama_bin):
-                os.chmod(ollama_bin, 0o755)
-                # Sincronizar bin/bin/ollama si existe la carpeta bin/bin
-                bin_bin_ollama = os.path.join(prig_root, "bin", "bin", "ollama")
-                if os.path.exists(os.path.dirname(bin_bin_ollama)):
-                    try:
-                        shutil.copy2(ollama_bin, bin_bin_ollama)
-                        os.chmod(bin_bin_ollama, 0o755)
-                    except Exception:
-                        pass
-
-            # Sincronizar en ~/.local/bin si la carpeta existe
-            local_bin_dir = os.path.join(os.path.expanduser("~"), ".local", "bin")
-            if os.path.exists(local_bin_dir):
-                local_bin_ollama = os.path.join(local_bin_dir, "ollama")
-                try:
-                    if os.path.islink(local_bin_ollama) or os.path.exists(local_bin_ollama):
-                        os.remove(local_bin_ollama)
-                    shutil.copy2(ollama_bin, local_bin_ollama)
-                    os.chmod(local_bin_ollama, 0o755)
-                except Exception:
-                    pass
-
-            yield json.dumps({"stage": "reinicio", "porcentaje": 95, "mensaje": "Reiniciando el servicio de Ollama..."}) + "\n"
-
-            # Recargar y reiniciar Ollama
-            ai_engine.reload_ollama()
-            time.sleep(2)
-
-            nueva_ver = _version_ollama()
-            yield json.dumps({
-                "stage": "fin",
-                "porcentaje": 100,
-                "version": nueva_ver,
-                "mensaje": f"¡Ollama se ha actualizado con éxito! Versión activa: {nueva_ver}"
-            }) + "\n"
-
-        except Exception as e:
-            yield json.dumps({
-                "stage": "error",
-                "mensaje": f"Fallo durante la actualización: {str(e)}",
-                "comando_manual": "curl -fsSL https://ollama.com/install.sh | sh"
-            }) + "\n"
-        finally:
-            if temp_tar and os.path.exists(temp_tar):
-                try:
-                    os.remove(temp_tar)
-                except Exception:
-                    pass
-
-    return StreamingResponse(_flujo_cancelable(emit()), media_type="application/x-ndjson")
-
-
-@app.post("/api/ai/ollama/launch-terminal-update")
-def launch_terminal_update():
-    """ Abre una ventana de terminal nativa para ejecutar la actualización oficial con soporte interactivo de sudo """
-    import shutil
-    cmd = (
-        "echo '=================================================='; "
-        "echo '      🚀 Actualizador Oficial de Ollama           '; "
-        "echo '=================================================='; "
-        "echo ''; "
-        "echo 'Descargando e instalando con el script oficial...'; "
-        "echo ''; "
-        "curl -fsSL https://ollama.com/install.sh | sh; "
-        "echo ''; "
-        "echo '=================================================='; "
-        "echo '✅ ¡Proceso finalizado! Ya puedes cerrar esta ventana.'; "
-        "echo '=================================================='; "
-        "read -p 'Presiona Enter para salir...' dummy"
-    )
-
-    candidates = [
-        ["gnome-terminal", "--", "bash", "-c", cmd],
-        ["x-terminal-emulator", "-e", f"bash -c \"{cmd}\""],
-        ["xterm", "-e", f"bash -c \"{cmd}\""]
-    ]
-
-    for terminal_cmd in candidates:
-        if shutil.which(terminal_cmd[0]):
-            try:
-                subprocess.Popen(terminal_cmd, start_new_session=True)
-                return {"status": "ok", "message": f"Terminal abierta con {terminal_cmd[0]}"}
-            except Exception:
-                continue
-
-    return {"status": "error", "message": "No se encontró un emulador de terminal compatible instalado en el sistema."}
+# La versión de Ollama, actualizarlo y abrir la terminal con el instalador: servidor de Rust (routes/ia.rs)
 
 class AIConfigUpdateRequest(BaseModel):
     ollama_url: Optional[str] = None
@@ -1965,19 +1554,9 @@ def ai_ocupada():
 gestor_modelos = GestorModelos(ai_engine.base_url)
 
 
-def _modelos(fn, *args, **kwargs):
-    gestor_modelos.base = ai_engine.base_url.rstrip("/")
-    try:
-        return fn(*args, **kwargs)
-    except (ErrorConfig, ErrorGestion) as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except requests_lib.RequestException as e:
-        raise HTTPException(status_code=503, detail=f"Ollama no responde: {e}")
-
-
 # Las rutas de modelos (/api/modelos, catalogo, ficha, config, plantilla, probar, crear, copiar, borrar, importar,
-# actualizaciones, cargados, precargar, descargar, parciales, registro) son del servidor de Rust (routes/modelos.rs).
-# Aquí quedan los embeddings, con el índice semántico.
+# actualizaciones, cargados, precargar, descargar, parciales, registro, embeddings) son del servidor de Rust
+# (routes/modelos.rs).
 
 
 def _carpeta_modelos_servidor() -> Optional[str]:
@@ -1988,41 +1567,7 @@ def _carpeta_modelos_servidor() -> Optional[str]:
         return None
 
 
-@app.get("/api/modelos/embeddings")
-def modelos_embeddings():
-    return {"ajustes": ollama_opciones.config().embeddings(), "indice": indice_semantico.estado()}
-
-
-class ModelosEmbeddingsRequest(BaseModel):
-    modelo: Optional[str] = None
-    dimensiones: Optional[int] = None
-    truncar: Optional[bool] = None
-    quitar_dimensiones: bool = False
-
-
-@app.post("/api/modelos/embeddings")
-def modelos_embeddings_fijar(req: ModelosEmbeddingsRequest):
-    if req.modelo and "embedding" not in ai_engine.capacidades(req.modelo):
-        raise HTTPException(status_code=400, detail=f"{req.modelo} no es un modelo de embeddings")
-    ajustes = _modelos(ollama_opciones.config().fijar_embeddings, req.modelo, req.dimensiones,
-                       req.truncar, req.quitar_dimensiones)
-    return {"ajustes": ajustes, "indice": indice_semantico.estado()}
-
-
-class ModelosEmbeddingsProbarRequest(BaseModel):
-    texto: str = "Prueba de embeddings"
-
-
-@app.post("/api/modelos/embeddings/probar")
-def modelos_embeddings_probar(req: ModelosEmbeddingsProbarRequest):
-    import time as _t
-    t0 = _t.time()
-    try:
-        vectores = indice_semantico.embeber([req.texto], timeout=120)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo generar el embedding: {e}")
-    return {"dimensiones": len(vectores[0]) if vectores else 0, "ms": round((_t.time() - t0) * 1000),
-            "muestra": [round(x, 4) for x in (vectores[0][:8] if vectores else [])]}
+# Los embeddings (ajustes, fijar y probar): servidor de Rust (routes/modelos.rs, con el índice de routes/kb.rs)
 
 
 # ===========================================================================

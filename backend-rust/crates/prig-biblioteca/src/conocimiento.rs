@@ -1089,6 +1089,17 @@ impl Conocimiento {
         let _ = std::fs::write(&marca, ahora());
     }
 
+    /// `index_single`: un archivo recién importado, sin recorrer la biblioteca. (estado, fragmentos)
+    pub fn indexar_uno(&self, ruta: &str, tipo: &str) -> Result<(&'static str, usize), String> {
+        self.purgar_viejo(ruta, self.sha(ruta).as_deref(), &self.mapa_por_ruta());
+        let (estado, _, n) = meter(&self.catalogo, ruta, tipo, self.pdf_listo)?;
+        if estado == "INGESTED" {
+            // el backend de Python rehace sus índices en memoria cuando cambia `.index/generacion`
+            let _ = std::fs::write(Path::new(&self.raiz).join(".index").join("generacion"), ahora());
+        }
+        Ok((estado, n))
+    }
+
     /// `index_library_async`: en marcha ANTES de lanzar el hilo (así el estado no dice «terminado» por un instante)
     pub fn indexar_en_segundo_plano(self: &'static Self, forzar: bool) -> Mapa {
         let ya = self.con_trabajo(|t| t.verdad("running"));

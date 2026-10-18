@@ -175,3 +175,40 @@ pub async fn restaurar(b: Bytes) -> Response {
         _ => error_500(),
     }
 }
+
+/// `POST /api/books/import` (`path`, `category`): copia a la biblioteca e indexa en el acto (si se separan, el tutor
+/// deja de «ver» lo que el usuario añadió)
+pub async fn importar(State(state): State<AppState>, b: Bytes) -> Response {
+    use prig_plataforma::modelo::Tipo;
+    const TEXTO_OPC: Tipo = Tipo::Opcional(&Tipo::Texto);
+    let c = match cuerpo::modelo(&b).and_then(|m| cuerpo::tipados(&m, &[("path", &Tipo::Texto, true), ("category", &TEXTO_OPC, false)])) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    let r = tokio::task::spawn_blocking(move || {
+        let categoria = c.get("category").filter(|v| !v.es_nulo()).map(Valor::texto_py);
+        let mut res = Estante::por_defecto().importar(&c.valor("path").texto_py(), categoria.as_deref());
+        if res.contiene("error") {
+            return res;
+        }
+        let ruta = res.valor("path").texto_py();
+        let tipo = res.get("category").map(Valor::texto_py).unwrap_or_else(|| "book".into()).to_lowercase();
+        match crate::routes::conocimiento::servicio(&state).and_then(|k| k.indexar_uno(&ruta, &tipo)) {
+            Ok((estado, n)) => {
+                res.poner("indexed", estado == "INGESTED" || estado == "ALREADY_EXISTS");
+                res.poner("chunks_count", n as i64);
+            }
+            Err(e) => {
+                res.poner("indexed", false);
+                res.poner("index_error", e);
+            }
+        }
+        res
+    })
+    .await;
+    match r {
+        Ok(m) if m.contiene("error") => detalle(StatusCode::BAD_REQUEST, m.valor("error").texto_py()),
+        Ok(m) => json_py(StatusCode::OK, &Valor::Mapa(m)),
+        Err(_) => error_500(),
+    }
+}

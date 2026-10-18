@@ -615,3 +615,75 @@ pub async fn registro(State(state): State<AppState>, Query(q): Query<HashMap<Str
     })
     .await
 }
+
+// =========================================================================== embeddings (con el índice semántico)
+
+const ENTERO_OPC: Tipo = Tipo::Opcional(&Tipo::Entero);
+
+fn con_indice(ajustes: Mapa) -> Response {
+    match crate::routes::kb::estado_indice() {
+        Ok(i) => ok(Valor::Mapa(Mapa::new().con("ajustes", ajustes).con("indice", i))),
+        Err(_) => error_500(),
+    }
+}
+
+/// `GET /api/modelos/embeddings`: los ajustes del embebedor y el estado del índice semántico
+pub async fn embeddings() -> Response {
+    bloque(|| con_indice(opciones::config().embeddings())).await
+}
+
+/// `POST /api/modelos/embeddings` (`modelo`, `dimensiones`, `truncar`, `quitar_dimensiones`)
+pub async fn embeddings_fijar(b: Bytes) -> Response {
+    let c = match cuerpo::modelo(&b).and_then(|m| {
+        cuerpo::tipados(
+            &m,
+            &[("modelo", &TEXTO_OPC, false), ("dimensiones", &ENTERO_OPC, false), ("truncar", &BOOL_OPC, false), ("quitar_dimensiones", &Tipo::Booleano, false)],
+        )
+    }) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    bloque(move || {
+        let modelo = c.get("modelo").filter(|v| !v.es_nulo()).cloned();
+        if let Some(m) = modelo.as_ref().filter(|m| m.verdad()) {
+            let m = m.texto_py();
+            if !prig_ia::generar::capacidades(&m).iter().any(|x| x == "embedding") {
+                return detalle(StatusCode::BAD_REQUEST, format!("{m} no es un modelo de embeddings"));
+            }
+        }
+        let presente = |k: &str| c.get(k).filter(|v| !v.es_nulo()).cloned();
+        match opciones::config().fijar_embeddings(modelo.as_ref(), presente("dimensiones").as_ref(), presente("truncar").as_ref(), c.verdad("quitar_dimensiones")) {
+            Ok(a) => con_indice(a),
+            Err(e) => de_config(e),
+        }
+    })
+    .await
+}
+
+/// `POST /api/modelos/embeddings/probar` (`texto`): las dimensiones, el tiempo y una muestra del vector
+pub async fn embeddings_probar(b: Bytes) -> Response {
+    let c = match cuerpo::modelo(&b).and_then(|m| cuerpo::tipados(&m, &[("texto", &Tipo::Texto, false)])) {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+    bloque(move || {
+        let texto = c.get("texto").map(Valor::texto_py).unwrap_or_else(|| "Prueba de embeddings".into());
+        let t0 = std::time::Instant::now();
+        let vectores = match crate::routes::kb::embeber(&[texto], 120) {
+            Ok(v) => v,
+            Err(e) => return detalle(StatusCode::BAD_REQUEST, format!("No se pudo generar el embedding: {e}")),
+        };
+        let ms = prig_plataforma::valor::redondear_entero(t0.elapsed().as_secs_f64() * 1000.0) as i64;
+        let primero = vectores.first();
+        ok(Valor::Mapa(
+            Mapa::new()
+                .con("dimensiones", primero.map(|v| v.len()).unwrap_or(0) as i64)
+                .con("ms", ms)
+                .con(
+                    "muestra",
+                    Valor::Lista(primero.map(|v| v.iter().take(8).map(|x| Valor::Real(prig_plataforma::valor::redondear(*x, 4))).collect()).unwrap_or_default()),
+                ),
+        ))
+    })
+    .await
+}

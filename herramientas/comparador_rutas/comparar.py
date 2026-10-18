@@ -382,6 +382,18 @@ def sembrar_ejercicios(proyecto: str):
         json.dump(datos, f, indent=2, ensure_ascii=False)
 
 
+def sembrar_ejecutar(proyecto: str):
+    """ Programas para «Ejecutar» y archivos para importar a la biblioteca """
+    d = os.path.join(proyecto, "ejec")
+    os.makedirs(os.path.join(d, "carpeta", "sub"), exist_ok=True)
+    for nombre, texto in [("hola.py", "print('hola', 2 + 3)\n"), ("falla.py", "import sys\nprint('antes')\nraise ValueError('mal')\n"),
+                          ("salida.py", "import sys\nsys.stderr.write('aviso\\n')\nsys.exit(3)\n"),
+                          ("hola.sh", "echo uno; echo dos >&2\n"), ("notas_de_curso.md", "# Notas\n\nUna nota con texto.\n\n## Otra\n\nMás texto aquí.\n"),
+                          ("arxiv_paper.txt", "Resumen de un paper.\n"), ("carpeta/a.py", "x = 1\n"), ("carpeta/sub/b.txt", "b\n")]:
+        with open(os.path.join(d, nombre), "w", encoding="utf-8") as f:
+            f.write(texto)
+
+
 def sembrar_flujos(proyecto: str):
     """ Dos flujos guardados y dos ejecuciones en el historial (Python los carga al arrancar) """
     d = os.path.join(proyecto, ".prig_dataset")
@@ -497,6 +509,57 @@ CASOS_FLUJOS = [
     {"ruta": "/api/flujos/nada", "metodo": "DELETE"},
 ]
 # retiradas de Python en la tanda 45 (antes, 58 de 58 iguales)
+CASOS_OLLAMA_ACT = [
+    {"ruta": "/api/ai/ollama/version-info"},
+    {"ruta": "/api/ai/ollama/launch-terminal-update", "metodo": "POST"},
+]
+
+_NB = "{proyecto}/ejec/cuaderno.ipynb"
+_LIB = {"carpetas": [f"{{home}}/.prig_books/{c}" for c in ("books", "papers", "code", "projects", "documentation")], "restaurar_otro": ["{home}/.prig_books/.index/catalog.db", "{home}/.prig_books/.index/generacion"]}
+CASOS_EJECUTAR = [
+    *({"ruta": "/api/run", "metodo": "POST", "json": j, "volatiles": ["execution_time", "duracion", "tiempo"],
+       "reemplazos": [[r"^\S*/\.venv/bin/python", "PYTHON"]]} for j in [
+        {"path": "{proyecto}/ejec/hola.py"}, {"path": "{proyecto}/ejec/falla.py", "run_id": "r1"}, {"path": "{proyecto}/ejec/salida.py"},
+        {"path": "{proyecto}/ejec/hola.sh"}, {"path": "{proyecto}/ejec/nada.py"}, {"path": "{proyecto}/ejec/notas_de_curso.md"}, {"path": "{proyecto}/ejec"},
+        {}, {"path": 3}, {"path": "{proyecto}/ejec/hola.py", "run_id": 5},
+    ]),
+    *({"ruta": "/api/run/cancel", "metodo": "POST", "json": j} for j in [{"run_id": "nada"}, {}, {"run_id": None}]),
+    *({"ruta": "/api/notebook/cell/run", "metodo": "POST", "json": j, "volatiles": ["execution_time", "duracion", "tiempo"]} for j in [
+        {"code": "x = 21\nprint(x)", "path": _NB}, {"code": "print(x * 2)", "path": _NB}, {"code": "x * 3", "path": _NB},
+        {"code": "print(x)", "path": _NB + "#otra"}, {"code": "import os\nprint(os.getcwd())"}, {"code": "import os\nprint(os.getcwd())", "path": ""},
+        {"code": "1/0", "path": _NB}, {"code": "import sys; sys.stderr.write('e')", "path": _NB}, {}, {"code": 3},
+    ]),
+    {"ruta": "/api/notebook/session/reset", "metodo": "POST", "json": {"path": _NB}},
+    {"ruta": "/api/notebook/cell/run", "metodo": "POST", "json": {"code": "print(x)", "path": _NB}, "volatiles": ["execution_time", "duracion", "tiempo"]},
+    *({"ruta": "/api/notebook/session/reset", "metodo": "POST", "json": j} for j in [{"path": "nunca"}, {}, {"path": 3}]),
+    *({"ruta": "/api/books/import", "metodo": "POST", "json": j, **_LIB} for j in [
+        {"path": "{proyecto}/ejec/notas_de_curso.md"}, {"path": "{proyecto}/ejec/notas_de_curso.md", "category": "PAPERS"},
+        {"path": "{proyecto}/ejec/arxiv_paper.txt"}, {"path": "{proyecto}/ejec/hola.py", "category": "nada"}, {"path": "{proyecto}/ejec/carpeta"},
+        {"path": "{proyecto}/ejec/no_esta.md"}, {"path": "~/no_esta.md"}, {}, {"path": 1}, {"path": "{proyecto}/ejec/hola.py", "category": 2},
+    ]),
+]
+
+_EMB = {"archivo": "{home}/.prig_modelos.json", "archivo_json": True}
+CASOS_EMBEDDINGS = [
+    {"ruta": "/api/modelos/embeddings"},
+    # Python embebía siempre en localhost:11434; Rust, en la Ollama configurada (la falsa aquí): solo Rust
+    {"ruta": "/api/modelos/embeddings/probar", "metodo": "POST", "json": {}, "solo_rust": True},
+    {"ruta": "/api/modelos/embeddings/probar", "metodo": "POST", "json": {"texto": 3}},
+    *({"ruta": "/api/modelos/embeddings", "metodo": "POST", "json": j, **_EMB, "restaurar": True} for j in [
+        {"modelo": "qwen2.5-coder:7b"}, {"dimensiones": "x"}, {"dimensiones": -3}, {"truncar": "no"}, {"modelo": 4}, {}, {"truncar": False},
+        {"quitar_dimensiones": True}, {"modelo": ""},
+    ]),
+    {"ruta": "/api/modelos/embeddings", "metodo": "POST", "json": {"modelo": "nomic-embed-text:latest", "dimensiones": 32}, **_EMB, "solo_rust": True},
+    {"ruta": "/api/modelos/embeddings/probar", "metodo": "POST", "json": {"texto": "hola"}, "volatiles": ["ms"], "solo_rust": True},
+    {"ruta": "/api/modelos/embeddings", "metodo": "POST", "json": {"quitar_dimensiones": True}, **_EMB, "solo_rust": True},
+    {"ruta": "/api/modelos/embeddings/probar", "metodo": "POST", "json": {"texto": "hola"}, "volatiles": ["ms"], "solo_rust": True},
+    {"ruta": "/api/modelos/embeddings", "solo_rust": True},
+]
+
+# Retiradas de Python tras dar lo mismo (tanda 46): solo Rust
+for _c in [*CASOS_OLLAMA_ACT, *CASOS_EMBEDDINGS, *CASOS_EJECUTAR]:
+    _c["solo_rust"] = True
+
 for _c in CASOS_FLUJOS:
     _c["solo_rust"] = True
 
@@ -1016,6 +1079,12 @@ def ollama_falso() -> str:
 
         def do_POST(self):
             d = self.cuerpo()
+            if self.path == "/api/embed":
+                if d.get("model") != "nomic-embed-text:latest":
+                    return self.responder(404, {"error": f"model \"{d.get('model')}\" not found, try pulling it first"})
+                dims = d.get("dimensions") or 12
+                return self.responder(200, {"model": d["model"], "embeddings": [[round(0.123456789 * (i + 1) / (j + 1), 9) for i in range(dims)]
+                                                                                  for j, _ in enumerate(d.get("input") or [])]})
             if self.path == "/api/pull":
                 n = d.get("name")
                 if n == "noexiste":
@@ -2345,6 +2414,9 @@ def casos_por_defecto(proyecto: str, home: str, desafio: str = "des_0000000000",
         # los flujos de agentes, la ficha de un libro con un flujo y el workflow del editor (tanda 45). Python guarda
         # los flujos y el historial en memoria: primero lo que lee, después lo que escribe
         *CASOS_FLUJOS,
+        *CASOS_OLLAMA_ACT,
+        *CASOS_EMBEDDINGS,
+        *CASOS_EJECUTAR,
     ]
     def sustituir(v):
         """ {home} y {proyecto} también dentro del cuerpo JSON (sin esto llegaban literales: rutas que no existen) """
@@ -2403,6 +2475,7 @@ def main():
             sembrar_ejercicios(p["proyecto"])
             sembrar_guiado(p["proyecto"])
             sembrar_flujos(p["proyecto"])
+            sembrar_ejecutar(p["proyecto"])
             sembrar_biblioteca(p["home"])
             sembrar_kaggle_datos(p["proyecto"], p["home"])
             sembrar_buscador(p["home"])

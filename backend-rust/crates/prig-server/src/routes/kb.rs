@@ -129,7 +129,17 @@ pub fn embeber(textos: &[String], segundos: u64) -> Result<Vec<Vec<f64>>, String
         c.poner("truncate", false);
     }
     c.poner("options", Mapa::new().con("num_gpu", 0));
-    let r = reqwest::blocking::Client::builder()
+    // Los errores, como los de `urllib` (los muestra «Probar» en Modelos → Embeddings)
+    let de_urllib = |e: reqwest::Error| {
+        if e.is_timeout() {
+            "timed out".to_string()
+        } else if e.is_connect() {
+            "<urlopen error [Errno 111] Connection refused>".to_string()
+        } else {
+            e.to_string()
+        }
+    };
+    let resp = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(segundos))
         .build()
         .map_err(|e| e.to_string())?
@@ -137,12 +147,16 @@ pub fn embeber(textos: &[String], segundos: u64) -> Result<Vec<Vec<f64>>, String
         .header("Content-Type", "application/json")
         .body(prig_plataforma::json::escribir_compacto(&Valor::Mapa(c)))
         .send()
-        .map_err(|e| e.to_string())?
-        .error_for_status()
-        .map_err(|e| e.to_string())?
-        .text()
-        .map_err(|e| e.to_string())?;
+        .map_err(de_urllib)?;
+    let estado = resp.status();
+    if !estado.is_success() {
+        return Err(format!("HTTP Error {}: {}", estado.as_u16(), estado.canonical_reason().unwrap_or("")));
+    }
+    let r = resp.text().map_err(de_urllib)?;
     let Ok(Valor::Mapa(m)) = prig_plataforma::json::leer(&r) else { return Err("respuesta no válida".into()) };
+    if !m.get("embeddings").is_some_and(Valor::verdad) {
+        return Ok(Vec::new());
+    }
     Ok(m.lista("embeddings").unwrap_or(&[]).iter().map(|v| match v {
         Valor::Lista(l) => l.iter().filter_map(Valor::num).collect(),
         _ => Vec::new(),
@@ -247,7 +261,12 @@ pub async fn contexto_tutor(b: Bytes) -> Response {
 
 /// `GET /api/kb/indice`: si el índice semántico está en pie y con qué modelo
 pub async fn indice() -> Response {
-    en_hilo(|| {
+    en_hilo(estado_indice).await
+}
+
+/// `IndiceSemantico.estado()`
+pub fn estado_indice() -> Result<Valor, String> {
+    {
         let kb = BaseKb::por_defecto()?;
         let c = kb.conectar()?;
         c.execute_batch("CREATE TABLE IF NOT EXISTS vectores (concept_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, modelo TEXT, indexado_en TEXT);").map_err(|e| e.to_string())?;
@@ -269,8 +288,7 @@ pub async fn indice() -> Response {
                 .con("dimension", f.get("dim").cloned().unwrap_or(Valor::Nulo))
                 .con("indexado_en", f.get("cuando").cloned().unwrap_or(Valor::Nulo)),
         ))
-    })
-    .await
+    }
 }
 
 /// `IndiceSemantico.indexar`: embebe el bloque compilado de cada concepto (de 64 en 64)

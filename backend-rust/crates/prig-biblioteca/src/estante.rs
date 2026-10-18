@@ -184,6 +184,62 @@ impl Estante {
         Ok(Some(e))
     }
 
+    /// `volver_a_mostrar`: importar de nuevo algo quitado lo vuelve a poner (comparando la ruta tal cual)
+    fn volver_a_mostrar(&self, ruta: &str) {
+        let Some(Valor::Mapa(mut datos)) = leer_json(&self.archivo_ocultos()) else { return };
+        let Some(antes) = datos.lista("ocultos").map(<[Valor]>::to_vec) else { return };
+        let despues: Vec<Valor> = antes.iter().filter(|o| !matches!(o, Valor::Mapa(m) if m.texto("ruta") == Some(ruta))).cloned().collect();
+        if despues.len() != antes.len() {
+            datos.poner("ocultos", Valor::Lista(despues));
+            let _ = escribir_json(&self.archivo_ocultos(), &Valor::Mapa(datos));
+        }
+    }
+
+    /// `BookService.import_file`: copia un archivo o una carpeta a su categoría (la pedida o la de su tipo)
+    pub fn importar(&self, origen: &str, categoria: Option<&str>) -> Mapa {
+        let abs = abspath(&prig_plataforma::py::expanduser(origen));
+        if std::fs::metadata(&abs).is_err() {
+            return Mapa::new().con("error", format!("El archivo u origen no existe: {origen}"));
+        }
+        let nombre = basename(&abs);
+        let pedida = categoria.map(str::to_lowercase);
+        let cat = match pedida.as_deref().and_then(|c| CATEGORIAS.iter().find(|x| **x == c)) {
+            Some(c) => *c,
+            None => categoria_de(&abs),
+        };
+        let destino = join(&join(&self.raiz, cat), &nombre);
+        let r: Result<(), String> = (|| {
+            if abspath(&abs) != abspath(&destino) {
+                if Path::new(&abs).is_dir() {
+                    copiar_arbol(Path::new(&abs), Path::new(&destino))?;
+                } else {
+                    std::fs::copy(&abs, &destino).map_err(|e| prig_plataforma::py::error_os(&e, &destino))?;
+                    if let Ok(m) = std::fs::metadata(&abs).and_then(|m| m.modified()) {
+                        let _ = std::fs::File::options().write(true).open(&destino).and_then(|f| f.set_modified(m));
+                    }
+                }
+            }
+            Ok(())
+        })();
+        if let Err(e) = r {
+            return Mapa::new().con("error", format!("Error importando elemento: {e}"));
+        }
+        self.volver_a_mostrar(&abspath(&destino));
+        let tam = std::fs::metadata(&destino).ok().filter(|m| m.is_file()).map(|m| redondear(m.len() as f64 / (1024.0 * 1024.0), 2)).unwrap_or(0.0);
+        let ext = splitext(&nombre).1.to_lowercase().replace('.', "");
+        Mapa::new()
+            .con("id", nombre.as_str())
+            .con("uid", relpath(&destino, &self.raiz))
+            .con("category", cat.to_uppercase())
+            .con("category_id", cat)
+            .con("title", titulo_de_nombre(&nombre))
+            .con("filename", nombre.as_str())
+            .con("path", destino)
+            .con("ext", ext)
+            .con("size_mb", Valor::Real(tam))
+            .con("analyzed", false)
+    }
+
     /// La categoría por la carpeta en que está (o, en la raíz, por su tipo)
     fn categoria_de_ruta(&self, ruta: &str) -> &'static str {
         let rel = relpath(ruta, &self.raiz);
@@ -919,4 +975,19 @@ mod pruebas {
         assert!(e.quitar(&el, &piezas, Some(&["../../books/otro.pdf".to_string()])).is_err());
         std::fs::remove_dir_all(r).ok();
     }
+}
+
+/// `shutil.copytree(origen, destino, dirs_exist_ok=True)` (con los enlaces seguidos, como hace por defecto)
+fn copiar_arbol(origen: &Path, destino: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(destino).map_err(|e| prig_plataforma::py::error_os(&e, &destino.to_string_lossy()))?;
+    let l = std::fs::read_dir(origen).map_err(|e| prig_plataforma::py::error_os(&e, &origen.to_string_lossy()))?;
+    for e in l.flatten() {
+        let (de, a) = (e.path(), destino.join(e.file_name()));
+        if de.is_dir() {
+            copiar_arbol(&de, &a)?;
+        } else {
+            std::fs::copy(&de, &a).map_err(|e| prig_plataforma::py::error_os(&e, &a.to_string_lossy()))?;
+        }
+    }
+    Ok(())
 }
