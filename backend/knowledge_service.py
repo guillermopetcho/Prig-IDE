@@ -76,8 +76,21 @@ class KnowledgeService:
     # Ciclo de vida del índice
     # ------------------------------------------------------------------
 
+    def _generacion(self) -> float:
+        """ Fecha de `.index/generacion`: el servidor de Rust la cambia cuando quita algo del catálogo """
+        try:
+            return os.path.getmtime(os.path.join(self.books_dir, ".index", "generacion"))
+        except OSError:
+            return 0.0
+
     def _ensure_engine(self):
         with self._lock:
+            generacion = self._generacion()
+            if generacion != getattr(self, "_generacion_vista", 0.0):
+                self._generacion_vista = generacion
+                self._retriever = None
+                self._reranker = None
+                self._evidence = None
             if self._retriever is None:
                 self._retriever = HybridRetriever(self.catalog)
                 self._reranker = ExplicableReranker(self.catalog)
@@ -117,15 +130,21 @@ class KnowledgeService:
 
     def discover_files(self) -> List[Dict[str, str]]:
         """ Archivos indexables presentes en la biblioteca """
+        from book_service import rutas_ocultas, esta_oculto, INFRAESTRUCTURA
         found = []
+        ocultos = rutas_ocultas(self.books_dir)
         for root, dirs, files in os.walk(self.books_dir):
             # .index guarda el catálogo y metadata los JSON del analizador de IA
-            dirs[:] = [d for d in dirs if d not in (".index", "metadata") and not d.startswith(".")]
+            # en la raíz, las carpetas de Prig (citas, trabajos, paquetes...) no son material de estudio
+            dirs[:] = [d for d in dirs if d != "metadata" and not d.startswith(".") and not (root == self.books_dir and d in INFRAESTRUCTURA)]
             for name in sorted(files):
                 ext = os.path.splitext(name)[1].lower()
                 if ext not in INDEXABLE_EXTENSIONS:
                     continue
                 path = os.path.join(root, name)
+                # lo que el usuario quitó de la biblioteca no se indexa
+                if esta_oculto(os.path.abspath(path), ocultos):
+                    continue
                 rel = os.path.relpath(path, self.books_dir)
                 category = rel.split(os.sep)[0] if os.sep in rel else INDEXABLE_EXTENSIONS[ext]
                 found.append({

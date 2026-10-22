@@ -8,6 +8,7 @@ archivos que no son UTF-8, y respeten los finales de línea.
 """
 
 import json
+import time
 import os
 import shutil
 import sys
@@ -216,22 +217,53 @@ class PruebaRecientes(_Base):
 
 
 class PruebaMostrarEnSistema(_Base):
+    """ Con programas falsos en el PATH (xdg-open, dbus-send) que anotan con qué se los llamó """
+
+    def _path_falso(self, programas):
+        bin_ = tempfile.mkdtemp(prefix="prig_test_bin_")
+        self.addCleanup(shutil.rmtree, bin_, True)
+        self.anotado = os.path.join(bin_, "llamadas.txt")
+        for p in programas:
+            ruta = os.path.join(bin_, p)
+            with open(ruta, "w") as f:
+                f.write(f'#!/bin/sh\necho "{p} $*" >> "{self.anotado}"\nexit 1\n')
+            os.chmod(ruta, 0o755)
+        return mock.patch.dict(os.environ, {"PATH": bin_})
+
+    def _llamadas(self, esperar=False):
+        for _ in range(100 if esperar else 1):
+            if os.path.exists(self.anotado):
+                with open(self.anotado) as f:
+                    return f.read().splitlines()
+            time.sleep(0.02)
+        return []
+
     def test_no_lanza_nada_fuera_del_workspace(self):
-        with mock.patch("ide_servicios.subprocess.Popen") as popen, \
-                mock.patch("ide_servicios.subprocess.run") as run:
+        with self._path_falso(["xdg-open", "dbus-send"]):
             with self.assertRaises(PermissionError):
                 self.ide.mostrar_en_sistema(self.fuera)
-            popen.assert_not_called()
-            run.assert_not_called()
+        time.sleep(0.1)
+        self.assertEqual(self._llamadas(), [])
 
     def test_abre_la_carpeta_si_no_hay_dbus(self):
         ruta = self.escribir("a.py", "")
-        with mock.patch("ide_servicios.shutil.which", return_value=None), \
-                mock.patch("ide_servicios.sys.platform", "linux"), \
-                mock.patch("ide_servicios.subprocess.Popen") as popen:
+        with self._path_falso(["xdg-open"]):
             self.ide.mostrar_en_sistema(ruta)
-        self.assertEqual(popen.call_args.args[0], ["xdg-open", self.ws])
+        self.assertEqual(self._llamadas(esperar=True), [f"xdg-open {self.ws}"])
 
+    def test_abre_la_carpeta_si_dbus_falla(self):
+        ruta = self.escribir("a.py", "")
+        with self._path_falso(["xdg-open", "dbus-send"]):
+            self.ide.mostrar_en_sistema(ruta)
+        llamadas = self._llamadas(esperar=True)
+        for _ in range(50):
+            if len(llamadas) == 2:
+                break
+            time.sleep(0.02)
+            llamadas = self._llamadas()
+        self.assertTrue(llamadas[0].startswith("dbus-send --session"), llamadas)
+        self.assertIn(f"array:string:file://{ruta}", llamadas[0])
+        self.assertEqual(llamadas[1], f"xdg-open {self.ws}")
 
 
 class PruebaProyectosGuardados(_Base):

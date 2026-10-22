@@ -107,3 +107,49 @@ class TestNotebook(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSegundaCarpeta(unittest.TestCase):
+    """ La segunda carpeta del explorador se puede leer y editar, pero no borrar entera """
+
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="prig_test_ws_")
+        self.otra = tempfile.mkdtemp(prefix="prig_test_otra_")
+        self.fm = FileManager(self.ws)
+        # Nunca la config del usuario
+        self.fm.config_path = os.path.join(self.ws, "config.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.ws, ignore_errors=True)
+        shutil.rmtree(self.otra, ignore_errors=True)
+
+    def test_sin_segunda_carpeta_queda_fuera(self):
+        self.assertIn("error", self.fm.write_file(os.path.join(self.otra, "a.py"), "x"))
+
+    def test_segunda_carpeta_se_lee_y_escribe(self):
+        self.assertTrue(self.fm.set_segunda_dir(self.otra).get("success"))
+        destino = os.path.join(self.otra, "a.py")
+        self.assertTrue(self.fm.write_file(destino, "x=2").get("success"))
+        self.assertEqual(self.fm.read_file(destino)["content"], "x=2")
+        self.assertTrue(self.fm.get_file_tree(self.otra))
+
+    def test_no_se_borra_su_raiz(self):
+        self.fm.set_segunda_dir(self.otra)
+        self.assertIn("error", self.fm.delete_item(self.otra))
+        self.assertTrue(os.path.isdir(self.otra))
+
+    def test_se_guarda_sin_tocar_last_workspace(self):
+        import json
+        with open(self.fm.config_path, "w") as f:
+            json.dump({"last_workspace": self.ws}, f)
+        self.fm.set_segunda_dir(self.otra)
+        with open(self.fm.config_path) as f:
+            self.assertEqual(json.load(f), {"last_workspace": self.ws, "segunda_carpeta": self.otra})
+        self.fm.set_segunda_dir(None)
+        with open(self.fm.config_path) as f:
+            self.assertEqual(json.load(f), {"last_workspace": self.ws})
+        self.assertIn("error", self.fm.read_file(os.path.join(self.otra, "a.py")))
+
+    def test_carpeta_inexistente_se_rechaza(self):
+        self.assertIn("error", self.fm.set_segunda_dir(os.path.join(self.otra, "no_existe")))
+        self.assertIsNone(self.fm.segunda_dir)

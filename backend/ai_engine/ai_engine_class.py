@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import threading
+import uuid
 import requests
 import ast
 from typing import Dict, Any, Generator, List, Optional, Callable
@@ -80,28 +81,12 @@ def explicar_error_motor(texto: str) -> Optional[str]:
         return MENSAJE_RUNTIME_INCOMPLETO
     return None
 
-# Chat con herramientas (chat_eventos): una consulta idéntica no se repite, y la última ronda responde
-CONSULTA_REPETIDA = ("Ya hiciste exactamente esta consulta y su resultado está más arriba: no la repitas. Usa ese "
-                     "resultado, prueba una consulta DISTINTA o responde.")
-SIN_MAS_CONSULTAS = ("No hay más consultas: responde ahora la pregunta con lo que ya obtuviste. Si algo no lo pudiste "
-                     "confirmar, dilo en lugar de suponerlo.")
-SALIR_DEL_BUCLE = ("Te estás repitiendo. Detente y da ahora tu conclusión final en pocas líneas, sin repetir lo anterior.")
-
-
-def corte_de_bucle(texto: str, largo: int = 240, veces: int = 3) -> Optional[int]:
-    """ Si el final del texto ya apareció literal `veces - 1` veces antes, el modelo está en un bucle: devuelve dónde
-    termina la primera aparición (lo de antes del bucle). Revisando una función, una respuesta repitió el mismo párrafo
-    («Espera, creo que el error está en la línea 96…») hasta el tope; en 132 respuestas medidas, solo esa dispara esto
-    (docs/estudio-banco.md, «Corrige los fallos») """
-    if len(texto) < largo * veces:
-        return None
-    cola = texto[-largo:]
-    previo = texto[:-largo]
-    if previo.count(cola) < veces - 1:
-        return None
-    return previo.index(cola) + largo
+# El chat con herramientas (consultas repetidas, última ronda, cortes por bucle) está en Rust: prig_ia::generar
 
 CONFIG_PATH = os.path.expanduser("~/.prig_ai_config.json")
+
+# Las herramientas de los chats en curso: el servidor de Rust genera y pide ejecutar cada una (/api/interno/herramienta)
+SESIONES_HERRAMIENTAS: Dict[str, Any] = {}
 
 
 def reparar_y_parsear_json(response_text: str) -> dict:
@@ -344,6 +329,7 @@ class AIEngine:
             "banco_modo": "auto",
         }
         self._load_config()
+        self._firma_vista = self._firma_config()
 
     def _load_config(self) -> None:
         """ La configuración se guardaba solo en memoria y se perdía al reiniciar """
@@ -363,14 +349,31 @@ class AIEngine:
         except Exception as e:
             print(f"⚠️ No se pudo leer la configuración de IA guardada: {e}")
 
+    def _firma_config(self):
+        try:
+            st = os.stat(self.config_path)
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+
+    def _refrescar_config(self) -> None:
+        """ El servidor de Rust también escribe este archivo (los ajustes del motor MoE): si cambió en disco, se relee
+        antes de usarlo o de guardar encima (si no, guardar otro ajuste desharía el suyo) """
+        firma = self._firma_config()
+        if firma is not None and firma != getattr(self, "_firma_vista", None):
+            self._load_config()
+            self._firma_vista = firma
+
     def _save_config(self) -> None:
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
+            self._firma_vista = self._firma_config()
         except Exception as e:
             print(f"⚠️ No se pudo guardar la configuración de IA: {e}")
 
     def get_config(self) -> Dict[str, Any]:
+        self._refrescar_config()
         return self.config
 
     ROLES = {
@@ -390,6 +393,7 @@ class AIEngine:
         return (str(self.config.get(clave) or "")).strip() or None
 
     def update_config(self, new_cfg: Dict[str, Any]) -> Dict[str, Any]:
+        self._refrescar_config()
         for k, v in new_cfg.items():
             if k in self.config and v is not None:
                 self.config[k] = v
@@ -510,92 +514,18 @@ class AIEngine:
         time.sleep(1.0)
 
     def try_autostart_ollama(self, force_restart: bool = False) -> bool:
-        best = self.get_best_ollama_binary()
-        best_bin = best[0] if best else None
-        best_ver = best[1] if best else "0.0.0"
-
-        # 1. Comprobar si ya hay una instancia respondiendo
-        active_ver = None
-        try:
-            res = requests.get(f"{self.base_url}/api/version", timeout=2)
-            if res.status_code == 200:
-                active_ver = res.json().get("version")
-        except Exception:
-            pass
-
-        # Si ya responde y no se fuerza reinicio:
-        # Verificar si la versión activa es obsoleta respecto al mejor binario disponible
-        if active_ver and not force_restart:
-            en_marcha = self.binario_ollama_en_marcha()
-            roto = (en_marcha is not None and best_bin is not None
-                    and os.path.realpath(en_marcha) != os.path.realpath(best_bin)
-                    and estado_runtime_ollama(en_marcha) == RUNTIME_INCOMPLETO
-                    and estado_runtime_ollama(best_bin) == RUNTIME_COMPLETO)
-            if roto:
-                # Responde, pero no puede cargar modelos: se cambia por el completo
-                print(f"⚠️ {en_marcha} no tiene llama-server; se reinicia Ollama con {best_bin}")
-            elif best_ver and self._version_ge(active_ver, best_ver):
-                return True
-            # El binario local es más moderno (o el activo está roto): forzar reinicio
-            force_restart = True
-
-        if force_restart:
-            self.kill_ollama_processes()
-
-        if not best_bin:
+        """ Arranca (o reinicia) Ollama si no responde, está incompleto o hay uno más nuevo. Lo hace el servidor de
+        Rust, dueño del `ollama serve` que lanza Prig (muere con Prig: PDEATHSIG); ver prig_ia::ollama """
+        if os.environ.get("PRIG_SIN_AUTOARRANQUE_OLLAMA") == "1":
             return False
-
-        # Iniciar el mejor binario con serve
+        puerto = os.environ.get("PRIG_PUERTO_RUST")
+        if not puerto:
+            return False
         try:
-            env = os.environ.copy()
-            # Variables del servidor elegidas en "Recomendado" (caché KV, ranuras…)
-            try:
-                from recursos.servidor import entorno_arranque
-                env = entorno_arranque(env)
-            except Exception as e:
-                print(f"⚠️ No se pudieron leer los ajustes de servidor guardados: {e}")
-            prig_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            bin_dir = os.path.dirname(best_bin)
-            env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-
-            ollama_home = os.path.expanduser("~/.ollama")
-            try:
-                os.makedirs(ollama_home, exist_ok=True)
-            except Exception:
-                local_models = os.path.join(prig_root, ".ollama")
-                try:
-                    os.makedirs(local_models, exist_ok=True)
-                    env["OLLAMA_MODELS"] = os.path.join(local_models, "models")
-                except Exception:
-                    pass
-
-            # La salida va a ~/.prig_ollama.log (Modelos → Servidor → Registro)
-            registro = None
-            try:
-                from recursos.servidor import abrir_registro
-                registro = abrir_registro()
-            except Exception:
-                registro = None
-            self._ollama_proc = subprocess.Popen(
-                [best_bin, "serve"],
-                env=env,
-                stdout=registro or subprocess.DEVNULL,
-                stderr=subprocess.STDOUT if registro else subprocess.DEVNULL
-            )
-
-            # Esperar a que el servidor responda (hasta 6 segundos)
-            for _ in range(12):
-                time.sleep(0.5)
-                try:
-                    res = requests.get(f"{self.base_url}/api/version", timeout=1)
-                    if res.status_code == 200:
-                        return True
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"Error intentando iniciar Ollama con {best_bin}: {e}")
-
-        return False
+            r = requests.post(f"http://127.0.0.1:{puerto}/api/ollama/asegurar", json={"forzar": bool(force_restart)}, timeout=60)
+            return bool(r.json().get("ok"))
+        except Exception:
+            return False
 
     def check_health(self) -> Dict[str, Any]:
         self.try_autostart_ollama()
@@ -890,52 +820,75 @@ class AIEngine:
         """ El motor MoE, con la VRAM que le dejan los modelos de Ollama y los ajustes de IA """
         return motor_moe.motor(
             liberar_gpu=self._descargar_ollama,
+            propios=self._modelos_de_prig_en_ollama,
             ajustes=lambda: {"contexto": self.config.get("moe_contexto"), "hilos": self.config.get("moe_hilos"),
                              "calientes": self.config.get("moe_calientes"), "modo": self.config.get("moe_modo"),
                              "mtp": self.config.get("moe_mtp", True), "nucleo": self.config.get("moe_nucleo"),
                              "cache_gb": self.config.get("moe_cache_gb"),
                              "cache_reserva_gb": self.config.get("moe_cache_reserva_gb")})
 
-    def _post_con_recuperacion(self, url: str, payload: Dict[str, Any], intentos: int = 3):
-        """ POST a Ollama que sobrevive a una falta de memoria al cargar.
+    # ------------------------------------------------------------------ generar (en el servidor de Rust)
+    # Generar es del servidor de Rust (prig_ia::generar): las opciones, el motor MoE, la recuperación de una falta de
+    # memoria y el gobernador térmico viven allí. Estos métodos son sus clientes y conservan su forma de siempre.
 
-        Si el modelo no cabe con estas opciones (otro programa ocupó la GPU, un
-        contexto demasiado grande), se reintenta con menos contexto y después menos
-        capas en GPU, en lugar de devolver un error al usuario. Lo que funcionó se
-        anota en los eventos de recursos.
-        """
-        if payload.get("model"):
-            self.__dict__.setdefault("_usados", set()).add(payload["model"])
-        if motor_moe.es_moe(payload.get("model")):
-            # Su propio llama-server: traduce la petición y responde con el formato de Ollama
-            res = self.motor_moe().post(url, payload)
-            with self._streams_lock:
-                self._active_streams.add(res)
-            return res
-        for n in range(intentos + 1):
-            res = requests.post(url, json=payload, stream=True, timeout=300)
-            with self._streams_lock:
-                self._active_streams.add(res)
-            if res.status_code == 200 or n == intentos:
-                return res
-            detalle = self._error_de(res)
-            try:
-                from recursos.gestor import gestor
-                siguiente = gestor().recuperar_oom(payload.get("model", ""),
-                                                   payload.get("options") or {}, detalle)
-            except Exception:
-                siguiente = None
-            if siguiente is None:
-                return res
+    @staticmethod
+    def _servidor_rust() -> Optional[str]:
+        puerto = os.environ.get("PRIG_PUERTO_RUST")
+        return f"http://127.0.0.1:{puerto}" if puerto else None
+
+    def _flujo_rust(self, ruta: str, pedido: Dict[str, Any], cancelar: Optional[threading.Event]):
+        """ Los eventos NDJSON de una generación en el servidor de Rust. Si se cancela (Detener, el cliente se fue),
+        se cierra la conexión y el servidor deja de generar en el acto, también en mitad de una pausa térmica. """
+        base = self._servidor_rust()
+        if not base:
+            raise ConnectionError("no hay servidor de Rust (PRIG_PUERTO_RUST)")
+        res = requests.post(f"{base}{ruta}", json=pedido, stream=True, timeout=(5, None))
+        with self._streams_lock:
+            self._active_streams.add(res)
+        parar = threading.Event()
+
+        def vigia():
+            while not parar.is_set():
+                if cancelar.wait(0.2):
+                    try:
+                        res.close()
+                    except Exception:
+                        pass
+                    return
+        if cancelar is not None:
+            threading.Thread(target=vigia, daemon=True, name="prig-vigia-generar").start()
+        try:
+            if res.status_code != 200:
+                raise RuntimeError(f"Error del servidor {res.status_code}: {self._error_de(res)}")
+            for linea in res.iter_lines():
+                if linea:
+                    yield json.loads(linea.decode("utf-8"))
+        finally:
+            parar.set()
             with self._streams_lock:
                 self._active_streams.discard(res)
-            res.close()
-            opciones = dict(payload.get("options") or {})
-            opciones.pop("num_gpu", None)
-            opciones.update(siguiente)
-            payload = {**payload, "options": opciones}
-            print(f"⚠️ {payload.get('model')} sin memoria; reintentando con {siguiente}")
-        return res
+            try:
+                res.close()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _error_de(res) -> str:
+        try:
+            return (res.json().get("error") or "")[:300]
+        except Exception:
+            return (getattr(res, "text", "") or "")[:300]
+
+    def motor_moe(self) -> "motor_moe.Motor":
+        """ El motor MoE (cliente del servidor de Rust), con los modelos de Ollama que hay que soltarle y los ajustes """
+        return motor_moe.motor(
+            liberar_gpu=self._descargar_ollama,
+            propios=self._modelos_de_prig_en_ollama,
+            ajustes=lambda: {"contexto": self.config.get("moe_contexto"), "hilos": self.config.get("moe_hilos"),
+                             "calientes": self.config.get("moe_calientes"), "modo": self.config.get("moe_modo"),
+                             "mtp": self.config.get("moe_mtp", True), "nucleo": self.config.get("moe_nucleo"),
+                             "cache_gb": self.config.get("moe_cache_gb"),
+                             "cache_reserva_gb": self.config.get("moe_cache_reserva_gb")})
 
     def generar_con_pausas(
         self,
@@ -949,112 +902,26 @@ class AIEngine:
         avisar: Optional[Callable[[Dict[str, Any]], None]] = None,
         uso: Optional[str] = None,
     ) -> str:
-        """ Genera la respuesta completa, parando a enfriar la GPU cuando hace falta.
-
-        Usa /api/chat porque permite CONTINUAR: si hay que cortar a mitad, lo ya
-        generado se reenvía como principio de la respuesta del asistente y el modelo
-        sigue desde ahí. Ollama reaprovecha la caché del prefijo, así que retomar
-        cuesta milisegundos y no se pierde nada de lo generado.
-
-        Cortar la conexión detiene la generación en Ollama (medido: el consumo de la
-        GPU cae de 40 a 15 W en 1,5 s), que es lo que de verdad la enfría.
-
-        Si se corta durante el razonamiento de un modelo que piensa, al retomar
-        Ollama cierra ese razonamiento y pasa a la respuesta: se avisa.
-        """
-        url = f"{self.base_url}/api/chat"
-        opciones = self._build_options(options, model, uso)
-        tope = int(opciones.get("num_predict") or 0)
-        base: Dict[str, Any] = {}
-        sistema = self._completar_payload(base, model, uso, think, system_prompt)["sistema"]
-        think = base.get("think")
-        mensajes: List[Dict[str, Any]] = []
-        if sistema:
-            mensajes.append({"role": "system", "content": sistema})
-        mensajes.append({"role": "user", "content": prompt})
-        contenido, pensamiento = "", ""
-        generados = 0
-        keep_alive = base.get("keep_alive")
-        monitor = gobernador.monitor.trabajando() if gobernador is not None else None
-        if monitor is not None:
-            monitor.__enter__()
+        """ La respuesta completa, parando a enfriar la GPU cuando hace falta (con `gobernador`): se corta la conexión
+        (eso enfría) y se continúa con lo ya escrito como inicio de la respuesta del asistente, sin perder nada.
+        RuntimeError con el error de Ollama. Cancelada, devuelve "". """
+        pedido = {"prompt": prompt, "model": model, "system_prompt": system_prompt, "options": options, "think": think,
+                  "uso": uso, "gobernador": gobernador is not None, "con_avisos": avisar is not None}
+        contenido = ""
         try:
-            while True:
-                if cancelar is not None and cancelar.is_set():
-                    break
-                payload: Dict[str, Any] = {"model": model, "stream": True,
-                                           "options": dict(opciones),
-                                           **{k: base[k] for k in ("truncate", "shift") if k in base}}
-                if tope > 0:
-                    payload["options"]["num_predict"] = max(1, tope - generados)
-                if keep_alive is not None:
-                    payload["keep_alive"] = keep_alive
-                if think is not None:
-                    payload["think"] = bool(think)
-                if options and options.get("format"):
-                    payload["format"] = options.get("format")
-                previo = []
-                if contenido or pensamiento:
-                    asistente: Dict[str, Any] = {"role": "assistant", "content": contenido}
-                    if pensamiento:
-                        asistente["thinking"] = pensamiento
-                    previo = [asistente]
-                payload["messages"] = mensajes + previo
-
-                tramo = gobernador.empezar_tramo() if gobernador is not None else None
-                res = self._post_con_recuperacion(url, payload)
-                motivo, terminado = None, False
-                ultimo_control = time.time()
-                try:
-                    if res.status_code != 200:
-                        raise RuntimeError(f"Error Ollama {res.status_code}: {self._error_de(res)}")
-                    for linea in res.iter_lines():
-                        if not linea:
-                            continue
-                        datos = json.loads(linea.decode("utf-8"))
-                        if datos.get("error"):
-                            raise RuntimeError(datos["error"])
-                        msg = datos.get("message") or {}
-                        if msg.get("thinking"):
-                            pensamiento += msg["thinking"]
-                            generados += 1
-                        if msg.get("content"):
-                            contenido += msg["content"]
-                            generados += 1
-                        if datos.get("done"):
-                            terminado = True
-                            break
-                        if cancelar is not None and cancelar.is_set():
-                            break
-                        ahora = time.time()
-                        if gobernador is not None and ahora - ultimo_control >= 1.0:
-                            ultimo_control = ahora
-                            motivo = gobernador.debe_cortar(tramo)
-                            if motivo == "ritmo" and msg.get("thinking") and not msg.get("content"):
-                                motivo = None
-                            if motivo:
-                                break
-                finally:
-                    with self._streams_lock:
-                        self._active_streams.discard(res)
-                    try:
-                        res.close()
-                    except Exception:
-                        pass
-
-                if terminado or not motivo or (tope > 0 and generados >= tope):
-                    if gobernador is not None:
-                        gobernador.terminar_tramo(tramo, motivo)
-                    break
-                if avisar is not None and not contenido and pensamiento and motivo != "ritmo":
-                    avisar({"tipo": "aviso_termico",
-                            "mensaje": "Pausa durante el razonamiento: al retomar, el modelo "
-                                       "cerrará ese razonamiento y pasará a responder."})
-                gobernador.enfriar(motivo, cancelar, avisar, tramo=tramo)
-                gobernador.terminar_tramo(tramo, motivo)
-        finally:
-            if monitor is not None:
-                monitor.__exit__(None, None, None)
+            for ev in self._flujo_rust("/api/ia/pausas", pedido, cancelar):
+                if ev.get("t") == "aviso" and avisar is not None:
+                    avisar(ev.get("v") or {})
+                elif ev.get("t") == "fin":
+                    contenido = ev.get("v") or ""
+                elif ev.get("t") == "error":
+                    raise RuntimeError(ev.get("v") or "Error de Ollama")
+        except RuntimeError:
+            raise
+        except Exception:
+            if cancelar is not None and cancelar.is_set():
+                return ""
+            raise
         return contenido
 
     def chat_eventos(
@@ -1071,248 +938,36 @@ class AIEngine:
         extra: Optional[Dict[str, Any]] = None,
         max_tokens: Optional[int] = None,
     ) -> Generator[Dict[str, Any], None, None]:
-        """ Chat por eventos: texto, razonamiento, herramientas, confianza y métricas.
-
-        `extra`: campos que se añaden tal cual a la petición (p. ej. el modo «solo código» del
-        motor MoE). `max_tokens`: tope de la respuesta si la configuración no fija otro (num_predict); con `think`, también
-        si la configuración fija uno menor: el razonamiento cuenta dentro del tope, y con el num_predict de 4096 de la
-        configuración, revisar una función con «Pensar» gastaba todo en razonar y la respuesta salía vacía (2 de 2;
-        docs/estudio-banco.md, «Corrige los fallos»).
-
-        Con herramientas: una consulta idéntica a otra ya hecha no se vuelve a ejecutar (se le recuerda
-        que el resultado está arriba) y, si insiste o se llega a la última ronda, esa ronda va SIN
-        herramientas para que responda con lo que tiene. Medido en el estudio del banco
-        (docs/estudio-banco.md): de las respuestas con 9 o más consultas solo 1 de 5 fue correcta; una
-        repitió 4 veces el mismo código fallido y otra agotó 16 rondas sin llegar a responder.
-
-          {"t": "texto", "v": "…"}            parte de la respuesta
-          {"t": "pensando", "v": "…"}         parte del razonamiento
-          {"t": "herramienta", "nombre", "argumentos"}
-          {"t": "resultado", "nombre", "v"}
-          {"t": "logprobs", "v": [...]}       probabilidad de cada token
-          {"t": "stats", "v": {...}}          métricas al terminar
-          {"t": "aviso" | "error", "v": "…"}
-          {"t": "termico", "v": "…", "pausa": bool}   pausa para enfriar la GPU y reanudación
-
-        Si el último mensaje es del asistente, el modelo lo CONTINÚA (verificado): es
-        lo que permite "Continuar" una respuesta cortada por el límite de tokens.
-
-        Con `gobernador`, el chat respeta el límite de temperatura igual que los flujos:
-        corta la generación al acercarse, espera a que la GPU baje y la continúa con lo
-        ya escrito como prefijo del asistente (no se pierde nada).
-        """
-        url = f"{self.base_url}/api/chat"
-        opciones = self._build_options(None, model, uso)
-        configurado = int(opciones.get("num_predict") or 0)
-        if max_tokens and (configurado <= 0 or (think and configurado < int(max_tokens))):
-            opciones["num_predict"] = int(max_tokens)
-        base: Dict[str, Any] = {}
-        extra = self._completar_payload(base, model, uso, think, "")["sistema"]
-        msgs = [dict(m) for m in mensajes]
-        if extra:
-            if msgs and msgs[0].get("role") == "system":
-                msgs[0]["content"] = f"{msgs[0]['content']}\n\n{extra}"
-            else:
-                msgs.insert(0, {"role": "system", "content": extra})
-        caps = self.capacidades(model)
-        definiciones = herramientas.definiciones() if herramientas is not None else None
-        if definiciones and "tools" not in caps:
-            yield {"t": "aviso", "v": f"{model} no admite herramientas: responde sin ellas."}
-            definiciones = None
-        if think and "thinking" not in caps:
-            yield {"t": "aviso", "v": f"{model} no razona antes de responder."}
-
-        def enfriar(motivo):
-            """ Espera a que la GPU baje, contando lo que pasa en el chat """
-            if motivo == "ritmo":
-                gobernador.descansar(tramo, cancelar)      # modo suave: pausa corta y sin avisos
-                return
-            temp = gobernador.monitor.gpu(max_edad=1.0)
-            if temp is None or temp <= gobernador.reanudar:
-                return
-            yield {"t": "termico", "pausa": True,
-                   "v": f"GPU a {temp:.0f} °C (límite {gobernador.limite:.0f} °C): pausa para enfriar; "
-                        f"se sigue a {gobernador.reanudar:.0f} °C sin perder la respuesta."}
-            esperado = gobernador.enfriar(motivo, cancelar, None, tramo=tramo)
-            ahora = gobernador.monitor.gpu()
-            yield {"t": "termico", "pausa": False,
-                   "v": f"GPU a {ahora or 0:.0f} °C tras {esperado:.0f} s: se reanuda."}
-
-        # «Detener» cierra las conexiones activas; durante una pausa térmica no hay ninguna,
-        # así que el chat se apunta aquí para que también lo despierte
+        """ Chat por eventos (texto, pensando, herramienta, resultado, logprobs, stats, aviso, error, termico), en el
+        servidor de Rust (prig_ia::generar::chat_eventos). Las herramientas siguen aquí: el servidor pide ejecutar
+        cada una (POST /api/interno/herramienta) mientras dura la respuesta. """
         if cancelar is None:
             cancelar = cancelacion_actual() or threading.Event()
         with self._streams_lock:
             self.__dict__.setdefault("_cancelables", set()).add(cancelar)
-        monitor = gobernador.monitor.trabajando() if gobernador is not None else None
-        if monitor is not None:
-            monitor.__enter__()
+        sesion = None
+        definiciones = None
+        if herramientas is not None:
+            definiciones = herramientas.definiciones()
+            sesion = uuid.uuid4().hex
+            SESIONES_HERRAMIENTAS[sesion] = herramientas
+        pedido = {"mensajes": mensajes, "model": model, "uso": uso, "think": think, "logprobs": logprobs,
+                  "max_rondas": max_rondas, "gobernador": gobernador is not None, "extra": extra,
+                  "max_tokens": max_tokens,
+                  "herramientas": {"sesion": sesion, "definiciones": definiciones or []} if sesion else None}
         try:
-            if gobernador is not None:
-                tramo = None
-                yield from enfriar("antes_de_paso")
-            hechas: Dict[str, str] = {}          # consultas ya ejecutadas en esta respuesta
-            repetidas = 0
-            # Cuando se le pide responder (última ronda o consultas repetidas), las herramientas SIGUEN en la petición:
-            # quitarlas cambia el prefijo que el motor MoE guardó (las definiciones van en él) y lo relee entero
-            # (T7: 26 s y un estado nuevo de 246 MB; docs/estudio-banco.md). Una consulta que pida igual no se
-            # ejecuta, y recién entonces hay una ronda más, esa sí sin herramientas.
-            forzada = False
-            salio_de_bucle = False          # el corte por texto repetido, una sola vez por respuesta
-            ronda, limite = 0, max_rondas
-            while ronda < limite:
-                if definiciones and not forzada and ronda > 0 and ronda == max_rondas - 1:
-                    forzada = True
-                    msgs.append({"role": "user", "content": SIN_MAS_CONSULTAS})
-                    yield {"t": "aviso", "v": "Última ronda: se le pide al modelo que responda con lo que ya consultó."}
-                contenido, pensamiento, llamadas, probabilidades = "", "", [], []
-                revisado, bucle = 0, None
-                estadisticas = None
-                while True:
-                    previo = []
-                    if contenido or pensamiento:
-                        asistente_parcial: Dict[str, Any] = {"role": "assistant", "content": contenido}
-                        if pensamiento:
-                            asistente_parcial["thinking"] = pensamiento
-                        previo = [asistente_parcial]
-                    payload: Dict[str, Any] = {"model": model, "messages": msgs + previo, "stream": True,
-                                               "options": opciones, **base, **(extra or {})}
-                    if definiciones:
-                        payload["tools"] = definiciones
-                    if logprobs:
-                        payload["logprobs"] = True
-                        payload["top_logprobs"] = int(logprobs)
-                    tramo = gobernador.empezar_tramo() if gobernador is not None else None
-                    motivo, terminado = None, False
-                    ultimo_control = time.time()
-                    res = None
-                    try:
-                        res = self._post_con_recuperacion(url, payload)
-                        if res.status_code != 200:
-                            yield {"t": "error", "v": f"Ollama {res.status_code}: {self._error_de(res)}"}
-                            return
-                        for linea in res.iter_lines():
-                            if not linea:
-                                continue
-                            datos = json.loads(linea.decode("utf-8"))
-                            if datos.get("error"):
-                                yield {"t": "error", "v": str(datos["error"])}
-                                return
-                            msg = datos.get("message") or {}
-                            if msg.get("thinking"):
-                                pensamiento += msg["thinking"]
-                                yield {"t": "pensando", "v": msg["thinking"]}
-                            if msg.get("content"):
-                                contenido += msg["content"]
-                                yield {"t": "texto", "v": msg["content"]}
-                                if len(contenido) - revisado >= 200 and not salio_de_bucle:
-                                    revisado = len(contenido)
-                                    bucle = corte_de_bucle(contenido)
-                                    if bucle is not None:
-                                        break
-                            if msg.get("tool_calls"):
-                                llamadas.extend(msg["tool_calls"])
-                            if datos.get("logprobs"):
-                                probabilidades.extend(datos["logprobs"])
-                            if datos.get("done"):
-                                estadisticas = self.metricas(datos, opciones.get("num_ctx"))
-                                terminado = True
-                                break
-                            if cancelar is not None and cancelar.is_set():
-                                yield {"t": "aviso", "v": "Detenido."}
-                                return
-                            ahora = time.time()
-                            if gobernador is not None and ahora - ultimo_control >= 1.0:
-                                ultimo_control = ahora
-                                motivo = gobernador.debe_cortar(tramo)
-                                # El modo suave no corta a mitad del razonamiento (el modelo lo daría por cerrado)
-                                if motivo == "ritmo" and msg.get("thinking") and not msg.get("content"):
-                                    motivo = None
-                                if motivo:
-                                    break
-                    except Exception as e:
-                        yield {"t": "error", "v": f"Error de conexión con Ollama: {e}"}
-                        return
-                    finally:
-                        if res is not None:
-                            with self._streams_lock:
-                                self._active_streams.discard(res)
-                            try:
-                                res.close()
-                            except Exception:
-                                pass
-                    if gobernador is not None and (terminado or not motivo):
-                        gobernador.terminar_tramo(tramo, motivo)
-                    if terminado or not motivo:
-                        break
-                    # Cortar la conexión detiene la generación en Ollama: es lo que enfría
-                    if not contenido and pensamiento and motivo != "ritmo":
-                        yield {"t": "aviso", "v": "Hubo una pausa térmica durante el razonamiento: al retomar, "
-                                                  "el modelo lo cerró y pasó a responder."}
-                    yield from enfriar(motivo)
-                    gobernador.terminar_tramo(tramo, motivo)
-                    if cancelar is not None and cancelar.is_set():
-                        yield {"t": "aviso", "v": "Detenido."}
-                        return
-
-                if probabilidades:
-                    yield {"t": "logprobs", "v": [
-                        {"token": p.get("token"), "logprob": p.get("logprob"),
-                         "alternativas": [{"token": a.get("token"), "logprob": a.get("logprob")}
-                                          for a in (p.get("top_logprobs") or [])]}
-                        for p in probabilidades[:4000]]}
-                if bucle is not None:
-                    # Cortado por repetirse: lo de antes del bucle queda como su mensaje, y se le pide la conclusión. Las
-                    # herramientas siguen en la petición (como al pedirle responder: no cambia el prefijo guardado)
-                    salio_de_bucle = True
-                    msgs.append({"role": "assistant", "content": contenido[:bucle]})
-                    msgs.append({"role": "user", "content": SALIR_DEL_BUCLE})
-                    yield {"t": "aviso", "v": "El modelo repetía el mismo texto: se cortó y se le pide la conclusión."}
-                    forzada = forzada or bool(definiciones)
-                    limite = max(limite, ronda + 2)
-                    ronda += 1
-                    continue
-                if not llamadas or herramientas is None:
-                    if estadisticas:
-                        yield {"t": "stats", "v": {**estadisticas, "rondas": ronda + 1}}
-                    return
-                if forzada and definiciones:
-                    definiciones = None
-                    limite = ronda + 2
-                    ronda += 1
-                    yield {"t": "aviso", "v": "El modelo pidió otra consulta en vez de responder: no se ejecuta; "
-                                              "se le vuelve a pedir que responda, ya sin herramientas."}
-                    continue
-
-                asistente: Dict[str, Any] = {"role": "assistant", "content": contenido, "tool_calls": llamadas}
-                if pensamiento:
-                    asistente["thinking"] = pensamiento
-                msgs.append(asistente)
-                for llamada in llamadas:
-                    funcion = llamada.get("function") or {}
-                    nombre = funcion.get("name", "")
-                    argumentos = funcion.get("arguments") or {}
-                    yield {"t": "herramienta", "nombre": nombre, "argumentos": argumentos}
-                    clave = f"{nombre}:{json.dumps(argumentos, sort_keys=True, ensure_ascii=False, default=str)}"
-                    if clave in hechas:
-                        repetidas += 1
-                        resultado = CONSULTA_REPETIDA
-                    else:
-                        resultado = herramientas.ejecutar(nombre, argumentos)
-                        hechas[clave] = resultado
-                    yield {"t": "resultado", "nombre": nombre, "v": resultado[:2000]}
-                    msgs.append({"role": "tool", "tool_name": nombre, "content": resultado})
-                if repetidas >= 2 and definiciones and not forzada:
-                    forzada = True
-                    msgs.append({"role": "user", "content": SIN_MAS_CONSULTAS})
-                    yield {"t": "aviso", "v": "El modelo repetía consultas: se le pide que responda con lo que ya tiene."}
-                ronda += 1
-            yield {"t": "aviso", "v": f"Se alcanzó el máximo de {max_rondas} rondas de herramientas."}
+            for ev in self._flujo_rust("/api/ia/chat", pedido, cancelar):
+                yield ev
+        except Exception as e:
+            if cancelar.is_set():
+                yield {"t": "aviso", "v": "Detenido."}
+            else:
+                yield {"t": "error", "v": f"Error de conexión con Ollama: {e}"}
         finally:
+            if sesion:
+                SESIONES_HERRAMIENTAS.pop(sesion, None)
             with self._streams_lock:
                 self._cancelables.discard(cancelar)
-            if monitor is not None:
-                monitor.__exit__(None, None, None)
 
     def generate_response(
         self,
@@ -1326,143 +981,34 @@ class AIEngine:
         uso: Optional[str] = None,
         on_stats: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Generator[str, None, None]:
-        """ `think` controla el razonamiento en voz alta de los modelos que lo traen.
-
-        Qwen3 lo lleva conmutable, y la diferencia importa: en un paso que debe
-        devolver JSON, el bloque de pensamiento ensucia la salida y se come la
-        ventana; en uno que debe criticar, es justamente lo que aporta. Se pasa
-        None para modelos que no lo soportan, porque enviarles el campo no les
-        afecta pero tampoco hace falta.
-        """
-        url = f"{self.base_url}/api/generate"
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": True,
-            "options": self._build_options(options, model, uso)
-        }
-        if options and options.get("format"):
-            payload["format"] = options.get("format")
-        if think is None and on_thinking is not None and "thinking" in self.capacidades(model):
-            think = True
-        sistema = self._completar_payload(payload, model, uso, think, system_prompt)["sistema"]
-        if sistema:
-            payload["system"] = sistema
-
-        # Con el gobernador térmico (modo suave y límite de temperatura) la respuesta se
-        # genera por tramos: se pausa y se sigue donde quedó por /api/chat, con lo ya escrito
-        # como inicio del asistente (medido: el resultado es idéntico al de una sola vez y
-        # retomar relee lo escrito en milisegundos). Sin gobernador, una sola petición.
-        gobernador = getattr(self, "gobernador", None)
-        tope = int(payload["options"].get("num_predict") or 0)
-        respuesta, pensamiento, generados = "", "", 0
-        in_think_tag = False
+        """ La respuesta en trozos. `think` controla el razonamiento en voz alta de los modelos que lo traen; con
+        `on_thinking` se pide si el modelo piensa. Con el gobernador térmico se genera por tramos y se sigue donde
+        quedó (en el servidor de Rust). Los errores llegan como texto («[Error Ollama: …]»). """
         cancelar = cancelacion_actual() or threading.Event()
         with self._streams_lock:
             self.__dict__.setdefault("_cancelables", set()).add(cancelar)
-        monitor = gobernador.monitor.trabajando() if gobernador is not None else None
-        if monitor is not None:
-            monitor.__enter__()
-        res = None
+        pedido = {"prompt": prompt, "model": model, "system_prompt": system_prompt, "options": options, "think": think,
+                  "con_pensamiento": on_thinking is not None, "uso": uso,
+                  "gobernador": getattr(self, "gobernador", None) is not None}
         try:
-            primera = True
-            while True:
-                if primera:
-                    res = self._post_con_recuperacion(url, payload)
-                else:
-                    mensajes = ([{"role": "system", "content": sistema}] if sistema else []) + [{"role": "user", "content": prompt}]
-                    asistente: Dict[str, Any] = {"role": "assistant", "content": respuesta}
-                    if pensamiento:
-                        asistente["thinking"] = pensamiento
-                    seguir = {k: v for k, v in payload.items() if k not in ("prompt", "system", "raw", "context")}
-                    seguir["options"] = dict(payload["options"])
-                    if tope > 0:
-                        seguir["options"]["num_predict"] = max(1, tope - generados)
-                    seguir["messages"] = mensajes + [asistente]
-                    res = self._post_con_recuperacion(f"{self.base_url}/api/chat", seguir)
-                if res.status_code != 200:
-                    detalle = self._error_de(res)
-                    yield f"[Error Ollama: {res.status_code}{': ' + detalle if detalle else ''}]"
-                    return
-                tramo = gobernador.empezar_tramo() if gobernador is not None else None
-                ultimo_control = time.time()
-                motivo, terminado, pensando_ahora = None, False, False
-                for line in res.iter_lines():
-                    if cancelar.is_set():
-                        break                   # cerrar la conexión (abajo) hace que Ollama deje de generar
-                    if not line:
-                        continue
-                    data = json.loads(line.decode('utf-8'))
-                    mensaje = data.get("message") or {}
-                    thinking_part = data.get("thinking") or mensaje.get("thinking") or ""
-                    if thinking_part:
-                        pensamiento += thinking_part
-                        generados += 1
-                        pensando_ahora = True
-                        if on_thinking:
-                            on_thinking(thinking_part)
-
-                    response_part = data.get("response") or mensaje.get("content") or ""
-                    if response_part:
-                        respuesta += response_part
-                        generados += 1
-                        pensando_ahora = False
-                        if "<think>" in response_part:
-                            in_think_tag = True
-                        if in_think_tag:
-                            clean_think = response_part.replace("<think>", "").replace("</think>", "")
-                            if clean_think and on_thinking:
-                                on_thinking(clean_think)
-                            if "</think>" in response_part:
-                                in_think_tag = False
-                        else:
-                            if on_token:
-                                on_token(response_part)
-                        yield response_part
-                    if data.get("done", False):
-                        terminado = True
-                        if on_stats is not None:
-                            on_stats(self.metricas(data, payload["options"].get("num_ctx")))
-                        break
-                    ahora = time.time()
-                    if gobernador is not None and ahora - ultimo_control >= 1.0:
-                        ultimo_control = ahora
-                        motivo = gobernador.debe_cortar(tramo)
-                        # Cortar a mitad del razonamiento hace que el modelo lo dé por cerrado:
-                        # el modo suave espera a que empiece a responder (el límite, no)
-                        if motivo == "ritmo" and (pensando_ahora or in_think_tag):
-                            motivo = None
-                        if motivo:
-                            break
-                with self._streams_lock:
-                    self._active_streams.discard(res)
-                try:
-                    res.close()
-                except Exception:
-                    pass
-                if terminado or not motivo or cancelar.is_set() or (tope > 0 and generados >= tope):
-                    if gobernador is not None and tramo is not None:
-                        gobernador.terminar_tramo(tramo, None if terminado else motivo)
-                    break
-                gobernador.enfriar(motivo, cancelar, None, tramo=tramo)
-                gobernador.terminar_tramo(tramo, motivo)
-                if cancelar.is_set():
-                    break
-                primera = False
+            for ev in self._flujo_rust("/api/ia/generar", pedido, cancelar):
+                t = ev.get("t")
+                if t == "texto":
+                    if ev.get("token") and on_token:
+                        on_token(ev["v"])
+                    yield ev["v"]
+                elif t == "pensando":
+                    if on_thinking:
+                        on_thinking(ev["v"])
+                elif t == "stats":
+                    if on_stats is not None:
+                        on_stats(ev["v"])
         except Exception as e:
-            yield f"[Error de conexión con Ollama: {str(e)}]"
+            if not cancelar.is_set():
+                yield f"[Error de conexión con Ollama: {str(e)}]"
         finally:
             with self._streams_lock:
                 self.__dict__.setdefault("_cancelables", set()).discard(cancelar)
-            if res is not None:
-                with self._streams_lock:
-                    self._active_streams.discard(res)
-                try:
-                    res.close()
-                except Exception:
-                    pass
-            if monitor is not None:
-                monitor.__exit__(None, None, None)
 
     def cancel_active_requests(self) -> int:
         """ Cierra todas las conexiones HTTP activas con Ollama para detener la generación en GPU """
@@ -1481,12 +1027,25 @@ class AIEngine:
         return count
 
     def unload_models(self) -> None:
-        """ Libera la VRAM: los modelos de Ollama que cargó Prig y el motor MoE """
+        """ Libera la VRAM: los modelos de Ollama que cargó Prig (los de este proceso y los del servidor de Rust, que
+        es quien genera) y el motor MoE """
         self._descargar_ollama()
+        base = self._servidor_rust()
+        if base:
+            try:
+                requests.post(f"{base}/api/ia/descargar", timeout=10)
+            except Exception:
+                pass
         try:
             self.motor_moe().detener()
         except Exception:
             pass
+
+    def _modelos_de_prig_en_ollama(self) -> List[str]:
+        """ Los modelos de Ollama que usa Prig (los que se descargan para dejarle la VRAM al motor MoE) """
+        propios = set(getattr(self, "_usados", set()))
+        propios |= {self.config.get(k) for k in ("agent1_model", "agent2_model", "agent3_model")}
+        return sorted(m for m in propios if m and not motor_moe.es_moe(m))
 
     def _descargar_ollama(self) -> None:
         """ Libera la memoria VRAM descargando los modelos que Prig tiene cargados en Ollama.
@@ -1515,15 +1074,13 @@ class AIEngine:
             self.motor_moe().detener()
         except Exception:
             pass
-        if self._ollama_proc and self._ollama_proc.poll() is None:
+        # el `ollama serve` que arrancó Prig es del servidor de Rust
+        puerto = os.environ.get("PRIG_PUERTO_RUST")
+        if puerto:
             try:
-                self._ollama_proc.terminate()
-                self._ollama_proc.wait(timeout=2)
+                requests.post(f"http://127.0.0.1:{puerto}/api/ollama/detener", timeout=10)
             except Exception:
-                try:
-                    self._ollama_proc.kill()
-                except Exception:
-                    pass
+                pass
 
     # ==========================================
     # CONSULTA SOBRE LA BIBLIOTECA (RAG)

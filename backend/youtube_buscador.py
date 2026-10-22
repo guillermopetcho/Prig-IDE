@@ -30,8 +30,13 @@ import time
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
 logger = logging.getLogger("prig.youtube_buscador")
+
+# Otras direcciones solo en las pruebas (un YouTube falso, sin red)
+YOUTUBE = os.environ.get("PRIG_YOUTUBE_URL") or "https://www.youtube.com"
+SUGERENCIAS = os.environ.get("PRIG_YOUTUBE_SUGERENCIAS") or "https://suggestqueries.google.com"
 
 # Palabras registradas para el motor de búsqueda didáctico de Prig
 PALABRAS_REGISTRADAS = {
@@ -209,7 +214,7 @@ def verificar_disponibilidad_oembed(video_id: str, timeout: float = 3.0) -> bool
         headers={"User-Agent": "Mozilla/5.0 (compatible; PrigIDE/2.0; +https://github.com/guillermopetcho/Prig-IDE)"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with red_http.urlopen(req, timeout=timeout) as resp:
             return resp.status == 200
     except Exception:
         return False
@@ -223,7 +228,7 @@ def obtener_sugerencias_youtube(query: str, max_sugerencias: int = 8) -> List[st
     consulta = query.strip()
     if not consulta:
         return []
-    url = f"https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q={urllib.parse.quote(consulta)}"
+    url = f"{SUGERENCIAS}/complete/search?client=youtube&ds=yt&q={urllib.parse.quote(consulta)}"
     req = urllib.request.Request(
         url,
         headers={
@@ -232,7 +237,7 @@ def obtener_sugerencias_youtube(query: str, max_sugerencias: int = 8) -> List[st
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=3.5) as resp:
+        with red_http.urlopen(req, timeout=3.5) as resp:
             raw_text = resp.read().decode("utf-8", errors="ignore")
             # Parsear: window.google.ac.h(["consulta", [["sug1", ...], ...]])
             m = re.search(r"\((.*)\)", raw_text)
@@ -600,7 +605,7 @@ def _buscar_innertube(query: str, params: str = "", idioma: str = "todos") -> Op
     Estrategia Primaria: Consulta directa al endpoint JSON de InnerTube.
     Mucho más rápido y sin necesidad de renderizar HTML.
     """
-    url = "https://www.youtube.com/youtubei/v1/search"
+    url = f"{YOUTUBE}/youtubei/v1/search"
     hl, gl, aceptar = _idioma_cliente(idioma)
     payload = {
         "context": {
@@ -628,7 +633,7 @@ def _buscar_innertube(query: str, params: str = "", idioma: str = "todos") -> Op
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=6.5) as resp:
+        with red_http.urlopen(req, timeout=6.5) as resp:
             if resp.status == 200:
                 raw_json = json.loads(resp.read().decode("utf-8"))
                 return _extraer_items_de_yt_data(raw_json)
@@ -644,7 +649,7 @@ def _buscar_html_scraper(query: str, params: str = "", idioma: str = "todos") ->
     Se activa si la llamada a InnerTube encuentra bloqueos o contingencias.
     """
     hl, _, aceptar = _idioma_cliente(idioma)
-    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&hl={hl}"
+    url = f"{YOUTUBE}/results?search_query={urllib.parse.quote(query)}&hl={hl}"
     if params:
         url += f"&sp={urllib.parse.quote(params)}"
     req = urllib.request.Request(
@@ -659,7 +664,7 @@ def _buscar_html_scraper(query: str, params: str = "", idioma: str = "todos") ->
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=7.5) as resp:
+        with red_http.urlopen(req, timeout=7.5) as resp:
             html_content = resp.read().decode("utf-8", errors="ignore")
         m = re.search(r"ytInitialData\s*=\s*({.+?});", html_content)
         if m:

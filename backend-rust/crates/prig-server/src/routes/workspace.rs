@@ -25,10 +25,14 @@ pub fn dirs_or_home() -> Option<PathBuf> {
     std::env::var("HOME").ok().map(PathBuf::from).or_else(|| std::env::current_dir().ok())
 }
 
-fn leer_last_workspace(config_path: &Path) -> Option<String> {
+fn leer_clave(config_path: &Path, clave: &str) -> Option<String> {
     let texto = fs::read_to_string(config_path).ok()?;
     let valor: Value = serde_json::from_str(&texto).ok()?;
-    valor.get("last_workspace").and_then(|v| v.as_str()).map(|s| s.to_string())
+    valor.get(clave).and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+fn leer_last_workspace(config_path: &Path) -> Option<String> {
+    leer_clave(config_path, "last_workspace")
 }
 
 /// `FileManager._load_last_workspace` de Python: la última carpeta si existe; si no, la raíz de Prig (el directorio
@@ -48,12 +52,15 @@ pub async fn espacio_de_trabajo(state: &AppState) -> PathBuf {
         let mut visto = state.config_visto.lock().await;
         if *visto != mtime {
             *visto = mtime;
+            let mut fm = state.file_mgr.write().await;
             if let Some(ruta) = leer_last_workspace(&state.config_path) {
                 if Path::new(&ruta).is_dir() {
-                    let mut fm = state.file_mgr.write().await;
                     let _ = fm.set_base_dir(Path::new(&ruta));
                 }
             }
+            // La segunda carpeta del explorador (la guarda Python en `segunda_carpeta`)
+            let segunda = leer_clave(&state.config_path, "segunda_carpeta");
+            fm.set_segunda_dir(segunda.as_deref().map(Path::new));
         }
     }
     state.file_mgr.read().await.base_dir.clone()

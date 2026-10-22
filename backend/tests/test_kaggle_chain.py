@@ -157,62 +157,7 @@ class PruebaPaqueteIncompleto(unittest.TestCase):
         self.assertTrue(self.imp.verificar(ruta)["ok"])
 
 
-class PruebaPreparacionDelTrabajo(unittest.TestCase):
-
-    def setUp(self):
-        # Bajo el directorio del usuario a propósito: la prueba de la virgulilla
-        # solo tiene sentido si la ruta se puede escribir como "~/…".
-        base = os.path.join(os.path.expanduser("~"), ".prig_pruebas")
-        os.makedirs(base, exist_ok=True)
-        self.tmp = tempfile.mkdtemp(dir=base)
-        from job_exporter import JobExporter
-        self.ex = JobExporter(self.tmp)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def _libro(self, nombre, texto="Contenido de prueba. " * 40, sub=""):
-        carpeta = os.path.join(self.tmp, sub) if sub else self.tmp
-        os.makedirs(carpeta, exist_ok=True)
-        ruta = os.path.join(carpeta, nombre)
-        with open(ruta, "w", encoding="utf-8") as f:
-            f.write(texto)
-        return ruta
-
-    def test_expande_la_virgulilla(self):
-        """ "~/x.pdf" pasaba por abspath sin expandir y quedaba como carpeta
-        relativa inexistente: el libro se omitía con un aviso discreto. """
-        ruta = self._libro("libro.md")
-        casa = os.path.expanduser("~")
-        con_virgulilla = "~" + ruta[len(casa):]
-        self.assertTrue(con_virgulilla.startswith("~/"))
-        m = self.ex.preparar([con_virgulilla], "~" + os.path.join(self.tmp, "job")[len(casa):])
-        self.assertEqual(m["total_books"], 1,
-                         "una ruta con ~ debe leerse igual que la absoluta")
-
-    def test_no_procesa_dos_veces_el_mismo_libro(self):
-        texto = "Un texto identico guardado en dos carpetas. " * 40
-        a = self._libro("libro.md", texto)
-        b = self._libro("libro.md", texto, sub="documentation")
-        m = self.ex.preparar([a, b], os.path.join(self.tmp, "job"))
-        self.assertEqual(m["total_books"], 1)
-        self.assertEqual(len(m["duplicates_skipped"]), 1)
-
-    def test_el_destino_tambien_admite_virgulilla(self):
-        ruta = self._libro("libro.md")
-        destino = os.path.join(self.tmp, "job_destino")
-        m = self.ex.preparar([ruta], destino)
-        self.assertTrue(os.path.isfile(os.path.join(destino, "chunks.jsonl")))
-        self.assertTrue(os.path.isfile(os.path.join(destino, "manifest.json")))
-        self.assertTrue(m["chunks_sha256"])
-
-    def test_el_manifiesto_ata_la_entrada(self):
-        """ chunks_sha256 permite saber si un paquete salió de estos fragmentos. """
-        ruta = self._libro("libro.md")
-        m1 = self.ex.preparar([ruta], os.path.join(self.tmp, "j1"))
-        m2 = self.ex.preparar([ruta], os.path.join(self.tmp, "j2"))
-        self.assertEqual(m1["chunks_sha256"], m2["chunks_sha256"],
-                         "el troceado debe ser determinista")
+# Preparar el trabajo (la virgulilla, los repetidos): prig-biblioteca/src/trabajos.rs
 
 
 if __name__ == "__main__":

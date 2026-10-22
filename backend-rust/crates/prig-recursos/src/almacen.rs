@@ -58,9 +58,35 @@ pub fn ahora() -> String {
     }
 }
 
+/// El almacén del proceso (`almacen()` de Python): el de `ruta_por_defecto()`, reabierto si esa ruta cambia
+pub fn global() -> std::sync::Arc<Almacen> {
+    static GLOBAL: Mutex<Option<std::sync::Arc<Almacen>>> = Mutex::new(None);
+    let ruta = ruta_por_defecto();
+    let mut g = GLOBAL.lock().unwrap_or_else(|e| e.into_inner());
+    match g.as_ref() {
+        Some(a) if a.ruta == ruta => a.clone(),
+        _ => {
+            let a = std::sync::Arc::new(Almacen::abrir(&ruta));
+            *g = Some(a.clone());
+            a
+        }
+    }
+}
+
 pub struct Almacen {
     ruta: PathBuf,
     datos: Mutex<Mapa>,
+    /// Cómo estaba el archivo la última vez que se leyó o escribió: si otro proceso de Prig lo cambia (el servidor de
+    /// Rust y el backend de Python lo comparten mientras conviven), se relee antes de usarlo y no se pisa lo suyo
+    firma: Mutex<Option<Firma>>,
+}
+
+type Firma = (SystemTime, u64, u64);
+
+fn firma(ruta: &Path) -> Option<Firma> {
+    use std::os::unix::fs::MetadataExt;
+    let m = std::fs::metadata(ruta).ok()?;
+    Some((m.modified().ok()?, m.len(), m.ino()))
 }
 
 /// `d.setdefault(clave, {})` que devuelve el mapa (si la clave tiene otra cosa, se reemplaza por un mapa)
@@ -96,7 +122,8 @@ fn ultimos(l: &[Valor], n: i64) -> &[Valor] {
 
 impl Almacen {
     pub fn abrir(ruta: &Path) -> Almacen {
-        Almacen { ruta: ruta.to_path_buf(), datos: Mutex::new(Self::leer(ruta)) }
+        let f = firma(ruta);
+        Almacen { ruta: ruta.to_path_buf(), datos: Mutex::new(Self::leer(ruta)), firma: Mutex::new(f) }
     }
 
     pub fn ruta(&self) -> &Path {
@@ -104,7 +131,14 @@ impl Almacen {
     }
 
     fn cerrojo(&self) -> MutexGuard<'_, Mapa> {
-        self.datos.lock().unwrap_or_else(|e| e.into_inner())
+        let mut d = self.datos.lock().unwrap_or_else(|e| e.into_inner());
+        let ahora = firma(&self.ruta);
+        let mut previa = self.firma.lock().unwrap_or_else(|e| e.into_inner());
+        if ahora.is_some() && ahora != *previa {
+            *d = Self::leer(&self.ruta);
+            *previa = firma(&self.ruta);
+        }
+        d
     }
 
     // -------------------------------------------------------------- disco
@@ -157,6 +191,8 @@ impl Almacen {
         let resultado = resultado.and_then(|_| std::fs::rename(&tmp, &self.ruta));
         if resultado.is_err() {
             let _ = std::fs::remove_file(&tmp);
+        } else {
+            *self.firma.lock().unwrap_or_else(|e| e.into_inner()) = firma(&self.ruta);
         }
         resultado
     }
@@ -517,6 +553,20 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn dos_procesos_no_se_pisan() {
+        let t = Tmp::nueva("dos");
+        let ruta = t.0.join("r.json");
+        let (a, b) = (Almacen::abrir(&ruta), Almacen::abrir(&ruta));
+        a.guardar_seccion("ritmo", Mapa::new().con("activo", true), None).unwrap();
+        assert!(b.seccion("ritmo").verdad("activo"));
+        b.guardar_seccion("frio", Mapa::new().con("activo", true), None).unwrap();
+        a.evento("x", "uno", None).unwrap();
+        let c = Almacen::abrir(&ruta);
+        assert!(c.seccion("ritmo").verdad("activo") && c.seccion("frio").verdad("activo"));
+        assert_eq!(c.eventos(10).len(), 1);
     }
 
     #[test]

@@ -32,7 +32,7 @@ pub struct RitmoPy {
 
 impl RitmoPy {
     pub fn bloquear(&self) -> MutexGuard<'_, Ritmo> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+        crate::gil::bloquear(&self.inner)
     }
 }
 
@@ -250,18 +250,21 @@ impl MundoFijador for MundoPython<'_, '_> {
 #[pyclass(name = "FijadorCPU", frozen)]
 pub struct FijadorPy {
     inner: Mutex<FijadorCpu>,
+    /// Para `modelos_en_gpu`: `aplicar` lo llama (por la fachada) con `inner` tomado; con un solo cerrojo, el
+    /// fijador se esperaba a sí mismo para siempre
+    consultor: Mutex<FijadorCpu>,
 }
 
 #[pymethods]
 impl FijadorPy {
     #[new]
     fn new(url: &str) -> Self {
-        FijadorPy { inner: Mutex::new(FijadorCpu::new(url)) }
+        FijadorPy { inner: Mutex::new(FijadorCpu::new(url)), consultor: Mutex::new(FijadorCpu::new(url)) }
     }
 
     /// blob de pesos → True si el modelo está entero en la VRAM (pregunta a Ollama)
     fn modelos_en_gpu(&self, py: Python<'_>) -> HashMap<String, bool> {
-        py.detach(|| self.inner.lock().unwrap_or_else(|e| e.into_inner()).modelos_en_gpu())
+        py.detach(|| self.consultor.lock().unwrap_or_else(|e| e.into_inner()).modelos_en_gpu())
     }
 
     /// `aplicar(forzar)` con el mundo que da la fachada de Python
@@ -269,7 +272,7 @@ impl FijadorPy {
         let sistema = fachada.getattr("_sistema")?;
         let sistema = if sistema.is_none() { None } else { Some(sistema) };
         let mut mundo = MundoPython { py, fachada, sistema, error: None };
-        let r = self.inner.lock().unwrap_or_else(|e| e.into_inner()).aplicar(&mut mundo, forzar);
+        let r = crate::gil::bloquear(&self.inner).aplicar(&mut mundo, forzar);
         if let Some(e) = mundo.error {
             return Err(e);
         }
@@ -278,7 +281,7 @@ impl FijadorPy {
 
     /// Devuelve todos los núcleos a los procesos que se habían fijado
     fn soltar(&self) {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).soltar();
+        crate::gil::bloquear(&self.inner).soltar();
     }
 }
 

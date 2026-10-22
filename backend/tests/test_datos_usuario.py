@@ -94,23 +94,33 @@ class TestBiblioteca(unittest.TestCase):
             victima = os.path.join(fuera, "secreto.txt")
             open(victima, "w").write("privado")
             self.assertIsNone(self.bs._resolve_item(victima))
-            self.assertIn("error", self.bs.get_book_content(victima))
         finally:
             shutil.rmtree(fuera, ignore_errors=True)
 
-    def test_no_se_puede_borrar_una_categoria(self):
-        self.assertIn("error", self.bs.delete_item("books"))
-        self.assertTrue(os.path.isdir(os.path.join(self.lib, "books")))
-
-    def test_borrar_lleva_su_ficha_y_respeta_al_homonimo(self):
+    def test_quitar_no_borra_el_archivo_y_respeta_al_homonimo(self):
         a = os.path.join(self.lib, "books", "notas.md")
         b = os.path.join(self.lib, "documentation", "notas.md")
         open(a, "w").write("a"); open(b, "w").write("b")
         self.bs.save_metadata(a, {"title": "LIBRO"})
         self.bs.save_metadata(b, {"title": "DOC"})
-        self.assertTrue(self.bs.delete_item("books/notas.md").get("success"))
-        self.assertIsNone(self.bs.get_metadata(a))
-        self.assertEqual(self.bs.get_metadata(b)["title"], "DOC")
+        # quitarlo de la vista (lo hace el servidor de Rust, POST /api/books/delete): se apunta en .index/ocultos.json
+        os.makedirs(os.path.join(self.lib, ".index"), exist_ok=True)
+        with open(os.path.join(self.lib, ".index", "ocultos.json"), "w", encoding="utf-8") as f:
+            json.dump({"version": 1, "ocultos": [{"ruta": a, "titulo": "LIBRO", "categoria": "books", "proyecto": False}]}, f)
+        # el archivo y lo guardado siguen: solo deja de verse
+        self.assertTrue(os.path.exists(a))
+        self.assertEqual(self.bs.get_metadata(a)["title"], "LIBRO")
+        rutas = [i["path"] for i in self.bs.list_books()]
+        self.assertNotIn(a, rutas)
+        self.assertIn(b, rutas)
+        # importarlo de nuevo lo vuelve a mostrar
+        fuera = tempfile.mkdtemp(prefix="prig_test_imp_")
+        try:
+            open(os.path.join(fuera, "notas.md"), "w").write("a")
+            self.bs.import_file(os.path.join(fuera, "notas.md"), "books")
+            self.assertIn(a, [i["path"] for i in self.bs.list_books()])
+        finally:
+            shutil.rmtree(fuera, ignore_errors=True)
 
     def test_la_muestra_no_reaparece_tras_borrarla(self):
         guia = os.path.join(self.lib, "documentation", "Guia_Fundamentos_Deep_Learning.md")

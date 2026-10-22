@@ -557,6 +557,54 @@ pub fn leer_sensores() -> Lectura {
     clasificar(gpus_nvidia(), &temperaturas(raiz), &ventiladores(raiz).unwrap_or_default())
 }
 
+// =========================================================================== como valor
+
+fn gpu_valor(g: &GpuSensor) -> crate::valor::Mapa {
+    crate::valor::Mapa::new()
+        .con("id", g.id.as_str())
+        .con("tipo", "gpu")
+        .con("nombre", g.nombre.as_str())
+        .con("temp", g.temp)
+        .con("consumo_w", g.consumo_w)
+        .con("uso_pct", g.uso_pct)
+        .con("ventilador_pct", g.ventilador_pct)
+}
+
+impl Componente {
+    /// El diccionario que daba Python (mismas claves, mismo orden)
+    pub fn a_valor(&self) -> crate::valor::Valor {
+        use crate::valor::{Mapa, Valor};
+        let (alto, critico) = match self {
+            Componente::Gpu(g) => return gpu_valor(g).into(),
+            Componente::Cpu { alto, critico, .. } | Componente::Otro { alto, critico, .. } => (*alto, *critico),
+        };
+        let mut d = Mapa::new().con("id", self.id()).con("tipo", self.tipo()).con("nombre", self.nombre()).con("temp", self.temp());
+        if let Componente::Cpu { nucleo_max, nucleos, .. } = self {
+            d.poner("nucleo_max", *nucleo_max);
+            let lista = nucleos.iter().map(|(e, t)| Mapa::new().con("etiqueta", e.as_str()).con("temp", *t).into()).collect();
+            d.poner("nucleos", Valor::Lista(lista));
+        }
+        d.con("alto", alto).con("critico", critico).into()
+    }
+}
+
+impl Lectura {
+    /// `{tomada, componentes, ventiladores}` como la daba Python
+    pub fn a_valor(&self) -> crate::valor::Valor {
+        use crate::valor::{Mapa, Valor};
+        let ventiladores = self
+            .ventiladores
+            .iter()
+            .map(|v| Mapa::new().con("id", v.id.as_str()).con("nombre", v.nombre.as_str()).con("rpm", v.rpm).into())
+            .collect();
+        Mapa::new()
+            .con("tomada", self.tomada)
+            .con("componentes", Valor::Lista(self.componentes.iter().map(Componente::a_valor).collect()))
+            .con("ventiladores", Valor::Lista(ventiladores))
+            .into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

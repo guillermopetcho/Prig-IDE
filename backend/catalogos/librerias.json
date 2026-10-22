@@ -1,0 +1,193 @@
+[
+ {
+  "id": "numpy",
+  "nombre": "NumPy",
+  "repo": "numpy/numpy",
+  "doc_url": "https://numpy.org/doc/stable/",
+  "descripcion": "Cálculo tensorial y numérico de alto rendimiento, álgebra lineal, transformadas de Fourier y arrays multidimensionales (ndarray).",
+  "modulos_clave": [
+   "numpy.linalg",
+   "numpy.random",
+   "numpy.fft",
+   "numpy.ma",
+   "numpy.polynomial"
+  ],
+  "color": "#4DABCF",
+  "tags": [
+   "tensores",
+   "matrices",
+   "algebra-lineal",
+   "calculo-numerico"
+  ]
+ },
+ {
+  "id": "matplotlib",
+  "nombre": "Matplotlib",
+  "repo": "matplotlib/matplotlib",
+  "doc_url": "https://matplotlib.org/stable/contents.html",
+  "descripcion": "Trazado y visualización completa 2D y 3D en Python. Soporta gráficos estáticos, interactivos y publicación científica con pyplot.",
+  "modulos_clave": [
+   "matplotlib.pyplot",
+   "matplotlib.figure",
+   "matplotlib.axes",
+   "matplotlib.animation",
+   "mpl_toolkits.mplot3d"
+  ],
+  "color": "#11557C",
+  "tags": [
+   "visualizacion",
+   "graficos",
+   "pyplot",
+   "ciencia-de-datos"
+  ]
+ },
+ {
+  "id": "pandas",
+  "nombre": "Pandas",
+  "repo": "pandas-dev/pandas",
+  "doc_url": "https://pandas.pydata.org/docs/",
+  "descripcion": "Estructuras de datos DataFrame y Series para manipulación, limpieza, unión, pivote y análisis estadístico tabular veloz.",
+  "modulos_clave": [
+   "pandas.DataFrame",
+   "pandas.Series",
+   "pandas.read_csv",
+   "pandas.merge",
+   "pandas.pivot_table"
+  ],
+  "color": "#130754",
+  "tags": [
+   "dataframes",
+   "datos-tabulares",
+   "limpieza",
+   "series-temporales"
+  ]
+ },
+ {
+  "id": "scikit-learn",
+  "nombre": "Scikit-Learn",
+  "repo": "scikit-learn/scikit-learn",
+  "doc_url": "https://scikit-learn.org/stable/",
+  "descripcion": "Herramientas eficientes para análisis predictivo y machine learning: regresión, clasificación, clustering, reducción de dimensionalidad y pipelines.",
+  "modulos_clave": [
+   "sklearn.pipeline",
+   "sklearn.model_selection",
+   "sklearn.preprocessing",
+   "sklearn.ensemble",
+   "sklearn.metrics"
+  ],
+  "color": "#F7931E",
+  "tags": [
+   "machine-learning",
+   "clasificacion",
+   "regresion",
+   "clustering",
+   "pipeline"
+  ]
+ },
+ {
+  "id": "pytorch",
+  "nombre": "PyTorch",
+  "repo": "pytorch/pytorch",
+  "doc_url": "https://pytorch.org/docs/stable/index.html",
+  "descripcion": "Framework líder de Deep Learning con tensores acelerados en GPU, autograd (diferenciación automática dinámica) y módulos neurales.",
+  "modulos_clave": [
+   "torch.nn",
+   "torch.optim",
+   "torch.utils.data",
+   "torch.autograd",
+   "torch.cuda"
+  ],
+  "color": "#EE4C2C",
+  "tags": [
+   "deep-learning",
+   "redes-neuronales",
+   "autograd",
+   "gpu",
+   "tensores"
+  ]
+ },
+ {
+  "id": "seaborn",
+  "nombre": "Seaborn",
+  "repo": "mwaskom/seaborn",
+  "doc_url": "https://seaborn.pydata.org/",
+  "descripcion": "Visualización de datos estadísticos atractiva y orientada a datasets, construida sobre matplotlib e integrada con DataFrames de pandas.",
+  "modulos_clave": [
+   "seaborn.heatmap",
+   "seaborn.pairplot",
+   "seaborn.histplot",
+   "seaborn.boxplot",
+   "seaborn.FacetGrid"
+  ],
+  "color": "#388E3C",
+  "tags": [
+   "visualizacion",
+   "estadistica",
+   "distribuciones",
+   "correlacion"
+  ]
+ },
+ {
+  "id": "scipy",
+  "nombre": "SciPy",
+  "repo": "scipy/scipy",
+  "doc_url": "https://docs.scipy.org/doc/scipy/",
+  "descripcion": "Ecosistema de algoritmos científicos: optimización de funciones, integración numérica, ecuaciones diferenciales y procesamiento de señales.",
+  "modulos_clave": [
+   "scipy.optimize",
+   "scipy.stats",
+   "scipy.integrate",
+   "scipy.signal",
+   "scipy.spatial"
+  ],
+  "color": "#0054A6",
+  "tags": [
+   "calculo-cientifico",
+   "optimizacion",
+   "estadistica",
+   "senales"
+  ]
+ },
+ {
+  "id": "tensorflow",
+  "nombre": "TensorFlow / Keras",
+  "repo": "tensorflow/tensorflow",
+  "doc_url": "https://www.tensorflow.org/api_docs",
+  "descripcion": "Plataforma integral de Machine Learning y Deep Learning con soporte de grafos, tensores, entrenamiento distribuido y despliegue.",
+  "modulos_clave": [
+   "tf.keras.layers",
+   "tf.keras.models",
+   "tf.data",
+   "tf.GradientTape",
+   "tf.saved_model"
+  ],
+  "color": "#FF6F00",
+  "tags": [
+   "deep-learning",
+   "keras",
+   "produccion",
+   "grafos"
+  ]
+ },
+ {
+  "id": "transformers",
+  "nombre": "Transformers (Hugging Face)",
+  "repo": "huggingface/transformers",
+  "doc_url": "https://huggingface.co/docs/transformers/index",
+  "descripcion": "Modelos State-of-the-Art de procesamiento de lenguaje natural (LLMs), visión artificial y audio, con soporte PyTorch y JAX.",
+  "modulos_clave": [
+   "transformers.AutoModel",
+   "transformers.AutoTokenizer",
+   "transformers.pipeline",
+   "transformers.Trainer"
+  ],
+  "color": "#FFD21E",
+  "tags": [
+   "llm",
+   "nlp",
+   "atencion",
+   "embeddings",
+   "huggingface"
+  ]
+ }
+]

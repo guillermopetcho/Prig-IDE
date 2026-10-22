@@ -189,21 +189,50 @@ fn compacto(s: &mut String, v: &Valor) {
 // =========================================================================== leer
 
 /// `json.loads(texto)`. Las claves repetidas se quedan con el último valor en el sitio de la primera, como un dict.
+/// Los errores, con el texto de `json.JSONDecodeError`: `Expecting value: line 1 column 1 (char 0)`.
 pub fn leer(texto: &str) -> Result<Valor, String> {
-    let mut l = Lector { c: texto.as_bytes(), p: 0, t: texto };
+    if texto.starts_with('\u{feff}') {
+        return Err("Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)".into());
+    }
+    leer_con(texto, true)
+}
+
+/// `json.loads(texto, strict=False)`: admite caracteres de control dentro de las cadenas
+pub fn leer_flexible(texto: &str) -> Result<Valor, String> {
+    if texto.starts_with('\u{feff}') {
+        return Err("Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)".into());
+    }
+    leer_con(texto, false)
+}
+
+fn leer_con(texto: &str, estricto: bool) -> Result<Valor, String> {
+    let mut l = Lector { c: texto.as_bytes(), p: 0, t: texto, estricto };
     l.blancos();
     let v = l.valor(0)?;
     l.blancos();
     if l.p != l.c.len() {
-        return Err(format!("Extra data: char {}", l.p));
+        return l.error("Extra data");
     }
     Ok(v)
+}
+
+/// `msg: line L column C (char N)`, con la posición en caracteres (no en bytes), como `JSONDecodeError`
+fn mensaje(t: &str, byte: usize, que: &str) -> String {
+    let antes = &t[..byte.min(t.len())];
+    let pos = antes.chars().count();
+    let linea = antes.matches('\n').count() + 1;
+    let columna = match antes.rfind('\n') {
+        Some(i) => antes[i + 1..].chars().count() + 1,
+        None => pos + 1,
+    };
+    format!("{que}: line {linea} column {columna} (char {pos})")
 }
 
 struct Lector<'a> {
     c: &'a [u8],
     p: usize,
     t: &'a str,
+    estricto: bool,
 }
 
 impl<'a> Lector<'a> {
@@ -214,7 +243,11 @@ impl<'a> Lector<'a> {
     }
 
     fn error<T>(&self, que: &str) -> Result<T, String> {
-        Err(format!("{que}: char {}", self.p))
+        self.error_en(self.p, que)
+    }
+
+    fn error_en<T>(&self, byte: usize, que: &str) -> Result<T, String> {
+        Err(mensaje(self.t, byte, que))
     }
 
     fn literal(&mut self, palabra: &str) -> bool {
@@ -305,21 +338,24 @@ impl<'a> Lector<'a> {
         }
     }
 
+    /// Las 4 cifras de `\uXXXX` (`self.p` justo después de la `u`); el error, en la `u`, como Python
     fn hex4(&mut self) -> Result<u32, String> {
-        let Some(h) = self.t.get(self.p..self.p + 4) else { return self.error("Invalid \\uXXXX escape") };
-        let n = u32::from_str_radix(h, 16).or_else(|_| self.error("Invalid \\uXXXX escape"))?;
+        let malo = || self.error_en(self.p - 1, "Invalid \\uXXXX escape");
+        let Some(h) = self.t.get(self.p..self.p + 4) else { return malo() };
         if !h.chars().all(|c| c.is_ascii_hexdigit()) {
-            return self.error("Invalid \\uXXXX escape");
+            return malo();
         }
+        let n = u32::from_str_radix(h, 16).or_else(|_| malo())?;
         self.p += 4;
         Ok(n)
     }
 
     fn cadena(&mut self) -> Result<String, String> {
+        let inicio = self.p;
         self.p += 1; // la comilla
         let mut s = String::new();
         loop {
-            let Some(&c) = self.c.get(self.p) else { return self.error("Unterminated string starting at") };
+            let Some(&c) = self.c.get(self.p) else { return self.error_en(inicio, "Unterminated string starting at") };
             match c {
                 b'"' => {
                     self.p += 1;
@@ -327,7 +363,7 @@ impl<'a> Lector<'a> {
                 }
                 b'\\' => {
                     self.p += 1;
-                    let Some(&e) = self.c.get(self.p) else { return self.error("Unterminated string starting at") };
+                    let Some(&e) = self.c.get(self.p) else { return self.error_en(inicio, "Unterminated string starting at") };
                     self.p += 1;
                     match e {
                         b'"' => s.push('"'),
@@ -353,14 +389,14 @@ impl<'a> Lector<'a> {
                             }
                             s.push(char::from_u32(u).unwrap_or('\u{fffd}'));
                         }
-                        _ => return self.error("Invalid \\escape"),
+                        _ => return self.error_en(self.p - 2, "Invalid \\escape"),
                     }
                 }
-                c if c < 0x20 => return self.error("Invalid control character at"),
+                c if c < 0x20 && self.estricto => return self.error("Invalid control character at"),
                 _ => {
                     // un trozo sin escapes de una vez (el texto ya es UTF-8 válido)
                     let ini = self.p;
-                    while self.p < self.c.len() && !matches!(self.c[self.p], b'"' | b'\\') && self.c[self.p] >= 0x20 {
+                    while self.p < self.c.len() && !matches!(self.c[self.p], b'"' | b'\\') && (self.c[self.p] >= 0x20 || !self.estricto) {
                         self.p += 1;
                     }
                     s.push_str(&self.t[ini..self.p]);
@@ -451,5 +487,24 @@ mod tests {
         }
         assert_eq!(leer("-0").unwrap(), Valor::Entero(0));
         assert!(matches!(leer("1E2").unwrap(), Valor::Real(x) if x == 100.0));
+    }
+}
+
+#[cfg(test)]
+mod errores_python {
+    /// Los mensajes de `json.loads` de Python para documentos rotos (generados con Python 3.12)
+    #[test]
+    fn mismos_mensajes_que_python() {
+        let mut malos = Vec::new();
+        for linea in include_str!("json_errores_python.txt").lines() {
+            let par = super::leer(linea).unwrap();
+            let super::Valor::Lista(par) = par else { panic!() };
+            let (super::Valor::Texto(t), super::Valor::Texto(m)) = (&par[0], &par[1]) else { panic!() };
+            match super::leer(t) {
+                Err(e) if &e == m => {}
+                otro => malos.push(format!("{t:?}\n  python: {m}\n  rust:   {otro:?}")),
+            }
+        }
+        assert!(malos.is_empty(), "{} distintos:\n{}", malos.len(), malos.join("\n"));
     }
 }

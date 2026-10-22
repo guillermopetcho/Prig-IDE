@@ -199,6 +199,11 @@ fn nucleos_logicos() -> Option<i64> {
     (n >= 1).then_some(n as i64)
 }
 
+/// (sistema, versión del núcleo, máquina): `platform.system()`, `platform.release()`, `platform.machine()`
+pub fn uname_publico() -> (String, String, String) {
+    uname()
+}
+
 fn uname() -> (String, String, String) {
     // SAFETY: uname llena la estructura que se le da
     unsafe {

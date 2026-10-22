@@ -30,10 +30,12 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
-API = "https://api.github.com"
-RAW = "https://raw.githubusercontent.com"
-CODELOAD = "https://codeload.github.com"
+# Otras direcciones solo en las pruebas (una API falsa, sin red)
+API = os.environ.get("PRIG_GITHUB_API") or "https://api.github.com"
+RAW = os.environ.get("PRIG_GITHUB_RAW") or "https://raw.githubusercontent.com"
+CODELOAD = os.environ.get("PRIG_GITHUB_CODELOAD") or "https://codeload.github.com"
 UA = {"User-Agent": "Prig-IDE (lector de repositorios; uso educativo local)", "Accept": "application/vnd.github+json"}
 REF_VALIDA = re.compile(r"^[A-Za-z0-9_.\-]{1,100}/[A-Za-z0-9_.\-]{1,100}$")
 ORDENES = {"estrellas": "stars", "actualizados": "updated", "forks": "forks", "relevancia": ""}
@@ -129,7 +131,7 @@ def borrar_token() -> Dict[str, Any]:
 
 def _get(url: str, params: Optional[Dict[str, Any]] = None, cabeceras: Optional[Dict[str, str]] = None, **kw):
     try:
-        return requests.get(url, params=params, headers=cabeceras or _cabeceras(), timeout=kw.pop("timeout", 30), **kw)
+        return red_http.get(url, params=params, headers=cabeceras or _cabeceras(), timeout=kw.pop("timeout", 30), **kw)
     except requests.RequestException:
         raise ErrorGitHub("Sin conexión con GitHub: comprueba internet.")
 
@@ -589,30 +591,27 @@ def exportar_markdown(texto: str, workspace: str) -> Dict[str, Any]:
 
 
 def exportar_pdf(texto: str, workspace: str) -> Dict[str, Any]:
-    """ Resumen del repositorio y, por cada archivo explicado, su código con la explicación debajo """
+    """ Resumen del repositorio y, por cada archivo explicado, su código con la explicación debajo (Typst, en Rust:
+    los bloques de kaggle_pdf) """
     import kaggle_pdf as kp
-    from reportlab.platypus import PageBreak, Paragraph, Spacer
-    from html import escape
     info = abrir(texto)
     e = explicadas(info)
     if not e["repo"] and not e["archivos"]:
         raise ErrorGitHub("Todavía no hay explicaciones de este repositorio: pide la del repositorio o la de algún archivo.")
-    kp._registrar_fuentes()
-    est = kp._estilos()
-    lineas = [f"de <b>{escape(info.get('dueno') or '')}</b> · {info.get('estrellas')} estrellas · {escape(info.get('lenguaje') or '')}",
-              f'<link href="{escape(info["url"])}" color="#0a7bb0">{escape(info["url"])}</link>',
+    lineas = [f"de **{kp.md(info.get('dueno') or '')}** · {info.get('estrellas')} estrellas · {kp.md(info.get('lenguaje') or '')}",
+              kp.enlace(info["url"]),
               f"{len(e['archivos'])} archivos explicados"]
-    historia = kp._portada(info["ref"], est, "REPOSITORIO DE GITHUB EXPLICADO", lineas)
-    historia.append(Spacer(1, 20))
-    historia.append(Paragraph(escape(info.get("descripcion") or ""), est["portada_sub"]))
-    historia.append(Paragraph(f"Licencia del código original: {escape(info.get('licencia') or 'sin indicar')}. "
-                              "Las explicaciones las generó un modelo de IA: pueden contener errores.", est["nota"]))
+    historia = kp._portada(info["ref"], None, "REPOSITORIO DE GITHUB EXPLICADO", lineas)
+    historia.append({"tipo": "espacio", "alto": 20})
+    historia.append({"tipo": "markdown", "texto": kp.md(info.get("descripcion") or "")})
+    historia.append({"tipo": "nota", "texto": kp.md(f"Licencia del código original: {info.get('licencia') or 'sin indicar'}. "
+                                                    "Las explicaciones las generó un modelo de IA: pueden contener errores.")})
     if e["repo"]:
-        historia += [PageBreak(), Paragraph("El repositorio en conjunto", est["seccion"]),
-                     kp._caja_profesor(e["repo"]["texto"], est, "PROFESOR · VISIÓN GENERAL")]
+        historia += [{"tipo": "salto"}, {"tipo": "seccion", "texto": "El repositorio en conjunto"},
+                     kp._caja_profesor(e["repo"]["texto"], None, "PROFESOR · VISIÓN GENERAL")]
     for ruta in sorted(e["archivos"]):
-        historia.append(PageBreak())
-        historia.append(Paragraph(escape(ruta), est["seccion"]))
+        historia.append({"tipo": "salto"})
+        historia.append({"tipo": "seccion", "texto": ruta})
         try:
             a = leer_archivo(info["ref"], ruta)
             codigo = a.get("contenido") or ""
@@ -620,13 +619,13 @@ def exportar_pdf(texto: str, workspace: str) -> Dict[str, Any]:
             codigo = ""
         if codigo:
             recortado = codigo.count("\n") > 400
-            historia += kp._caja_codigo("\n".join(codigo.split("\n")[:400]), est, lenguaje=_lenguaje(ruta) if _lenguaje(ruta) != "plaintext" else "text")
+            historia += kp._caja_codigo("\n".join(codigo.split("\n")[:400]), None,
+                                        lenguaje=_lenguaje(ruta) if _lenguaje(ruta) != "plaintext" else None)
             if recortado:
-                historia.append(Paragraph("… (el archivo sigue: se muestran las primeras 400 líneas)", est["nota"]))
-        historia.append(Spacer(1, 6))
+                historia.append({"tipo": "nota", "texto": "… (el archivo sigue: se muestran las primeras 400 líneas)"})
         nivel = e["archivos"][ruta].get("nivel") or ""
-        historia.append(kp._caja_profesor(e["archivos"][ruta]["texto"], est, f"PROFESOR{' · NIVEL ' + nivel.upper() if nivel else ''}"))
+        historia.append(kp._caja_profesor(e["archivos"][ruta]["texto"], None, f"PROFESOR{' · NIVEL ' + nivel.upper() if nivel else ''}"))
     destino = os.path.join(workspace, CARPETA_EXPORT, info["ref"].replace("/", "__") + ".pdf")
-    paginas = kp._construir(destino, historia, info["ref"])
+    paginas = kp._construir(destino, historia, info["ref"], "Repositorio de GitHub explicado")
     return {"ruta": destino, "relativa": os.path.relpath(destino, workspace), "paginas": paginas,
             "archivos": len(e["archivos"]), "con_resumen": bool(e["repo"]), "bytes": os.path.getsize(destino)}

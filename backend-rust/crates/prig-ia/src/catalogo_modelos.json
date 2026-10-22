@@ -1,0 +1,450 @@
+{
+ "modelos": {
+  "qwen3:8b": {
+   "vram_gb": 5.2,
+   "familia": "Qwen3",
+   "razona": 5,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar",
+    "redactar",
+    "extraer",
+    "corregir"
+   ],
+   "nota": "El más capaz que entra entero en 6 GB. Piensa en voz alta cuando le conviene y calla cuando no, así que sirve para toda la cadena. Va justo de memoria: deja poco margen para contexto largo."
+  },
+  "qwen3:4b": {
+   "vram_gb": 2.5,
+   "familia": "Qwen3",
+   "razona": 4,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "extraer",
+    "redactar",
+    "corregir"
+   ],
+   "nota": "Razona sorprendentemente bien para su tamaño y deja 3,5 GB libres: es el que permite tener dos modelos cargados a la vez."
+  },
+  "qwen3:1.7b": {
+   "vram_gb": 1.4,
+   "familia": "Qwen3",
+   "razona": 3,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "clasificar",
+    "extraer"
+   ],
+   "nota": "Para pasos mecánicos. Con pensamiento apagado va muy rápido."
+  },
+  "qwen3:0.6b": {
+   "vram_gb": 0.5,
+   "familia": "Qwen3",
+   "razona": 2,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "clasificar"
+   ],
+   "nota": "Filtro previo barato: clasificar, etiquetar, decidir si algo merece un modelo mayor."
+  },
+  "qwen3:14b": {
+   "vram_gb": 9.3,
+   "familia": "Qwen3",
+   "razona": 5,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar"
+   ],
+   "nota": "No cabe en 6 GB: unos 4 GB irían a RAM y sería bastante más lento. Sirve para UN paso de revisión final sobre un texto ya corto."
+  },
+  "qwen3:30b-a3b": {
+   "vram_gb": 18.2,
+   "familia": "Qwen3",
+   "razona": 5,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar",
+    "redactar"
+   ],
+   "nota": "MoE oficial de Qwen3 (30B totales, 3.3B activos por token). Inferencia muy rápida con pensamiento conmutable; requiere ~18 GB de memoria."
+  },
+  "qwen2.5:7b": {
+   "vram_gb": 4.7,
+   "familia": "Qwen2.5",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "extraer",
+    "redactar",
+    "razonar",
+    "corregir"
+   ],
+   "nota": "Instruct general. Sigue instrucciones y copia literal muy bien, sin bloque de pensamiento que estorbe."
+  },
+  "qwen2.5-coder:7b": {
+   "vram_gb": 4.7,
+   "familia": "Qwen2.5",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "programar",
+    "extraer",
+    "corregir"
+   ],
+   "nota": "Para código y libros de programación. Medido en Prig: 100 % de citas verificadas con formato JSON forzado."
+  },
+  "qwen2.5-coder:3b": {
+   "vram_gb": 1.9,
+   "familia": "Qwen2.5",
+   "razona": 2,
+   "piensa": "no",
+   "fuerte_en": [
+    "programar",
+    "clasificar"
+   ],
+   "nota": "Código en poco espacio."
+  },
+  "qwen2.5:3b": {
+   "vram_gb": 1.9,
+   "familia": "Qwen2.5",
+   "razona": 2,
+   "piensa": "no",
+   "fuerte_en": [
+    "extraer",
+    "clasificar"
+   ],
+   "nota": "Pasos mecánicos dejando sitio a otro modelo."
+  },
+  "qwen2.5-coder:1.5b": {
+   "vram_gb": 1.0,
+   "familia": "Qwen2.5",
+   "razona": 1,
+   "piensa": "no",
+   "fuerte_en": [
+    "clasificar"
+   ],
+   "nota": "Solo para tareas de una línea."
+  },
+  "deepseek-r1:8b": {
+   "vram_gb": 5.2,
+   "familia": "R1 destilado",
+   "razona": 5,
+   "piensa": "siempre",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar"
+   ],
+   "nota": "DeepSeek-R1-0528 destilado sobre Qwen3 8B (la etiqueta 8b de Ollama). Entra en 6 GB de VRAM"
+  },
+  "deepseek-r1:7b": {
+   "vram_gb": 4.7,
+   "familia": "R1 destilado",
+   "razona": 5,
+   "piensa": "siempre",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar"
+   ],
+   "nota": "Igual que el de 8B pero sobre Qwen. Prueba los dos: en cada equipo suele ir mejor uno."
+  },
+  "deepseek-r1:1.5b": {
+   "vram_gb": 1.1,
+   "familia": "R1 destilado",
+   "razona": 3,
+   "piensa": "siempre",
+   "fuerte_en": [
+    "razonar"
+   ],
+   "nota": "Razona por encima de su tamaño, pero gasta muchos tokens pensando."
+  },
+  "gemma3:4b": {
+   "vram_gb": 3.3,
+   "familia": "Gemma 3",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "extraer"
+   ],
+   "nota": "Escribe muy bien en castellano para lo que ocupa."
+  },
+  "gemma2:9b": {
+   "vram_gb": 5.4,
+   "familia": "Gemma 2",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar"
+   ],
+   "nota": "Bueno explicando en castellano. Muy justo de espacio."
+  },
+  "llama3.1:8b": {
+   "vram_gb": 4.9,
+   "familia": "Llama 3.1",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar"
+   ],
+   "nota": "Explicaciones largas con naturalidad. Menos disciplinado con el JSON."
+  },
+  "llama3.2:3b": {
+   "vram_gb": 2.0,
+   "familia": "Llama 3.2",
+   "razona": 2,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "clasificar"
+   ],
+   "nota": "Ligero y rápido para pasos de redacción corta."
+  },
+  "granite3.3:8b": {
+   "vram_gb": 4.9,
+   "familia": "Granite 3.3",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "extraer",
+    "razonar",
+    "corregir"
+   ],
+   "nota": "Pensado para tareas de empresa: muy regular siguiendo formatos."
+  },
+  "phi4-mini": {
+   "vram_gb": 2.5,
+   "familia": "Phi-4",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "verificar"
+   ],
+   "nota": "Fuerte en razonamiento matemático para su tamaño."
+  },
+  "mistral:7b": {
+   "vram_gb": 4.4,
+   "familia": "Mistral",
+   "razona": 2,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar"
+   ],
+   "nota": "Rápido y correcto, sin destacar en nada concreto."
+  },
+  "exaone3.5:7.8b": {
+   "vram_gb": 4.8,
+   "familia": "EXAONE 3.5",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "extraer"
+   ],
+   "nota": "Buena relación entre tamaño y capacidad; menos probado en castellano."
+  },
+  "olmo2:7b": {
+   "vram_gb": 4.5,
+   "familia": "OLMo 2",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "redactar"
+   ],
+   "nota": "Completamente abierto, datos de entrenamiento incluidos."
+  },
+  "phi4": {
+   "vram_gb": 9.1,
+   "familia": "Phi-4",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "verificar"
+   ],
+   "nota": "Fuerte en matemáticas, pero no entra: unos 3,5 GB irían a RAM."
+  },
+  "qwen2.5:14b": {
+   "vram_gb": 9.0,
+   "familia": "Qwen2.5",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "redactar"
+   ],
+   "nota": "No cabe en 6 GB. Para un paso de revisión final, no para un libro."
+  },
+  "deepseek-r1:14b": {
+   "vram_gb": 9.0,
+   "familia": "R1 destilado",
+   "razona": 5,
+   "piensa": "siempre",
+   "fuerte_en": [
+    "criticar",
+    "verificar"
+   ],
+   "nota": "El mejor revisor de la lista, pero reparte con la CPU."
+  },
+  "gemma3:12b": {
+   "vram_gb": 8.1,
+   "familia": "Gemma 3",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar"
+   ],
+   "nota": "Muy bueno redactando, pero no entra entero."
+  },
+  "mistral-nemo:12b": {
+   "vram_gb": 7.1,
+   "familia": "Mistral",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar"
+   ],
+   "nota": "Ventana de contexto muy amplia. No entra entero."
+  },
+  "hf.co/bartowski/OLMoE-1B-7B-0924-Instruct-GGUF:Q4_K_M": {
+   "vram_gb": 4.2,
+   "familia": "OLMoE",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "extraer",
+    "redactar",
+    "clasificar"
+   ],
+   "nota": "MoE 100 % abierto de Allen AI (7B totales, 1B activos), desde Hugging Face. Entra entero en 6 GB de VRAM y genera muy rápido."
+  },
+  "qwen3-coder:30b": {
+   "vram_gb": 18.6,
+   "familia": "Qwen3-Coder MoE",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "programar",
+    "corregir",
+    "verificar"
+   ],
+   "nota": "MoE de código de Qwen (30B totales, 3,3B activos). No entra en 6 GB: se reparte con la RAM, pero al activar pocos parámetros sigue siendo rápido."
+  },
+  "dolphin3:8b": {
+   "vram_gb": 4.9,
+   "familia": "Dolphin 3",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar"
+   ],
+   "nota": "Dolphin 3.0 sobre Llama 3.1 8B: sigue instrucciones con pocos rechazos. Entra en 6 GB."
+  },
+  "hf.co/RichardErkhov/Qwen_-_Qwen1.5-MoE-A2.7B-Chat-gguf:Q4_K_M": {
+   "vram_gb": 9.5,
+   "familia": "Qwen1.5 MoE",
+   "razona": 3,
+   "piensa": "no",
+   "fuerte_en": [
+    "extraer",
+    "redactar",
+    "programar"
+   ],
+   "nota": "MoE de Qwen (14B totales, 2,7B activos), desde Hugging Face. Se reparte con la RAM en 6 GB."
+  },
+  "deepseek-coder-v2:16b": {
+   "vram_gb": 8.9,
+   "familia": "DeepSeek Coder",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "programar",
+    "corregir",
+    "extraer"
+   ],
+   "nota": "Versión Lite de DeepSeek-Coder-V2 (MoE 16B totales, 2.4B activos). Excelente para código, matemáticas y lógica."
+  },
+  "deepseek-coder-v2:lite": {
+   "vram_gb": 8.9,
+   "familia": "DeepSeek Coder",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "programar",
+    "corregir",
+    "extraer"
+   ],
+   "nota": "Alias de DeepSeek-Coder-V2 16B Lite."
+  },
+  "qwen3.6:35b-a3b": {
+   "vram_gb": 22.6,
+   "familia": "Qwen3.6 MoE",
+   "razona": 5,
+   "piensa": "conmutable",
+   "fuerte_en": [
+    "razonar",
+    "criticar",
+    "verificar",
+    "redactar",
+    "programar"
+   ],
+   "nota": "MoE de 35B totales y 3B activos, con visión. Requiere unos 23 GB entre RAM y VRAM."
+  },
+  "hf.co/bartowski/Phi-3.5-MoE-instruct-GGUF:Q4_K_M": {
+   "vram_gb": 25.4,
+   "familia": "Phi-3.5 MoE",
+   "razona": 5,
+   "piensa": "no",
+   "fuerte_en": [
+    "razonar",
+    "verificar",
+    "programar",
+    "redactar"
+   ],
+   "nota": "Phi-3.5 MoE de Microsoft (42B totales, 6,6B activos), desde Hugging Face. Requiere unos 25 GB entre RAM y VRAM."
+  },
+  "mixtral:8x7b": {
+   "vram_gb": 26.0,
+   "familia": "Mixtral",
+   "razona": 4,
+   "piensa": "no",
+   "fuerte_en": [
+    "redactar",
+    "razonar",
+    "extraer",
+    "programar"
+   ],
+   "nota": "El MoE clásico de Mistral AI (47B totales, 13B activos). Excelente calidad general; requiere ~26 GB de memoria compartida."
+  }
+ },
+ "embedding": {
+  "bge-m3": {
+   "vram_gb": 1.2,
+   "familia": "BGE-M3",
+   "multilingue": true,
+   "nota": "Multilingüe de verdad. Medido en Prig: 6 aciertos de 7 con preguntas en castellano, contra 4 de 7 de nomic-embed-text."
+  },
+  "nomic-embed-text": {
+   "vram_gb": 0.3,
+   "familia": "Nomic",
+   "multilingue": false,
+   "nota": "Ligero, pero flojo en castellano: las mismas preguntas traducidas al inglés le suben de 4 a 6 aciertos de 7."
+  }
+ }
+}

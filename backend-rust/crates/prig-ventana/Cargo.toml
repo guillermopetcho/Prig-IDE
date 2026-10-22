@@ -1,0 +1,22 @@
+[package]
+name = "prig-ventana"
+version = "0.1.0"
+edition = "2021"
+
+# La ventana de Prig (F9 de docs/plan-prig-rust.md): un solo binario, `prig`, dueño de todo: el servidor de Rust (en
+# el mismo proceso), el backend de Python como proceso hijo mientras quede algo en él, y la ventana (tao + wry, con
+# WebKitGTK en Linux) en lugar de pywebview + Qt.
+
+[[bin]]
+name = "prig"
+path = "src/main.rs"
+
+[dependencies]
+prig-server = { path = "../prig-server" }
+tao = "0.37"
+wry = "0.57"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync"] }
+axum = "0.7"
+libc = "0.2"
+gtk = "0.18"
+webkit2gtk = "2.0"

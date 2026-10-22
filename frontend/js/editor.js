@@ -11,6 +11,8 @@ class EditorManager {
         ];
         this._isAutoCommenting = false;
         this._restaurando = false;
+        this.nivelTransparencia = this.obtenerNivelTransparencia();
+        this.fondoTransparente = this.nivelTransparencia > 0;
         this.initMonaco();
     }
 
@@ -63,9 +65,20 @@ class EditorManager {
         this.setupTabDragAndDrop();
         this.pintarVacio();
 
+        // Aplicar transparencia inicial guardada
+        this.aplicarFondoTransparente(this.fondoTransparente);
+
         // Restaurar disposición y sesión de inmediato
         this.restoreLayoutState();
         this.restoreSessionState();
+
+        // Atajo global Alt+T para alternar fondo de código transparente
+        window.addEventListener('keydown', (e) => {
+            if (e.altKey && (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                this.alternarFondoTransparente();
+            }
+        });
 
         // Carga diferida o actualización con Monaco si require está presente
         if (typeof require !== 'undefined' && typeof require.config === 'function') {
@@ -83,6 +96,23 @@ class EditorManager {
     _onMonacoAvailable() {
         if (typeof monaco === 'undefined' || !monaco.editor) return;
 
+        // Registrar tema transparente nativo para Monaco
+        monaco.editor.defineTheme('prig-transparent', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#00000000',
+                'editorGutter.background': '#00000000',
+                // Monaco no soporta hex-8 con alpha=0; #00000001 es casi invisible y sí respetado
+                'editor.lineHighlightBackground': '#00000001',
+                'editor.lineHighlightBorder': '#00000001',
+                'editorLineNumber.foreground': '#7f849c',
+                'editorLineNumber.activeForeground': '#00f0ff',
+                'editorIndentGuide.background': 'rgba(255,255,255,0.06)'
+            }
+        });
+
         if (window.sintaxisMgr) {
             window.sintaxisMgr.aplicar();
         } else {
@@ -91,13 +121,20 @@ class EditorManager {
                 inherit: true,
                 rules: [],
                 colors: {
-                    'editor.background': '#1e1e1e',
-                    'editor.lineHighlightBackground': '#2a2d2e',
+                    'editor.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
+                    'editorGutter.background': this.fondoTransparente ? '#00000000' : '#1e1e1e',
+                    // Monaco no soporta hex-8 con alpha=0; #00000001 es casi invisible y sí respetado
+                    'editor.lineHighlightBackground': '#00000001',
+                    'editor.lineHighlightBorder': '#00000001',
                     'editorLineNumber.foreground': '#858585',
                     'editorLineNumber.activeForeground': '#cccccc',
                     'editorIndentGuide.background': '#333333'
                 }
             });
+        }
+
+        if (this.fondoTransparente) {
+            this.aplicarFondoTransparente(true);
         }
 
         // Si alguna columna usaba el editor fallback, reemplazarla por Monaco conservando contenido
@@ -179,6 +216,9 @@ class EditorManager {
         if (monaco.languages.registerInlineCompletionsProvider) {
             monaco.languages.registerInlineCompletionsProvider('python', {
                 provideInlineCompletions: async (model, position, context, token) => {
+                    if (typeof window !== 'undefined' && window.isQwenEditorActivo && !window.isQwenEditorActivo()) {
+                        return { items: [] };
+                    }
                     const lineContent = model.getLineContent(position.lineNumber);
                     if (!lineContent.trim() || lineContent.trim().length < 3) {
                         return { items: [] };
@@ -351,6 +391,17 @@ class EditorManager {
             currentModel: null,
             focus: () => textarea.focus(),
             layout: () => updateGutter(),
+            // Lo que se aplica antes de que cargue Monaco (preferencias de apariencia y vista): el resto de opciones
+            // no tiene equivalente en una textarea y se ignora
+            updateOptions: (o) => {
+                if (!o) return;
+                if (o.fontSize) wrapper.style.fontSize = `${o.fontSize}px`;
+                if (o.fontFamily) wrapper.style.fontFamily = o.fontFamily;
+                if (o.tabSize) textarea.style.tabSize = String(o.tabSize);
+                if (o.wordWrap) textarea.style.whiteSpace = o.wordWrap === 'on' ? 'pre-wrap' : 'pre';
+                if (o.lineNumbers) gutter.style.display = o.lineNumbers === 'off' ? 'none' : '';
+            },
+            getAction: () => null,
             getValue: () => textarea.value,
             setValue: (val) => {
                 textarea.value = val || '';
@@ -453,7 +504,18 @@ class EditorManager {
             this.setActivePane(colIndex);
         });
 
-        return instance;
+        // Mientras carga Monaco, el resto del IDE llama a métodos de Monaco que una textarea no tiene: los eventos
+        // (on…) devuelven algo que se puede soltar, las consultas (get…) nada, y lo demás no hace nada. Sin esto,
+        // la primera llamada que faltaba cortaba el arranque de su módulo (pasaba en WebKitGTK, que carga Monaco
+        // más tarde).
+        return new Proxy(instance, {
+            get(objetivo, nombre) {
+                if (nombre in objetivo || typeof nombre !== 'string') return objetivo[nombre];
+                if (/^on[A-Z]/.test(nombre)) return () => ({ dispose() {} });
+                if (/^get[A-Z]/.test(nombre)) return () => null;
+                return () => undefined;
+            },
+        });
     }
 
     /** Crea una instancia de Monaco Editor para una columna dada */
@@ -463,13 +525,18 @@ class EditorManager {
         const ed = monaco.editor.create(containerEl, {
             value: '',
             language: 'python',
-            theme: window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'),
+            theme: this.fondoTransparente
+                ? 'prig-transparent'
+                : (window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark')),
             automaticLayout: true,
             fontSize: parseInt(localStorage.getItem('prig_editor_font_size') || '14', 10),
             fontFamily: "'Fira Code', monospace",
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
-            smoothScrolling: true
+            smoothScrolling: true,
+            // Espacio entre número de línea y el inicio del código (evita que el cursor tape la primera letra)
+            lineDecorationsWidth: 18,
+            lineNumbersMinChars: 3
         });
 
         // Evento de foco: actualizar la columna activa
@@ -890,7 +957,10 @@ class EditorManager {
             if (col1) { col1.style.flex = 'none'; col1.style.width = `${100 - w0}%`; }
 
             // Si Col 1 no tiene pestañas y Col 0 tiene varias, mover una o clonar la activa para ver 2 códigos
-            if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length > 1) {
+            // (no cuando se abre a propósito un archivo en esa columna: ese archivo la ocupa)
+            if (this._abriendoEnColumna) {
+                // nada
+            } else if (this.panes[1].tabs.length === 0 && this.panes[0].tabs.length > 1) {
                 const moverRuta = this.panes[0].tabs[1] || this.panes[0].tabs[this.panes[0].tabs.length - 1];
                 this.moveTabToPane(moverRuta, 0, 1);
             } else if (this.panes[1].tabs.length === 0 && this.panes[0].activePath) {
@@ -974,6 +1044,8 @@ class EditorManager {
         if (window.IDE && typeof window.IDE.pintarEstado === 'function') {
             window.IDE.pintarEstado();
         }
+        // Refrescar badges de nombre de archivo (para actualizar cuál está activo)
+        this.renderBadgesBarra();
     }
 
     /** Refresca el layout de todos los editores activos */
@@ -1181,6 +1253,8 @@ class EditorManager {
         const ext = (name || '').split('.').pop().toLowerCase();
         const lang = this.getLanguageForExt(ext);
         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'].includes(ext);
+        const isPensamiento = (name && name.toUpperCase().includes('PENSAMIENTO')) || (path && path.toUpperCase().includes('PENSAMIENTO'));
+        const isMarkdown = ext === 'md' || ext === 'markdown' || isPensamiento;
 
         if (!this.openTabs.has(path)) {
             let model = null;
@@ -1199,7 +1273,10 @@ class EditorManager {
                 notebookData,
                 savedContent: content,
                 isImage,
-                imageUrl: `/api/file/raw?path=${encodeURIComponent(path)}`
+                imageUrl: `/api/file/raw?path=${encodeURIComponent(path)}`,
+                isMarkdown,
+                isPensamiento,
+                viewMode: isMarkdown ? 'markdown' : (isNotebook ? 'notebook' : 'source')
             };
             this.openTabs.set(path, tab);
 
@@ -1207,6 +1284,9 @@ class EditorManager {
                 model.onDidChangeContent(() => {
                     this.checkAutoComment(tab.path);
                     this.onContentChanged(tab.path);
+                    if (tab.isMarkdown && tab.viewMode === 'markdown') {
+                        this.renderMarkdownView(tab.path);
+                    }
                 });
             }
         } else {
@@ -1216,11 +1296,22 @@ class EditorManager {
             }
             tab.savedContent = content;
             tab.notebookData = notebookData;
+            tab.isMarkdown = isMarkdown;
+            tab.isPensamiento = isPensamiento;
+        }
+
+        if (typeof window !== 'undefined' && window.notificarArchivoLeido) {
+            window.notificarArchivoLeido(name || path);
         }
 
         const destCol = targetCol !== null ? targetCol : this.activeCol;
         if (destCol >= this.numColumns) {
-            this.setColumnLayout(destCol + 1, false);
+            this._abriendoEnColumna = true;
+            try {
+                this.setColumnLayout(destCol + 1, false);
+            } finally {
+                this._abriendoEnColumna = false;
+            }
         }
 
         const targetPane = this.panes[destCol];
@@ -1229,7 +1320,13 @@ class EditorManager {
         }
 
         this.setActiveTabInPane(destCol, path);
-        this.setActivePane(destCol);
+        const wrapper = document.getElementById('editor-area-wrapper');
+        if (wrapper) wrapper.style.display = 'flex';
+        const gridEl = document.getElementById('editor-grid-container');
+        if (gridEl) gridEl.style.display = 'flex';
+        const vacio = document.getElementById('editor-vacio');
+        if (vacio) vacio.hidden = true;
+
         this.saveLayoutState();
         this.saveSessionState();
 
@@ -1275,8 +1372,9 @@ class EditorManager {
         if (ed && tabData.model) {
             ed.setModel(tabData.model);
         }
+        this.actualizarCentroArchivo(colIndex);
 
-        // Si la columna es 0 y es un cuaderno o imagen, manejar contenedores visuales
+        // Si la columna es 0 y es un cuaderno, imagen o markdown, manejar contenedores visuales
         if (colIndex === 0) {
             const monacoContainer = document.getElementById('monaco-editor-container');
             const notebookContainer = document.getElementById('notebook-view-container');
@@ -1290,11 +1388,22 @@ class EditorManager {
                     monacoContainer.parentElement.appendChild(imageContainer);
                 }
             }
+            let markdownContainer = document.getElementById('markdown-view-container');
+            if (!markdownContainer) {
+                markdownContainer = document.createElement('div');
+                markdownContainer.id = 'markdown-view-container';
+                markdownContainer.className = 'prig-markdown-container';
+                markdownContainer.style.cssText = 'display:none; flex:1; min-height:0; overflow-y:auto; padding:24px 32px; background:var(--bg-panel, #181825); color:var(--text-main, #cdd6f4);';
+                if (monacoContainer && monacoContainer.parentElement) {
+                    monacoContainer.parentElement.appendChild(markdownContainer);
+                }
+            }
 
             if (tabData.isImage) {
                 if (viewModeBar) viewModeBar.style.display = 'none';
                 if (monacoContainer) monacoContainer.style.display = 'none';
                 if (notebookContainer) notebookContainer.style.display = 'none';
+                if (markdownContainer) markdownContainer.style.display = 'none';
                 imageContainer.style.display = 'flex';
                 imageContainer.innerHTML = `
                     <div style="text-align:center; max-width:90%; max-height:85%;">
@@ -1306,17 +1415,50 @@ class EditorManager {
                 `;
             } else if (tabData.isNotebook && tabData.notebookData) {
                 if (imageContainer) imageContainer.style.display = 'none';
-                if (viewModeBar) viewModeBar.style.display = 'flex';
-                if (monacoContainer) monacoContainer.style.display = 'none';
-                if (notebookContainer) {
-                    notebookContainer.style.display = 'flex';
-                    if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+                if (markdownContainer) markdownContainer.style.display = 'none';
+                if (viewModeBar) {
+                    viewModeBar.style.display = 'flex';
+                    viewModeBar.innerHTML = `
+                        <button id="btn-view-notebook" class="view-toggle-btn ${tabData.viewMode === 'source' ? '' : 'active'}" onclick="window.editorMgr && window.editorMgr.showNotebookView();"><i class="fa-solid fa-book-bookmark"></i> Vista Cuaderno Jupyter</button>
+                        <button id="btn-view-source" class="view-toggle-btn ${tabData.viewMode === 'source' ? 'active' : ''}" onclick="window.editorMgr && window.editorMgr.showSourceEditor();"><i class="fa-solid fa-code"></i> Código Fuente Raw</button>
+                    `;
+                }
+                if (tabData.viewMode === 'source') {
+                    if (monacoContainer) monacoContainer.style.display = 'block';
+                    if (notebookContainer) notebookContainer.style.display = 'none';
+                } else {
+                    if (monacoContainer) monacoContainer.style.display = 'none';
+                    if (notebookContainer) {
+                        notebookContainer.style.display = 'flex';
+                        if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+                    }
+                }
+            } else if (tabData.isMarkdown) {
+                if (imageContainer) imageContainer.style.display = 'none';
+                if (notebookContainer) notebookContainer.style.display = 'none';
+                if (viewModeBar) {
+                    viewModeBar.style.display = 'flex';
+                    viewModeBar.innerHTML = `
+                        <button id="btn-view-markdown" class="view-toggle-btn ${tabData.viewMode === 'source' ? '' : 'active'}" onclick="window.editorMgr && window.editorMgr.showMarkdownView();"><i class="fa-solid fa-file-lines"></i> Vista Markdown</button>
+                        <button id="btn-view-source-md" class="view-toggle-btn ${tabData.viewMode === 'source' ? 'active' : ''}" onclick="window.editorMgr && window.editorMgr.showSourceEditor();"><i class="fa-solid fa-code"></i> Código Fuente Raw</button>
+                    `;
+                }
+                if (tabData.viewMode === 'source') {
+                    if (monacoContainer) monacoContainer.style.display = 'block';
+                    if (markdownContainer) markdownContainer.style.display = 'none';
+                } else {
+                    if (monacoContainer) monacoContainer.style.display = 'none';
+                    if (markdownContainer) {
+                        markdownContainer.style.display = 'block';
+                        this.renderMarkdownView(path);
+                    }
                 }
             } else {
                 if (imageContainer) imageContainer.style.display = 'none';
+                if (notebookContainer) notebookContainer.style.display = 'none';
+                if (markdownContainer) markdownContainer.style.display = 'none';
                 if (viewModeBar) viewModeBar.style.display = 'none';
                 if (monacoContainer) monacoContainer.style.display = 'block';
-                if (notebookContainer) notebookContainer.style.display = 'none';
             }
         }
 
@@ -1327,20 +1469,128 @@ class EditorManager {
     }
 
     showSourceEditor() {
-        document.getElementById('monaco-editor-container').style.display = 'block';
-        document.getElementById('notebook-view-container').style.display = 'none';
-        document.getElementById('btn-view-notebook').className = 'view-toggle-btn';
-        document.getElementById('btn-view-source').className = 'view-toggle-btn active';
+        const tabData = this.openTabs.get(this.activePath);
+        if (tabData) tabData.viewMode = 'source';
+        const monacoContainer = document.getElementById('monaco-editor-container');
+        const notebookContainer = document.getElementById('notebook-view-container');
+        const markdownContainer = document.getElementById('markdown-view-container');
+        if (monacoContainer) monacoContainer.style.display = 'block';
+        if (notebookContainer) notebookContainer.style.display = 'none';
+        if (markdownContainer) markdownContainer.style.display = 'none';
+
+        const btnNb = document.getElementById('btn-view-notebook');
+        const btnSrc = document.getElementById('btn-view-source');
+        const btnMd = document.getElementById('btn-view-markdown');
+        const btnSrcMd = document.getElementById('btn-view-source-md');
+        if (btnNb) btnNb.className = 'view-toggle-btn';
+        if (btnSrc) btnSrc.className = 'view-toggle-btn active';
+        if (btnMd) btnMd.className = 'view-toggle-btn';
+        if (btnSrcMd) btnSrcMd.className = 'view-toggle-btn active';
+
+        if (this.panes[0] && this.panes[0].editor && typeof this.panes[0].editor.layout === 'function') {
+            this.panes[0].editor.layout();
+        }
     }
 
     showNotebookView() {
         const tabData = this.openTabs.get(this.activePath);
         if (tabData && tabData.notebookData) {
-            document.getElementById('monaco-editor-container').style.display = 'none';
-            document.getElementById('notebook-view-container').style.display = 'flex';
-            document.getElementById('btn-view-notebook').className = 'view-toggle-btn active';
-            document.getElementById('btn-view-source').className = 'view-toggle-btn';
+            tabData.viewMode = 'notebook';
+            const monacoContainer = document.getElementById('monaco-editor-container');
+            const notebookContainer = document.getElementById('notebook-view-container');
+            const markdownContainer = document.getElementById('markdown-view-container');
+            if (monacoContainer) monacoContainer.style.display = 'none';
+            if (markdownContainer) markdownContainer.style.display = 'none';
+            if (notebookContainer) {
+                notebookContainer.style.display = 'flex';
+                if (window.notebookMgr) window.notebookMgr.renderNotebook(tabData.notebookData);
+            }
+            const btnNb = document.getElementById('btn-view-notebook');
+            const btnSrc = document.getElementById('btn-view-source');
+            if (btnNb) btnNb.className = 'view-toggle-btn active';
+            if (btnSrc) btnSrc.className = 'view-toggle-btn';
         }
+    }
+
+    showMarkdownView() {
+        const tabData = this.openTabs.get(this.activePath);
+        if (!tabData) return;
+        tabData.viewMode = 'markdown';
+        const monacoContainer = document.getElementById('monaco-editor-container');
+        const notebookContainer = document.getElementById('notebook-view-container');
+        const markdownContainer = document.getElementById('markdown-view-container');
+        if (monacoContainer) monacoContainer.style.display = 'none';
+        if (notebookContainer) notebookContainer.style.display = 'none';
+        if (markdownContainer) {
+            markdownContainer.style.display = 'block';
+            this.renderMarkdownView(this.activePath);
+        }
+
+        const btnMd = document.getElementById('btn-view-markdown');
+        const btnSrcMd = document.getElementById('btn-view-source-md');
+        if (btnMd) btnMd.className = 'view-toggle-btn active';
+        if (btnSrcMd) btnSrcMd.className = 'view-toggle-btn';
+    }
+
+    renderMarkdownView(path) {
+        const tabData = this.openTabs.get(path);
+        if (!tabData) return;
+        let markdownContainer = document.getElementById('markdown-view-container');
+        if (!markdownContainer) {
+            const monacoContainer = document.getElementById('monaco-editor-container');
+            markdownContainer = document.createElement('div');
+            markdownContainer.id = 'markdown-view-container';
+            markdownContainer.className = 'prig-markdown-container';
+            markdownContainer.style.cssText = 'display:block; flex:1; min-height:0; overflow-y:auto; padding:24px 32px; background:var(--bg-panel, #181825); color:var(--text-main, #cdd6f4);';
+            if (monacoContainer && monacoContainer.parentElement) {
+                monacoContainer.parentElement.appendChild(markdownContainer);
+            }
+        }
+
+        const rawContent = (tabData.model && typeof tabData.model.getValue === 'function')
+            ? tabData.model.getValue()
+            : (tabData.savedContent || '');
+
+        let htmlContent = '';
+        if (window.marked && typeof window.marked.parse === 'function') {
+            try {
+                htmlContent = window.marked.parse(rawContent);
+            } catch (err) {
+                console.error('Error parseando markdown:', err);
+                htmlContent = `<pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml ? this.escapeHtml(rawContent) : rawContent}</pre>`;
+            }
+        } else {
+            htmlContent = `<pre style="white-space: pre-wrap; font-family: monospace;">${this.escapeHtml ? this.escapeHtml(rawContent) : rawContent}</pre>`;
+        }
+
+        const isPensamiento = tabData.isPensamiento || (tabData.name && tabData.name.toUpperCase().includes('PENSAMIENTO'));
+
+        markdownContainer.innerHTML = `
+            <div class="prig-markdown-document ${isPensamiento ? 'es-pensamiento-proyecto' : ''}" style="max-width: 960px; margin: 0 auto; width: 100%;">
+                <div class="prig-markdown-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px; margin-bottom: 22px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="${isPensamiento ? 'fa-solid fa-brain' : 'fa-solid fa-file-lines'}" style="color: ${isPensamiento ? 'var(--accent-purple, #cba6f7)' : 'var(--accent-blue, #89b4fa)'}; font-size: 20px;"></i>
+                        <div>
+                            <div style="font-weight: 800; font-size: 15px; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                                ${this.escapeHtml ? this.escapeHtml(tabData.name) : tabData.name}
+                                ${isPensamiento ? '<span style="background: rgba(203, 166, 247, 0.2); color: #cba6f7; border: 1px solid rgba(203, 166, 247, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">Pensamiento del Proyecto</span>' : '<span style="background: rgba(137, 180, 250, 0.15); color: #89b4fa; border: 1px solid rgba(137, 180, 250, 0.3); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">Markdown</span>'}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted, #a6adc8); font-family: 'Fira Code', monospace; margin-top: 2px;">
+                                ${this.escapeHtml ? this.escapeHtml(path) : path}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="prig-md-btn-editar" onclick="window.editorMgr && window.editorMgr.showSourceEditor();" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #cdd6f4; border-radius: 6px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                            <i class="fa-solid fa-pen-to-square"></i> Editar Código Fuente
+                        </button>
+                    </div>
+                </div>
+                <div class="prig-markdown-rendered-body" style="font-size: 13.5px; line-height: 1.75; color: var(--text-main, #cdd6f4);">
+                    ${htmlContent}
+                </div>
+            </div>
+        `;
     }
 
     /** Cierra una pestaña en la columna activa (compatibilidad) */
@@ -1491,21 +1741,153 @@ class EditorManager {
         }
     }
 
+    /** Nivel de transparencia guardado (0 a 100) */
+    obtenerNivelTransparencia() {
+        const guardado = localStorage.getItem('prig_editor_transparencia');
+        if (guardado !== null) {
+            const num = parseInt(guardado, 10);
+            return isNaN(num) ? 0 : Math.max(0, Math.min(100, num));
+        }
+        return localStorage.getItem('prig_editor_transparente') === '1' ? 100 : 0;
+    }
+
+    /** Indica si el fondo del código tiene algún grado de transparencia */
+    esFondoTransparente() {
+        return (this.nivelTransparencia || 0) > 0;
+    }
+
+    /** Alterna entre 0% y el último valor positivo (o 100%) */
+    alternarFondoTransparente() {
+        if (this.esFondoTransparente()) {
+            this._ultimoNivelPositivo = this.nivelTransparencia;
+            this.establecerNivelTransparencia(0);
+        } else {
+            const restaurar = this._ultimoNivelPositivo && this._ultimoNivelPositivo > 0 ? this._ultimoNivelPositivo : 100;
+            this.establecerNivelTransparencia(restaurar);
+        }
+        if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+            window.layoutMgr.mensajeEstado(
+                this.esFondoTransparente()
+                    ? `Fondo de código: ${this.nivelTransparencia}% de transparencia`
+                    : 'Fondo de código opaco restaurado (0%)',
+                2200
+            );
+        }
+    }
+
+    /** Establece el nivel de transparencia del editor (0 a 100) */
+    establecerNivelTransparencia(porcentaje) {
+        const p = Math.max(0, Math.min(100, parseInt(porcentaje, 10) || 0));
+        this.nivelTransparencia = p;
+        this.fondoTransparente = p > 0;
+        try {
+            localStorage.setItem('prig_editor_transparencia', String(p));
+            localStorage.setItem('prig_editor_transparente', this.fondoTransparente ? '1' : '0');
+        } catch (e) {}
+
+        const alpha = ((100 - p) / 100).toFixed(3);
+        document.documentElement.style.setProperty('--editor-bg-alpha', String(alpha));
+        document.body.classList.toggle('editor-transparente', this.fondoTransparente);
+
+        // Forzar tema transparente o restaurar en Monaco
+        if (typeof monaco !== 'undefined' && monaco.editor) {
+            if (window.sintaxisMgr && typeof window.sintaxisMgr.aplicar === 'function') {
+                window.sintaxisMgr.aplicar();
+            } else {
+                const tema = this.fondoTransparente
+                    ? 'prig-transparent'
+                    : (localStorage.getItem('prig_editor_theme') || 'vs-dark');
+                try {
+                    monaco.editor.setTheme(tema);
+                } catch (e) {}
+            }
+            this.panes.forEach(pane => {
+                if (pane && pane.editor && typeof pane.editor.updateOptions === 'function') {
+                    pane.editor.updateOptions({
+                        theme: this.fondoTransparente
+                            ? (window.sintaxisMgr ? ('prig-custom-syntax-v' + (window.sintaxisMgr._temaVersion || 1)) : 'prig-transparent')
+                            : (window.sintaxisMgr ? 'prig-custom-syntax' : (localStorage.getItem('prig_editor_theme') || 'vs-dark'))
+                    });
+                }
+            });
+        }
+
+        window.dispatchEvent(new CustomEvent('prig:editor-transparencia-cambiada', {
+            detail: { porcentaje: p, transparente: this.fondoTransparente, alpha: parseFloat(alpha) }
+        }));
+    }
+
+    /** Compatibilidad: aplica fondo transparente con booleano o porcentaje */
+    aplicarFondoTransparente(activo) {
+        if (typeof activo === 'number') {
+            this.establecerNivelTransparencia(activo);
+        } else {
+            this.establecerNivelTransparencia(activo ? (this.nivelTransparencia || 100) : 0);
+        }
+    }
+
+    /** Cierra la vista del editor y vuelve a Inicio o a la vista siguiente */
+    cerrarVistaEditor() {
+        if (this.openTabs.size > 0) {
+            let tieneSucios = false;
+            for (const [p] of this.openTabs) {
+                if (this.isDirty(p)) {
+                    tieneSucios = true;
+                    break;
+                }
+            }
+            if (tieneSucios) {
+                if (!confirm('Hay archivos con cambios sin guardar en el editor.\n\n¿Cerrar el editor de todos modos?')) {
+                    return;
+                }
+            }
+        }
+        if (window.workArea && typeof window.workArea.cerrar === 'function') {
+            window.workArea.cerrar('editor');
+        }
+    }
+
     /** Dibuja el estado vacío cuando no hay archivos abiertos */
     pintarVacio() {
         const vacio = document.getElementById('editor-vacio');
-        if (!vacio) return;
-        const sinArchivos = this.openTabs.size === 0;
-        vacio.hidden = !sinArchivos;
-
+        const wrapper = document.getElementById('editor-area-wrapper');
         const gridEl = document.getElementById('editor-grid-container');
-        if (gridEl) gridEl.style.display = sinArchivos ? 'none' : 'flex';
+        const panelRaz = document.getElementById('editor-panel-razonamiento');
+        const sinArchivos = this.openTabs.size === 0;
 
-        if (!vacio.dataset.conectado) {
+        if (vacio) vacio.hidden = !sinArchivos;
+        // Ocultar el wrapper completo y el panel de razonamiento para que no quede el plano residual de color
+        if (wrapper) wrapper.style.display = sinArchivos ? 'none' : 'flex';
+        if (gridEl) gridEl.style.display = sinArchivos ? 'none' : 'flex';
+        if (panelRaz && sinArchivos) panelRaz.style.display = 'none';
+        else if (panelRaz && !panelRaz.classList.contains('oculto')) panelRaz.style.display = 'flex';
+
+        if (sinArchivos) {
+            for (let i = 0; i < 3; i++) {
+                const c = document.getElementById(`editor-col-centro-${i}`);
+                if (c) c.style.display = 'none';
+            }
+            const barra = document.getElementById('editor-col-badges-barra');
+            if (barra) { barra.innerHTML = ''; barra.style.display = 'none'; }
+        }
+
+        if (vacio && !vacio.dataset.conectado) {
             vacio.dataset.conectado = '1';
             vacio.addEventListener('click', (e) => {
                 const b = e.target.closest('[data-cmd]');
-                if (b && window.PrigCommands) window.PrigCommands.ejecutar(b.dataset.cmd);
+                if (!b) return;
+                const cmd = b.dataset.cmd;
+                if (cmd === 'editor.cerrar') {
+                    this.cerrarVistaEditor();
+                } else if (cmd === 'herr.inicio') {
+                    if (window.Inicio && typeof window.Inicio.abrir === 'function') {
+                        window.Inicio.abrir();
+                    } else if (window.PrigCommands) {
+                        window.PrigCommands.ejecutar('herr.inicio');
+                    }
+                } else if (window.PrigCommands) {
+                    window.PrigCommands.ejecutar(cmd);
+                }
             });
         }
     }
@@ -1588,6 +1970,141 @@ class EditorManager {
 
             container.appendChild(tabEl);
         });
+
+        // Actualizar el cuadradito central con el nombre completo del archivo activo de esta división
+        this.actualizarCentroArchivo(colIndex);
+    }
+
+    /**
+     * Actualiza los badges de archivo activo en la barra superior del editor.
+     * Se llama cuando cambia la pestaña activa en cualquier columna.
+     */
+    actualizarCentroArchivo(colIndex) {
+        // Ocultar badges embebidos en los headers de columna (ya no se usan)
+        for (let i = 0; i < 3; i++) {
+            const el = document.getElementById(`editor-col-centro-${i}`);
+            if (el) el.style.display = 'none';
+        }
+        // Redibujar todos los badges en la barra superior
+        this.renderBadgesBarra();
+    }
+
+    /**
+     * Renderiza los badges de archivo activo en #editor-col-badges-barra.
+     * Muestra uno por cada columna/división visible con archivo activo.
+     * Estilo idéntico al indicador verde de "archivo leído".
+     */
+    renderBadgesBarra() {
+        const barra = document.getElementById('editor-col-badges-barra');
+        if (!barra) return;
+
+        barra.innerHTML = '';
+        let totalBadges = 0;
+
+        for (let i = 0; i < this.numColumns; i++) {
+            const pane = this.panes ? this.panes[i] : null;
+            if (!pane || !pane.activePath || !this.openTabs || !this.openTabs.has(pane.activePath)) continue;
+
+            const tab = this.openTabs.get(pane.activePath);
+            if (!tab) continue;
+
+            const nombreCompleto = tab.name || pane.activePath.split('/').pop() || 'Archivo';
+            const iconInfo = this.getFileIconInfo(nombreCompleto, tab);
+            const esActivo = (i === this.activeCol);
+
+            // Separador entre badges cuando hay más de una columna
+            if (totalBadges > 0) {
+                const sep = document.createElement('span');
+                sep.style.cssText = 'color: rgba(255,255,255,0.15); font-size: 14px; user-select:none; flex-shrink:0;';
+                sep.textContent = '|';
+                barra.appendChild(sep);
+            }
+
+            const badge = document.createElement('span');
+            badge.className = 'editor-col-badge-nombre' + (esActivo ? ' activo' : '');
+            badge.dataset.col = String(i);
+            badge.style.cssText = [
+                'display: inline-flex',
+                'align-items: center',
+                'gap: 5px',
+                'font-size: 11px',
+                'font-family: \'Fira Code\', monospace',
+                'border-radius: 5px',
+                'padding: 2px 8px',
+                'cursor: pointer',
+                'transition: all 0.2s ease',
+                'max-width: 240px',
+                'min-width: 0',
+                'flex-shrink: 1',
+                esActivo
+                    ? 'color: #a6e3a1; background: rgba(166,227,161,0.15); border: 1px solid rgba(166,227,161,0.35);'
+                    : 'color: #89b4fa; background: rgba(137,180,250,0.10); border: 1px solid rgba(137,180,250,0.22);'
+            ].join(';');
+
+            badge.innerHTML = `
+                <i class="${iconInfo.icon}" style="color:${iconInfo.color}; font-size:10px; flex-shrink:0;"></i>
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${this.escapeHtml(nombreCompleto)}">${this.escapeHtml(nombreCompleto)}</span>
+            `;
+            badge.title = `División ${i + 1} — ${nombreCompleto}\n${pane.activePath}\n(Clic para enfocar)`;
+
+            const capturedI = i;
+            const capturedPath = pane.activePath;
+            badge.onclick = (e) => {
+                e.stopPropagation();
+                this.setActivePane(capturedI);
+                const p = this.panes[capturedI];
+                if (p && p.editor) p.editor.focus();
+                if (capturedPath && navigator.clipboard) {
+                    navigator.clipboard.writeText(capturedPath).then(() => {
+                        if (window.layoutMgr && window.layoutMgr.mensajeEstado) {
+                            window.layoutMgr.mensajeEstado(`📋 Ruta copiada: ${nombreCompleto}`, 1800);
+                        }
+                    }).catch(() => {});
+                }
+            };
+
+            barra.appendChild(badge);
+            totalBadges++;
+        }
+
+        barra.style.display = totalBadges > 0 ? 'flex' : 'none';
+    }
+
+    /** Obtiene información del icono y color para el archivo activo */
+    getFileIconInfo(filename, tab = null) {
+        if (tab && tab.isNotebook) return { icon: 'fa-solid fa-book-bookmark', color: 'var(--accent-yellow, #f9e2af)' };
+        if (tab && tab.isImage) return { icon: 'fa-solid fa-image', color: 'var(--accent-blue, #89b4fa)' };
+        if ((tab && tab.isMarkdown) || filename.toLowerCase().endsWith('.md')) {
+            if (filename.toLowerCase().includes('pensamiento')) {
+                return { icon: 'fa-solid fa-brain', color: 'var(--accent-purple, #cba6f7)' };
+            }
+            return { icon: 'fa-solid fa-file-lines', color: 'var(--accent-blue, #89b4fa)' };
+        }
+        const ext = filename.split('.').pop().toLowerCase();
+        switch (ext) {
+            case 'rs': return { icon: 'fa-solid fa-gear', color: '#f38ba8' };
+            case 'py': return { icon: 'fa-brands fa-python', color: '#a6e3a1' };
+            case 'js': case 'mjs': case 'cjs': return { icon: 'fa-brands fa-js', color: '#f9e2af' };
+            case 'ts': return { icon: 'fa-solid fa-code', color: '#89b4fa' };
+            case 'html': return { icon: 'fa-brands fa-html5', color: '#fab387' };
+            case 'css': return { icon: 'fa-brands fa-css3-alt', color: '#89dceb' };
+            case 'json': return { icon: 'fa-solid fa-code', color: '#fab387' };
+            case 'sql': return { icon: 'fa-solid fa-database', color: '#cba6f7' };
+            case 'sh': case 'bash': return { icon: 'fa-solid fa-terminal', color: '#a6e3a1' };
+            case 'toml': case 'yaml': case 'yml': return { icon: 'fa-solid fa-sliders', color: '#f9e2af' };
+            default: return { icon: 'fa-solid fa-file-code', color: 'var(--accent-blue, #89b4fa)' };
+        }
+    }
+
+    /** Escapa caracteres HTML para prevenir inyección de código */
+    escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     /** ¿La pestaña tiene cambios sin guardar? */
@@ -2008,3 +2525,95 @@ window.addEventListener('beforeunload', (e) => {
         return '';
     }
 });
+
+// ============================================================================
+// Control Global: Modelo Qwen en Editor (Activación / Desactivación de análisis)
+// ============================================================================
+window.isQwenEditorActivo = function () {
+    return localStorage.getItem('prig_qwen_editor_activo') !== 'false';
+};
+
+window.alternarQwenEditor = function (activo) {
+    if (typeof activo !== 'boolean') {
+        activo = window.isQwenEditorActivo() ? false : true;
+    }
+    localStorage.setItem('prig_qwen_editor_activo', activo ? 'true' : 'false');
+
+    // 1. Actualizar interruptor cuadradito en la barra superior del editor
+    const chk = document.getElementById('chk-qwen-editor-activo');
+    const badge = document.getElementById('badge-qwen-editor-estado');
+    const lbl = document.getElementById('btn-toggle-qwen-editor');
+    const icono = document.getElementById('icono-qwen-editor');
+
+    if (chk) chk.checked = activo;
+    if (badge) {
+        badge.textContent = activo ? 'ON' : 'OFF';
+        badge.style.background = activo ? 'rgba(166, 227, 161, 0.25)' : 'rgba(243, 139, 168, 0.2)';
+        badge.style.color = activo ? '#a6e3a1' : '#f38ba8';
+    }
+    if (lbl) {
+        lbl.classList.toggle('inactivo', !activo);
+        lbl.title = activo
+            ? 'Qwen está activo: leyendo y analizando el código del editor'
+            : 'Qwen está desactivado: NO analiza el archivo en el editor';
+    }
+    if (icono) {
+        icono.style.color = activo ? '#cba6f7' : 'var(--text-muted, #a6adc8)';
+    }
+
+    // 2. Notificar a EditorRazonamiento
+    if (window.EditorRazonamiento && typeof window.EditorRazonamiento.fijarQwenActivo === 'function') {
+        window.EditorRazonamiento.fijarQwenActivo(activo);
+    }
+
+    // 3. Notificar a DirectorAscii
+    if (window.DIRECTOR_ASCII && typeof window.DIRECTOR_ASCII.fijarQwenActivo === 'function') {
+        window.DIRECTOR_ASCII.fijarQwenActivo(activo);
+    }
+
+    // 4. Sincronizar checkbox secundario en el panel de telemetría si está abierto
+    const chkTele = document.getElementById('chk-qwen-telemetria');
+    if (chkTele) chkTele.checked = activo;
+
+    if (window.layoutMgr && typeof window.layoutMgr.mensajeEstado === 'function') {
+        window.layoutMgr.mensajeEstado(
+            activo ? '🤖 Qwen: Análisis de código ACTIVADO' : '⏸️ Qwen: Análisis de código DESACTIVADO',
+            2000
+        );
+    }
+};
+
+// Sincronizar estado inicial al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (typeof window.alternarQwenEditor === 'function') {
+            window.alternarQwenEditor(window.isQwenEditorActivo());
+        }
+    }, 150);
+});
+
+/**
+ * Notifica en la barra del editor qué archivo fue leído por el modelo / editor
+ */
+window.notificarArchivoLeido = function (pathOrName) {
+    if (!pathOrName) return;
+    const nombre = String(pathOrName).split('/').pop();
+    const ind = document.getElementById('indicador-archivo-leido');
+    const txt = document.getElementById('indicador-archivo-leido-nombre');
+    const btnCerebro = document.getElementById('btn-cerebro-dialogo');
+    if (ind && txt && nombre) {
+        txt.textContent = `${nombre}`;
+        ind.title = `Archivo leído: ${pathOrName}`;
+        ind.style.display = 'inline-flex';
+    }
+    if (btnCerebro && nombre) {
+        btnCerebro.title = `Cerebro IA (Último leído: ${nombre})`;
+    }
+};
+
+window.addEventListener('prig:archivo-abierto', (e) => {
+    if (e.detail && e.detail.path) {
+        window.notificarArchivoLeido(e.detail.path);
+    }
+});
+

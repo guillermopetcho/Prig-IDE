@@ -1,3 +1,14 @@
+pub mod github;
+pub mod github_widget;
+pub mod hub;
+pub mod kaggle;
+pub mod kaggle_datos;
+pub mod kaggle_pdf;
+pub mod kaggle_profesor;
+pub mod kaggle_red;
+pub mod youtube;
+pub mod youtube_profesor;
+
 use bytes::Bytes;
 use futures_util::Stream;
 use reqwest::Client;

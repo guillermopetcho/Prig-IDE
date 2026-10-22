@@ -1,16 +1,8 @@
 import os
 import json
-import uuid
 import shutil
-import urllib.parse
-from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-try:
-    import pypdf
-    PYPDF_AVAILABLE = True
-except ImportError:
-    PYPDF_AVAILABLE = False
 
 # Extensiones que la biblioteca muestra. Deben ser un superconjunto de las que
 # indexa knowledge_service: si aquí aparece algo que allí no, el elemento se queda
@@ -19,6 +11,10 @@ VIEWABLE_EXTENSIONS = {
     'pdf', 'md', 'txt', 'rst', 'ipynb', 'py', 'js', 'sql',
     'json', 'html', 'css', 'cpp', 'c', 'csv', 'tsv', 'parquet',
 }
+
+# Carpetas de la raíz que son de Prig, no del usuario: las citas, los trabajos exportados, el analista de librerías y
+# los paquetes de conocimiento. Se colaban en la lista como si fueran proyectos («citas», «jobs»...).
+INFRAESTRUCTURA = {"metadata", ".index", "citas", "jobs", "librerias", "packs"}
 
 # Subconjunto que el motor de conocimiento sabe fragmentar e indexar
 INDEXABLE_EXTENSIONS = {'pdf', 'md', 'txt', 'rst', 'ipynb', 'py', 'js', 'sql'}
@@ -33,7 +29,42 @@ CATEGORIES = {
     "projects": {"name": "PROJECTS", "label": "Proyectos & Repositorios", "icon": "fa-folder-tree"}
 }
 
+def rutas_ocultas(books_dir: str) -> List[str]:
+    """ Lo que el usuario quitó de la biblioteca (`.index/ocultos.json`, lo escribe el servidor de Rust). Quitar no
+    borra el archivo: deja de verse y de indexarse hasta que se vuelve a poner. """
+    try:
+        with open(os.path.join(books_dir, ".index", "ocultos.json"), "r", encoding="utf-8") as f:
+            datos = json.load(f)
+        return [o["ruta"] for o in datos.get("ocultos", []) if isinstance(o, dict) and isinstance(o.get("ruta"), str)]
+    except Exception:
+        return []
+
+
+def esta_oculto(ruta: str, ocultos: List[str]) -> bool:
+    """ ¿Está quitado `ruta` o una carpeta que lo contiene? """
+    return any(ruta == o or ruta.startswith(o.rstrip("/") + "/") for o in ocultos)
+
+
+def volver_a_mostrar(books_dir: str, ruta: str) -> None:
+    """ Importar de nuevo algo quitado lo vuelve a poner en la biblioteca """
+    archivo = os.path.join(books_dir, ".index", "ocultos.json")
+    try:
+        with open(archivo, "r", encoding="utf-8") as f:
+            datos = json.load(f)
+        antes = datos.get("ocultos", [])
+        datos["ocultos"] = [o for o in antes if not (isinstance(o, dict) and o.get("ruta") == ruta)]
+        if len(datos["ocultos"]) != len(antes):
+            with open(archivo, "w", encoding="utf-8") as f:
+                json.dump(datos, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+
 class BookService:
+    """ Lo que el backend de Python aún usa de la biblioteca: la lista para otras secciones, importar (con la
+    indexación), las fichas de IA y las citas de los libros para el chat. Leer, analizar, los recortes, el lector de
+    PDF y las citas son del servidor de Rust (backend-rust/crates/prig-server/src/routes/libros.rs). """
+
     def __init__(self, books_dir: str = None):
         if not books_dir:
             books_dir = os.environ.get("PRIG_BOOKS_DIR")
@@ -169,6 +200,7 @@ class BookService:
                 scan_dirs.append((os.path.join(self.books_dir, cat), cat))
 
         seen_paths = set()
+        ocultos = rutas_ocultas(self.books_dir)
 
         for sdir, cat_name in scan_dirs:
             if not os.path.isdir(sdir):
@@ -183,7 +215,7 @@ class BookService:
                 fpath = os.path.join(sdir, fname)
                 # .index guarda el catálogo SQLite y metadata los JSON del
                 # analizador: son infraestructura, no elementos de la biblioteca.
-                if fname in ("metadata", ".index") or fname.startswith(".") or fpath in seen_paths:
+                if fname == "metadata" or fname.startswith(".") or fpath in seen_paths or (sdir == self.books_dir and fname in INFRAESTRUCTURA):
                     continue
                 # Las carpetas de categoría son contenedores, no elementos:
                 # aparecían en la lista como si fueran libros llamados "books",
@@ -204,6 +236,8 @@ class BookService:
                     seen_paths.add(fpath)
                     item_category = cat_name or self.detect_category(fpath)
                     size_mb = round(os.path.getsize(fpath) / (1024 * 1024), 2) if not is_dir else 0.0
+                    if esta_oculto(fpath, ocultos):
+                        continue
 
                     meta = self.get_metadata(fpath)
                     # El título nunca puede ser None: el frontend hace
@@ -235,6 +269,8 @@ class BookService:
             for sp in self.get_saved_projects():
                 p_path = sp.get("path") if isinstance(sp, dict) else str(sp)
                 if not p_path or p_path in seen_paths or not os.path.isdir(p_path):
+                    continue
+                if esta_oculto(os.path.abspath(p_path), ocultos):
                     continue
                 seen_paths.add(p_path)
                 p_name = (sp.get("name") if isinstance(sp, dict) else None) or os.path.basename(p_path) or p_path
@@ -289,118 +325,6 @@ class BookService:
                 if p_path == book_id or os.path.basename(p_path) == book_id:
                     return p_path
         return None
-
-    def get_book_content(self, book_id: str) -> Dict[str, Any]:
-        fpath = self._resolve_item(book_id)
-        if not fpath:
-            return {"error": f"Elemento no encontrado en el Knowledge Repository: {book_id}"}
-
-        # Si es un directorio / proyecto, devolver resumen estructurado sin error
-        if os.path.isdir(fpath):
-            meta = self.get_metadata(os.path.basename(fpath)) or {}
-            files_count, dirs_count = 0, 0
-            sample_files = []
-            try:
-                for root, dirs, files in os.walk(fpath):
-                    dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ('node_modules', '__pycache__', '.git', 'venv', '.venv')]
-                    dirs_count += len(dirs)
-                    files_count += len(files)
-                    if len(sample_files) < 20:
-                        for f in files:
-                            if not f.startswith("."):
-                                sample_files.append(os.path.relpath(os.path.join(root, f), fpath))
-                                if len(sample_files) >= 20:
-                                    break
-            except Exception:
-                pass
-
-            return {
-                "id": os.path.basename(fpath),
-                "type": "project",
-                "is_project": True,
-                "path": fpath,
-                "title": (meta or {}).get("title") or self._fallback_title(os.path.basename(fpath)),
-                "files_count": files_count,
-                "dirs_count": dirs_count,
-                "sample_files": sample_files,
-                "metadata": meta or {"title": self._fallback_title(os.path.basename(fpath)), "path": fpath, "is_project": True}
-            }
-
-        ext = os.path.splitext(fpath)[1].lower()
-        meta = self.get_metadata(os.path.basename(fpath))
-
-        if ext == '.pdf':
-            extracted_text = self.extract_pdf_text(fpath, max_pages=5)
-            return {
-                "id": os.path.basename(fpath),
-                "type": "pdf",
-                "path": fpath,
-                "url": f"/api/raw-file?path={urllib.parse.quote(fpath, safe='')}",
-                "preview_text": extracted_text[:2000],
-                "metadata": meta
-            }
-        else:
-            try:
-                # Tope de lectura: sin él, un .csv o un log de 50 MB se enviaba entero
-                # al navegador y colgaba la interfaz.
-                max_chars = 400_000
-                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
-                    text = f.read(max_chars + 1)
-
-                truncated = len(text) > max_chars
-                if truncated:
-                    text = text[:max_chars]
-
-                return {
-                    "id": os.path.basename(fpath),
-                    "type": "text",
-                    "path": fpath,
-                    "content": text,
-                    "truncated": truncated,
-                    "size_bytes": os.path.getsize(fpath),
-                    "metadata": meta
-                }
-            except Exception as e:
-                return {"error": f"Error leyendo elemento: {str(e)}"}
-
-
-    def extract_pdf_text(self, pdf_path: str, max_pages: int = 25) -> str:
-        if not PYPDF_AVAILABLE:
-            return "pypdf no disponible para extracción de PDF."
-        try:
-            reader = pypdf.PdfReader(pdf_path)
-            extracted = []
-            num_pages = min(len(reader.pages), max_pages)
-            for i in range(num_pages):
-                txt = reader.pages[i].extract_text()
-                if txt:
-                    extracted.append(f"--- Página {i+1} ---\n{txt}")
-            return "\n\n".join(extracted)
-        except Exception as e:
-            return f"Error extrayendo texto del PDF: {str(e)}"
-
-    def extract_document_text(self, fpath: str, max_chars: int = 15000) -> str:
-        ext = os.path.splitext(fpath)[1].lower()
-        if ext == '.pdf':
-            return self.extract_pdf_text(fpath)[:max_chars]
-        elif ext == '.ipynb':
-            try:
-                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
-                    nb = json.load(f)
-                cells_text = []
-                for cell in nb.get('cells', []):
-                    c_type = cell.get('cell_type', '')
-                    src = "".join(cell.get('source', []))
-                    if src.strip():
-                        cells_text.append(f"[{c_type.upper()}]\n{src}")
-                return "\n\n".join(cells_text)[:max_chars]
-            except Exception:
-                pass
-        try:
-            with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
-                return f.read()[:max_chars]
-        except Exception as e:
-            return f"Error leyendo documento: {str(e)}"
 
     def _metadata_key(self, book_id_or_path: str) -> Optional[str]:
         """ Clave única de metadatos basada en la ruta relativa dentro de la biblioteca.
@@ -465,6 +389,7 @@ class BookService:
                 else:
                     shutil.copy2(abs_src, dest_path)
 
+            volver_a_mostrar(self.books_dir, os.path.abspath(dest_path))
             size_mb = round(os.path.getsize(dest_path) / (1024 * 1024), 2) if os.path.isfile(dest_path) else 0.0
             ext = os.path.splitext(filename)[1].lower().replace('.', '')
             return {
@@ -482,402 +407,9 @@ class BookService:
         except Exception as e:
             return {"error": f"Error importando elemento: {str(e)}"}
 
-    def analyze_document(self, book_id_or_path: str, ai_engine, model: str = "qwen2.5-coder:7b") -> Dict[str, Any]:
-        fpath = self._resolve_item(book_id_or_path)
-        if not fpath:
-            return {"error": f"Elemento no encontrado para análisis: {book_id_or_path}"}
-
-        filename = os.path.basename(fpath)
-        category = self.detect_category(fpath)
-        doc_text = self.extract_document_text(fpath, max_chars=12000)
-
-        prompt = (
-            f"Analiza a fondo el elemento de conocimiento de la Biblioteca del repositorio titulado '{filename}'.\n"
-            f"Categoría asignada: {category.upper()} (Opciones: BOOKS, DOCUMENTATION, PAPERS, CODE, NOTEBOOKS, DATASETS, PROJECTS).\n\n"
-            f"CONTENIDO / CÓDIGO EXTRAÍDO DEL ELEMENTO:\n"
-            f"```\n{doc_text[:10000]}\n```\n\n"
-            "DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO con la siguiente estructura completa (sin texto explicativo fuera del JSON):\n"
-            "{\n"
-            f'  "id": "{category[:3]}_{uuid.uuid4().hex[:8]}",\n'
-            f'  "category": "{category.upper()}",\n'
-            f'  "type": "{category[:-1] if category.endswith("s") else category}",\n'
-            f'  "title": "Nombre o Título descriptivo claro del elemento",\n'
-            f'  "filename": "{filename}",\n'
-            '  "topics": ["tema 1", "tema 2", "tema 3"],\n'
-            '  "concepts": ["concepto 1", "concepto 2", "concepto 3"],\n'
-            '  "libraries": ["librería 1", "librería 2"],\n'
-            '  "dataset": "Nombre del Dataset asociado si aplica o N/A",\n'
-            '  "level": "beginner|intermediate|advanced",\n'
-            '  "languages": ["python", "bash"],\n'
-            '  "dependencies": ["prerrequisito o dependencia 1", "dependencia 2"],\n'
-            '  "summary": "Resumen claro, técnico y estructurado del conocimiento contenido en 2 párrafos.",\n'
-            '  "key_takeaways": ["Insight o aprendizaje clave 1", "Insight clave 2", "Insight 3"],\n'
-            '  "code_examples": ["# Ejemplo práctico de código o uso derivado\\nprint(\'Práctica\')"]\n'
-            "}\n"
-        )
-
-        sys_prompt = "Eres un Arquitecto de Conocimiento e Ingeniero de Software Senior. Devuelve EXCLUSIVAMENTE un objeto JSON válido estructurado sin bloques ni texto adicional fuera del JSON."
-
-        try:
-            response_text = ""
-            for chunk in ai_engine.generate_response(prompt, model=model, system_prompt=sys_prompt):
-                response_text += chunk
-
-            clean_json_str = response_text.strip()
-            if "```" in clean_json_str:
-                start = clean_json_str.find('{')
-                end = clean_json_str.rfind('}')
-                if start != -1 and end != -1:
-                    clean_json_str = clean_json_str[start:end+1]
-
-            metadata = json.loads(clean_json_str)
-            metadata["category"] = category.upper()
-            metadata["filename"] = filename
-            metadata["file_path"] = fpath
-            metadata["created_at"] = datetime.now().isoformat()
-
-            # Persistir metadatos JSON con la clave por ruta relativa
-            metadata.setdefault("title", self._fallback_title(filename))
-            metadata["analysis_failed"] = False
-            self.save_metadata(fpath, metadata)
-            return metadata
-
-        except Exception as e:
-            # El análisis falló (el modelo no devolvió JSON válido, Ollama caído...).
-            # Antes se guardaba una ficha inventada con temas genéricos y el error
-            # escondido dentro del resumen, de modo que un fallo quedaba marcado como
-            # "analizado" y el usuario nunca sabía que los datos eran falsos.
-            fallback_meta = {
-                "id": f"{category[:3]}_{uuid.uuid4().hex[:8]}",
-                "category": category.upper(),
-                "type": category[:-1] if category.endswith("s") else category,
-                "title": self._fallback_title(filename),
-                "filename": filename,
-                "analysis_failed": True,
-                "analysis_error": str(e),
-                "topics": [],
-                "concepts": [],
-                "libraries": [],
-                "dataset": "N/A",
-                "level": "unknown",
-                "languages": [],
-                "dependencies": [],
-                "summary": f"No se pudo analizar '{filename}'. Motivo: {e}",
-                "key_takeaways": [],
-                "code_examples": [],
-                "file_path": fpath,
-                "created_at": datetime.now().isoformat()
-            }
-            self.save_metadata(fpath, fallback_meta)
-            return fallback_meta
-
-    def delete_item(self, book_id_or_path: str) -> Dict[str, Any]:
-        """ Elimina un elemento de la biblioteca junto con su ficha de IA """
-        fpath = self._resolve_item(book_id_or_path)
-        if not fpath:
-            return {"error": f"Elemento no encontrado: {book_id_or_path}"}
-
-        # No permitir borrar la raíz ni las carpetas de categoría
-        if os.path.abspath(fpath) == self.books_dir:
-            return {"error": "No se puede eliminar la raíz de la biblioteca."}
-        rel = os.path.relpath(fpath, self.books_dir)
-        if rel in CATEGORIES:
-            return {"error": f"'{rel}' es una carpeta de categoría y no puede eliminarse."}
-
-        key = self._metadata_key(fpath)
-
-        try:
-            if os.path.isdir(fpath):
-                shutil.rmtree(fpath)
-            else:
-                os.remove(fpath)
-        except Exception as e:
-            return {"error": f"No se pudo eliminar: {e}"}
-
-        # Retirar también la ficha de IA (nueva y antigua) para no dejar huérfanos
-        for name in filter(None, [f"{key}.json" if key else None, f"{os.path.basename(fpath)}.json"]):
-            meta_file = os.path.join(self.metadata_dir, name)
-            if os.path.exists(meta_file):
-                try:
-                    os.remove(meta_file)
-                except Exception:
-                    pass
-
-        return {"success": True, "path": fpath, "relative_path": rel}
-
-    def save_snippet(self, book_id: str, page: int, box: dict, text: str, label: str) -> Dict[str, Any]:
-        snippets = self.load_snippets()
-        snippet_id = f"snp_{uuid.uuid4().hex[:8]}"
-        snippet_data = {
-            "id": snippet_id,
-            "book_id": book_id,
-            "page": page,
-            "box": box,
-            "text": text,
-            "label": label or f"Cita pág. {page}",
-            "cite_tag": f"::cite[{snippet_id}]"
-        }
-        snippets[snippet_id] = snippet_data
-        
-        try:
-            with open(self.snippets_file, 'w', encoding='utf-8') as f:
-                json.dump(snippets, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error guardando recortes: {e}")
-            
-        return snippet_data
-
-    def load_snippets(self) -> Dict[str, Any]:
-        if os.path.exists(self.snippets_file):
-            try:
-                with open(self.snippets_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return {}
-
-    def get_snippet(self, snippet_id: str) -> Dict[str, Any]:
-        snippets = self.load_snippets()
-        return snippets.get(snippet_id, {"error": "Cita no encontrada"})
-
     # =========================================================================
     # LECTOR / EDITOR DE TEXTO PDF Y CITAS (nombre_libro.json)
     # =========================================================================
-
-    def _book_stem(self, fpath: str) -> str:
-        fname = os.path.basename(fpath)
-        return os.path.splitext(fname)[0]
-
-    def _get_page_edit_path(self, stem: str, page: int) -> str:
-        return os.path.join(self.edits_dir, f"{stem}_p{page}.txt")
-
-    def get_pdf_pages(self, book_id: str, page: Optional[int] = 1, search_query: Optional[str] = None) -> Dict[str, Any]:
-        fpath = self._resolve_item(book_id)
-        if not fpath:
-            return {"error": f"Documento no encontrado: {book_id}"}
-
-        stem = self._book_stem(fpath)
-        meta = self.get_metadata(fpath) or {}
-        title = meta.get("title") or self._fallback_title(os.path.basename(fpath))
-
-        ext = os.path.splitext(fpath)[1].lower()
-        if ext != '.pdf':
-            # Para archivos de texto o markdown, tratamos el archivo completo como página 1
-            try:
-                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read(400_000)
-                return {
-                    "id": os.path.basename(fpath),
-                    "uid": os.path.relpath(fpath, self.books_dir),
-                    "title": title,
-                    "filename": os.path.basename(fpath),
-                    "is_pdf": False,
-                    "total_pages": 1,
-                    "current_page": 1,
-                    "page_text": content,
-                    "has_edit": False,
-                    "stem": stem
-                }
-            except Exception as e:
-                return {"error": f"Error leyendo documento: {str(e)}"}
-
-        if not PYPDF_AVAILABLE:
-            return {"error": "pypdf no está instalado en el entorno. No se puede leer el PDF página por página."}
-
-        try:
-            reader = pypdf.PdfReader(fpath)
-            total_pages = len(reader.pages)
-            if total_pages == 0:
-                return {"error": "El archivo PDF no contiene páginas legibles."}
-
-            page_idx = max(1, min(int(page or 1), total_pages))
-            
-            # Verificar si existe una edición manual guardada de esta página
-            edit_path = self._get_page_edit_path(stem, page_idx)
-            has_edit = False
-            page_text = ""
-            if os.path.exists(edit_path):
-                try:
-                    with open(edit_path, 'r', encoding='utf-8') as ef:
-                        page_text = ef.read()
-                    has_edit = True
-                except Exception:
-                    pass
-
-            if not page_text:
-                try:
-                    raw_text = reader.pages[page_idx - 1].extract_text() or ""
-                    # Limpiar saltos de línea excesivos
-                    page_text = raw_text.replace("\r\n", "\n")
-                except Exception as ex:
-                    page_text = f"(No se pudo extraer texto de la página {page_idx}: {ex})"
-
-            matches = []
-            if search_query and search_query.strip():
-                sq = search_query.strip().lower()
-                for i in range(min(total_pages, 200)):
-                    try:
-                        p_txt = reader.pages[i].extract_text() or ""
-                        if sq in p_txt.lower():
-                            pos = p_txt.lower().find(sq)
-                            start = max(0, pos - 40)
-                            end = min(len(p_txt), pos + len(sq) + 40)
-                            snippet = p_txt[start:end].replace('\n', ' ')
-                            matches.append({"page": i + 1, "snippet": f"...{snippet}..."})
-                    except Exception:
-                        continue
-
-            return {
-                "id": os.path.basename(fpath),
-                "uid": os.path.relpath(fpath, self.books_dir),
-                "title": title,
-                "filename": os.path.basename(fpath),
-                "is_pdf": True,
-                "total_pages": total_pages,
-                "current_page": page_idx,
-                "page_text": page_text,
-                "has_edit": has_edit,
-                "stem": stem,
-                "search_matches": matches
-            }
-
-        except Exception as e:
-            return {"error": f"Error abriendo PDF con pypdf: {str(e)}"}
-
-    def save_pdf_page_edit(self, book_id: str, page: int, edited_text: str) -> Dict[str, Any]:
-        fpath = self._resolve_item(book_id)
-        stem = self._book_stem(fpath) if fpath else self._book_stem(book_id)
-        edit_path = self._get_page_edit_path(stem, page)
-        try:
-            with open(edit_path, 'w', encoding='utf-8') as f:
-                f.write(edited_text)
-            return {"success": True, "ok": True, "book_id": book_id, "page": page, "path": edit_path}
-        except Exception as e:
-            return {"error": f"No se pudo guardar la edición de la página: {e}"}
-
-    def _citation_file_path(self, stem: str) -> str:
-        return os.path.join(self.citas_dir, f"{stem}.json")
-
-    def get_book_citations(self, book_id: str) -> Dict[str, Any]:
-        fpath = self._resolve_item(book_id)
-        stem = self._book_stem(fpath) if fpath else self._fallback_title(book_id).replace(" ", "_")
-        citas_path = self._citation_file_path(stem)
-
-        if os.path.exists(citas_path):
-            try:
-                with open(citas_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    return data
-            except Exception as e:
-                print(f"Error leyendo archivo de citas {citas_path}: {e}")
-
-        # Plantilla inicial de citas si no existía aún
-        meta = self.get_metadata(fpath) if fpath else None
-        title = (meta or {}).get("title") or self._fallback_title(os.path.basename(fpath) if fpath else book_id)
-        fname = os.path.basename(fpath) if fpath else f"{stem}.pdf"
-
-        initial = {
-            "libro": fname,
-            "titulo": title,
-            "stem": stem,
-            "archivo_json": f"{stem}.json",
-            "total_citas": 0,
-            "fecha_actualizacion": datetime.now().isoformat(),
-            "citas": []
-        }
-        try:
-            with open(citas_path, 'w', encoding='utf-8') as f:
-                json.dump(initial, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
-        return initial
-
-    def save_book_citation(self, book_id: str, citation_data: Dict[str, Any]) -> Dict[str, Any]:
-        current = self.get_book_citations(book_id)
-        stem = current.get("stem") or self._book_stem(book_id)
-        citas_path = self._citation_file_path(stem)
-
-        cid = citation_data.get("id") or f"cita_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:4]}"
-        
-        entry = {
-            "id": cid,
-            "pagina": int(citation_data.get("pagina", 1)),
-            "capitulo": (citation_data.get("capitulo") or "").strip(),
-            "texto": (citation_data.get("texto") or "").strip(),
-            "nota": (citation_data.get("nota") or "").strip(),
-            "tags": citation_data.get("tags") if isinstance(citation_data.get("tags"), list) else [t.strip() for t in str(citation_data.get("tags") or "").split(",") if t.strip()],
-            "fecha": datetime.now().isoformat()
-        }
-
-        # Actualizar o insertar
-        existing = current.get("citas", [])
-        found_idx = next((i for i, c in enumerate(existing) if c.get("id") == cid), None)
-        if found_idx is not None:
-            existing[found_idx] = entry
-        else:
-            existing.append(entry)
-
-        # Ordenar por número de página
-        existing.sort(key=lambda x: (x.get("pagina", 0), x.get("id", "")))
-        current["citas"] = existing
-        current["total_citas"] = len(existing)
-        current["fecha_actualizacion"] = datetime.now().isoformat()
-
-        try:
-            with open(citas_path, 'w', encoding='utf-8') as f:
-                json.dump(current, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            return {"error": f"Error guardando {stem}.json: {e}"}
-
-        return {"success": True, "ok": True, "cita": entry, "book_citations": current, "archivo_json": f"{stem}.json"}
-
-    def delete_book_citation(self, book_id: str, citation_id: str) -> Dict[str, Any]:
-        current = self.get_book_citations(book_id)
-        stem = current.get("stem") or self._book_stem(book_id)
-        citas_path = self._citation_file_path(stem)
-
-        existing = current.get("citas", [])
-        initial_count = len(existing)
-        existing = [c for c in existing if c.get("id") != citation_id]
-
-        if len(existing) == initial_count:
-            return {"error": f"Cita no encontrada: {citation_id}"}
-
-        current["citas"] = existing
-        current["total_citas"] = len(existing)
-        current["fecha_actualizacion"] = datetime.now().isoformat()
-
-        try:
-            with open(citas_path, 'w', encoding='utf-8') as f:
-                json.dump(current, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            return {"error": f"Error actualizando {stem}.json: {e}"}
-
-        return {"success": True, "ok": True, "deleted_id": citation_id, "total_citas": len(existing)}
-
-    def export_citations_to_workspace(self, book_id: str, workspace_path: str) -> Dict[str, Any]:
-        current = self.get_book_citations(book_id)
-        stem = current.get("stem") or self._book_stem(book_id)
-        src_path = self._citation_file_path(stem)
-        
-        if not os.path.exists(src_path):
-            return {"error": f"No hay archivo de citas para {book_id}"}
-
-        dest_dir = os.path.abspath(workspace_path)
-        os.makedirs(dest_dir, exist_ok=True)
-        dest_file = os.path.join(dest_dir, f"{stem}.json")
-
-        try:
-            shutil.copy2(src_path, dest_file)
-            return {
-                "success": True,
-                "ok": True,
-                "exported_to": dest_file,
-                "filename": f"{stem}.json",
-                "total_citas": current.get("total_citas", 0)
-            }
-        except Exception as e:
-            return {"error": f"Error copiando al espacio de trabajo: {e}"}
 
     def get_all_citations_for_ai(self, query: Optional[str] = None, max_results: int = 12) -> List[Dict[str, Any]]:
         """ Recolecta todas las citas de libros y las prepara para que el modelo razone con ellas """

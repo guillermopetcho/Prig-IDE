@@ -61,9 +61,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("🎨 Frontend estático: {}", frontend_dir.display());
     info!("🔄 Proxy Dual-Stack hacia Python: {}", fallback_url);
 
+    let n = prig_server::routes::moe::limpiar_huerfanos(&project_root);
+    if n > 0 {
+        info!("🧹 Motor MoE: cerrados {n} servidores que quedaron de una sesión anterior");
+    }
+    // Los recursos vivos (motor suave, modo frío): Python ya no los arranca si hay servidor de Rust
+    prig_ia::vivo::recursos(&project_root).iniciar();
     let mut state = AppState::new(project_root.clone(), frontend_dir.clone(), assets_dir, fallback_url);
     state.puerto = port;
 
+    // lo que Python preparaba al arrancar (las citas de muestra de las librerías)
+    prig_server::routes::librerias::preparar();
     let app = create_app(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -74,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
+    prig_ia::vivo::cerrar();
     info!("🛑 Prig Native Server detenido limpiamente.");
     Ok(())
 }

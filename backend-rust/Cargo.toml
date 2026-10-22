@@ -7,6 +7,13 @@ members = [
     "crates/prig-runner",
     "crates/banco-core",
     "crates/prig-recursos",
+    "crates/prig-plataforma",
+    "crates/prig-modelos",
+    "crates/prig-ia",
+    "crates/prig-biblioteca",
+    "crates/prig-documentos",
+    "crates/prig-aprendizaje",
+    "crates/prig-ventana",
     "crates/prig-nativo-py",
 ]
 resolver = "2"

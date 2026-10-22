@@ -37,13 +37,21 @@ class PDFParser:
 
     @classmethod
     def _extraer_paginas(cls, ruta: str, total: int) -> list:
-        """ Texto de todas las páginas, en paralelo si el libro es grande.
+        """ Texto de todas las páginas: con PDFium (pdf_nativo, Rust) si está; si no, con pypdf, en paralelo si el
+        libro es grande.
 
         Medido sobre un libro de 195 páginas: 1,9 s en serie contra 0,5 s con
         cuatro procesos, con el texto byte a byte idéntico. La extracción de texto
         de pypdf es trabajo de CPU puro, así que los hilos no servirían: hacen
         falta procesos.
         """
+        from pdf_nativo import lector as _pdfium
+        pdfium = _pdfium()
+        if pdfium is not None:
+            try:
+                return [{"page_num": n, "text": t} for n, t in pdfium.paginas(ruta)]
+            except Exception as err:
+                print(f"PDFium no pudo leer {os.path.basename(ruta)} ({err}); se usa pypdf.")
         import pypdf
         if total < cls.PAGINAS_PARA_PARALELIZAR:
             lector = pypdf.PdfReader(ruta)
@@ -117,6 +125,17 @@ class PDFParser:
         outline = []
 
         if ext == 'pdf':
+            from pdf_nativo import lector as _pdfium
+            pdfium = _pdfium()
+            if pdfium is not None:
+                try:
+                    pages_content = [{"page_num": n, "text": t} for n, t in pdfium.paginas(abs_path)]
+                    outline = [{"title": t, "level": nivel, "page": pagina}
+                               for t, nivel, pagina in pdfium.marcadores(abs_path)]
+                except Exception as err:
+                    print(f"PDFium no pudo leer {filename} ({err}); se usa pypdf.")
+                    pages_content, outline = [], []
+        if ext == 'pdf' and not pages_content:
             try:
                 import pypdf
                 reader = pypdf.PdfReader(abs_path)
@@ -130,6 +149,8 @@ class PDFParser:
                 print(f"Advertencia pypdf en {filename}: {err}")
                 # Fallback texto básico si pypdf falla
                 pages_content.append({"page_num": 1, "text": f"Contenido PDF: {filename}"})
+        elif ext == 'pdf':
+            pass                    # ya leído con PDFium
         elif ext == 'ipynb':
             # Un cuaderno indexado como JSON crudo llena el índice de comillas y
             # metadatos. Se extraen las celdas y cada una actúa como "página".

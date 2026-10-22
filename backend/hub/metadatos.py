@@ -16,6 +16,7 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
+import red_http  # HTTP por Rust con conexiones reutilizadas
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Prig-IDE/1.0 (Prig Hub; lee solo el título)"}
 SEMANA = 7 * 24 * 3600
@@ -44,7 +45,7 @@ def _guardar_cache(base: str, datos: Dict[str, Any]):
 
 
 def _youtube(url: str) -> Optional[Dict[str, str]]:
-    r = requests.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, headers=UA, timeout=6)
+    r = red_http.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, headers=UA, timeout=6)
     if r.status_code != 200:
         return None
     d = r.json()

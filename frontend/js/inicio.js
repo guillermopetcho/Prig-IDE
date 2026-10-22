@@ -31,6 +31,7 @@
         ['herr.github', 'fa-brands fa-github', '#e6edf3', 'Busca repositorios o pega su enlace y léelos con el profesor.'],
         ['herr.youtube', 'fa-brands fa-youtube', '#ff0000', 'Videos y clases magistrales de programación y ML con notas de IA.'],
         ['herr.hub', 'fa-solid fa-circle-nodes', '#cba6f7', 'Tus cursos, canales, perfiles y desafíos en texto plano: sigue a otros y comparte los tuyos por GitHub.'],
+        ['herr.sql', 'fa-solid fa-database', '#00758f', 'Gestor de bases de datos relacionales SQL estilo MySQL Workbench, con motor nativo en Rust, explorador de esquemas, editor de consultas y visor de tablas.'],
         ['herr.modelos', 'fa-solid fa-microchip', '#b4befe', 'Ajustes, pruebas, memoria y servidor de tus modelos.'],
         ['herr.buscarModelos', 'fa-solid fa-cloud-arrow-down', '#74c7ec', 'Busca y descarga modelos de Ollama, Hugging Face y ModelScope.'],
         ['herr.modelosServidor', 'fa-solid fa-server', '#94e2d5', 'Servidor de Ollama, estado de servicios y registro.'],

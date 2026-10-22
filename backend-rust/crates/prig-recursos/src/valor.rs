@@ -215,6 +215,14 @@ impl Valor {
     }
 
     /// `repr(v)`
+    /// `str(v)` de Python: el texto tal cual; lo demás, su repr
+    pub fn texto_o_repr(&self) -> String {
+        match self {
+            Valor::Texto(t) => t.clone(),
+            otro => otro.repr_py(),
+        }
+    }
+
     pub fn repr_py(&self) -> String {
         match self {
             Valor::Nulo => "None".into(),

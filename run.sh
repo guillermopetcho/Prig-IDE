@@ -141,4 +141,10 @@ fi
 export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-accelerated-video-decode --disable-dev-shm-usage ${QTWEBENGINE_CHROMIUM_FLAGS:-}"
 
 echo "✨ Lanzando Prig IDE..."
+# La ventana en Rust (tao + wry, backend-rust/crates/prig-ventana) es dueña del servidor y del backend de Python.
+# PRIG_VENTANA=python vuelve a la ventana de antes (main.py con pywebview y Qt).
+VENTANA="$DIR/backend-rust/target/release/prig"
+if [ "${PRIG_VENTANA:-}" != "python" ] && [ -x "$VENTANA" ]; then
+    exec "$VENTANA"
+fi
 python3 main.py

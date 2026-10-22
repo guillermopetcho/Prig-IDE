@@ -29,6 +29,7 @@ aquí se normalizan a unos pocos campos en castellano.
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -394,9 +395,11 @@ def _tam(n: float) -> str:
 
 def _numero(v: str) -> Optional[float]:
     try:
-        return float(v.replace(",", "")) if v not in ("", "NA", "NaN", "nan", "null", "None") else None
+        n = float(v.replace(",", "")) if v not in ("", "NA", "NaN", "nan", "null", "None") else None
     except ValueError:
         return None
+    # «inf» o «nan» como texto: un infinito en las estadísticas rompía la respuesta (JSON no los admite)
+    return n if n is None or math.isfinite(n) else None
 
 
 VACIOS = {"", "NA", "N/A", "NaN", "nan", "null", "NULL", "None"}

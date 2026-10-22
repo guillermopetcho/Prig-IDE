@@ -115,15 +115,24 @@
         }
 
         _actualizarBadgeContador() {
-            const badge = document.getElementById('badge-cerebro-memoria');
-            if (!badge) return;
-
             const count = this.archivosMemorizados.length;
+            const indEl = document.getElementById('indicador-archivo-leido');
+            const txtEl = document.getElementById('indicador-archivo-leido-nombre');
+            const btnCerebro = document.getElementById('btn-cerebro-dialogo');
+
             if (count > 0) {
-                badge.innerText = `${count} ${count === 1 ? 'archivo leído' : 'archivos leídos'}`;
-                badge.style.display = 'inline-block';
+                const ultimo = this.archivosMemorizados[this.archivosMemorizados.length - 1];
+                const nombreArchivo = (typeof ultimo === 'string' ? ultimo : (ultimo.archivo || ultimo.nombre || '')).split('/').pop();
+                if (indEl && txtEl && nombreArchivo) {
+                    txtEl.textContent = `Leído: ${nombreArchivo}`;
+                    indEl.title = `Último archivo leído e indexado en Cerebro IA: ${nombreArchivo}`;
+                    indEl.style.display = 'inline-flex';
+                }
+                if (btnCerebro) {
+                    btnCerebro.title = `Cerebro IA (Último leído: ${nombreArchivo})`;
+                }
             } else {
-                badge.innerText = '0 leídos';
+                if (btnCerebro) btnCerebro.title = 'Cerebro IA';
             }
         }
 

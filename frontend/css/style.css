@@ -467,6 +467,55 @@ select optgroup {
   font-size: 12px;
 }
 
+/* Dos carpetas: la primera arriba y la segunda abajo, mitad y mitad */
+#segunda-carpeta-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  flex-direction: column;
+  border-top: 2px solid var(--border-color);
+}
+
+#segunda-carpeta-panel.activa {
+  display: flex !important;
+}
+
+/* (con #sidebar-left para ganarle a `.vista-modelo #file-tree-container` de rediseno.css) */
+#sidebar-left.dos-carpetas #file-tree-container {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.segunda-carpeta-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.segunda-carpeta-nombre {
+  flex: 1;
+  color: #eee;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segunda-carpeta-cabecera button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.segunda-carpeta-cabecera button:hover {
+  color: #eee;
+}
+
 .tree-item {
   display: flex;
   align-items: center;
@@ -520,14 +569,26 @@ select optgroup {
 .tab-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 7px;
+  padding: 6px 12px;
   background: var(--bg-panel);
   border-right: 1px solid var(--border-color);
   color: var(--text-muted);
   font-size: 12px;
   cursor: pointer;
   user-select: none;
+  max-width: 160px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.tab-item .tab-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .tab-item.active {

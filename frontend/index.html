@@ -5,9 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prig IDE - Editor de Código & Tutor IA</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=9">
-  <link rel="stylesheet" href="/static/css/rediseno.css?v=20">
+  <link rel="stylesheet" href="/static/css/style.css?v=10">
+  <link rel="stylesheet" href="/static/css/rediseno.css?v=21">
   <link rel="stylesheet" href="/static/css/editor_razonamiento.css?v=1">
+  <link rel="stylesheet" href="/static/css/sql_studio.css?v=1">
 
   <!-- Google Font & FontAwesome Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -438,8 +439,8 @@
 
               <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
 
-              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; window.abrirAprendizajeGuiado();" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
-                <i class="fa-solid fa-brain" style="color: var(--accent-blue);"></i> Análisis Inteligente (Plan de Estudio)
+              <a href="#" onclick="document.getElementById('archivos-header-menu').style.display='none'; window.ejecutarPensamientoPersonajeEnArchivo('', 'Proyecto');" style="padding: 8px 14px; color: #eee; display: flex; align-items: center; gap: 10px; font-size: 12px; text-decoration: none;">
+                <i class="fa-solid fa-brain" style="color: var(--accent-blue);"></i> Analizar con IA
               </a>
 
               <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
@@ -457,6 +458,9 @@
           <div style="display: flex; align-items: center; gap: 4px;">
             <button type="button" onclick="if(window.fileTreeMgr) window.fileTreeMgr.openFolderManagerModal('guardados');" title="Proyectos Guardados y Cambiar Carpeta" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--accent-yellow); border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer;">
               <i class="fa-solid fa-folder-open"></i>
+            </button>
+            <button type="button" id="btn-segunda-carpeta" onclick="if(window.fileTreeMgr) window.fileTreeMgr.alternarVisionMultiple();" title="Visión múltiple: cargar una segunda carpeta debajo (sus archivos se abren en el editor de la derecha)" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--accent-blue); border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer;">
+              <i class="fa-solid fa-table-columns fa-rotate-90"></i>
             </button>
             <button type="button" onclick="if(window.fileTreeMgr) window.fileTreeMgr.guardarCarpetaActualEnBiblioteca();" title="Guardar carpeta actual en la Biblioteca de Proyectos" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--accent-purple); border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer;">
               <i class="fa-solid fa-bookmark"></i>
@@ -480,7 +484,12 @@
             <i class="fa-solid fa-folder" style="color: var(--accent-yellow); font-size: 11px;"></i>
             <span id="workspace-folder-indicator-name" style="color: #eee; font-weight: 600;">Prig</span>
           </div>
-          <span style="font-size: 9.5px; background: rgba(203,166,247,0.18); color: var(--accent-purple); padding: 1px 5px; border-radius: 3px; font-weight: bold;">CAMBIAR</span>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <button type="button" class="btn-cerebrito-carpeta" title="Analizar con IA (PENSAMIENTO_DEL_PROYECTO.md)" onclick="event.stopPropagation(); window.ejecutarPensamientoPersonajeEnArchivo('', 'Proyecto');" style="background: var(--accent-blue); color: #111; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+              <i class="fa-solid fa-brain"></i>
+            </button>
+            <span style="font-size: 9.5px; background: rgba(203,166,247,0.18); color: var(--accent-purple); padding: 1px 5px; border-radius: 3px; font-weight: bold;">CAMBIAR</span>
+          </div>
         </div>
 
         <!-- Filter / Quick Search Input -->
@@ -491,6 +500,18 @@
 
         <div id="file-tree-container" class="file-tree">
           <!-- Tree nodes rendered via JS -->
+        </div>
+
+        <!-- Segunda carpeta: ocupa la mitad de abajo; sus archivos se abren en la columna derecha del editor -->
+        <div id="segunda-carpeta-panel" style="display: none;">
+          <div class="segunda-carpeta-cabecera">
+            <i class="fa-solid fa-folder" style="color: var(--accent-blue); font-size: 11px;"></i>
+            <span id="segunda-carpeta-nombre" class="segunda-carpeta-nombre"></span>
+            <button type="button" title="Cambiar la segunda carpeta" onclick="if(window.fileTreeMgr) window.fileTreeMgr.elegirSegundaCarpeta();"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>
+            <button type="button" title="Actualizar" onclick="if(window.fileTreeMgr) window.fileTreeMgr.cargarSegundaCarpeta();"><i class="fa-solid fa-rotate-right"></i></button>
+            <button type="button" title="Cerrar la segunda carpeta" onclick="if(window.fileTreeMgr) window.fileTreeMgr.quitarSegundaCarpeta();"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="file-tree-container-2" class="file-tree"></div>
         </div>
       </aside>
         
@@ -522,24 +543,45 @@
                 <div id="editor-layout-bar" class="editor-layout-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: rgba(0,0,0,0.18); border-bottom: 1px solid var(--border-color);">
                   <div class="editor-layout-info" style="display: flex; align-items: center; gap: 8px;">
                     <span class="editor-layout-badge"><i class="fa-solid fa-code"></i> Editor</span>
+                    <span id="indicador-archivo-leido" class="indicador-archivo-leido" style="display: none; align-items: center; gap: 6px; font-size: 11px; color: #a6e3a1; background: rgba(166, 227, 161, 0.12); border: 1px solid rgba(166, 227, 161, 0.28); border-radius: 5px; padding: 2px 8px; font-family: 'Fira Code', monospace; transition: all 0.3s ease;">
+                      <i class="fa-solid fa-book-open" style="font-size: 11px; color: #a6e3a1;"></i>
+                      <span id="indicador-archivo-leido-nombre">archivo</span>
+                    </span>
                   </div>
-                  <div class="editor-layout-actions" style="display: flex; align-items: center; gap: 8px;">
-                    <button id="btn-cerebro-dialogo" class="btn-cerebro-hud" title="Abrir Cerebro IA: Historial de razonamiento, memoria comprimida y preguntas sobre archivos" onclick="window.CerebroMemoria && window.CerebroMemoria.alternarPanel();" style="display: flex; align-items: center; gap: 8px; background: rgba(203, 166, 247, 0.18); border: 1px solid #cba6f7; color: #f8fafc; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
-                      <i class="fa-solid fa-brain" style="color: #cba6f7; font-size: 13px;"></i>
-                      <span>Cerebro IA</span>
-                      <span id="badge-cerebro-memoria" style="background: #cba6f7; color: #11111b; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 10px; margin-left: 2px;">0 leídos</span>
+                  <!-- BADGES CENTRALES: nombre del archivo activo por división -->
+                  <div id="editor-col-badges-barra" style="flex: 1; display: none; align-items: center; justify-content: center; gap: 10px; min-width: 0; padding: 0 8px; overflow: hidden;">
+                    <!-- Llenado dinámicamente por JS según las columnas activas -->
+                  </div>
+                  <div class="editor-layout-actions" style="display: flex; align-items: center; gap: 6px;">
+                    <!-- CUADRADITO TOGGLE QWEN -->
+                    <label id="btn-toggle-qwen-editor" class="editor-qwen-toggle-label" title="Qwen: Activar/Desactivar análisis en el editor" style="display: inline-flex; align-items: center; gap: 4px; background: rgba(203, 166, 247, 0.12); border: 1px solid rgba(203, 166, 247, 0.35); border-radius: 6px; padding: 0 6px; cursor: pointer; height: 26px; box-sizing: border-box;">
+                      <input type="checkbox" id="chk-qwen-editor-activo" title="Qwen activo" onchange="window.alternarQwenEditor && window.alternarQwenEditor(this.checked);" style="accent-color: #cba6f7; cursor: pointer; margin: 0; width: 13px; height: 13px;">
+                      <span id="badge-qwen-editor-estado" style="font-size: 9.5px; font-weight: 800; color: #a6e3a1;">ON</span>
+                    </label>
+
+                    <!-- BOTÓN EJECUTAR -->
+                    <button id="btn-editor-ejecutar" class="btn-editor-hud-secundario" title="Ejecutar" onclick="window.app && window.app.runCode();" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(166, 227, 161, 0.18); border: 1px solid rgba(166, 227, 161, 0.45); color: #a6e3a1; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-play"></i>
                     </button>
-                    <!-- BOTÓN RAZONAMIENTO DEL MODELO (25% Ancho Minimapa) -->
-                    <button id="btn-editor-razonamiento" class="btn-editor-hud-secundario activo" title="Panel de razonamiento del modelo sobre el código (25% ancho minimapa)" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('razonamiento');" style="display: flex; align-items: center; gap: 6px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
-                      <i class="fa-solid fa-brain-circuit" style="font-size: 12px;"></i>
-                      <span>Razonamiento</span>
-                      <span id="badge-razonamiento-estado" style="background: rgba(137, 180, 250, 0.28); color: #89b4fa; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">CoT</span>
+
+                    <!-- BOTÓN CEREBRO IA -->
+                    <button id="btn-cerebro-dialogo" class="btn-cerebro-hud" title="Cerebro IA" onclick="window.CerebroMemoria && window.CerebroMemoria.alternarPanel();" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(203, 166, 247, 0.18); border: 1px solid #cba6f7; color: #cba6f7; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-brain"></i>
                     </button>
+
+                    <!-- BOTÓN RAZONAMIENTO DEL MODELO (icono de redondo de dialogo) -->
+                    <button id="btn-editor-razonamiento" class="btn-editor-hud-secundario activo" title="Razonamiento" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('razonamiento');" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-comment-dots"></i>
+                    </button>
+
                     <!-- BOTÓN NOTAS TÉCNICAS SOBRE EL CÓDIGO -->
-                    <button id="btn-editor-notas" class="btn-editor-hud-secundario" title="Notas técnicas profesionales y anotaciones estructuradas sobre el código" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('notas');" style="display: flex; align-items: center; gap: 6px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
-                      <i class="fa-solid fa-clipboard-list" style="font-size: 12px;"></i>
-                      <span>Notas</span>
-                      <span id="badge-notas-contador" style="background: rgba(166, 227, 161, 0.25); color: #a6e3a1; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">0</span>
+                    <button id="btn-editor-notas" class="btn-editor-hud-secundario" title="Notas" onclick="window.EditorRazonamiento && window.EditorRazonamiento.alternarTabOVisibilidad('notas');" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-clipboard-list"></i>
+                    </button>
+
+                    <!-- BOTÓN CERRAR VISTA DEL EDITOR -->
+                    <button id="btn-cerrar-vista-editor" class="editor-layout-btn-cerrar" title="Cerrar editor" onclick="window.editorMgr && window.editorMgr.cerrarVistaEditor();" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(243, 139, 168, 0.15); border: 1px solid rgba(243, 139, 168, 0.35); color: #f38ba8; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s ease;">
+                      <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
                 </div>
@@ -558,6 +600,10 @@
                         <div id="editor-tabs" class="tab-bar editor-col-tabs" data-col="0">
                           <!-- Open file tabs dynamically injected -->
                         </div>
+                        <div id="editor-col-centro-0" class="editor-col-centro-archivo" style="display: none;" title="Archivo activo">
+                          <i class="fa-solid fa-file-code"></i>
+                          <span class="editor-col-centro-nombre"></span>
+                        </div>
                         <div class="editor-col-actions" style="display:none;" id="editor-col-actions-0">
                           <button class="editor-col-action-btn" data-split-col="0" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
                           <button class="editor-col-action-btn" data-mover-der="0" title="Mover archivo a la derecha"><i class="fa-solid fa-arrow-right"></i></button>
@@ -572,6 +618,7 @@
                         </div>
                         <div id="monaco-editor-container" class="monaco-container"></div>
                         <div id="notebook-view-container" style="display:none;"></div>
+                        <div id="markdown-view-container" style="display:none;"></div>
                       </div>
                     </div>
 
@@ -583,6 +630,10 @@
                       <div class="editor-col-header">
                         <div id="editor-tabs-1" class="tab-bar editor-col-tabs" data-col="1">
                           <!-- Pestañas de Columna 1 -->
+                        </div>
+                        <div id="editor-col-centro-1" class="editor-col-centro-archivo" style="display: none;" title="Archivo activo">
+                          <i class="fa-solid fa-file-code"></i>
+                          <span class="editor-col-centro-nombre"></span>
                         </div>
                         <div class="editor-col-actions">
                           <button class="editor-col-action-btn" data-split-col="1" title="Abrir archivo al lado (Ctrl+\)"><i class="fa-solid fa-table-columns"></i></button>
@@ -609,6 +660,10 @@
                       <div class="editor-col-header">
                         <div id="editor-tabs-2" class="tab-bar editor-col-tabs" data-col="2">
                           <!-- Pestañas de Columna 2 -->
+                        </div>
+                        <div id="editor-col-centro-2" class="editor-col-centro-archivo" style="display: none;" title="Archivo activo">
+                          <i class="fa-solid fa-file-code"></i>
+                          <span class="editor-col-centro-nombre"></span>
                         </div>
                         <div class="editor-col-actions">
                           <button class="editor-col-action-btn" data-mover-izq="2" title="Mover archivo a la izquierda"><i class="fa-solid fa-arrow-left"></i></button>
@@ -644,6 +699,7 @@
                     <button data-cmd="archivo.abrirArchivo"><i class="fa-solid fa-file-code"></i> Abrir archivo…</button>
                     <button data-cmd="archivo.abrirCarpeta"><i class="fa-solid fa-folder-open"></i> Abrir carpeta…</button>
                     <button data-cmd="herr.inicio"><i class="fa-solid fa-house"></i> Inicio</button>
+                    <button data-cmd="editor.cerrar" class="editor-vacio-btn-cerrar" style="background: rgba(243, 139, 168, 0.15); border: 1px solid rgba(243, 139, 168, 0.45); color: #f38ba8;"><i class="fa-solid fa-xmark"></i> Cerrar editor</button>
                   </div>
                 </div>
               </div>
@@ -842,6 +898,13 @@
     <div id="modal-prig-hub" class="modal-overlay" style="display:none;">
       <div class="modal-content modal-lg" style="padding:0; height:100%; max-width:none;">
         <div id="prig-hub-raiz" style="height:100%;"></div>
+      </div>
+    </div>
+
+    <!-- SQL Studio: MySQL Workbench en Rust (js/sql_studio.js) -->
+    <div id="modal-sql-studio" class="modal-overlay" style="display:none;">
+      <div class="modal-content modal-lg" style="padding:0; height:100%; max-width:none;">
+        <div id="sql-studio-raiz" style="height:100%;"></div>
       </div>
     </div>
 
@@ -1118,8 +1181,11 @@
             </button>
             <button id="btn-delete-book" class="tool-btn"
               style="background: rgba(243,139,168,0.12); color: var(--accent-red); border-color: rgba(243,139,168,0.3);"
-              title="Eliminar el elemento seleccionado de la biblioteca y del índice">
-              <i class="fa-solid fa-trash-can"></i> Eliminar
+              title="Quitar el elemento de la biblioteca (tus archivos no se borran) y elegir qué borrar de lo que Prig guardó">
+              <i class="fa-solid fa-eye-slash"></i> Quitar
+            </button>
+            <button id="btn-books-quitados" class="tool-btn" title="Lo que quitaste de la biblioteca: volver a ponerlo">
+              <i class="fa-solid fa-box-archive"></i> Quitados
             </button>
             <button id="btn-refresh-books" class="tool-btn" title="Refrescar lista de la biblioteca"><i
                 class="fa-solid fa-rotate-right"></i></button>
@@ -3048,10 +3114,10 @@
   <script src="/static/js/layout.js?v=8"></script>
   <script src="/static/js/workarea.js?v=17"></script>
   <script src="/static/js/plan_actual.js?v=7"></script>
-  <script src="/static/js/editor.js?v=16"></script>
-  <script src="/static/js/editor_razonamiento.js?v=1"></script>
+  <script src="/static/js/editor.js?v=19"></script>
+  <script src="/static/js/editor_razonamiento.js?v=2"></script>
   <script src="/static/js/notebook.js?v=7"></script>
-  <script src="/static/js/filetree.js?v=9"></script>
+  <script src="/static/js/filetree.js?v=11"></script>
   <script src="/static/js/menu_rueda_archivos.js?v=1"></script>
   <script src="/static/js/terminal.js?v=7"></script>
   <script src="/static/js/ai_chat.js?v=18"></script>
@@ -3061,11 +3127,13 @@
   <script src="/static/js/github_widget.js?v=1"></script>
   <script src="/static/js/youtube_hub.js?v=18"></script>
   <script src="/static/js/prig_hub.js?v=5"></script>
+  <script src="/static/js/sql_studio.js?v=1"></script>
   <script src="/static/js/motor_aprendizaje_grafo.js?v=1"></script>
   <script src="/static/js/inicio.js?v=7"></script>
   <script src="/static/js/agent_workflow.js?v=6"></script>
   <script src="/static/js/ml_flow_analyzer.js?v=6"></script>
-  <script src="/static/js/book_library.js?v=9"></script>
+  <script src="/static/js/biblioteca_quitar.js?v=1"></script>
+  <script src="/static/js/book_library.js?v=10"></script>
   <script src="/static/js/referencias_ml.js?v=1"></script>
   <script src="/static/js/base_conocimiento.js?v=3"></script>
   <script src="/static/js/explorador.js?v=3"></script>

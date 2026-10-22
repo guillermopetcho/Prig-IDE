@@ -889,6 +889,27 @@ class AparienciaManager {
             .monaco-editor, .monaco-editor-background, .monaco-container, .editor-col-body, .editor-col, #editor-cols-container, .monaco-editor .margin, .monaco-editor .overflow-guard, .monaco-editor-pane, .trabajo-vistas, .panel-trabajo, .trabajo-split-contenedor, #notebook-view-container {
                 background: transparent !important;
             }
+            body.editor-transparente #seccion-trabajo,
+            body.editor-transparente #panel-trabajo-izq,
+            body.editor-transparente #trabajo-split-contenedor,
+            body.editor-transparente #trabajo-vistas,
+            body.editor-transparente #vista-editor,
+            body.editor-transparente .editor-area-wrapper,
+            body.editor-transparente .editor-grid-container,
+            body.editor-transparente .editor-col,
+            body.editor-transparente .editor-col-body,
+            body.editor-transparente .monaco-container,
+            body.editor-transparente .monaco-editor,
+            body.editor-transparente .monaco-editor-background,
+            body.editor-transparente .monaco-editor .margin,
+            body.editor-transparente .monaco-editor .margin-view-overlays,
+            body.editor-transparente .monaco-editor .overflow-guard,
+            body.editor-transparente .monaco-editor-pane,
+            body.editor-transparente #notebook-view-container,
+            body.editor-transparente .editor-vacio {
+                background: rgba(30, 30, 30, var(--editor-bg-alpha, 0)) !important;
+                background-color: rgba(30, 30, 30, var(--editor-bg-alpha, 0)) !important;
+            }
         `);
 
         el.textContent = cssReglas.join('\n');

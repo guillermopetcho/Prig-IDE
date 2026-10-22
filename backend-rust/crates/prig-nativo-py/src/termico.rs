@@ -17,8 +17,8 @@ use pyo3::types::{PyDict, PyList, PySet, PyTuple};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
-fn bloquear<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+fn bloquear<T: Send>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    crate::gil::bloquear(m)
 }
 
 // =========================================================================== monitor

@@ -23,7 +23,6 @@ import os
 import re
 import sys
 import time
-import unicodedata
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -31,113 +30,26 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 RUTA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "data", "referencias_ml.json")
 RUTA_MD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "referencias-ml.md")
 
-TIPOS = {
-    "libro": "Libro",
-    "paper": "Paper",
-    "survey": "Survey / tutorial académico",
-    "formulario": "Formulario / cheat sheet",
-    "apuntes": "Apuntes de curso",
-    "curso": "Curso en línea",
-    "articulo": "Artículo divulgativo",
-    "documentacion": "Documentación oficial",
-}
-
-# Familias de modelos, en el orden en que se muestran. `claves`: cómo se nombra el tema en una pregunta
-# (español e inglés, sin tildes); con eso se eligen las referencias para el chat.
-CATEGORIAS: List[Dict[str, Any]] = [
-    {"id": "fundamentos", "nombre": "Fundamentos y teoría del aprendizaje", "icono": "fa-graduation-cap",
-     "claves": ["machine learning", "aprendizaje automatico", "aprendizaje estadistico", "statistical learning",
-                "sesgo varianza", "bias variance", "sobreajuste", "overfitting", "validacion cruzada", "cross validation",
-                "teoria del aprendizaje", "learning theory", "pac", "vc dimension", "generalizacion", "regularizacion"]},
-    {"id": "matematicas", "nombre": "Matemáticas para ML (álgebra, cálculo, probabilidad)", "icono": "fa-square-root-variable",
-     "claves": ["algebra lineal", "linear algebra", "matriz", "matrices", "calculo", "derivada", "gradiente", "jacobiano",
-                "probabilidad", "probability", "estadistica", "statistics", "teoria de la informacion", "entropia",
-                "information theory", "divergencia kl", "kl divergence", "svd", "autovalores", "eigen",
-                "teorema de bayes", "bayes theorem", "distribucion normal", "varianza", "esperanza"]},
-    {"id": "optimizacion", "nombre": "Optimización", "icono": "fa-arrow-trend-down",
-     "claves": ["optimizacion", "optimization", "descenso de gradiente", "gradient descent", "sgd", "adam", "adamw",
-                "momentum", "learning rate", "tasa de aprendizaje", "convexa", "convex", "newton", "lbfgs"]},
-    {"id": "lineales", "nombre": "Regresión lineal, regularización y GLM", "icono": "fa-chart-line",
-     "claves": ["regresion lineal", "linear regression", "minimos cuadrados", "least squares", "ols", "ridge", "lasso",
-                "elastic net", "glm", "modelo lineal generalizado", "regresion logistica", "logistic regression",
-                "softmax", "poisson"]},
-    {"id": "bayesianos", "nombre": "Modelos probabilísticos y bayesianos", "icono": "fa-dice",
-     "claves": ["bayes", "bayesiano", "bayesian", "naive bayes", "inferencia variacional", "variational inference",
-                "mcmc", "monte carlo", "hamiltonian", "em", "expectation maximization", "mezcla de gaussianas",
-                "gaussian mixture", "gmm", "modelo grafico", "graphical model", "hmm", "markov oculto", "hidden markov",
-                "proceso gaussiano", "gaussian process", "gp", "kalman"]},
-    {"id": "kernels", "nombre": "SVM y métodos de kernel", "icono": "fa-vector-square",
-     "claves": ["svm", "support vector", "maquina de vectores de soporte", "vectores de soporte", "kernel", "margen",
-                "margin", "smo", "kernel pca", "one class svm", "knn", "vecinos mas cercanos", "nearest neighbor"]},
-    {"id": "arboles", "nombre": "Árboles de decisión y ensembles", "icono": "fa-tree",
-     "claves": ["arbol de decision", "arboles de decision", "decision tree", "cart", "id3", "c4.5", "random forest",
-                "bosque aleatorio", "bosques aleatorios", "bagging", "boosting", "adaboost", "gradient boosting",
-                "xgboost", "lightgbm", "catboost", "gbm", "extra trees", "ensemble", "ensamble"]},
-    {"id": "no_supervisado", "nombre": "Clustering, reducción de dimensión y anomalías", "icono": "fa-circle-nodes",
-     "claves": ["clustering", "agrupamiento", "k-means", "kmeans", "k means", "dbscan", "hdbscan", "clustering jerarquico",
-                "hierarchical clustering", "espectral", "spectral clustering", "pca", "componentes principales",
-                "principal component", "t-sne", "tsne", "umap", "reduccion de dimension", "dimensionality reduction", "ica",
-                "nmf", "anomalias", "anomaly detection", "outlier", "isolation forest", "lof"]},
-    {"id": "redes_neuronales", "nombre": "Redes neuronales y entrenamiento profundo", "icono": "fa-brain",
-     "claves": ["red neuronal", "redes neuronales", "neural network", "perceptron", "mlp", "backpropagation",
-                "retropropagacion", "deep learning", "aprendizaje profundo", "dropout", "batch norm", "batchnorm",
-                "normalizacion", "layer norm", "inicializacion", "initialization", "funcion de activacion", "relu",
-                "residual", "resnet"]},
-    {"id": "cnn", "nombre": "Redes convolucionales y visión por computadora", "icono": "fa-eye",
-     "claves": ["cnn", "convolucional", "convolutional", "convolucion", "vision por computadora", "computer vision",
-                "clasificacion de imagenes", "image classification", "deteccion de objetos", "object detection", "yolo",
-                "r-cnn", "segmentacion", "segmentation", "u-net", "unet", "alexnet", "vgg", "resnet", "efficientnet",
-                "vision transformer", "vit", "imagenet"]},
-    {"id": "secuencias", "nombre": "Redes recurrentes y modelos de secuencia", "icono": "fa-arrows-rotate",
-     "claves": ["rnn", "recurrente", "recurrent", "lstm", "gru", "seq2seq", "secuencia a secuencia", "sequence to sequence",
-                "mecanismo de atencion", "attention mechanism", "capa de atencion", "traduccion automatica", "machine translation"]},
-    {"id": "nlp", "nombre": "Procesamiento de lenguaje y embeddings", "icono": "fa-language",
-     "claves": ["nlp", "procesamiento de lenguaje", "natural language", "word2vec", "glove", "embedding", "embeddings",
-                "tokenizacion", "tokenizer", "tokenization", "bpe", "fasttext", "elmo", "bert"]},
-    {"id": "transformers", "nombre": "Transformers y modelos de lenguaje (LLM)", "icono": "fa-robot",
-     "claves": ["transformer", "transformers", "llm", "modelo de lenguaje", "language model", "gpt", "bert", "t5", "llama",
-                "self-attention", "autoatencion", "mecanismo de atencion", "attention mechanism", "multi-head attention",
-                "atencion multi-cabeza", "scaling laws", "leyes de escala", "fine-tuning",
-                "ajuste fino", "lora", "rlhf", "instruct", "prompt", "chain of thought", "rag", "retrieval",
-                "mixture of experts", "moe", "flashattention", "rope", "kv cache", "cuantizacion", "quantization", "dpo"]},
-    {"id": "generativos", "nombre": "Modelos generativos (VAE, GAN, flujos, difusión)", "icono": "fa-wand-magic-sparkles",
-     "claves": ["generativo", "generative", "vae", "autoencoder", "autocodificador", "variational autoencoder", "gan",
-                "adversarial", "adversaria", "stylegan", "flujos normalizantes", "normalizing flow", "difusion", "diffusion",
-                "ddpm", "stable diffusion", "score matching", "clip", "texto a imagen", "text to image"]},
-    {"id": "refuerzo", "nombre": "Aprendizaje por refuerzo", "icono": "fa-chess-knight",
-     "claves": ["refuerzo", "reinforcement learning", "rl", "q-learning", "q learning", "dqn", "policy gradient",
-                "gradiente de politica", "ppo", "trpo", "actor critic", "actor-critic", "sac", "ddpg", "a3c", "mdp",
-                "proceso de decision de markov", "alphago", "muzero", "bellman"]},
-    {"id": "grafos", "nombre": "Redes neuronales sobre grafos", "icono": "fa-diagram-project",
-     "claves": ["grafo", "grafos", "graph", "gnn", "gcn", "graph neural", "graph convolutional", "gat", "graphsage",
-                "message passing", "paso de mensajes", "geometric deep learning", "node2vec", "deepwalk"]},
-    {"id": "series_temporales", "nombre": "Series temporales y pronóstico", "icono": "fa-clock-rotate-left",
-     "claves": ["serie temporal", "series temporales", "time series", "pronostico", "forecasting", "arima", "prophet",
-                "estacionalidad", "seasonality", "deepar", "n-beats", "informer", "temporal fusion"]},
-    {"id": "recomendacion", "nombre": "Sistemas de recomendación", "icono": "fa-thumbs-up",
-     "claves": ["recomendacion", "recommender", "recommendation", "filtrado colaborativo", "collaborative filtering",
-                "factorizacion de matrices", "matrix factorization", "wide and deep"]},
-    {"id": "interpretabilidad", "nombre": "Interpretabilidad, explicabilidad y causalidad", "icono": "fa-magnifying-glass-chart",
-     "claves": ["interpretabilidad", "interpretability", "explicabilidad", "explainability", "xai", "shap", "lime",
-                "grad-cam", "saliency", "causalidad", "causal", "causal inference", "inferencia causal", "fairness",
-                "equidad", "sesgo algoritmico"]},
-    {"id": "practica", "nombre": "Práctica: evaluación, datos y MLOps", "icono": "fa-screwdriver-wrench",
-     "claves": ["metricas", "metrics", "evaluacion", "evaluation", "roc", "auc", "precision", "recall", "f1",
-                "matriz de confusion", "confusion matrix", "feature engineering", "ingenieria de caracteristicas",
-                "preprocesamiento", "preprocessing", "desbalance", "imbalanced", "smote", "mlops", "produccion",
-                "deployment", "scikit-learn", "sklearn", "pytorch", "tensorflow", "keras", "hiperparametros",
-                "hyperparameter"]},
-]
+# Los tipos, las familias de modelos (en el orden en que se muestran; `claves`: cómo se nombra el tema en una pregunta,
+# en español e inglés sin tildes, con lo que se eligen las referencias para el chat) y las palabras que solas no hacen
+# relevante una referencia: en frontend/data/referencias_ml_categorias.json, que también lee el servidor de Rust
+with open(os.path.join(os.path.dirname(RUTA), "referencias_ml_categorias.json"), encoding="utf-8") as _f:
+    _CATEGORIAS_JSON = json.load(_f)
+TIPOS: Dict[str, str] = _CATEGORIAS_JSON["tipos"]
+CATEGORIAS: List[Dict[str, Any]] = _CATEGORIAS_JSON["categorias"]
 CATEGORIA_POR_ID = {c["id"]: c for c in CATEGORIAS}
-# Palabras que aparecen en cualquier pregunta de programación: solas no hacen relevante una referencia
-TEMAS_GENERICOS = {"python", "introduccion", "datasets", "prediccion", "texto", "codigo", "programacion", "entrenamiento",
-                   "atencion", "attention", "error", "errores"}
+TEMAS_GENERICOS = set(_CATEGORIAS_JSON["temas_genericos"])
 
 
 # ---------------------------------------------------------------------------------------------- lectura
 def _normalizar(texto: str) -> str:
-    t = unicodedata.normalize("NFKD", (texto or "").lower())
-    return "".join(ch for ch in t if not unicodedata.combining(ch))
+    """ Minúsculas, NFKD y sin marcas combinantes (en Rust: prig_nativo.referencias) """
+    return _rs().normalizar(texto or "")
+
+
+def _rs():
+    from nativo_rust import rust
+    return rust().referencias
 
 
 _cache: Dict[str, Any] = {"mtime": None, "datos": None}
@@ -185,51 +97,29 @@ def _texto_busqueda(r: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------------------------- para el chat
 def _aparece(clave: str, texto: str) -> bool:
     # admite el plural («transformer» encuentra «transformers», «red neuronal» no encuentra «redes»)
-    return re.search(r"(?<![a-z0-9])" + re.escape(clave) + r"(?:s|es)?(?![a-z0-9])", texto) is not None
+    return _rs().aparece(clave, texto)
+
+
+_indice: Dict[str, Any] = {"datos": None, "catalogo": None}
+
+
+def _catalogo(datos: Dict[str, Any]):
+    """ El índice en Rust del catálogo cargado (se rehace cuando cargar() relee el archivo) """
+    if _indice["datos"] is not datos:
+        refs = [(r.get("estado") == "caido", list(r.get("categorias", [])), list(r.get("temas", [])),
+                 r.get("titulo", ""), r.get("tipo")) for r in datos["referencias"]]
+        _indice.update(datos=datos, catalogo=_rs().Catalogo([(c["id"], list(c["claves"])) for c in CATEGORIAS], refs,
+                                                            set(TEMAS_GENERICOS)))
+    return _indice["catalogo"]
 
 
 def relacionadas(texto: str, maximo: int = 5) -> List[Dict[str, Any]]:
     """ Las referencias que vienen al caso de una pregunta o un texto: por los temas de la pregunta
     (claves de cada familia) y por coincidencias con el título o los temas de cada referencia.
     Prioriza formularios y libros (lo que sirve para estudiar) y luego los papers fundacionales. """
-    t = _normalizar(texto)
-    if len(t) < 3:
-        return []
-    puntos_cat: Dict[str, float] = {}
-    for c in CATEGORIAS:
-        n = sum(1 + 0.2 * len(k.split()) for k in c["claves"] if _aparece(k, t))
-        if n:
-            puntos_cat[c["id"]] = n
-    candidatas: List[Tuple[float, Dict[str, Any]]] = []
-    peso_tipo = {"formulario": 1.2, "libro": 1.5, "apuntes": 1.0, "survey": 1.1, "paper": 0.8, "articulo": 0.6,
-                 "documentacion": 0.4}
-    for r in cargar()["referencias"]:
-        if r.get("estado") == "caido":
-            continue
-        p = sum(puntos_cat.get(c, 0) * (1.0 if i == 0 else 0.5) for i, c in enumerate(r.get("categorias", [])))
-        temas = [_normalizar(x) for x in r.get("temas", []) if _normalizar(x) not in TEMAS_GENERICOS]
-        propios = sum(2.5 for x in temas if len(x) > 2 and _aparece(x, t))
-        titulo = _normalizar(r.get("titulo", ""))
-        # el nombre del paper o del libro en la pregunta («attention is all you need», «xgboost»)
-        if len(titulo) > 8 and titulo in t:
-            propios += 6
-        if not p and not propios:
-            continue
-        candidatas.append((p + propios + peso_tipo.get(r.get("tipo"), 0.5) * (1 if p else 0), r))
-    candidatas.sort(key=lambda x: -x[0])
-    elegidas: List[Dict[str, Any]] = []
-    por_tipo: Dict[str, int] = {}
-    for puntos, r in candidatas:
-        if puntos < 2.0:
-            break
-        # variedad: no cinco papers del mismo tema
-        if por_tipo.get(r.get("tipo"), 0) >= 2:
-            continue
-        por_tipo[r.get("tipo")] = por_tipo.get(r.get("tipo"), 0) + 1
-        elegidas.append(r)
-        if len(elegidas) >= maximo:
-            break
-    return elegidas
+    datos = cargar()
+    refs = datos["referencias"]
+    return [refs[i] for i in _catalogo(datos).relacionadas(texto or "", maximo)]
 
 
 def cita_corta(r: Dict[str, Any]) -> str:

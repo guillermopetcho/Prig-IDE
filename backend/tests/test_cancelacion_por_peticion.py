@@ -9,7 +9,9 @@ y solo esa.
   · dos peticiones a la vez: cortar una no corta la otra (antes «Cancelar» en Desafíos
     llamaba a /api/ai/cancel y detenía lo que se estuviera generando en todas las secciones).
 
-Contra un Ollama falso que emite un token cada 20 ms y cuenta cuántos llegó a enviar.
+Contra un servidor de Rust falso (/api/ia/generar: generar es suyo) que emite un trozo cada 20 ms y cuenta cuántos
+llegó a enviar: si el backend de Python corta la conexión, el de verdad deja de generar (prig-ia/tests/generar.rs,
+cancelar_corta_la_conexion_con_ollama).
 """
 
 import json
@@ -19,6 +21,7 @@ import sys
 import threading
 import time
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests
@@ -32,7 +35,7 @@ from ai_engine import AIEngine  # noqa: E402
 TOKENS = 400          # a 20 ms cada uno, una respuesta completa tardaría 8 s
 
 
-class OllamaLento(BaseHTTPRequestHandler):
+class RustLento(BaseHTTPRequestHandler):
     enviados = {}     # id de la petición → tokens que llegaron a salir
 
     def log_message(self, *a):
@@ -41,17 +44,17 @@ class OllamaLento(BaseHTTPRequestHandler):
     def do_POST(self):
         cuerpo = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         clave = cuerpo.get("prompt", "?")
-        OllamaLento.enviados[clave] = 0
+        RustLento.enviados[clave] = 0
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
         self.end_headers()
         try:
             for i in range(TOKENS):
-                self.wfile.write((json.dumps({"response": f"t{i} ", "done": False}) + "\n").encode())
+                self.wfile.write((json.dumps({"t": "texto", "v": f"t{i} ", "token": True}) + "\n").encode())
                 self.wfile.flush()
-                OllamaLento.enviados[clave] += 1
+                RustLento.enviados[clave] += 1
                 time.sleep(0.02)
-            self.wfile.write((json.dumps({"response": "", "done": True}) + "\n").encode())
+            self.wfile.write((json.dumps({"t": "stats", "v": {}}) + "\n").encode())
         except (BrokenPipeError, ConnectionResetError):
             pass                                  # Prig cerró la conexión: se deja de generar
 
@@ -65,8 +68,10 @@ def puerto_libre() -> int:
 class TestCancelacionPorPeticion(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.ollama = ThreadingHTTPServer(("127.0.0.1", 0), OllamaLento)
+        cls.ollama = ThreadingHTTPServer(("127.0.0.1", 0), RustLento)
         threading.Thread(target=cls.ollama.serve_forever, daemon=True).start()
+        cls.entorno = mock.patch.dict(os.environ, {"PRIG_PUERTO_RUST": str(cls.ollama.server_address[1])})
+        cls.entorno.start()
         motor = AIEngine.__new__(AIEngine)
         motor.base_url = f"http://127.0.0.1:{cls.ollama.server_address[1]}"
         motor.config = {"num_ctx": 2048, "num_gpu": -1, "temperature": 0.3, "num_predict": -1}
@@ -109,6 +114,7 @@ class TestCancelacionPorPeticion(unittest.TestCase):
     def tearDownClass(cls):
         cls.servidor.should_exit = True
         cls.ollama.shutdown()
+        cls.entorno.stop()
 
     def leer_y_cortar(self, texto, eventos=3, ruta="generar"):
         r = requests.get(f"http://127.0.0.1:{self.puerto}/{ruta}", params={"texto": texto}, stream=True, timeout=10)
@@ -125,12 +131,12 @@ class TestCancelacionPorPeticion(unittest.TestCase):
         fin = time.time() + segundos
         anterior = -1
         while time.time() < fin:
-            actual = OllamaLento.enviados.get(clave, 0)
+            actual = RustLento.enviados.get(clave, 0)
             if actual == anterior:
                 return actual
             anterior = actual
             time.sleep(0.4)
-        return OllamaLento.enviados.get(clave, 0)
+        return RustLento.enviados.get(clave, 0)
 
     def test_si_el_cliente_se_va_el_modelo_deja_de_generar(self):
         self.leer_y_cortar("uno")
@@ -145,7 +151,7 @@ class TestCancelacionPorPeticion(unittest.TestCase):
     def test_generador_sincrono_completo_llega_entero(self):
         r = requests.get(f"http://127.0.0.1:{self.puerto}/generar_sync", params={"texto": "sync-entera"}, stream=True, timeout=30)
         trozos = [json.loads(l)["delta"] for l in r.iter_lines() if l]
-        self.assertEqual(OllamaLento.enviados["sync-entera"], TOKENS)
+        self.assertEqual(RustLento.enviados["sync-entera"], TOKENS)
         self.assertEqual("".join(trozos), "".join(f"t{i} " for i in range(TOKENS)))
 
     def test_cortar_una_no_corta_la_otra(self):
@@ -161,7 +167,7 @@ class TestCancelacionPorPeticion(unittest.TestCase):
         self.leer_y_cortar("cortada")
         hilo.join(timeout=30)
         self.assertLess(self.esperar_estable("cortada"), TOKENS // 4)
-        self.assertEqual(OllamaLento.enviados["entera"], TOKENS)           # la otra llegó hasta el final
+        self.assertEqual(RustLento.enviados["entera"], TOKENS)           # la otra llegó hasta el final
         self.assertEqual(completa["ultimo"], {"tipo": "fin", "resultado": "fin"})
 
 

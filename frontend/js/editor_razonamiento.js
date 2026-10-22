@@ -23,11 +23,14 @@
             this.anchoPorcentaje = 25; // 25% de ancho por defecto
             this.archivoActivo = 'main.py';
             this.lineaCursor = 1;
+            this.qwenActivo = (typeof window !== 'undefined' && window.isQwenEditorActivo)
+                ? window.isQwenEditorActivo()
+                : (localStorage.getItem('prig_qwen_editor_activo') !== 'false');
 
             // Datos de Razonamiento del Modelo
             this.razonamiento = {
                 modelo: 'qwen2.5-coder:7b',
-                estado: 'listo', // 'listo' | 'pensando' | 'pausado'
+                estado: this.qwenActivo ? 'listo' : 'pausado', // 'listo' | 'pensando' | 'pausado'
                 tiempoCoT: '1.4s',
                 tokSeg: '44 tok/s',
                 cotExpandido: true,
@@ -213,18 +216,14 @@
             const accionesBar = document.querySelector('#editor-layout-bar .editor-layout-actions');
             if (!accionesBar) return;
 
-            // Botón "Razonamiento"
+            // Botón "Razonamiento" (icono de redondo de dialogo)
             if (!document.getElementById('btn-editor-razonamiento')) {
                 const btnRaz = document.createElement('button');
                 btnRaz.id = 'btn-editor-razonamiento';
                 btnRaz.className = 'btn-editor-hud-secundario activo';
-                btnRaz.title = 'Mostrar / Ocultar panel de razonamiento del modelo (25% ancho)';
-                btnRaz.style.cssText = 'display: flex; align-items: center; gap: 6px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;';
-                btnRaz.innerHTML = `
-                    <i class="fa-solid fa-brain-circuit" style="font-size: 12px;"></i>
-                    <span>Razonamiento</span>
-                    <span id="badge-razonamiento-estado" style="background: rgba(137, 180, 250, 0.28); color: #89b4fa; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">CoT</span>
-                `;
+                btnRaz.title = 'Razonamiento';
+                btnRaz.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(137, 180, 250, 0.18); border: 1px solid rgba(137, 180, 250, 0.45); color: #89b4fa; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease;';
+                btnRaz.innerHTML = `<i class="fa-solid fa-comment-dots"></i>`;
                 btnRaz.onclick = () => this.alternarTabOVisibilidad('razonamiento');
                 accionesBar.appendChild(btnRaz);
             }
@@ -234,14 +233,9 @@
                 const btnNotas = document.createElement('button');
                 btnNotas.id = 'btn-editor-notas';
                 btnNotas.className = 'btn-editor-hud-secundario';
-                btnNotas.title = 'Notas técnicas profesionales y anotaciones sobre el código';
-                btnNotas.style.cssText = 'display: flex; align-items: center; gap: 6px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;';
-                const totalNotas = this._obtenerNotasArchivoActual().length;
-                btnNotas.innerHTML = `
-                    <i class="fa-solid fa-clipboard-list" style="font-size: 12px;"></i>
-                    <span>Notas</span>
-                    <span id="badge-notas-contador" style="background: rgba(166, 227, 161, 0.25); color: #a6e3a1; font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 8px;">${totalNotas}</span>
-                `;
+                btnNotas.title = 'Notas';
+                btnNotas.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: rgba(166, 227, 161, 0.14); border: 1px solid rgba(166, 227, 161, 0.4); color: #a6e3a1; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s ease;';
+                btnNotas.innerHTML = `<i class="fa-solid fa-clipboard-list"></i>`;
                 btnNotas.onclick = () => this.alternarTabOVisibilidad('notas');
                 accionesBar.appendChild(btnNotas);
             }
@@ -393,8 +387,28 @@
             }
         }
 
+        fijarQwenActivo(activo) {
+            this.qwenActivo = !!activo;
+            if (this.qwenActivo) {
+                this.razonamiento.estado = 'listo';
+                const ed = window.editorMgr ? window.editorMgr.editor : null;
+                if (ed && ed.getModel()) {
+                    this.analizarCodigoBuffer(ed.getModel().getValue(), this.archivoActivo);
+                }
+            } else {
+                this.razonamiento.estado = 'pausado';
+                if (this._timerParseo) {
+                    clearTimeout(this._timerParseo);
+                    this._timerParseo = null;
+                }
+            }
+            this.renderizar();
+            this.actualizarOverlay();
+        }
+
         /** Analiza el búfer de código y extrae la jerarquía completa de clases, funciones y métodos */
         analizarCodigoBuffer(codigo, ruta = '') {
+            if (!this.qwenActivo) return;
             if (typeof codigo !== 'string' || !codigo.trim()) return;
             const rutaNormalizada = (ruta || this.archivoActivo || '').toLowerCase();
             const esJsTs = rutaNormalizada.endsWith('.js') || rutaNormalizada.endsWith('.ts') || rutaNormalizada.endsWith('.jsx') || rutaNormalizada.endsWith('.tsx');
@@ -763,7 +777,7 @@
             this._actualizarContadorNotas();
 
             const ed = window.editorMgr ? window.editorMgr.editor : null;
-            if (ed && ed.getModel()) {
+            if (ed && ed.getModel() && this.qwenActivo) {
                 this.analizarCodigoBuffer(ed.getModel().getValue(), this.archivoActivo);
             }
 
@@ -801,12 +815,18 @@
                 </div>
 
                 <!-- Barra de Telemetría Profesional -->
-                <div class="razonamiento-telemetria-bar">
-                    <span class="razonamiento-modelo-pill">
-                        <span class="razonamiento-dot-pulse ${this.razonamiento.estado === 'pensando' ? 'pensando' : ''}"></span>
-                        ${this.razonamiento.modelo}
-                    </span>
-                    <span>${this.razonamiento.tokSeg} · CoT ${this.razonamiento.tiempoCoT}</span>
+                <div class="razonamiento-telemetria-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="razonamiento-modelo-pill ${!this.qwenActivo ? 'pausado' : ''}">
+                            <span class="razonamiento-dot-pulse ${this.qwenActivo && this.razonamiento.estado === 'pensando' ? 'pensando' : ''}"></span>
+                            ${this.qwenActivo ? this.razonamiento.modelo : 'Qwen: Desactivado'}
+                        </span>
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; color: var(--text-muted); font-weight: 600;" title="Activar/desactivar análisis de Qwen sobre este archivo">
+                            <input type="checkbox" id="chk-qwen-telemetria" ${this.qwenActivo ? 'checked' : ''} onchange="window.alternarQwenEditor && window.alternarQwenEditor(this.checked);" style="accent-color: #cba6f7; cursor: pointer; width: 13px; height: 13px; margin: 0;">
+                            <span>Analizar</span>
+                        </label>
+                    </div>
+                    <span>${this.qwenActivo ? `${this.razonamiento.tokSeg} · CoT ${this.razonamiento.tiempoCoT}` : 'Pausado'}</span>
                 </div>
 
                 <!-- Ámbito Activo / Scope Header -->
@@ -1274,6 +1294,12 @@
         }
 
         /** Actualiza el SVG Overlay con flechas curvas y corchetes grandes jerárquicos */
+        /** Vuelve a medir el editor de código (Monaco) tras cambiar el tamaño de la ventana o del panel */
+        _refrescarLayoutMonaco() {
+            const ed = window.editorMgr && window.editorMgr.editor;
+            if (ed && typeof ed.layout === 'function') ed.layout();
+        }
+
         actualizarOverlay() {
             if (typeof requestAnimationFrame === 'undefined') return;
             if (this._timerRedibujado) cancelAnimationFrame(this._timerRedibujado);
@@ -1475,6 +1501,8 @@
 
         _actualizarContadorNotas() {
             const total = this._obtenerNotasArchivoActual().length;
+            const btn = document.getElementById('btn-editor-notas');
+            if (btn) btn.title = total > 0 ? `Notas (${total})` : 'Notas';
             const badge = document.getElementById('badge-notas-contador');
             if (badge) badge.textContent = String(total);
         }

@@ -19,10 +19,8 @@ Tres cosas que este módulo hacía mal y que no daban error, solo peores resulta
     depende poder decir "esto está en el capítulo 4, páginas 181-240".
 """
 
-import re
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-from .structure_detector import StructureDetector
+from typing import Dict, Any, List
+from .structure_detector import StructureDetector  # noqa: F401  (se importaba desde aquí)
 
 # Caracteres por token. Es la misma cifra que usa el resto de Prig para presupuestar
 # contexto; mantenerla igual en todas partes es lo que hace que los presupuestos
@@ -34,137 +32,42 @@ CARACTERES_POR_TOKEN = 3.6
 MINIMO_BLOQUE = 20
 
 
+def _rs():
+    from nativo_rust import rust
+    return rust().troceado
+
+
 def tokens_de(texto: str) -> int:
-    return int(len(texto) / CARACTERES_POR_TOKEN) + 1
+    return _rs().tokens_de(texto)
 
 
 class SemanticChunker:
-    """ Fragmentador semántico que atomiza un documento en trozos enlazados """
+    """ Fragmentador semántico que atomiza un documento en trozos enlazados.
+
+    Párrafos, cortes, ubicación y clasificación están en Rust (backend-rust/crates/prig-biblioteca, troceado.rs),
+    con el mismo resultado; los fragmentos se clasifican en paralelo. """
 
     @classmethod
     def chunk_document(cls, parsed_doc: Dict[str, Any], structure: Dict[str, Any],
                        source_id: str, max_chunk_tokens: int = 500
                        ) -> List[Dict[str, Any]]:
-        bloques = cls._bloques(parsed_doc.get("pages", []), max_chunk_tokens)
-        if not bloques:
-            return []
-
-        secciones = cls._ordenar_secciones(structure)
-        fragmentos: List[Dict[str, Any]] = []
-
-        actual: List[str] = []
-        tokens_actual = 0
-        pagina_inicio = bloques[0]["page"]
-        pagina_fin = bloques[0]["page"]
-
-        for bloque in bloques:
-            t = bloque["tokens"]
-            if actual and tokens_actual + t > max_chunk_tokens:
-                fragmentos.append(cls._crear(
-                    "\n\n".join(actual), source_id, len(fragmentos) + 1,
-                    pagina_inicio, pagina_fin, secciones))
-                actual, tokens_actual = [], 0
-                pagina_inicio = bloque["page"]
-            actual.append(bloque["text"])
-            tokens_actual += t
-            pagina_fin = bloque["page"]
-
-        if actual:
-            fragmentos.append(cls._crear(
-                "\n\n".join(actual), source_id, len(fragmentos) + 1,
-                pagina_inicio, pagina_fin, secciones))
-
-        # Enlaces adyacentes: permiten recuperar el fragmento de al lado cuando una
-        # afirmación depende de lo que venía justo antes.
-        for i, f in enumerate(fragmentos):
-            if i:
-                f["previous_chunk_id"] = fragmentos[i - 1]["chunk_id"]
-            if i < len(fragmentos) - 1:
-                f["next_chunk_id"] = fragmentos[i + 1]["chunk_id"]
-        return fragmentos
+        paginas = [(p.get("page_num", 1), p.get("text") or "") for p in parsed_doc.get("pages", [])]
+        secciones = [(s["_es_seccion"], s.get("start_page") or 0, s.get("end_page") or 10 ** 9,
+                      s.get("section_id"), s.get("chapter_id"))
+                     for s in cls._ordenar_secciones(structure)]
+        return _rs().fragmentar(paginas, secciones, source_id, max_chunk_tokens)
 
     # ------------------------------------------------------------------
 
-    @classmethod
-    def _bloques(cls, paginas: List[Dict[str, Any]], tope: int) -> List[Dict[str, Any]]:
-        """ Párrafos de todas las páginas, ya partidos si eran demasiado largos """
-        salida: List[Dict[str, Any]] = []
-        for p in paginas:
-            numero = p.get("page_num", 1)
-            for parrafo in cls._parrafos(p.get("text") or ""):
-                for trozo in cls._partir(parrafo, tope):
-                    salida.append({"page": numero, "text": trozo,
-                                   "tokens": tokens_de(trozo)})
-        return salida
-
     @staticmethod
     def _parrafos(texto: str) -> List[str]:
-        """ Separa en párrafos tolerando que el PDF no use líneas en blanco.
-
-        Muchos PDF devuelven el texto con un salto de línea por renglón y ninguno
-        en blanco entre párrafos: partir solo por '\\n\\n' dejaba la página entera
-        como un único bloque. Cuando no hay líneas en blanco se recurre a la
-        sangría y a las mayúsculas tras punto final.
-        """
-        texto = (texto or "").replace("\r\n", "\n")
-        partes = [p.strip() for p in texto.split("\n\n")]
-        partes = [p for p in partes if len(p) > MINIMO_BLOQUE]
-        if partes:
-            return partes
-
-        lineas = [l for l in texto.split("\n") if l.strip()]
-        if not lineas:
-            return []
-        parrafos, actual = [], []
-        for linea in lineas:
-            nuevo = bool(re.match(r"\s{2,}\S", linea)) or (
-                actual and actual[-1].rstrip().endswith((".", ":", "?", "!"))
-                and re.match(r"\s*[A-ZÁÉÍÓÚÑ0-9]", linea))
-            if nuevo and actual:
-                parrafos.append(" ".join(actual))
-                actual = []
-            actual.append(linea.strip())
-        if actual:
-            parrafos.append(" ".join(actual))
-        return [p for p in parrafos if len(p) > MINIMO_BLOQUE]
+        """ Separa en párrafos tolerando que el PDF no use líneas en blanco (sangría y mayúsculas tras punto) """
+        return _rs().parrafos(texto or "")
 
     @staticmethod
     def _partir(texto: str, tope: int) -> List[str]:
-        """ Parte un bloque que no cabe, por frases y sin dejar cabos sueltos.
-
-        Se corta por final de frase siempre que se pueda: cortar a mitad de una
-        derivación produce una afirmación que no se puede verificar contra el texto
-        porque le falta la mitad.
-        """
-        if tokens_de(texto) <= tope:
-            return [texto]
-
-        limite = int(tope * CARACTERES_POR_TOKEN)
-        frases = re.split(r"(?<=[.!?:])\s+", texto)
-        trozos, actual = [], ""
-        for frase in frases:
-            if len(frase) > limite:
-                # Una sola frase enorme (una tabla, una fórmula larga): se parte
-                # por palabras, que es lo menos malo que queda.
-                if actual:
-                    trozos.append(actual.strip())
-                    actual = ""
-                palabras, linea = frase.split(), ""
-                for w in palabras:
-                    if len(linea) + len(w) + 1 > limite:
-                        trozos.append(linea.strip())
-                        linea = ""
-                    linea += w + " "
-                if linea.strip():
-                    actual = linea
-                continue
-            if actual and len(actual) + len(frase) + 1 > limite:
-                trozos.append(actual.strip())
-                actual = ""
-            actual += frase + " "
-        if actual.strip():
-            trozos.append(actual.strip())
-        return [t for t in trozos if len(t) > MINIMO_BLOQUE]
+        """ Parte un bloque que no cabe, por frases (por palabras si una frase sola no cabe) """
+        return _rs().partir(texto, tope)
 
     # ------------------------------------------------------------------
 
@@ -184,46 +87,3 @@ class SemanticChunker:
         todas = secciones + capitulos
         todas.sort(key=lambda x: (not x["_es_seccion"], x.get("start_page") or 0))
         return todas
-
-    @staticmethod
-    def _ubicar(pagina: int, secciones: List[Dict[str, Any]]) -> tuple:
-        """ En qué sección y capítulo cae una página """
-        sec_id = chp_id = None
-        for s in secciones:
-            inicio = s.get("start_page") or 0
-            fin = s.get("end_page") or 10 ** 9
-            if inicio <= pagina <= fin:
-                if s["_es_seccion"] and sec_id is None:
-                    sec_id = s.get("section_id")
-                    chp_id = chp_id or s.get("chapter_id")
-                elif not s["_es_seccion"] and chp_id is None:
-                    chp_id = s.get("chapter_id")
-            if sec_id and chp_id:
-                break
-        return sec_id, chp_id
-
-    @classmethod
-    def _crear(cls, texto: str, source_id: str, numero: int,
-               pagina_inicio: int, pagina_fin: int,
-               secciones: List[Dict[str, Any]]) -> Dict[str, Any]:
-        detectado = StructureDetector.detect_structure(texto)
-        sec_id, chp_id = cls._ubicar(pagina_inicio, secciones)
-        return {
-            "chunk_id": f"chk_{source_id}_{numero:04d}",
-            "source_id": source_id,
-            "section_id": sec_id,
-            "chapter_id": chp_id,
-            "content": texto,
-            "content_type": detectado["content_type"],
-            "token_count": tokens_de(texto),
-            "previous_chunk_id": None,
-            "next_chunk_id": None,
-            "contains_equation": detectado["contains_equation"],
-            "contains_code": detectado["contains_code"],
-            "topics": [],
-            "concepts": [],
-            "symbols": detectado["symbols"],
-            "page_start": pagina_inicio,
-            "page_end": pagina_fin,
-            "created_at": datetime.now().isoformat(),
-        }

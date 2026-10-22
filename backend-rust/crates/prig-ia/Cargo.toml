@@ -1,0 +1,22 @@
+[package]
+name = "prig-ia"
+version = "0.1.0"
+edition = "2021"
+
+# El motor de IA (F4 de docs/plan-prig-rust.md): el motor MoE (traducir las peticiones de Ollama a llama-server y
+# su flujo de vuelta), el flujo de tokens del chat, y las piezas del motor de IA. Rust puro: lo usa el backend de
+# Python por PyO3 (prig-nativo-py) y, después, el servidor en Rust.
+
+[dependencies]
+prig-recursos = { path = "../prig-recursos" }
+prig-plataforma = { path = "../prig-plataforma" }
+prig-modelos = { path = "../prig-modelos" }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+# Leer HTML (html5ever, el parser de los navegadores)
+scraper = "0.20"
+ego-tree = "0.6"
+# La clave de la caché de búsquedas (md5 de la consulta, como Python)
+md-5 = "0.10"
+sha2 = "0.10"
+libc = "0.2"
+regex = "1"

@@ -89,7 +89,10 @@ pub async fn proxy_fallback(State(state): State<AppState>, req: Request) -> Resp
         return proxy_websocket(state, req).await;
     }
     let method = req.method().clone();
-    let uri = req.uri().clone();
+    // Dentro de un router anidado (/api) la ruta llega sin el prefijo: la original la guarda axum en las extensiones.
+    // Sin esto, el método que una ruta propia no atiende (POST /api/flags, DELETE /api/desafios/…) llegaba a Python
+    // sin «/api» y daba 404.
+    let uri = req.extensions().get::<axum::extract::OriginalUri>().map(|o| o.0.clone()).unwrap_or_else(|| req.uri().clone());
     let ruta = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or_else(|| uri.path()).to_string();
     let destino = format!("{}{}", state.fallback_url.trim_end_matches('/'), ruta);
     debug!("Proxy: {} {} -> {}", method, uri, destino);
@@ -154,7 +157,8 @@ async fn proxy_websocket(state: AppState, req: Request) -> Response {
         Ok(ws) => ws,
         Err(rechazo) => return rechazo.into_response(),
     };
-    let ruta = partes.uri.path_and_query().map(|pq| pq.as_str().to_string()).unwrap_or_else(|| partes.uri.path().to_string());
+    let uri = partes.extensions.get::<axum::extract::OriginalUri>().map(|o| o.0.clone()).unwrap_or_else(|| partes.uri.clone());
+    let ruta = uri.path_and_query().map(|pq| pq.as_str().to_string()).unwrap_or_else(|| uri.path().to_string());
     let base = state.fallback_url.trim_end_matches('/');
     let destino = match base.strip_prefix("https://") {
         Some(resto) => format!("wss://{resto}{ruta}"),

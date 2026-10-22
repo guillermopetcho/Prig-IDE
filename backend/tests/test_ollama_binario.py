@@ -115,41 +115,7 @@ class PruebaElegirBinario(_Instalaciones):
         self.assertEqual(run.call_count, 1)
 
 
-class PruebaReiniciarSiEstaRoto(_Instalaciones):
-
-    def arrancar(self, en_marcha, mejor, version_activa="0.34.1"):
-        motor = AIEngine()
-        respuesta = mock.Mock(status_code=200)
-        respuesta.json.return_value = {"version": version_activa}
-        with mock.patch.object(AIEngine, "get_best_ollama_binary", return_value=(mejor, "0.34.1")), \
-                mock.patch.object(AIEngine, "binario_ollama_en_marcha", return_value=en_marcha), \
-                mock.patch.object(aec.requests, "get", return_value=respuesta), \
-                mock.patch.object(AIEngine, "kill_ollama_processes") as matar, \
-                mock.patch.object(aec.subprocess, "Popen") as popen, \
-                mock.patch.object(aec.time, "sleep"):
-            motor.try_autostart_ollama()
-        return matar, popen
-
-    def test_ollama_roto_en_marcha_se_cambia_por_el_completo(self):
-        prig = self.ollama("prig", "0.34.1")
-        usr = self.ollama("usr", "0.34.1", "incompleto")
-        matar, popen = self.arrancar(en_marcha=usr, mejor=prig)
-        matar.assert_called_once()
-        self.assertEqual(popen.call_args.args[0], [prig, "serve"])
-
-    def test_ollama_sano_en_marcha_no_se_toca(self):
-        prig = self.ollama("prig", "0.34.1")
-        otro = self.ollama("otro", "0.34.1")
-        for en_marcha in (prig, otro, None):          # None: no se ve el proceso (otro usuario, servicio)
-            matar, popen = self.arrancar(en_marcha=en_marcha, mejor=prig)
-            matar.assert_not_called()
-            popen.assert_not_called()
-
-    def test_si_el_mejor_tambien_esta_roto_no_se_reinicia_en_bucle(self):
-        usr = self.ollama("usr", "0.34.1", "incompleto")
-        usr2 = self.ollama("usr2", "0.34.1", "incompleto")
-        matar, popen = self.arrancar(en_marcha=usr, mejor=usr2)
-        matar.assert_not_called()
+# La decisión de reiniciar un Ollama roto (try_autostart_ollama) está en Rust con sus pruebas: prig_ia::ollama::decidir
 
 
 class PruebaMensaje(unittest.TestCase):
@@ -164,9 +130,8 @@ class PruebaMensaje(unittest.TestCase):
         self.assertIsNone(aec.explicar_error_motor("model requires more system memory"))
         self.assertIsNone(aec.explicar_error_motor(None))
 
-    def test_en_la_cola_de_descargas_y_en_la_prueba_de_recursos(self):
-        import descargas_modelos
-        self.assertEqual(descargas_modelos.explicar_error(self.ERROR_REAL), aec.MENSAJE_RUNTIME_INCOMPLETO)
+    def test_en_la_prueba_de_recursos(self):
+        # (la cola de descargas, ya en Rust, lo prueba en prig_ia::descargas)
         # La prueba de recursos explica el error del motor igual: un motor que falla con el error real
         # devuelve el mensaje explicado (sin GPU, sin Ollama y con un almacén temporal)
         from recursos import calibracion

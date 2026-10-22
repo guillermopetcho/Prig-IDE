@@ -1,0 +1,252 @@
+
+        @page {{
+            size: {page_size};
+            margin: 15mm;
+        }}
+        @media print {{
+            body {{
+                background: #ffffff !important;
+                color: #000000 !important;
+            }}
+            .pdf-container {{
+                padding: 0 !important;
+                margin: 0 !important;
+            }}
+            .pdf-page-break {{
+                page-break-after: always;
+                break-after: page;
+            }}
+            .pdf-nb-cell, .pdf-file-document {{
+                break-inside: avoid;
+            }}
+        }}
+
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            background-color: {bg_main};
+            color: {text_main};
+            font-family: {fuente};
+            font-size: {base_size};
+            line-height: 1.5;
+            padding: 20px;
+        }}
+
+        .pdf-container {{
+            max-width: 900px;
+            margin: 0 auto;
+        }}
+
+        .pdf-page-break {{
+            height: 20px;
+            margin: 20px 0;
+            border-bottom: 2px dashed {border_col};
+        }}
+
+        /* Portada */
+        .pdf-cover-page {{
+            text-align: center;
+            padding: 60px 20px;
+            background: {bg_card};
+            border: 1px solid {border_col};
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }}
+        .pdf-cover-badge {{
+            display: inline-block;
+            background: rgba(9, 105, 218, 0.1);
+            color: {accent_blue};
+            font-weight: 700;
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }}
+        .pdf-cover-title {{
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: {titulo_portada};
+        }}
+        .pdf-cover-subtitle {{
+            font-size: 16px;
+            color: {text_muted};
+            margin-bottom: 30px;
+        }}
+        .pdf-cover-meta {{
+            text-align: left;
+            display: inline-block;
+            background: {bg_code};
+            padding: 16px 24px;
+            border-radius: 8px;
+            border: 1px solid {border_col};
+            font-size: 13px;
+        }}
+        .pdf-cover-meta .meta-item {{
+            margin-bottom: 6px;
+        }}
+
+        /* Document File Banner */
+        .pdf-file-document {{
+            margin-bottom: 30px;
+            border: 1px solid {border_col};
+            border-radius: 10px;
+            background: {bg_card};
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }}
+        .pdf-file-banner {{
+            padding: 14px 18px;
+            background: {banner_bg};
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+        .pdf-banner-title {{
+            font-size: 16px;
+            font-weight: 700;
+        }}
+        .pdf-banner-path {{
+            font-size: 12px;
+            opacity: 0.85;
+        }}
+        .pdf-banner-badge {{
+            margin-left: auto;
+            background: rgba(255,255,255,0.2);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }}
+
+        .pdf-file-body {{
+            padding: 16px;
+        }}
+
+        /* Notebook Cells */
+        .pdf-nb-cell {{
+            margin-bottom: 16px;
+            border: 1px solid {border_col};
+            border-radius: 8px;
+            background: {bg_card};
+            overflow: hidden;
+        }}
+        .pdf-cell-code {{
+            border-left: 4px solid {accent_blue};
+        }}
+        .pdf-cell-markdown {{
+            border-left: 4px solid {accent_purple};
+        }}
+        .pdf-cell-header {{
+            background: {bg_code};
+            padding: 6px 12px;
+            border-bottom: 1px solid {border_col};
+            display: flex;
+            align-items: center;
+        }}
+        .pdf-tag {{
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+        }}
+        .pdf-tag-code {{
+            background: rgba(9, 105, 218, 0.15);
+            color: {accent_blue};
+        }}
+        .pdf-tag-md {{
+            background: rgba(130, 80, 223, 0.15);
+            color: {accent_purple};
+        }}
+
+        .pdf-cell-body {{
+            padding: 12px;
+        }}
+        .pdf-md-body {{
+            line-height: 1.6;
+        }}
+        .pdf-h1 {{ font-size: 20px; font-weight: 700; margin: 12px 0 6px 0; border-bottom: 1px solid {border_col}; padding-bottom: 4px; }}
+        .pdf-h2 {{ font-size: 17px; font-weight: 700; margin: 10px 0 4px 0; }}
+        .pdf-h3 {{ font-size: 15px; font-weight: 600; margin: 8px 0 4px 0; }}
+        .pdf-inline-code {{
+            background: {bg_code};
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9em;
+            border: 1px solid {border_col};
+        }}
+
+        /* Code & Line numbers */
+        .pdf-code-container {{
+            display: flex;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 12px;
+            background: {bg_code};
+            border-radius: 6px;
+            overflow-x: auto;
+        }}
+        .pdf-lineno-col {{
+            padding: 10px 10px;
+            background: rgba(0,0,0,0.03);
+            border-right: 1px solid {border_col};
+            color: {text_muted};
+            text-align: right;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.45;
+        }}
+        .pdf-code-content {{
+            padding: 10px;
+            flex: 1;
+            overflow-x: auto;
+            line-height: 1.45;
+        }}
+        .pdf-code-content pre {{
+            margin: 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }}
+
+        /* Outputs */
+        .pdf-nb-outputs {{
+            background: {bg_code};
+            border-top: 1px dashed {border_col};
+            padding: 10px 12px;
+        }}
+        .pdf-nb-out-tag {{
+            font-size: 10px;
+            font-weight: 700;
+            color: {text_muted};
+            margin-bottom: 6px;
+            font-family: 'Fira Code', monospace;
+        }}
+        .pdf-out-line {{
+            margin-bottom: 6px;
+            font-size: 12px;
+        }}
+        .pdf-out-stdout pre {{
+            font-family: 'Fira Code', monospace;
+            white-space: pre-wrap;
+            color: {text_main};
+        }}
+        .pdf-out-err {{
+            background: rgba(244, 135, 113, 0.1);
+            color: #d73a49;
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #d73a49;
+        }}
+        .pdf-out-img img {{
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            border: 1px solid {border_col};
+            display: block;
+            margin: 8px auto;
+        }}
+        

@@ -1,8 +1,19 @@
+"""
+Los archivos del usuario: qué rutas se pueden tocar, el árbol del explorador, leer (también cuadernos), escribir,
+crear y borrar, y la carpeta de trabajo y la segunda carpeta guardadas en ~/.prig_config.json.
+
+La lógica está en Rust (backend-rust/crates/prig-plataforma, archivos.rs y espacio.rs) y no guarda estado: la
+carpeta de trabajo, la segunda carpeta y la ruta de la configuración son atributos de este objeto (las pruebas los
+cambian) y llegan a Rust en cada llamada.
+"""
 import os
-import json
-import shutil
-import subprocess
 from typing import List, Dict, Any
+
+
+def _rs():
+    from nativo_rust import rust
+    return rust().archivos
+
 
 class FileManager:
     # Única raíz fuera del workspace a la que la aplicación necesita acceder.
@@ -20,13 +31,20 @@ class FileManager:
             self.base_dir = os.path.abspath(base_dir)
         else:
             self.base_dir = self._load_last_workspace()
+        # La segunda carpeta del explorador (para copiar código de una a otra); solo con el workspace del usuario
+        self.segunda_dir = None if base_dir else self._leer_config().get("segunda_carpeta")
+        if not isinstance(self.segunda_dir, str) or not os.path.isdir(self.segunda_dir):
+            self.segunda_dir = None
 
     def allowed_roots(self) -> List[str]:
         # Tus repositorios de Prig Hub (perfil y packs) se pueden editar a mano en el editor.
         # Los que sigues NO: son de otros y se actualizan solo revisando sus cambios.
         from hub.servicio import ruta_base
         propios = os.path.join(ruta_base(), "propios")
-        return [self.base_dir] + [os.path.abspath(r) for r in self.EXTRA_ALLOWED_ROOTS] + [os.path.abspath(propios)]
+        raices = [self.base_dir] + [os.path.abspath(r) for r in self.EXTRA_ALLOWED_ROOTS] + [os.path.abspath(propios)]
+        if self.segunda_dir:
+            raices.append(self.segunda_dir)
+        return raices
 
     def is_path_allowed(self, abs_path: str) -> bool:
         """ True solo si la ruta cae dentro del workspace o de una raíz permitida.
@@ -34,273 +52,88 @@ class FileManager:
         Sin esta comprobación cualquier página web abierta por el usuario podía leer,
         sobrescribir o borrar archivos arbitrarios a través de la API local.
         """
-        abs_path = os.path.abspath(abs_path)
-        for root in self.allowed_roots():
-            try:
-                if os.path.commonpath([abs_path, root]) == root:
-                    return True
-            except ValueError:
-                # Rutas en volúmenes distintos: commonpath lanza ValueError
-                continue
-        return False
+        return _rs().permitida(abs_path, self.allowed_roots())
 
     def resolve(self, path: str) -> str:
-        """ Normaliza una ruta relativa al workspace y verifica que sea accesible """
-        if not path:
-            raise PermissionError("Ruta no especificada")
-        abs_path = os.path.abspath(path if os.path.isabs(path) else os.path.join(self.base_dir, path))
-        if not self.is_path_allowed(abs_path):
-            raise PermissionError(
-                f"Acceso denegado: '{abs_path}' está fuera de la carpeta de trabajo."
-            )
-        return abs_path
+        """ Normaliza una ruta relativa al workspace y verifica que sea accesible (PermissionError si no) """
+        return _rs().resolver(path or "", self.base_dir, self.allowed_roots())
 
     @property
     def current_workspace(self) -> str:
         return self.base_dir
 
-
     def _load_last_workspace(self) -> str:
-        try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r') as f:
-                    config = json.load(f)
-                    last_dir = config.get("last_workspace")
-                    if last_dir and os.path.isdir(last_dir):
-                        return last_dir
-        except Exception:
-            pass
-        return os.getcwd()
+        return _rs().cargar_ultima(self.config_path)
 
     def _save_last_workspace(self, path: str):
-        try:
-            config = {}
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r') as f:
-                    config = json.load(f)
-            config["last_workspace"] = path
-            with open(self.config_path, 'w') as f:
-                json.dump(config, f)
-        except Exception:
-            pass
+        _rs().guardar_clave(self.config_path, "last_workspace", path)
+
+    def _leer_config(self) -> Dict[str, Any]:
+        return _rs().leer_config(self.config_path)
+
+    def set_segunda_dir(self, path: str = None) -> Dict[str, Any]:
+        """ Fija la segunda carpeta del explorador (o la quita con None) y la guarda en la config """
+        if path:
+            abs_path, res = _rs().carpeta(path)
+            if abs_path is None:
+                return res
+        else:
+            abs_path = None
+        self.segunda_dir = abs_path
+        _rs().guardar_clave(self.config_path, "segunda_carpeta", abs_path)
+        return _rs().respuesta_segunda(abs_path)
 
     def set_base_dir(self, path: str) -> Dict[str, Any]:
-        abs_path = os.path.abspath(os.path.expanduser(path))
-        if os.path.isdir(abs_path):
+        abs_path, res = _rs().carpeta(path)
+        if abs_path is not None:
             self.base_dir = abs_path
             self._save_last_workspace(abs_path)
-            return {"success": True, "path": abs_path, "name": os.path.basename(abs_path) or abs_path}
-        return {"error": f"El directorio no existe: {path}"}
+        return res
 
     def browse_folder_native(self) -> Dict[str, Any]:
-        """ Abre el selector de archivos nativo de Ubuntu mediante zenity, kdialog o python tkinter """
-        # Intentar zenity primero (estándar en Ubuntu GNOME)
-        try:
-            res = subprocess.run(
-                ["zenity", "--file-selection", "--directory", "--title=Seleccionar Carpeta de Proyecto - Prig IDE"],
-                capture_output=True, text=True, check=True
-            )
-            selected = res.stdout.strip()
-            if selected and os.path.isdir(selected):
-                return self.set_base_dir(selected)
-        except Exception:
-            pass
+        """ Abre el selector de carpetas del sistema (zenity, o tkinter si no hay) """
+        selected = self.elegir_carpeta_nativa()
+        if selected:
+            return self.set_base_dir(selected)
+        return {"error": "No se pudo abrir el diálogo nativo de carpetas"}
 
-        # Fallback a tkinter dialog
+    def elegir_carpeta_nativa(self, titulo: str = "Seleccionar Carpeta de Proyecto - Prig IDE"):
+        """ La carpeta que elige el usuario en el diálogo nativo (zenity o tkinter), o None """
+        selected = _rs().elegir_con_zenity(titulo)
+        if selected:
+            return selected
+
+        # Si no hay zenity: el diálogo de tkinter (solo existe en Python)
         try:
             import tkinter as tk
             from tkinter import filedialog
             root = tk.Tk()
             root.withdraw()
             root.attributes('-topmost', True)
-            selected = filedialog.askdirectory(title="Seleccionar Carpeta de Proyecto - Prig IDE", initialdir=self.base_dir)
+            selected = filedialog.askdirectory(title=titulo, initialdir=self.base_dir)
             root.destroy()
             if selected and os.path.isdir(selected):
-                return self.set_base_dir(selected)
+                return selected
         except Exception:
             pass
-
-        return {"error": "No se pudo abrir el diálogo nativo de carpetas"}
+        return None
 
     def get_file_tree(self, path: str = None, max_depth: int = 6, current_depth: int = 0) -> List[Dict[str, Any]]:
-        target_dir = os.path.abspath(path) if path else self.base_dir
-        if not os.path.exists(target_dir) or not os.path.isdir(target_dir) or current_depth >= max_depth:
-            return []
-        if not self.is_path_allowed(target_dir):
-            return []
-
-        ignored = {
-            '__pycache__', 'node_modules', 'venv', '.venv', 'env', '.env',
-            '.git', '.github', '.ipynb_checkpoints', 'dist', 'build',
-            '.cache', 'site-packages', '.idea', '.vscode', '.gemini',
-            'target',       # compilaciones de Rust (cargo): miles de archivos generados
-        }
-
-        tree = []
-        try:
-            entries = sorted(os.listdir(target_dir), key=lambda x: (not os.path.isdir(os.path.join(target_dir, x)), x.lower()))
-            for entry in entries:
-                if (entry.startswith('.') and entry not in ['.gitignore', '.env.example']) or entry in ignored:
-                    continue
-                full_path = os.path.join(target_dir, entry)
-                is_dir = os.path.isdir(full_path)
-                tree.append({
-                    "name": entry,
-                    "path": full_path,
-                    "is_dir": is_dir,
-                    "children": self.get_file_tree(full_path, max_depth=max_depth, current_depth=current_depth + 1) if is_dir else None
-                })
-        except Exception as e:
-            print(f"Error leyendo dir {target_dir}: {e}")
-        return tree
+        return _rs().arbol(path, self.base_dir, self.allowed_roots(), max_depth, current_depth)
 
     def read_file(self, file_path: str) -> Dict[str, Any]:
-        try:
-            abs_path = self.resolve(file_path)
-        except PermissionError as e:
-            return {"error": str(e)}
-        if not os.path.isfile(abs_path):
-            return {"error": f"Archivo no encontrado: {file_path}"}
-        
-        ext = os.path.splitext(abs_path)[1].lower()
-        try:
-            with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
-                raw_content = f.read()
-
-            if ext == '.ipynb':
-                notebook_data = self.read_notebook_structured(raw_content, abs_path)
-                return {
-                    "path": abs_path,
-                    "name": os.path.basename(abs_path),
-                    "content": raw_content,
-                    "notebook_data": notebook_data,
-                    "is_notebook": True
-                }
-
-            return {
-                "path": abs_path,
-                "name": os.path.basename(abs_path),
-                "content": raw_content,
-                "is_notebook": False
-            }
-        except Exception as e:
-            return {"error": str(e)}
+        return _rs().leer(file_path or "", self.base_dir, self.allowed_roots())
 
     def read_notebook_structured(self, json_str: str, file_path: str) -> Dict[str, Any]:
         """ Retorna la estructura de celdas formateada de un Jupyter Notebook """
-        try:
-            data = json.loads(json_str)
-            raw_cells = data.get("cells", [])
-            cells = []
-
-            for idx, cell in enumerate(raw_cells, 1):
-                cell_type = cell.get("cell_type", "code")
-                source = cell.get("source", [])
-                source_str = "".join(source) if isinstance(source, list) else str(source)
-                
-                # Procesar adjuntos (attachments) de celdas Markdown
-                attachments = cell.get("attachments", {})
-                if attachments and isinstance(attachments, dict):
-                    for attach_name, mime_dict in attachments.items():
-                        if isinstance(mime_dict, dict):
-                            for mime_type, b64_val in mime_dict.items():
-                                clean_b64 = "".join(b64_val) if isinstance(b64_val, list) else str(b64_val)
-                                clean_b64 = clean_b64.replace("\n", "").replace("\r", "").strip()
-                                data_uri = f"data:{mime_type};base64,{clean_b64}"
-                                source_str = source_str.replace(f"attachment:{attach_name}", data_uri)
-
-                outputs = []
-                for out in cell.get("outputs", []):
-                    output_type = out.get("output_type", "")
-                    if output_type == "stream":
-                        text = "".join(out.get("text", []))
-                        outputs.append({"type": "stream", "text": text, "name": out.get("name", "stdout")})
-                    elif output_type == "execute_result" or output_type == "display_data":
-                        data_dict = out.get("data", {})
-                        if "text/html" in data_dict:
-                            text = "".join(data_dict["text/html"]) if isinstance(data_dict["text/html"], list) else data_dict["text/html"]
-                            outputs.append({"type": "html", "text": text})
-                        else:
-                            img_found = False
-                            for mime in ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/gif"]:
-                                if mime in data_dict:
-                                    img_data = "".join(data_dict[mime]) if isinstance(data_dict[mime], list) else data_dict[mime]
-                                    outputs.append({"type": "image", "data": img_data, "mime": mime})
-                                    img_found = True
-                                    break
-                            if not img_found and "text/plain" in data_dict:
-                                text = "".join(data_dict["text/plain"]) if isinstance(data_dict["text/plain"], list) else data_dict["text/plain"]
-                                outputs.append({"type": "text", "text": text})
-                    elif output_type == "error":
-                        ename = out.get("ename", "")
-                        evalue = out.get("evalue", "")
-                        traceback = "\n".join(out.get("traceback", []))
-                        outputs.append({"type": "error", "text": f"{ename}: {evalue}\n{traceback}"})
-
-                cells.append({
-                    "id": f"cell_{idx}",
-                    "index": idx,
-                    "type": cell_type,
-                    "source": source_str,
-                    "execution_count": cell.get("execution_count", None),
-                    "outputs": outputs
-                })
-
-            return {
-                "path": file_path,
-                "name": os.path.basename(file_path),
-                "cells": cells
-            }
-        except Exception as e:
-            return {"error": f"Error parseando notebook: {str(e)}", "cells": []}
+        return _rs().cuaderno(json_str, file_path)
 
     def write_file(self, file_path: str, content: str) -> Dict[str, Any]:
-        try:
-            abs_path = self.resolve(file_path)
-        except PermissionError as e:
-            return {"error": str(e)}
-        try:
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return {"success": True, "path": abs_path}
-        except Exception as e:
-            return {"error": str(e)}
+        return _rs().escribir(file_path or "", content, self.base_dir, self.allowed_roots())
 
     def create_item(self, target_path: str, is_dir: bool = False) -> Dict[str, Any]:
-        try:
-            abs_path = self.resolve(target_path)
-        except PermissionError as e:
-            return {"error": str(e)}
-        try:
-            if is_dir:
-                os.makedirs(abs_path, exist_ok=True)
-            else:
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                if not os.path.exists(abs_path):
-                    with open(abs_path, 'w', encoding='utf-8') as f:
-                        f.write('')
-            return {"success": True, "path": abs_path}
-        except Exception as e:
-            return {"error": str(e)}
+        return _rs().crear(target_path or "", bool(is_dir), self.base_dir, self.allowed_roots())
 
     def delete_item(self, target_path: str) -> Dict[str, Any]:
-        try:
-            abs_path = self.resolve(target_path)
-        except PermissionError as e:
-            return {"error": str(e)}
-
-        # Nunca permitir borrar la raíz del workspace o de la biblioteca de un tirón
-        if abs_path in self.allowed_roots():
-            return {"error": "No se puede eliminar la carpeta raíz del espacio de trabajo."}
-
-        try:
-            if os.path.isdir(abs_path):
-                shutil.rmtree(abs_path)
-            elif os.path.isfile(abs_path):
-                os.remove(abs_path)
-            else:
-                return {"error": f"No existe: {target_path}"}
-            return {"success": True, "path": abs_path}
-        except Exception as e:
-            return {"error": str(e)}
+        # Nunca permite borrar la raíz del workspace o de la biblioteca de un tirón
+        return _rs().borrar(target_path or "", self.base_dir, self.allowed_roots())

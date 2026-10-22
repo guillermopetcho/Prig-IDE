@@ -72,6 +72,8 @@
           run: () => ide().cerrarGuardadas() },
         { id: 'archivo.cerrarTodas', menu: 'Archivos', label: 'Cerrar todas las pestañas', accel: 'Ctrl+K Ctrl+W',
           run: () => ide().cerrarTodas() },
+        { id: 'editor.cerrar', menu: 'Archivos', label: 'Cerrar editor de código',
+          run: () => window.editorMgr && window.editorMgr.cerrarVistaEditor() },
         { id: 'archivo.reabrir', menu: 'Archivos', label: 'Reabrir pestaña cerrada', accel: 'Ctrl+Shift+T',
           run: () => ide().reabrirCerrada() },
         { id: 'archivo.exportarPdf', menu: 'Archivos', label: 'Exportar carpeta a PDF…', accel: 'Ctrl+Shift+E', separadorAntes: true,
@@ -300,6 +302,9 @@
           run: () => window.aparienciaMgr.ajustarOpacidad(-0.05) },
         { id: 'vista.menosTransparencia', menu: 'Vista', label: 'Menos transparencia',
           run: () => window.aparienciaMgr.ajustarOpacidad(+0.05) },
+        { id: 'vista.fondoCodigoTransparente', menu: 'Vista', label: 'Fondo del código transparente', accel: 'Alt+T',
+          marcado: () => window.editorMgr && window.editorMgr.esFondoTransparente(),
+          run: () => window.editorMgr && window.editorMgr.alternarFondoTransparente() },
 
         // Atajos de navegación adicionales disponibles globalmente
         { id: 'ir.pestana', menu: null, label: 'Ir a pestaña abierta…', accel: 'Ctrl+K Ctrl+P',
@@ -371,6 +376,8 @@
           run: () => window.YouTubeHub && window.YouTubeHub.abrir() },
         { id: 'herr.hub', menu: 'Secciones', label: 'Prig Hub', accel: 'Ctrl+Shift+J',
           run: () => window.PrigHub && window.PrigHub.abrir() },
+        { id: 'herr.sql', menu: 'Secciones', label: 'SQL', accel: 'Ctrl+Shift+Q',
+          run: () => window.SqlStudio ? window.SqlStudio.abrir() : (window.workArea && window.workArea.abrirHerramienta('modal-sql-studio', 'SQL Studio', 'fa-solid fa-database')) },
 
         // Grupo 3: Modelos, Gestión de modelos, Gestión Ollama, Gestión máquina
         { id: 'herr.modelos', menu: 'Secciones', label: 'Modelos', separadorAntes: true,
@@ -440,6 +447,7 @@
         'sec.github': 'herr.github',
         'sec.youtube': 'herr.youtube',
         'sec.hub': 'herr.hub',
+        'sec.sql': 'herr.sql',
         'sec.modelos': 'herr.modelos',
         'sec.gestionModelos': 'herr.buscarModelos',
         'sec.gestionOllama': 'herr.modelosServidor',

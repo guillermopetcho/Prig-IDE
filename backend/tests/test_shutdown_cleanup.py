@@ -167,61 +167,9 @@ class TestShutdownCleanup(unittest.TestCase):
         self.assertEqual(m14.get("vram_gb"), 9.3)
         self.assertEqual(m14.get("familia"), "Qwen3")
 
-        # Verificar endpoint /api/ai/catalog
-        from fastapi.testclient import TestClient
-        from app import app
-        client = TestClient(app)
-        res = client.get("/api/ai/catalog")
-        self.assertEqual(res.status_code, 200)
-        catalog = res.json().get("catalog", [])
-        names = [m["name"] for m in catalog]
-        self.assertIn("qwen3:14b", names)
-        self.assertTrue(len(catalog) >= 20)
+        # El endpoint /api/ai/catalog es del servidor de Rust (comparador de rutas)
 
-    def test_ollama_version_and_update_endpoints(self):
-        """ Verifica que /api/ai/ollama/version-info y /api/ai/ollama/update funcionen correctamente """
-        from fastapi.testclient import TestClient
-        from app import app, _version_ollama
-        client = TestClient(app)
-
-        # 1. Comprobar _version_ollama (debe devolver versión o '?' sin romperse)
-        ver = _version_ollama()
-        self.assertIsInstance(ver, str)
-        self.assertTrue(len(ver) > 0)
-
-        # 2. Comprobar endpoint version-info
-        res = client.get("/api/ai/ollama/version-info")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertIn("current_version", data)
-        self.assertIn("latest_version", data)
-        self.assertIn("has_update", data)
-        self.assertIn("curl", data.get("command", ""))
-
-        # 3. Endpoint update: streaming ndjson con etapa inicial.
-        #
-        # SIN RED Y SIN INSTALAR NADA. Esta prueba llamaba al endpoint de verdad:
-        # descargaba Ollama, lo desempaquetaba sobre Prig, reiniciaba el servidor y
-        # abría una terminal con `curl … install.sh | sh`. Una prueba nunca puede
-        # tocar el binario de Ollama del usuario.
-        from unittest import mock
-        with mock.patch("requests.get", side_effect=ConnectionError("sin red en pruebas")):
-            res_update = client.post("/api/ai/ollama/update")
-        self.assertEqual(res_update.status_code, 200)
-        lines = [line for line in res_update.text.strip().split("\n") if line.strip()]
-        self.assertTrue(len(lines) >= 1)
-        first_event = json.loads(lines[0])
-        self.assertIn("stage", first_event)
-        self.assertEqual(first_event["stage"], "inicio")
-        self.assertEqual(json.loads(lines[-1])["stage"], "error")
-
-        # 4. Endpoint launch-terminal-update, sin abrir ninguna terminal
-        with mock.patch("subprocess.Popen") as popen:
-            res_term = client.post("/api/ai/ollama/launch-terminal-update")
-        self.assertEqual(res_term.status_code, 200)
-        self.assertIn("status", res_term.json())
-        for llamada in popen.call_args_list:
-            self.assertIn("install.sh", " ".join(map(str, llamada.args[0])))
+        # La versión de Ollama, actualizarlo y la terminal del instalador: servidor de Rust (routes/ia.rs)
 
 
 if __name__ == "__main__":

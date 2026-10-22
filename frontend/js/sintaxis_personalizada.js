@@ -484,6 +484,31 @@ class SintaxisManager {
         const glob = this.estado.efectosGlobales || {};
         let reglas = [];
 
+        // Obtener color representativo de la sintaxis elegida para bordes de línea y acentos
+        const colorSintaxisHex = (tokens.keyword && tokens.keyword.color)
+            ? this._toHex6(tokens.keyword.color, 'cba6f7')
+            : (tokens.type && tokens.type.color)
+            ? this._toHex6(tokens.type.color, '89b4fa')
+            : 'cba6f7';
+        const colorSintaxis = '#' + colorSintaxisHex;
+
+        let r = 203, g = 166, b = 247;
+        if (colorSintaxisHex.length === 6) {
+            r = parseInt(colorSintaxisHex.slice(0, 2), 16) || 203;
+            g = parseInt(colorSintaxisHex.slice(2, 4), 16) || 166;
+            b = parseInt(colorSintaxisHex.slice(4, 6), 16) || 247;
+        }
+        const neonColor = `rgba(${r}, ${g}, ${b}, 0.35)`;
+        const neonBrillo = `rgba(${r}, ${g}, ${b}, 0.65)`;
+        const neonBordeSuave = `rgba(${r}, ${g}, ${b}, 0.5)`;
+
+        try {
+            document.documentElement.style.setProperty('--editor-sintaxis-color', colorSintaxis);
+            document.documentElement.style.setProperty('--editor-sintaxis-neon', neonColor);
+            document.documentElement.style.setProperty('--editor-sintaxis-neon-glow', neonBrillo);
+            document.documentElement.style.setProperty('--editor-sintaxis-neon-border', neonBordeSuave);
+        } catch (e) {}
+
         // Keyframes completos de efectos raros (usando text-shadow para máxima nitidez y cero degradación)
         reglas.push(`
             @keyframes prigGlitchTexto {
@@ -571,8 +596,16 @@ class SintaxisManager {
             }
 
             @keyframes prigLineaActivaNeon {
-                0%, 100% { box-shadow: inset 0 0 8px rgba(137, 180, 250, 0.15), inset 2px 0 0 var(--accent-blue) !important; }
-                50% { box-shadow: inset 0 0 16px rgba(203, 166, 247, 0.35), inset 3px 0 0 var(--accent-purple) !important; }
+                0%, 100% {
+                    box-shadow: 0 0 6px ${neonColor}, inset 0 0 6px rgba(${r}, ${g}, ${b}, 0.1) !important;
+                    border-color: ${neonBordeSuave} !important;
+                    border-left-color: ${colorSintaxis} !important;
+                }
+                50% {
+                    box-shadow: 0 0 14px ${neonBrillo}, inset 0 0 9px rgba(${r}, ${g}, ${b}, 0.22) !important;
+                    border-color: ${colorSintaxis} !important;
+                    border-left-color: ${colorSintaxis} !important;
+                }
             }
         `);
 
@@ -660,10 +693,44 @@ class SintaxisManager {
             `);
         }
 
-        // 6. Línea activa pulsante neón
+        // 6. Línea activa de código: transparente con bordes leves de neón del color de la sintaxis elegida
+        // NOTA: Monaco no acepta hex-8 con alpha=0. Forzamos con rgba(0,0,0,0) en todas las capas DOM.
+        reglas.push(`
+            .monaco-editor .current-line,
+            .monaco-editor .view-overlays .current-line,
+            .monaco-editor .view-overlays .current-line-both,
+            .monaco-editor .lines-content .current-line,
+            .monaco-editor .lines-content .view-line.current-line {
+                background: rgba(0, 0, 0, 0) !important;
+                background-color: rgba(0, 0, 0, 0) !important;
+                border-top: 1px solid ${neonBordeSuave} !important;
+                border-bottom: 1px solid ${neonBordeSuave} !important;
+                border-left: 2.5px solid ${colorSintaxis} !important;
+                border-right: 1px solid ${neonBordeSuave} !important;
+                border-radius: 2.5px !important;
+                box-shadow: 0 0 8px ${neonColor}, inset 0 0 6px rgba(${r}, ${g}, ${b}, 0.08) !important;
+                box-sizing: border-box !important;
+            }
+
+            .monaco-editor .margin-view-overlays .current-line-margin,
+            .monaco-editor .margin-view-overlays .current-line-margin-both {
+                background: rgba(0, 0, 0, 0) !important;
+                background-color: rgba(0, 0, 0, 0) !important;
+                border-left: 2.5px solid ${colorSintaxis} !important;
+                box-shadow: -1px 0 6px ${neonColor} !important;
+            }
+
+            /* Eliminar fondo en cualquier div de overlay con clase que contenga "current" */
+            .monaco-editor .view-overlays > div[class*="current"] {
+                background: rgba(0, 0, 0, 0) !important;
+                background-color: rgba(0, 0, 0, 0) !important;
+            }
+        `);
+
         if (glob.lineaActivaPulsante) {
             reglas.push(`
-                .monaco-editor .current-line {
+                .monaco-editor .current-line,
+                .monaco-editor .view-overlays .current-line {
                     animation: prigLineaActivaNeon 3s ease-in-out infinite !important;
                 }
             `);
@@ -834,7 +901,9 @@ class SintaxisManager {
                     'editor.background': '#00000000',
                     'editorGutter.background': '#00000000',
                     'editor.foreground': '#' + varHex,
-                    'editor.lineHighlightBackground': 'rgba(255,255,255,0.04)',
+                    // Monaco no soporta alpha completo en hex-8; usar #00000001 fuerza alpha casi cero
+                    'editor.lineHighlightBackground': '#00000001',
+                    'editor.lineHighlightBorder': '#00000001',
                     'editorLineNumber.foreground': '#585b70',
                     'editorLineNumber.activeForeground': '#' + varHex,
                     'editorIndentGuide.background': 'rgba(255,255,255,0.06)'

@@ -1,0 +1,428 @@
+{
+ "CAPAS": [
+  "global",
+  "modelo",
+  "uso",
+  "modelo_uso"
+ ],
+ "USOS": {
+  "tutor": "Tutor y chat",
+  "flujos": "Flujos de agentes",
+  "extraccion": "Extracción de libros",
+  "revision": "Revisión final",
+  "autocompletado": "Autocompletado de código",
+  "embeddings": "Embeddings (índice semántico)"
+ },
+ "OPCIONES": [
+  {
+   "clave": "temperature",
+   "grupo": "Muestreo",
+   "nombre": "Temperatura",
+   "tipo": "float",
+   "min": 0,
+   "max": 2,
+   "paso": 0.05,
+   "ayuda": "Creatividad frente a precisión. 0 es determinista; 0.2-0.4 para código; 0.7-1 para ideas.",
+   "prueba": "Con 0 la salida pasa a ser la más probable palabra a palabra."
+  },
+  {
+   "clave": "top_k",
+   "grupo": "Muestreo",
+   "nombre": "Top K",
+   "tipo": "int",
+   "min": 1,
+   "max": 200,
+   "paso": 1,
+   "ayuda": "Solo elige entre las K palabras más probables. Menos = más conservador.",
+   "prueba": "top_k 1 da la salida voraz, distinta de la normal."
+  },
+  {
+   "clave": "top_p",
+   "grupo": "Muestreo",
+   "nombre": "Top P",
+   "tipo": "float",
+   "min": 0.05,
+   "max": 1,
+   "paso": 0.05,
+   "ayuda": "Elige entre las palabras que suman esta probabilidad. 0.9-0.95 es lo habitual.",
+   "prueba": "top_p 0.2 cambia la salida con la misma semilla."
+  },
+  {
+   "clave": "min_p",
+   "grupo": "Muestreo",
+   "nombre": "Min P",
+   "tipo": "float",
+   "min": 0,
+   "max": 1,
+   "paso": 0.01,
+   "ayuda": "Descarta palabras con menos de esta fracción de la probabilidad de la mejor. Más estable que top_p con temperaturas altas; 0.05-0.1 es un buen valor.",
+   "prueba": "min_p 0.5 cambia la salida y es reproducible."
+  },
+  {
+   "clave": "seed",
+   "grupo": "Muestreo",
+   "nombre": "Semilla",
+   "tipo": "int",
+   "min": 0,
+   "max": 2147483647,
+   "paso": 1,
+   "ayuda": "Con la misma semilla y los mismos ajustes, la misma respuesta. Útil para comparar configuraciones.",
+   "prueba": "Misma semilla → misma salida; semilla 8 frente a 7 → salida distinta."
+  },
+  {
+   "clave": "repeat_penalty",
+   "grupo": "Repeticiones",
+   "nombre": "Penalización por repetir",
+   "tipo": "float",
+   "min": 0.5,
+   "max": 2.5,
+   "paso": 0.05,
+   "ayuda": "Castiga repetir palabras recientes. 1 es no castigar; 1.05-1.15 suele bastar.",
+   "prueba": "1.8 cambia la salida."
+  },
+  {
+   "clave": "repeat_last_n",
+   "grupo": "Repeticiones",
+   "nombre": "Ventana de repetición",
+   "tipo": "int",
+   "min": -1,
+   "max": 4096,
+   "paso": 16,
+   "ayuda": "Cuántos tokens hacia atrás mira la penalización. 0 la desactiva; -1 usa todo el contexto.",
+   "prueba": "Con 0 desaparece el efecto de repeat_penalty."
+  },
+  {
+   "clave": "presence_penalty",
+   "grupo": "Repeticiones",
+   "nombre": "Penalización por presencia",
+   "tipo": "float",
+   "min": -2,
+   "max": 2,
+   "paso": 0.1,
+   "ayuda": "Castiga cualquier palabra que ya salió, aunque sea una vez: empuja a hablar de cosas nuevas.",
+   "prueba": "1.8 cambia la salida."
+  },
+  {
+   "clave": "frequency_penalty",
+   "grupo": "Repeticiones",
+   "nombre": "Penalización por frecuencia",
+   "tipo": "float",
+   "min": -2,
+   "max": 2,
+   "paso": 0.1,
+   "ayuda": "Castiga más cuantas más veces salió una palabra.",
+   "prueba": "1.8 cambia la salida."
+  },
+  {
+   "clave": "num_predict",
+   "grupo": "Longitud",
+   "nombre": "Máximo de tokens de respuesta",
+   "tipo": "int",
+   "min": -1,
+   "max": 32768,
+   "paso": 64,
+   "ayuda": "Tope de la respuesta. -1 es sin límite. Si se alcanza, la respuesta queda cortada y se puede continuar.",
+   "prueba": "10 corta la respuesta a 10 tokens."
+  },
+  {
+   "clave": "stop",
+   "grupo": "Longitud",
+   "nombre": "Textos de parada",
+   "tipo": "lista",
+   "ayuda": "La respuesta se corta al generar cualquiera de estos textos.",
+   "prueba": "stop [\",\"] corta en la primera coma."
+  },
+  {
+   "clave": "num_ctx",
+   "grupo": "Contexto y memoria",
+   "nombre": "Contexto (tokens)",
+   "tipo": "int",
+   "min": 512,
+   "max": 262144,
+   "paso": 512,
+   "ayuda": "Cuánto texto cabe entre pregunta y respuesta. Cada token ocupa memoria: mira Recomendado antes de subirlo.",
+   "prueba": "El motor arranca con -c igual al valor (1024 → 8192 en /api/ps)."
+  },
+  {
+   "clave": "num_keep",
+   "grupo": "Contexto y memoria",
+   "nombre": "Tokens iniciales que se conservan",
+   "tipo": "int",
+   "min": -1,
+   "max": 8192,
+   "paso": 16,
+   "ayuda": "Si el contexto se llena, estos primeros tokens (instrucciones) no se descartan.",
+   "prueba": "Con contexto de 256 y el dato al principio: con 60 lo recuerda, con 0 lo olvida."
+  },
+  {
+   "clave": "num_batch",
+   "grupo": "Contexto y memoria",
+   "nombre": "Lote de lectura",
+   "tipo": "int",
+   "min": 16,
+   "max": 4096,
+   "paso": 16,
+   "ayuda": "Tokens del prompt que se procesan de golpe. Más = lectura más rápida y más memoria.",
+   "prueba": "Leyendo 1500 tokens: 5441 tok/s con 512 frente a 1767 tok/s con 16."
+  },
+  {
+   "clave": "num_gpu",
+   "grupo": "Contexto y memoria",
+   "nombre": "Capas en GPU",
+   "tipo": "int",
+   "min": -1,
+   "max": 256,
+   "paso": 1,
+   "ayuda": "-1 automático (recomendado). Medido: forzar más capas no acelera y puede quedarse sin memoria. 0 = todo en CPU.",
+   "prueba": "Con 0 la VRAM usada pasa de 1,1 GB a 0; el motor recibe -ngl."
+  },
+  {
+   "clave": "num_thread",
+   "grupo": "Contexto y memoria",
+   "nombre": "Hilos de CPU",
+   "tipo": "int",
+   "min": 0,
+   "max": 256,
+   "paso": 1,
+   "ayuda": "Hilos para la parte que va en CPU. 0 automático. Suele convenir el número de núcleos físicos.",
+   "prueba": "En CPU: 12,8 tok/s con 1 hilo, 21,2 tok/s con 8."
+  },
+  {
+   "clave": "use_mmap",
+   "grupo": "Contexto y memoria",
+   "nombre": "Leer pesos con mmap",
+   "tipo": "bool",
+   "ayuda": "Activado: los pesos se leen del disco según se necesitan (arranca rápido). Desactivado: se cargan enteros en RAM (útil con discos lentos o de red).",
+   "prueba": "Desactivado, el motor arranca con --load-mode none."
+  },
+  {
+   "clave": "main_gpu",
+   "grupo": "Contexto y memoria",
+   "nombre": "GPU principal",
+   "tipo": "int",
+   "min": 0,
+   "max": 16,
+   "paso": 1,
+   "requiere_gpus": 2,
+   "ayuda": "Con varias GPUs, cuál hace de principal.",
+   "prueba": "El motor recibe --main-gpu; en este equipo hay una sola GPU, así que solo se ofrece con dos o más."
+  }
+ ],
+ "CAMPOS": [
+  {
+   "clave": "keep_alive",
+   "grupo": "Carga",
+   "nombre": "Mantener cargado",
+   "tipo": "duracion",
+   "ayuda": "Cuánto sigue el modelo en memoria tras responder: 0 lo descarga al momento, -1 lo deja siempre. Ej.: 5m, 30m, 1h.",
+   "prueba": "El vencimiento en /api/ps sigue al valor pedido."
+  },
+  {
+   "clave": "think",
+   "grupo": "Razonamiento",
+   "nombre": "Pensar antes de responder",
+   "tipo": "bool",
+   "requiere": "thinking",
+   "ayuda": "Solo en modelos que razonan (Qwen3…). Mejora problemas y críticas; en pasos JSON estorba.",
+   "prueba": "Qwen3 30B: con true piensa ~830 caracteres; con false responde directo."
+  },
+  {
+   "clave": "system_extra",
+   "grupo": "Instrucciones",
+   "nombre": "Instrucciones adicionales",
+   "tipo": "texto",
+   "ayuda": "Se añaden a las instrucciones de sistema de cada tarea (no las sustituyen).",
+   "prueba": "Un system de pirata hace que responda 'Arr!'."
+  },
+  {
+   "clave": "truncate",
+   "grupo": "Contexto lleno",
+   "nombre": "Recortar si no cabe el prompt",
+   "tipo": "bool",
+   "ayuda": "Desactivado: si el prompt no cabe en el contexto, error claro en vez de recortarlo en silencio.",
+   "prueba": "Con false y 631 tokens en un contexto de 256: error 'exceeds the available context size'."
+  },
+  {
+   "clave": "shift",
+   "grupo": "Contexto lleno",
+   "nombre": "Desplazar el contexto al llenarse",
+   "tipo": "bool",
+   "ayuda": "Activado: al llenarse el contexto se descarta lo más antiguo y sigue generando. Desactivado: la respuesta se corta.",
+   "prueba": "Contexto 256: sin desplazar se corta a 211 tokens; desplazando llega a 292."
+  }
+ ],
+ "CAMPOS_PRUEBA": {
+  "format": "JSON o esquema JSON: la respuesta cumple la estructura (verificado: {\"animal\": \"Perro\", \"patas\": 4}).",
+  "system": "Instrucciones de sistema completas.",
+  "template": "Plantilla propia para esta petición (verificado: cambia la respuesta).",
+  "raw": "Sin plantilla: el texto va tal cual al modelo (verificado: continúa código).",
+  "suffix": "Texto después del cursor; el modelo rellena el medio (verificado en qwen2.5-coder).",
+  "logprobs": "Probabilidad de cada token y alternativas (verificado: 3 alternativas por token)."
+ },
+ "EXCLUIDAS": {
+  "typical_p": {
+   "tipo": "error",
+   "motivo": "Ollama responde 400: «typical_p is no longer supported»."
+  },
+  "mirostat": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, pero la salida es idéntica con mirostat 1 o 2 (misma semilla, caché caliente)."
+  },
+  "mirostat_tau": {
+   "tipo": "sin_efecto",
+   "motivo": "Sin efecto: con mirostat activo, cambiarlo no altera la salida."
+  },
+  "mirostat_eta": {
+   "tipo": "sin_efecto",
+   "motivo": "Sin efecto: con mirostat activo, cambiarlo no altera la salida."
+  },
+  "tfs_z": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, salida idéntica con 0.1 y sin él."
+  },
+  "penalize_newline": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, salida idéntica activado y desactivado."
+  },
+  "use_mlock": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, pero no llega al motor (no cambia sus argumentos)."
+  },
+  "numa": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor; además este equipo tiene un solo nodo NUMA."
+  },
+  "low_vram": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor ni cambia la memoria (1,105 GB igual)."
+  },
+  "f16_kv": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor. La precisión de la caché se controla con OLLAMA_KV_CACHE_TYPE."
+  },
+  "vocab_only": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor; el modelo responde igual."
+  },
+  "logits_all": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor."
+  },
+  "embedding_only": {
+   "tipo": "sin_efecto",
+   "motivo": "Aceptado, no llega al motor."
+  },
+  "think_niveles": {
+   "tipo": "sin_efecto",
+   "motivo": "think high/medium/low: aceptado por Qwen3, pero piensa lo mismo (823/811/811 caracteres). Ningún modelo instalado usa niveles."
+  },
+  "images": {
+   "tipo": "no_verificable",
+   "motivo": "No hay ningún modelo con visión instalado; con uno sin visión Ollama da 400."
+  }
+ },
+ "EXCLUIDAS_SERVIDOR": {
+  "OLLAMA_GPU_OVERHEAD": {
+   "tipo": "sin_efecto",
+   "motivo": "Con 2,5 GB y con 1,5 GB reservados, el 7B y el 14B ocuparon exactamente la misma VRAM (4,75 y 4,84 GB)."
+  },
+  "LLAMA_ARG_FIT=off": {
+   "tipo": "error",
+   "motivo": "Desactiva el reparto automático y el 14B no llega a cargar: «cudaMalloc failed: out of memory»."
+  },
+  "OLLAMA_MAX_QUEUE": {
+   "tipo": "sin_efecto",
+   "motivo": "Con cola 1 y 8 peticiones largas simultáneas, las 8 respondieron 200 (ninguna rechazada)."
+  },
+  "OLLAMA_NOPRUNE": {
+   "tipo": "sin_efecto",
+   "motivo": "Un archivo huérfano en la carpeta de modelos no se borró ni con ni sin la variable."
+  },
+  "OLLAMA_SCHED_SPREAD": {
+   "tipo": "no_verificable",
+   "motivo": "Reparte entre varias GPUs y este equipo tiene una."
+  },
+  "OLLAMA_MAX_TRANSFER_STREAMS": {
+   "tipo": "no_verificable",
+   "motivo": "Solo afecta a descargas de modelos safetensors; no había ninguna que probar."
+  }
+ },
+ "EXCLUIDAS_GESTION": {
+  "cuantizar al crear": {
+   "tipo": "error",
+   "motivo": "«create-time quantization is only supported for safetensors imports»: con modelos GGUF no funciona."
+  },
+  "plantilla al crear variante": {
+   "tipo": "sin_efecto",
+   "motivo": "Se acepta, pero la variante conserva la plantilla del modelo base."
+  },
+  "adaptador LoRA (ADAPTER)": {
+   "tipo": "no_verificable",
+   "motivo": "No hay ningún adaptador LoRA en el equipo con el que probarlo."
+  },
+  "visión (imágenes)": {
+   "tipo": "no_verificable",
+   "motivo": "No hay modelos con visión instalados; con uno sin visión Ollama responde 400."
+  },
+  "publicar modelos (push)": {
+   "tipo": "no_verificable",
+   "motivo": "Requiere una cuenta de ollama.com con la sesión iniciada."
+  },
+  "iniciar / cerrar sesión (signin)": {
+   "tipo": "no_verificable",
+   "motivo": "Abre ollama.com en el navegador y necesita tu cuenta."
+  },
+  "modelos en la nube (:cloud)": {
+   "tipo": "no_verificable",
+   "motivo": "Sin sesión el servidor responde 401 Unauthorized. Sí se incluye bloquearlos (OLLAMA_NO_CLOUD)."
+  },
+  "búsqueda web de Ollama": {
+   "tipo": "no_verificable",
+   "motivo": "Requiere cuenta o clave de API de ollama.com."
+  },
+  "ollama launch (integraciones)": {
+   "tipo": "no_verificable",
+   "motivo": "Lanza integraciones externas; no tiene uso dentro de Prig."
+  }
+ },
+ "PLANTILLAS": {
+  "recomendado": {
+   "nombre": "Recomendado por el modelo",
+   "valores": {},
+   "ayuda": "No fija nada: se usan los valores que trae el modelo."
+  },
+  "codigo": {
+   "nombre": "Código / preciso",
+   "valores": {
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "min_p": 0.05,
+    "repeat_penalty": 1.05
+   }
+  },
+  "equilibrado": {
+   "nombre": "Equilibrado",
+   "valores": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "min_p": 0.05
+   }
+  },
+  "creativo": {
+   "nombre": "Creativo",
+   "valores": {
+    "temperature": 1.0,
+    "top_p": 0.98,
+    "min_p": 0.05,
+    "presence_penalty": 0.3
+   }
+  },
+  "determinista": {
+   "nombre": "Determinista",
+   "valores": {
+    "temperature": 0.0,
+    "seed": 42
+   }
+  }
+ }
+}

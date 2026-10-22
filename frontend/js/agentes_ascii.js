@@ -825,19 +825,18 @@
             const w = canvasW || (ctx.canvas ? ctx.canvas.width : window.innerWidth);
             const h = canvasH || (ctx.canvas ? ctx.canvas.height : window.innerHeight);
 
-            // 1. DIBUJAR FLUJO GRÁFICO ANIMADO CON CONECTORES SPLINE Y NODOS FLOTANTES EN EL CÓDIGO
-            this._dibujarFlujoGraficoEnCodigo(ctx, w, h);
+            // Deshabilitar razonamiento del modelo por detrás del código.
+            // Es suficiente con el botón de razonamiento en la barra del editor para que el usuario observe.
+            // this._dibujarFlujoGraficoEnCodigo(ctx, w, h);
 
-            // 2. DIBUJAR ECOSISTEMA DE DRONES SATÉLITES ORBITALES
+            // 1. DIBUJAR ECOSISTEMA DE DRONES SATÉLITES ORBITALES (Animación ambiental)
             this._dibujarDronesSatelite(ctx, w, h);
 
-            // 3. DIBUJAR HAZ TELEMÉTRICO Y RETÍCULA DE RELACIÓN VISUAL CON EL CÓDIGO
-            this._dibujarHazInspeccion(ctx, w, h);
+            // Deshabilitado: sin haz telemétrico ni panel de diálogo en el fondo del código
+            // this._dibujarHazInspeccion(ctx, w, h);
+            // this._dibujarPanelEvaluacionFijo(ctx, w, h);
 
-            // 4. DIBUJAR CUADRO DE DIÁLOGO VERTICAL AMPLIADO CON TIMELINE PLAYER
-            this._dibujarPanelEvaluacionFijo(ctx, w, h);
-
-            // 5. DIBUJAR EL PERSONAJE ASCII EN SU POSICIÓN DE NAVEGACIÓN (CON ESCALA DINÁMICA)
+            // 2. DIBUJAR EL PERSONAJE ASCII EN SU POSICIÓN DE NAVEGACIÓN (CON ESCALA DINÁMICA)
             const lineas = window.BIBLIOTECA_ASCII.obtener(this.catArte, this.arteId);
             if (!lineas) return;
 
@@ -1640,7 +1639,7 @@
             this.endpointLLM = 'http://localhost:11434';
             this.intervaloDecisionMs = 12000;
             this.ultimoTrigger = 0;
-            this.habilitado = true;
+            this.habilitado = false; // Deshabilitado: el razonamiento no corre en el fondo detrás del código
             this.consultando = false;
             this.historialReciente = [];
 

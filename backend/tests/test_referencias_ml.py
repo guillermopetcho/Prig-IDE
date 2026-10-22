@@ -6,11 +6,9 @@ sustituyen, así los tests no tocan la biblioteca del usuario.
 """
 
 import os
-import re
 import sys
 import tempfile
 import unittest
-from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -124,69 +122,14 @@ class PruebaEndpoints(unittest.TestCase):
         cls.app = main_app
         cls.client = TestClient(main_app.app)
 
-    def test_listar_y_detalle(self):
-        r = self.client.get("/api/referencias", params={"tipo": "libro"}).json()
-        self.assertTrue(r["referencias"] and all(x["tipo"] == "libro" for x in r["referencias"]))
-        self.assertNotIn("resumen_original", r["referencias"][0])
-        d = self.client.get("/api/referencias/detalle", params={"id": "arxiv_1706_03762"}).json()
-        self.assertEqual(d["titulo"], "Attention Is All You Need")
-        self.assertTrue(d["tiene_pdf"] and d["resumen_original"])
-        self.assertEqual(self.client.get("/api/referencias/detalle", params={"id": "no-existe"}).status_code, 404)
-
-    def test_pdf_solo_desde_el_catalogo(self):
-        pedidas = []
-
-        def falso(url):
-            pedidas.append(url)
-            return b"%PDF-1.4 prueba"
-        with mock.patch.object(self.app, "_descargar_pdf", falso):
-            r = self.client.get("/api/referencias/pdf", params={"id": "arxiv_1706_03762"})
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.headers["content-type"], "application/pdf")
-        self.assertEqual(pedidas, ["https://arxiv.org/pdf/1706.03762"])
-        # una página web sin PDF directo no se descarga
-        sin_pdf = next(x for x in rm.cargar()["referencias"] if not x.get("url_pdf") and not x["url"].endswith(".pdf"))
-        self.assertEqual(self.client.get("/api/referencias/pdf", params={"id": sin_pdf["id"]}).status_code, 404)
-
-    def test_abrir_en_navegador(self):
-        with mock.patch.object(self.app, "_lanzar_navegador_sistema", return_value=True) as lanzar:
-            r = self.client.post("/api/referencias/abrir", json={"id": "arxiv_1412_6980"}).json()
-        lanzar.assert_called_once_with("https://arxiv.org/abs/1412.6980")
-        self.assertTrue(r["ok"])
-
-    def test_guardar_en_biblioteca_e_indexar(self):
-        importados = []
-
-        def importar(ruta, categoria):
-            with open(ruta, "rb") as f:
-                importados.append((os.path.basename(ruta), categoria, f.read(5)))
-            return {"path": "/tmp/x.pdf", "category": categoria.upper(), "filename": os.path.basename(ruta)}
-        with mock.patch.object(self.app, "_descargar_pdf", return_value=b"%PDF-1.4 x"), \
-                mock.patch.object(self.app.book_service, "import_file", importar), \
-                mock.patch.object(self.app.knowledge_service, "index_single", return_value={"status": "INGESTED", "chunks_count": 7}):
-            r = self.client.post("/api/referencias/guardar", json={"id": "arxiv_1706_03762"}).json()
-        nombre, categoria, cabecera = importados[0]
-        self.assertEqual(categoria, "papers")
-        self.assertEqual(cabecera, b"%PDF-")
-        self.assertTrue(nombre.startswith("Vaswani et al 2017 - Attention Is All You Need") and nombre.endswith(".pdf"))
-        self.assertTrue(r["indexed"])
-        self.assertEqual(r["chunks_count"], 7)
-
-    def test_relacionadas_endpoint(self):
-        r = self.client.get("/api/referencias/relacionadas", params={"q": "explica XGBoost"}).json()["referencias"]
-        self.assertIn("XGBoost: A Scalable Tree Boosting System", [x["titulo"] for x in r])
-        self.assertTrue(all(set(x) >= {"id", "titulo", "url", "cita", "tipo"} for x in r))
+    # Guardar el PDF de una referencia en la biblioteca: servidor de Rust (routes/referencias.rs, con su prueba)
 
     def test_chats_de_las_secciones_reciben_las_referencias(self):
         prompt, refs = self.app._con_referencias("resumen de random forest", "PREGUNTA")
         self.assertTrue(prompt.endswith("PREGUNTA") and "REFERENCIAS DE LA BIBLIOTECA" in prompt and refs)
         self.assertEqual(self.app._con_referencias("hola", "PREGUNTA"), ("PREGUNTA", []))
-        mensajes = [{"role": "user", "content": "¿qué es XGBoost?"}, {"role": "assistant", "content": "…"},
-                    {"role": "user", "content": "resume el paper de XGBoost"}]
-        nuevos = self.app._mensajes_con_referencias(mensajes)
-        self.assertIn("arxiv.org/abs/1603.02754", nuevos[-1]["content"])
-        self.assertEqual(nuevos[0]["content"], "¿qué es XGBoost?")      # solo el último mensaje del alumno
-        self.assertEqual(mensajes[-1]["content"], "resume el paper de XGBoost")  # la original no se toca
+        # las referencias delante del último mensaje del alumno (`_mensajes_con_referencias`) están en Rust:
+        # routes/profesor.rs
 
 
 if __name__ == "__main__":

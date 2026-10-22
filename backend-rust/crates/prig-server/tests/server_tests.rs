@@ -251,11 +251,10 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
 
     // Antes 405: Rust tenía la ruta con otro método y no la pasaba a Python
     for (metodo, uri) in [
-        ("POST", "/api/descargas"),
-        ("POST", "/api/flags"),
-        ("DELETE", "/api/modelos/parciales"),
-        ("POST", "/api/recursos/servidor"),
-        ("POST", "/api/workspace/open"),
+        ("POST", "/api/banco/activar"),
+        ("POST", "/api/banco/analizar"),
+        ("POST", "/api/interno/cancelar"),
+        ("POST", "/api/app/shutdown"),
         ("POST", "/api/workspace"),
         ("POST", "/api/ai/chat"),
     ] {
@@ -267,14 +266,14 @@ async fn test_proxy_reenvia_lo_que_no_atiende_rust() {
     }
     // Consulta, Origin y cabeceras repetidas; las de CORS de Python no se reenvían
     let req = Request::builder()
-        .uri("/api/ai/config?a=1&b=dos")
+        .uri("/api/banco/buscar?a=1&b=dos")
         .header(header::ORIGIN, "http://127.0.0.1:8000")
         .body(Body::empty())
         .unwrap();
     let (estado, cab, cuerpo) = pedir(&app, req).await;
     assert_eq!(estado, StatusCode::OK);
     let v: Value = serde_json::from_slice(&cuerpo).unwrap();
-    assert_eq!(v["uri"], "/api/ai/config?a=1&b=dos");
+    assert_eq!(v["uri"], "/api/banco/buscar?a=1&b=dos");
     assert_eq!(v["origen"], "http://127.0.0.1:8000");
     assert_eq!(cab.get_all(header::SET_COOKIE).iter().count(), 2);
     assert_eq!(cab.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "http://127.0.0.1:8000", "solo la de Rust");
@@ -285,7 +284,7 @@ async fn test_proxy_sin_python() {
     let p = prueba("caido");
     let puerto = puerto_libre().await;
     let (app, _) = app(&p, &format!("http://127.0.0.1:{puerto}"), Duration::ZERO);
-    let (estado, v) = json_de(&app, get("/api/inicio")).await;
+    let (estado, v) = json_de(&app, get("/api/banco/buscar")).await;
     assert_eq!(estado, StatusCode::BAD_GATEWAY);
     assert_eq!(v["ok"], false);
     assert!(v["detail"].as_str().unwrap().contains("Python"));
@@ -305,7 +304,7 @@ async fn test_proxy_espera_a_que_python_arranque() {
         python_falso_en(listener).await;
     });
     let inicio = std::time::Instant::now();
-    let (estado, v) = json_de(&app, get("/api/inicio")).await;
+    let (estado, v) = json_de(&app, get("/api/banco/buscar")).await;
     assert_eq!(estado, StatusCode::OK);
     assert_eq!(v["python"], true);
     assert!(inicio.elapsed() >= Duration::from_millis(500));
@@ -319,7 +318,7 @@ async fn test_websocket_pasa_a_python() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let direccion = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{direccion}/ws/audio_reactivo")).await.unwrap();
+    let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{direccion}/ws/eco")).await.unwrap();
     ws.send(tokio_tungstenite::tungstenite::Message::Text("hola".into())).await.unwrap();
     let respuesta = tokio::time::timeout(Duration::from_secs(5), ws.next()).await.unwrap().unwrap().unwrap();
     assert_eq!(respuesta.into_text().unwrap(), "python:hola");
@@ -360,7 +359,7 @@ async fn test_proxy_espera_si_python_se_reinicia() {
     let (app, _) = app(&p, &format!("http://127.0.0.1:{puerto}"), Duration::from_secs(10));
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", puerto)).await.unwrap();
     let python = tokio::spawn(python_falso_en(listener));
-    let (estado, _) = json_de(&app, get("/api/inicio")).await;
+    let (estado, _) = json_de(&app, get("/api/banco/buscar")).await;
     assert_eq!(estado, StatusCode::OK);
     // «Python» se cae (la conexión del pool queda apuntando a nadie) y vuelve medio segundo después
     python.abort();
@@ -370,7 +369,7 @@ async fn test_proxy_espera_si_python_se_reinicia() {
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", puerto)).await.unwrap();
         python_falso_en(listener).await;
     });
-    let (estado, v) = json_de(&app, get("/api/inicio")).await;
+    let (estado, v) = json_de(&app, get("/api/banco/buscar")).await;
     assert_eq!(estado, StatusCode::OK, "{v}");
     assert_eq!(v["python"], true);
 }

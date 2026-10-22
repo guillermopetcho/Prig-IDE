@@ -27,7 +27,7 @@ class WorkAreaManager {
 
     get FIJAS() {
         return {
-            editor:   { titulo: 'Editor',   icono: 'fa-code',          fija: true },
+            editor:   { titulo: 'Editor',   icono: 'fa-code',          fija: false },
             cuaderno: { titulo: 'Cuaderno',  icono: 'fa-book-bookmark' },
             consola:  { titulo: 'Consola',   icono: 'fa-terminal' },
             buscar:   { titulo: 'Buscar',    icono: 'fa-magnifying-glass' },
@@ -245,7 +245,8 @@ class WorkAreaManager {
 
     cerrar(id) {
         const vista = this.vistas.find(v => v.id === id);
-        if (!vista || vista.fija) return;
+        if (!vista) return;
+        if (vista.fija && id !== 'editor') return;
 
         if (vista.tipo === 'herramienta') this._devolverHerramienta(vista);
 
@@ -255,14 +256,33 @@ class WorkAreaManager {
         if (this.paneles.izq.vistas.includes(id)) {
             this.paneles.izq.vistas = this.paneles.izq.vistas.filter(x => x !== id);
             if (this.paneles.izq.activa === id) {
-                this.paneles.izq.activa = this.paneles.izq.vistas[0] || 'editor';
-                if (!this.paneles.izq.vistas.includes('editor')) {
-                    this.paneles.izq.vistas.unshift('editor');
+                if (this.paneles.izq.vistas.length > 0) {
+                    this.paneles.izq.activa = this.paneles.izq.vistas[0];
+                } else {
+                    this.paneles.izq.activa = null;
                 }
             }
         }
 
-        this.activar(this.paneles.izq.activa || 'editor', 'izq');
+        // Si se cerró la vista del editor, ocultar explícitamente su contenedor visual
+        if (id === 'editor') {
+            const vistaEditor = document.getElementById('vista-editor');
+            if (vistaEditor) {
+                vistaEditor.hidden = true;
+                vistaEditor.style.display = 'none';
+            }
+        }
+
+        if (this.paneles.izq.activa) {
+            this.activar(this.paneles.izq.activa, 'izq');
+        } else {
+            // Si ya no queda ninguna pestaña en el panel, abrir Inicio amigablemente
+            if (window.Inicio && typeof window.Inicio.abrir === 'function') {
+                window.Inicio.abrir();
+            } else {
+                this.pintar();
+            }
+        }
     }
 
     // ------------------------------------------------------------------

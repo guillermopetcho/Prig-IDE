@@ -91,6 +91,8 @@ pub struct FileContentResponse {
 pub struct FileManager {
     pub base_dir: PathBuf,
     pub extra_allowed_roots: Vec<PathBuf>,
+    /// La segunda carpeta del explorador (para copiar código de una a otra): también se puede leer y editar
+    pub segunda_dir: Option<PathBuf>,
 }
 
 impl FileManager {
@@ -98,12 +100,15 @@ impl FileManager {
         let mut extra = Vec::new();
         if let Ok(home) = std::env::var("HOME") {
             extra.push(PathBuf::from(&home).join(".prig_books"));
-            extra.push(PathBuf::from(&home).join(".prig_hub").join("propios"));
+            // ruta_base() de hub/servicio.py: PRIG_HUB_DIR o ~/.prig_hub
+            let hub = std::env::var("PRIG_HUB_DIR").ok().filter(|h| !h.is_empty()).map(PathBuf::from);
+            extra.push(hub.unwrap_or_else(|| PathBuf::from(&home).join(".prig_hub")).join("propios"));
         }
 
         Self {
             base_dir: normalizar(&base_dir),
             extra_allowed_roots: extra.iter().map(|r| normalizar(r)).collect(),
+            segunda_dir: None,
         }
     }
 
@@ -122,10 +127,18 @@ impl FileManager {
         Ok(abs)
     }
 
+    /// Fija (o quita, con `None`) la segunda carpeta; una que no es un directorio se ignora
+    pub fn set_segunda_dir(&mut self, path: Option<&Path>) {
+        self.segunda_dir = path.map(normalizar).filter(|p| p.is_dir());
+    }
+
     pub fn allowed_roots(&self) -> Vec<PathBuf> {
         let mut roots = vec![self.base_dir.clone()];
         for extra in &self.extra_allowed_roots {
             roots.push(extra.clone());
+        }
+        if let Some(segunda) = &self.segunda_dir {
+            roots.push(segunda.clone());
         }
         roots
     }
@@ -332,7 +345,7 @@ impl FileManager {
                                     serde_json::Value::String(s) => s.clone(),
                                     _ => String::new(),
                                 };
-                                let clean_b64 = b64_str.replace('\n', "").replace('\r', "").trim().to_string();
+                                let clean_b64 = b64_str.replace(['\n', '\r'], "").trim().to_string();
                                 let data_uri = format!("data:{};base64,{}", mime_type, clean_b64);
                                 source_str = source_str.replace(&format!("attachment:{}", attach_name), &data_uri);
                             }
@@ -489,7 +502,7 @@ impl FileManager {
         if abs_path == self.base_dir {
             return Err(FsError::CannotDeleteRoot);
         }
-        for root in &self.extra_allowed_roots {
+        for root in self.extra_allowed_roots.iter().chain(self.segunda_dir.iter()) {
             if &abs_path == root {
                 return Err(FsError::CannotDeleteRoot);
             }

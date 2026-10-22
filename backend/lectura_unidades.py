@@ -245,9 +245,9 @@ class LectorUnidades:
         # Lo que hizo el motor con el prefijo (leerlo o restaurarlo): en respuestas con varias rondas de
         # herramientas no llega en las estadísticas finales, así que se toma del motor
         motor = self.ai.motor_moe()
-        proyecto = dict(getattr(motor, "ultimo_proyecto", None) or stats.get("proyecto") or {})
-        if getattr(motor, "ultimo_proyecto", None):
-            motor.ultimo_proyecto = {}          # la próxima conversación informa lo suyo
+        # (se olvida al tomarlo: la próxima conversación informa lo suyo)
+        tomado = motor.tomar_ultimo_proyecto()
+        proyecto = dict(tomado or stats.get("proyecto") or {})
         return {"texto": salida, "segundos": round(time.time() - t0, 2), "herramientas": usadas, "avisos": avisos,
                 "lectura": proyecto.get("origen") or "en memoria", "lectura_s": proyecto.get("segundos"),
                 "tokens_unidad": proyecto.get("tokens"), "clave": proyecto.get("clave"),

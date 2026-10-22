@@ -1,0 +1,19 @@
+[package]
+name = "prig-plataforma"
+version = "0.1.0"
+edition = "2021"
+
+# La plataforma de Prig: banderas, perfiles de configuración, archivos, IDE, explorador, ejecución, kernel e inicio
+# (F2 de docs/plan-prig-rust.md). Rust puro: lo usa el backend de Python por PyO3 (prig-nativo-py) y, después, el
+# servidor en Rust.
+
+[dependencies]
+prig-recursos = { path = "../prig-recursos" }
+libc = "0.2"
+# Las expresiones regulares de la búsqueda del IDE (con lo que tiene `re` de Python: lookbehind, referencias)
+fancy-regex = "0.19"
+# `\w` como lo entiende el motor (para los bordes de «palabra completa» sin mirar atrás)
+regex-syntax = "0.8"
+# El motor rápido para los patrones que no necesitan mirar atrás ni referencias (fancy-regex hace todo `\b` con
+# retroceso)
+regex = "1"

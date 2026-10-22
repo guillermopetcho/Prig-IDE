@@ -94,6 +94,10 @@ impl MundoPython<'_, '_> {
 }
 
 impl MundoSuave for MundoPython<'_, '_> {
+    fn bloquear<'a>(&mut self, ritmo: &'a Mutex<prig_recursos::ritmo::Ritmo>) -> std::sync::MutexGuard<'a, prig_recursos::ritmo::Ritmo> {
+        crate::gil::bloquear(ritmo)
+    }
+
     fn leer_estado(&mut self) -> Option<EstadoMotor> {
         match self.fachada.call_method0("_leer_estado").and_then(|e| estado_de(&e)) {
             Ok(e) => e,
@@ -158,7 +162,7 @@ impl ControladorPy {
         let ritmo = fachada.getattr("ritmo")?;
         let ritmo = ritmo.cast::<RitmoPy>()?;
         let mut mundo = MundoPython { py, fachada, error: None };
-        let r = self.inner.lock().unwrap_or_else(|e| e.into_inner()).paso(&ritmo.get().inner, &mut mundo);
+        let r = crate::gil::bloquear(&self.inner).paso(&ritmo.get().inner, &mut mundo);
         if let Some(e) = mundo.error {
             return Err(e);
         }
@@ -167,18 +171,18 @@ impl ControladorPy {
 
     #[getter]
     fn temp_media<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let t = self.inner.lock().unwrap_or_else(|e| e.into_inner()).temp_media.clone();
+        let t = crate::gil::bloquear(&self.inner).temp_media.clone();
         a_python(py, &t.unwrap_or(Valor::Nulo))
     }
 
     #[getter]
     fn fraccion(&self) -> Option<f64> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).fraccion
+        crate::gil::bloquear(&self.inner).fraccion
     }
 
     #[getter]
     fn ultimo<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let u = self.inner.lock().unwrap_or_else(|e| e.into_inner()).ultimo.clone();
+        let u = crate::gil::bloquear(&self.inner).ultimo.clone();
         mapa_a_python(py, &u)
     }
 }

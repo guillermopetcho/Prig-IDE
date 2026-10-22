@@ -14,6 +14,8 @@ La carpeta se puede cambiar con PRIG_DESAFIOS_DIR (las pruebas la aíslan así).
 import json
 import os
 import re
+import contextlib
+import fcntl
 import threading
 import uuid
 from datetime import datetime
@@ -58,15 +60,36 @@ class Almacen:
         self.dir = os.path.join(self.base, "desafios")
         # La carpeta se crea al guardar el primer desafío: importar la app no debe tocar el disco
         self._cerrojo = threading.RLock()
+        self._profundidad = 0
 
     def _ruta(self, id_: str) -> str:
         if not ID_VALIDO.match(id_ or ""):
             raise ErrorDesafio("Desafío desconocido")
         return os.path.join(self.dir, f"{id_}.json")
 
+    @contextlib.contextmanager
+    def _bloqueo(self):
+        """ Entre hilos (RLock) y entre procesos: el servidor de Rust también escribe desafíos (guardar páginas,
+        rendirse...), así que leer-cambiar-guardar va con un flock sobre `<base>/.cerrojo_desafios`. Solo el nivel
+        de fuera lo toma: un segundo flock del mismo proceso sobre otro descriptor se esperaría a sí mismo. """
+        with self._cerrojo:
+            fd = None
+            if self._profundidad == 0:
+                os.makedirs(self.base, exist_ok=True)
+                fd = os.open(os.path.join(self.base, ".cerrojo_desafios"), os.O_RDWR | os.O_CREAT, 0o600)
+                fcntl.flock(fd, fcntl.LOCK_EX)
+            self._profundidad += 1
+            try:
+                yield
+            finally:
+                self._profundidad -= 1
+                if fd is not None:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                    os.close(fd)
+
     # ------------------------------------------------------------ lectura y escritura
     def guardar(self, d: Dict[str, Any]) -> Dict[str, Any]:
-        with self._cerrojo:
+        with self._bloqueo():
             d.setdefault("id", nuevo_id())
             d.setdefault("creado", ahora())
             d.setdefault("progreso", progreso_inicial())
@@ -90,7 +113,7 @@ class Almacen:
             raise ErrorDesafio("El archivo del desafío está dañado.")
 
     def borrar(self, id_: str) -> bool:
-        with self._cerrojo:
+        with self._bloqueo():
             try:
                 os.remove(self._ruta(id_))
                 return True
@@ -99,35 +122,16 @@ class Almacen:
 
     def modificar(self, id_: str, cambio) -> Dict[str, Any]:
         """ Leer, aplicar `cambio(d)` y guardar, sin que otra petición se cuele en medio """
-        with self._cerrojo:
+        with self._bloqueo():
             d = self.obtener(id_)
             cambio(d)
             return self.guardar(d)
 
     def lista(self) -> List[Dict[str, Any]]:
-        salida = []
-        if not os.path.isdir(self.dir):
-            return salida
-        for nombre in os.listdir(self.dir):
-            if not nombre.endswith(".json"):
-                continue
-            try:
-                with open(os.path.join(self.dir, nombre), encoding="utf-8") as f:
-                    d = json.load(f)
-            except (OSError, ValueError):
-                continue
-            p = d.get("progreso") or {}
-            salida.append({
-                "id": d.get("id"), "titulo": d.get("titulo"), "nivel": d.get("nivel"),
-                "conceptos": d.get("conceptos") or [],
-                # El origen entero (ruta, bloque, modelo…) lo necesita el historial del perfil
-                "origen": {k: v for k, v in (d.get("origen") or {}).items() if k != "tema"},
-                "verificable": (d.get("comprobacion") or {}).get("tipo") != "ninguna",
-                "estado": p.get("estado", "nuevo"), "intentos": p.get("intentos", 0), "pistas": p.get("pistas", 0),
-                "mejor": p.get("mejor"), "creado": d.get("creado"), "actualizado": d.get("actualizado"),
-                "progreso": {k: v for k, v in p.items() if k != "historial"},
-            })
-        return sorted(salida, key=lambda x: x.get("actualizado") or "", reverse=True)
+        """ El resumen de cada desafío, de más a menos reciente. En Rust (prig_nativo.desafios: lee y analiza los
+        JSON en paralelo, con el mismo resultado; un archivo dañado se salta) """
+        from nativo_rust import rust
+        return rust().desafios.lista(self.dir)
 
     def _podar(self):
         archivos = [os.path.join(self.dir, n) for n in os.listdir(self.dir) if n.endswith(".json")]

@@ -35,6 +35,9 @@ pub struct AppState {
     pub config_visto: Arc<Mutex<Option<SystemTime>>>,
     pub respaldo: Arc<Mutex<EstadoRespaldo>>,
     pub plazo_respaldo: Duration,
+    /// Las ejecuciones de código que atiende este servidor (los desafíos): el mismo ejecutor que usa `runner.py`,
+    /// con el Python de Prig como herramienta
+    pub ejecutor: Arc<prig_plataforma::ejecucion::Ejecutor>,
 }
 
 impl AppState {
@@ -59,6 +62,11 @@ impl AppState {
             .build()
             .unwrap_or_default();
 
+        let python = {
+            let venv = base_dir.join(".venv/bin/python");
+            if venv.exists() { venv.to_string_lossy().into_owned() } else { "python3".to_string() }
+        };
+        let ejecutor = Arc::new(prig_plataforma::ejecucion::Ejecutor::new(25, python));
         let initial_ws = crate::routes::workspace::load_last_workspace(&config_path, &base_dir);
         let file_mgr = Arc::new(RwLock::new(FileManager::new(initial_ws)));
 
@@ -73,6 +81,7 @@ impl AppState {
             file_mgr,
             config_path,
             config_visto: Arc::new(Mutex::new(None)),
+            ejecutor,
             respaldo: Arc::new(Mutex::new(EstadoRespaldo::default())),
             plazo_respaldo: PLAZO_RESPALDO,
         }

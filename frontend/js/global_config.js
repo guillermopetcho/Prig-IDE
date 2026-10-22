@@ -2487,6 +2487,21 @@ class GlobalConfigManager {
                   <option value="amplia" ${est.densidad === 'amplia' ? 'selected' : ''}>Amplia (más espacio táctil/visual)</option>
                 </select>
               </div>
+
+              <div style="grid-column: 1 / -1; padding: 10px 14px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="font-weight: 600; color: #fff; font-size: 11.5px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-ghost" style="color: var(--accent-purple);"></i> Transparencia del Fondo del Editor de Código:
+                  </label>
+                  <span id="ap-editor-transparencia-val" style="font-size: 12px; font-weight: 700; color: var(--accent-purple);">${window.editorMgr && typeof window.editorMgr.obtenerNivelTransparencia === 'function' ? window.editorMgr.obtenerNivelTransparencia() : (localStorage.getItem('prig_editor_transparencia') || 0)}%</span>
+                </div>
+                <input type="range" id="ap-slider-editor-transparencia" min="0" max="100" step="1" value="${window.editorMgr && typeof window.editorMgr.obtenerNivelTransparencia === 'function' ? window.editorMgr.obtenerNivelTransparencia() : (localStorage.getItem('prig_editor_transparencia') || 0)}" style="width: 100%; accent-color: var(--accent-purple); cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                  <span>0% (Sólido / Opaco)</span>
+                  <span>50% (Traslúcido suave)</span>
+                  <span>100% (Completamente Transparente)</span>
+                </div>
+              </div>
             </div>
 
             <!-- Respaldo, Exportación e Importación de Temas -->
@@ -2539,6 +2554,18 @@ class GlobalConfigManager {
         if (selDens) {
             selDens.onchange = () => {
                 ap.set('densidad', selDens.value);
+            };
+        }
+
+        const sliderTrans = document.getElementById('ap-slider-editor-transparencia');
+        const lblTrans = document.getElementById('ap-editor-transparencia-val');
+        if (sliderTrans) {
+            sliderTrans.oninput = (e) => {
+                const val = parseInt(e.target.value, 10) || 0;
+                if (lblTrans) lblTrans.textContent = `${val}%`;
+                if (window.editorMgr && typeof window.editorMgr.establecerNivelTransparencia === 'function') {
+                    window.editorMgr.establecerNivelTransparencia(val);
+                }
             };
         }
 
